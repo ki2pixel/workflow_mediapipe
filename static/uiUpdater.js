@@ -5,9 +5,14 @@ import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
 
 const lastProgressTextByStep = {};
 
+const _lastAutoCenterTsByStep = {};
+const _AUTO_CENTER_THROTTLE_MS = 700;
+
 import { soundEvents } from './soundManager.js';
 import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
 import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
+
+let _stepDetailsPanelModulePromise = null;
 
 const STATUS_UI_MAP = {
     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
@@ -481,6 +486,21 @@ export function updateStepCardUI(stepKey, data) {
             const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
             progressTextEl.textContent = subText;
 
+            const shouldAutoCenter = state.getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
+            if (shouldAutoCenter) {
+                const logsOpenNow = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
+                if (!logsOpenNow) {
+                    const now = performance.now();
+                    const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
+                    if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
+                        _lastAutoCenterTsByStep[stepKey] = now;
+                        requestAnimationFrame(() => {
+                            scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
+                        });
+                    }
+                }
+            }
+
             if (candidateText && ['running','starting','initiated'].includes(data.status)) {
                 progressTextEl.setAttribute('data-processing', 'true');
             } else {
@@ -592,6 +612,21 @@ progressContainer.style.display = 'block';
                 dom.workflowWrapper.removeAttribute('data-active-step');
             }
         }
+
+        try {
+            if (!_stepDetailsPanelModulePromise) {
+                _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
+            }
+            _stepDetailsPanelModulePromise
+                .then((mod) => {
+                    if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
+                        mod.refreshStepDetailsPanelIfOpen(stepKey);
+                    }
+                })
+                .catch((e) => {
+                    console.debug('[UI] Step details module not available:', e);
+                });
+        } catch (_) {}
     } catch (_) {}
 
         console.groupEnd();
@@ -605,6 +640,7 @@ export function updateCustomSequenceButtonsUI() {
 }
 
 export function updateGlobalProgressUI(text, percentage, isError = false) {
+    if(dom.globalProgressAffix) dom.globalProgressAffix.style.display = 'flex';
     if(dom.globalProgressContainer) dom.globalProgressContainer.style.display = 'block';
     if(dom.globalProgressText) {
         dom.globalProgressText.style.display = 'block';

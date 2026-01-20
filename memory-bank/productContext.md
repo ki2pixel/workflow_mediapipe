@@ -46,6 +46,7 @@ Le frontend offre une interface interactive pour :
 -   Monitorer en temps réel l'état du système (CPU, RAM, GPU).
 -   Visualiser les logs en direct.
 -   Configurer et suivre le monitoring des téléchargements avec support multi-sources (Dropbox, FromSmash).
+-   **Timeline Connectée** : Visualisation pipeline moderne avec nœuds connectés, spine lumineux et micro-interactions (implémenté Phase 1 HTML/CSS).
 
 ### Gestion des Téléchargements
 -   **Système de suivi** : Suivi des téléchargements via un fichier `download_history.json` structuré `{url, timestamp}` pour éviter les doublons.

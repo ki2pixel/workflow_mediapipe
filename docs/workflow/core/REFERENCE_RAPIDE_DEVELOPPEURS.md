@@ -273,6 +273,32 @@ appState.subscribe('stepStatuses', callback);
   - `STEP5_EOS_ENV_PYTHON` permet de relocaliser l’environnement InsightFace GPU-only lorsque `VENV_BASE_DIR` pointe hors du repo. `STEP5_TF_GPU_ENV_PYTHON` a été retiré : MediaPipe/OpenSeeFace ne supportent plus le GPU.
   - Les logs `[Progression]|…`, `[Progression-MultiLine] …` et `[Gestionnaire] Succès/Échec …` sont contractuels avec `app_new.py`/`WorkflowState`. Ne modifiez pas leur format sans mettre à jour le parsing.
 
+### Timeline Connectée - Pipeline Manager (v4.2)
+
+#### Méthodes principales
+```javascript
+// Gestion des détails contextuels
+pipelineTimelineManager.showStepDetails(stepKey)
+pipelineTimelineManager.hideStepDetails()
+pipelineTimelineManager.toggleStepDetails(stepKey)
+
+// Gestion des séquences personnalisées
+pipelineTimelineManager.attachCustomSequenceListeners()
+pipelineTimelineManager.handleCustomSequenceChange(event)
+pipelineTimelineManager.updateCustomSequenceButtons()
+pipelineTimelineManager.runCustomSequence()
+pipelineTimelineManager.clearCustomSequence()
+
+// Synchronisation AppState
+pipelineTimelineManager.syncWithAppState()
+pipelineTimelineManager.refreshStepStatus(stepKey)
+```
+
+#### Tests associés
+- `tests/frontend/test_step_details_panel.mjs` : Tests Given/When/Then du panneau de détails
+- `tests/frontend/test_custom_sequence_timeline.mjs` : Tests des séquences personnalisées
+- `npm run test:frontend` : Suite complète incluant Timeline Connectée
+
 ---
 
 ## Patterns de Développement v4.2

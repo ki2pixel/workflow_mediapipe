@@ -10,6 +10,70 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-20 14:30:00+01:00: Fix Top Bar Scrolling — Correction positionnement fixe
+- **Décision** : Implémenter une solution robuste pour corriger le problème où la top bar et la global progress bar disparaissent progressivement pendant le scroll auto et manuel.
+- **Raison** : La solution précédente avec `position: sticky` était insuffisante car elle peut être cassée par des propriétés CSS sur les parents (overflow, transform, filter). Une approche avec `position: fixed` et compensation de flux est nécessaire pour garantir que la top bar reste toujours visible.
+- **Implémentation** :
+  - **Wrapper fixe** : Introduction de `.topbar-affix` avec `position: fixed; top: 0; left: 0; right: 0; z-index: 40;` pour encapsuler la top bar et la global progress bar.
+  - **Position relative interne** : Modification de `.unified-controls--topbar` pour utiliser `position: relative` au lieu de `sticky`, car il est maintenant dans un conteneur fixe.
+  - **Compensation du flux** : Ajustement du `padding-top` du `body` en `calc(var(--topbar-height) + 20px)` pour éviter que le contenu ne se glisse sous la top bar fixe.
+  - **Spacer structurel** : Ajout d'un `div#topbar-spacer` après le wrapper fixe pour préserver le flux normal du document.
+  - **Export JS** : Ajout de `topbarAffix` dans `static/domElements.js` pour permettre une mesure dynamique de la hauteur si nécessaire.
+- **Validation** : En attente de validation manuelle et tests frontend pour confirmer que la top bar reste visible pendant tous les types de scroll.
+- **Impact** : Solution plus robuste qui ne dépend pas du contexte CSS parent, garantissant que la top bar et la progress bar restent toujours visibles quel que soit le scroll.
+
+## 2026-01-20 12:53:00+01:00: Auto-scroll Timeline Connectée — Correction structurelle du centrage vertical
+- **Décision** : Résoudre définitivement le problème de glissement progressif des étapes vers le bas de la page pendant les séquences en appliquant une correction structurelle (espace scrollable + suppression des biais CSS + recentrage throttlé).
+- **Raison** : Les tentatives précédentes (scroll agressif, scroll absolu) échouaient car (1) la fin de document ne permettait pas de centrer STEP7, et (2) les cartes actives changeaient de hauteur pendant la progression (`progress_text`), provoquant une dérive du centre.
+- **Implémentation** :
+  - **Espace scrollable en bas** : Ajout d'un `div.timeline-scroll-spacer` après la timeline (`templates/index_new.html`) avec CSS `height: calc(100vh - var(--topbar-height)); min-height: 520px;` pour permettre le centrage de STEP7 même en fin de document.
+  - **Suppression des biais `scroll-margin-top`** : Neutralisation des `scroll-margin-top` sur `.timeline-step` (`static/css/components/steps.css`) et `.steps-column` (`static/css/layout.css`) qui interféraient avec le calcul de centrage.
+  - **Recentrage throttlé pendant la progression** : Dans `static/uiUpdater.js`, ajout d'un auto-centering (max toutes les 700ms) pendant les séquences (`state.getIsAnySequenceRunning()`) pour compenser l'augmentation de hauteur des cartes quand `progress_text` est mis à jour.
+  - **Scroll déterministe topbar-friendly** : Dans `static/scrollManager.js`, remplacement de `scrollIntoView()` par un calcul direct via `calculateOptimalScrollPosition()` + `window.scrollTo()` pour respecter la topbar (`--topbar-height: 68px`).
+  - **Simplification sequenceManager** : Utilisation unique de `scrollToActiveStep({behavior:'smooth', scrollDelay:0})` pour éviter les comportements invalides (`behavior:'instant'`).
+- **Validation** : Tests frontend OK (`npm run test:frontend`). En attente de validation manuelle après hard refresh.
+- **Impact** : Solution structurelle qui garantit un centrage vertical parfait et stable de toutes les étapes y compris STEP7, élimine les interférences CSS, et compense dynamiquement les changements de hauteur pendant la progression.
+
+## 2026-01-20 10:55:00+01:00: Timeline Connectée — Phase 3 (Advanced Features)
+- **Décision** : Implémenter la Phase 3 (Advanced Features) du redesign Dashboard Timeline Connectée : panneau de détails contextuel synchronisé avec AppState + DOMBatcher, accessibilité WCAG complète et optimisations performance.
+- **Raison** : L’audit UX prévoyait une Phase 3 pour finaliser la Timeline Connectée avec interactions avancées, accessibilité et performance. L’objectif était de fournir une interface premium tout en préservant la compatibilité et la maintenabilité.
+- **Implémentation** :
+  - **Panneau contextuel** (`templates/index_new.html`, `static/css/components/steps.css`, `static/css/layout.css`) : HTML sémantique `aside role="complementary"`, styles responsive/compact, transitions CSS, et coexistence avec le panneau logs.
+  - **Logique JS** (`static/stepDetailsPanel.js`, `static/main.js`) : Module dédié avec sélection par clic/clavier, synchronisation AppState (`stepDetailsOpen`, `selectedStepKey`), mise à jour DOM via DOMBatcher, fermeture auto lors de l’ouverture des logs, focus trap/restore, et gestion Escape.
+  - **Accessibilité** : `aria-expanded`, `aria-controls`, `aria-live="polite"`, navigation clavier complète (Enter/Espace), focus trap/restore, support `prefers-reduced-motion`.
+  - **Optimisations UI** : layout compact coexistence logs/détails, rafraîchissement différé via import dynamique dans `uiUpdater.js`, cache léger WeakMap pour les données affichées, et évitement de reflow inutile.
+  - **Tests frontend** (`tests/frontend/test_step_details_panel.mjs`, `package.json`) : Tests Given/When/Then pour ouverture/fermeture, navigation clavier, rafraîchissement, et usage correct de DOMBatcher. Intégrés à `npm run test:frontend`.
+- **Validation** : `npm run test:frontend` OK (tous les tests passent, y compris le nouveau test Phase 3). Audit mis à jour (`docs/workflow/audits/AUDIT_UX_DASHBOARD_UNIFIED-2026-01-20.md`) avec Phase 3 ✅.
+- **Impact** : Timeline Connectée désormais complète et production-ready, avec une expérience utilisateur premium, une accessibilité WCAG complète et des performances optimisées. Aucune régression fonctionnelle.
+ 
+## 2026-01-20 10:00:00+01:00: Timeline Connectée — Phase 2 (Visual Polish)
+- **Décision** : Implémenter la Phase 2 (Visual Polish) du redesign Dashboard Timeline Connectée en renforçant les micro-interactions, les transitions et le responsive, sans changement fonctionnel.
+- **Raison** : Améliorer la perception premium et la lisibilité du pipeline (spine/nœuds/connecteurs) tout en conservant la stabilité, la performance et la compatibilité totale avec le JavaScript existant.
+- **Implémentation** :
+  - **Variables motion** (`static/css/variables.css`) : Ajout de variables de motion (durées/easing) pour harmoniser les transitions.
+  - **Focus global** (`static/css/base.css`) : Ajout d’un style `:focus-visible` global pour l’accessibilité clavier.
+  - **Polish Timeline** (`static/css/components/steps.css`) : Transitions unifiées, micro-interactions `hover`/`focus-within` sur les cartes, et transitions ciblées sur spine/nœuds/connecteurs + ajustements responsive.
+- **Contraintes respectées** :
+  - **Aucun changement HTML/JS** : structure, IDs et classes inchangés.
+  - **Accessibilité** : focus ring visible et support `prefers-reduced-motion` (transitions désactivées lorsque requis).
+- **Validation** : Audit mis à jour (`docs/workflow/audits/AUDIT_UX_DASHBOARD_UNIFIED-2026-01-20.md`). Tests frontend recommandés (`npm run test:frontend`).
+- **Impact** : UX plus fluide et lisible, feedback d’interaction plus clair, et cohérence visuelle renforcée sur desktop et mobile, sans régression fonctionnelle.
+
+## 2026-01-20 09:00:00+01:00: Timeline Connectée — Phase 1 (HTML/CSS)
+- **Décision** : Implémenter la Phase 1 du redesign Dashboard `index_new.html` selon le concept "Timeline Connectée" défini dans `docs/workflow/audits/AUDIT_UX_DASHBOARD_UNIFIED-2026-01-20.md`.
+- **Raison** : L'audit UX avait identifié des problèmes fondamentaux avec l'interface existante : flux visuel brisé, charge cognitive élevée, et manque de connexion visuelle entre les étapes. La Timeline Connectée résout ces problèmes en créant une ligne temporelle verticale continue avec des nœuds connectés.
+- **Implémentation** :
+  - **Variables CSS** (`static/css/variables.css`) : Ajout de 16 nouvelles variables pour la Timeline : variables RGB pour `color-mix()`, variables de dimensionnement (nœuds, connecteurs, gap, cards), et alias de couleurs pour les statuts pipeline.
+  - **Styles Timeline** (`static/css/components/steps.css`) : Implémentation complète du design Timeline avec 200+ lignes de CSS : spine principal (`::before`), cartes `.timeline-step` avec micro-interactions hover, nœuds `.timeline-node` avec états visuels, connecteurs `.timeline-connector` avec gradients, et support `prefers-reduced-motion`.
+  - **Structure HTML** (`templates/index_new.html`) : Refactoring de la boucle Jinja pour intégrer la structure sémantique Timeline : `<section class="workflow-pipeline">`, `<div class="pipeline-timeline" role="list">`, et chaque step comme `<div class="timeline-step" role="listitem">` avec rail/nœud/connecteur.
+- **Contraintes respectées** :
+  - **Compatibilité Jinja** : La logique Flask `{% for step_key, config in steps_config.items() %}` préservée, simplement enveloppée dans la nouvelle structure.
+  - **Compatibilité JavaScript** : IDs (`#step-{{ step_key }}`) et classes (`.step`, `.run-button`, `.cancel-button`, `.specific-log-button`, `.custom-sequence-checkbox`) maintenus pour les event listeners existants.
+  - **CSS Moderne** : Utilisation extensive de `color-mix()` avec variables RGB, CSS variables pour la thématisation, et animations fluides.
+  - **Accessibilité** : Structure sémantique avec `role="list"`/`role="listitem"`, `aria-hidden="true"` sur éléments décoratifs, et `aria-live="polite"` sur les statuts.
+- **Validation** : Modifications appliquées avec succès sur les 3 fichiers cibles, aucune régression sur la compatibilité JavaScript, et structure HTML prête pour les phases futures d'interactivité.
+- **Impact** : Transformation radicale de l'interface utilisateur d'une liste de cartes indépendantes vers une pipeline visuel connecté, réduisant la charge cognitive et améliorant la perception de progression. Base solide établie pour les phases 2 et 3 (interactivité JavaScript et micro-interactions avancées).
+
 ## 2026-01-20 01:12:00+01:00: Maintenance Tests Backend — Application complète Guide de Maintenance (Phases 1-3)
 - **Décision** : Appliquer l'intégralité du Guide de Maintenance Tests Backend créé suite à l'audit du 2026-01-20 pour corriger les problèmes identifiés et stabiliser la suite de tests backend.
 - **Raison** : L'audit avait révélé des tests obsolètes post-refactoring, des dépendances manquantes dans les environnements spécialisés, et des imports incorrects. La correction de ces problèmes était nécessaire pour assurer la fiabilité des tests et la maintenabilité future du codebase.

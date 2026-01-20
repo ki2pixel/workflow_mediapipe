@@ -33,7 +33,7 @@ html, body { overflow-y: scroll; }
     align-items: center;
     transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
     opacity: 1;
-    scroll-margin-top: 100px; /* Ensures proper spacing when scrolling to steps column */
+    scroll-margin-top: 0;
 }
 
 /* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
@@ -155,7 +155,42 @@ html, body { overflow-y: scroll; }
     opacity: 1;
     transform: translateX(0);
     padding: 20px;
-}
+ }
+
+.workflow-wrapper.compact-mode .step-details-panel {
+    position: fixed;
+    right: 16px;
+    top: 120px;
+    width: min(30vw, 420px);
+    height: calc(100vh - 140px);
+    z-index: 19;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(30px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+ }
+
+.workflow-wrapper.compact-mode.details-active .step-details-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+ }
+
+.workflow-wrapper.compact-mode.details-active .steps-column {
+    margin-right: min(30vw, 420px);
+    padding-right: 16px;
+ }
+
+.workflow-wrapper.compact-mode.logs-active.details-active .steps-column {
+    margin-right: min(50vw, 800px);
+    padding-right: 16px;
+ }
+
+.workflow-wrapper.compact-mode.logs-active .step-details-panel {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(30px);
+ }
 
 /* Unified controls section compatibility with slideshow mode */
 .workflow-wrapper.slideshow-mode ~ .unified-controls-section,
@@ -163,4 +198,4 @@ html, body { overflow-y: scroll; }
     /* Ensure proper spacing and visibility during slideshow */
     z-index: 1;
     position: relative;
-}
+ }

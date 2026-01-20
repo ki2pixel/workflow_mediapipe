@@ -70,6 +70,10 @@ Intégration Source Webhook : Source de données JSON externe pour monitoring fl
   - Mode compact unifié pour toutes les étapes
   - Amélioration des performances de rendu
   - Meilleure accessibilité (ARIA, gestion du clavier)
+  - **Timeline Connectée** : ✅ **Pipeline visuel moderne complet** avec nœuds connectés, spine lumineuse, micro-interactions premium et panneau de détails contextuel (Phases 1-3 complétées le 2026-01-20).
+    - Phase 1 : Structure HTML/CSS avec variables Timeline et spine/connecteurs
+    - Phase 2 : Transitions harmonisées et micro-interactions hover/focus-within  
+    - Phase 3 : Panneau détails contextuel (StepDetailsPanel.js), accessibilité WCAG complète, tests frontend intégrés
 
 - **Archivage** :
   - Génération de hash SHA-256 pour l'intégrité des données

@@ -4,6 +4,7 @@ import * as state from './state.js';
 import { runStepAPI } from './apiService.js';
 import { showSequenceSummaryUI } from './popupManager.js';
 import { formatElapsedTime } from './utils.js';
+import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
 
 import { soundEvents } from './soundManager.js';
 
@@ -30,6 +31,12 @@ async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSt
     if (stepKey !== 'clear_disk_cache') {
         ui.openLogPanelUI(stepKey, true);
         ui.setActiveStepForLogPanelUI(stepKey);
+        
+        if (isSequenceAutoScrollEnabled()) {
+            setTimeout(() => {
+                scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
+            }, 0);
+        }
     }
 
     const stepInitiated = await runStepAPI(stepKey);
@@ -123,6 +130,12 @@ export async function runStepSequence(stepsToExecute, sequenceName = "Séquence"
                 try {
                     ui.openLogPanelUI(nextStepKey, true);
                     ui.setActiveStepForLogPanelUI(nextStepKey);
+                    
+                    if (isSequenceAutoScrollEnabled()) {
+                        setTimeout(() => {
+                            scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
+                        }, 0);
+                    }
                 } catch (e) {
                     console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
                 }

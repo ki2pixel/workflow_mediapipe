@@ -23,6 +23,8 @@ import { cinematicLogMode } from './cinematicLogMode.js';
 import { reportViewer } from './reportViewer.js';
 import { fetchWithLoadingState } from './apiService.js';
 
+import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
+
 window.addEventListener('unhandledrejection', (event) => {
     console.error('[MAIN] Unhandled promise rejection:', event.reason);
 
@@ -475,6 +477,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSystemMonitorMinimize();
 
     setupKeyboardShortcuts();
+
+    initializeStepDetailsPanel();
 });
 
 function setupCompactMode() {

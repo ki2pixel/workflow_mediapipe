@@ -13,7 +13,9 @@ const SCROLL_CONFIG = {
     inline: 'nearest',
     topOffset: 100,
     minScrollDistance: 50,
-    scrollDelay: 150
+    scrollDelay: 150,
+    topbarHeight: 68, // Hauteur de la topbar depuis variables.css
+    bottomMargin: 40   // Marge inférieure pour éviter le débordement
 };
 
 /**
@@ -57,7 +59,7 @@ function isElementPartiallyVisible(element) {
 }
 
 /**
- * Calculates the optimal scroll position for an element
+ * Calculates the optimal scroll position for an element with perfect centering
  * @param {HTMLElement} element - The target element
  * @returns {number} The optimal scroll top position
  */
@@ -68,18 +70,29 @@ function calculateOptimalScrollPosition(element) {
     const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const windowHeight = window.innerHeight || document.documentElement.clientHeight;
     
+    // Zone visible effective : topbar + margin inférieure
+    const effectiveViewportHeight = windowHeight - SCROLL_CONFIG.topbarHeight - SCROLL_CONFIG.bottomMargin;
     const elementTop = rect.top + currentScrollTop;
     const elementHeight = rect.height;
     
-    let targetScrollTop = elementTop - (windowHeight / 2) + (elementHeight / 2);
+    // Centrage agressif dans la zone effective (pas de contraintes min/max)
+    const viewportCenter = SCROLL_CONFIG.topbarHeight + (effectiveViewportHeight / 2);
+    const targetScrollTop = elementTop + (elementHeight / 2) - viewportCenter;
     
-    const minScrollTop = elementTop - SCROLL_CONFIG.topOffset;
-    targetScrollTop = Math.max(targetScrollTop, minScrollTop);
+    // Contrainte simple : ne pas aller en négatif
+    const finalScrollTop = Math.max(0, targetScrollTop);
     
-    const maxScrollTop = Math.max(0, document.documentElement.scrollHeight - windowHeight);
-    targetScrollTop = Math.min(targetScrollTop, maxScrollTop);
+    console.log('[SCROLL] Position calculation:', {
+        elementTop,
+        elementHeight,
+        windowHeight,
+        effectiveViewportHeight,
+        viewportCenter,
+        targetScrollTop,
+        finalScrollTop
+    });
     
-    return Math.max(0, targetScrollTop);
+    return finalScrollTop;
 }
 
 /**
@@ -90,30 +103,8 @@ function calculateOptimalScrollPosition(element) {
 function shouldScroll(element) {
     if (!element) return false;
     
-    if (isElementInViewport(element)) {
-        const rect = element.getBoundingClientRect();
-        const hasGoodPosition = rect.top > SCROLL_CONFIG.topOffset && 
-                               rect.bottom < (window.innerHeight - 50);
-        if (hasGoodPosition) {
-            console.log('[SCROLL] Element is well-positioned, skipping scroll');
-            return false;
-        }
-    }
-    
-    if (!isElementPartiallyVisible(element)) {
-        console.log('[SCROLL] Element not visible, scrolling required');
-        return true;
-    }
-    
-    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const optimalScrollTop = calculateOptimalScrollPosition(element);
-    const scrollDistance = Math.abs(optimalScrollTop - currentScrollTop);
-    
-    if (scrollDistance < SCROLL_CONFIG.minScrollDistance) {
-        console.log('[SCROLL] Scroll distance too small, skipping');
-        return false;
-    }
-    
+    // Pour les séquences, toujours autoriser le scroll pour garantir le repositionnement
+    console.log('[SCROLL] shouldScroll: allowing scroll for sequence positioning');
     return true;
 }
 
@@ -135,26 +126,13 @@ function scrollToElement(element, options = {}) {
     }
     
     console.log(`[SCROLL] Scrolling to element: ${element.id || element.className}`);
-    
-    if (element.scrollIntoView && 'behavior' in document.documentElement.style) {
-        try {
-            element.scrollIntoView({
-                behavior: config.behavior,
-                block: config.block,
-                inline: config.inline
-            });
-        } catch (error) {
-            console.warn('[SCROLL] Modern scrollIntoView failed, using fallback:', error);
-            const targetScrollTop = calculateOptimalScrollPosition(element);
-            window.scrollTo({
-                top: targetScrollTop,
-                behavior: config.behavior
-            });
-        }
-    } else {
-        const targetScrollTop = calculateOptimalScrollPosition(element);
-        window.scrollTo(0, targetScrollTop);
-    }
+
+    const behavior = config.behavior === 'smooth' ? 'smooth' : 'auto';
+    const targetScrollTop = calculateOptimalScrollPosition(element);
+    window.scrollTo({
+        top: targetScrollTop,
+        behavior
+    });
 }
 
 /**
@@ -196,6 +174,76 @@ export function scrollToStepImmediate(stepKey, options = {}) {
 }
 
 /**
+ * Scrolls to a step with forced repositioning for sequences (ignores current position)
+ * @param {string} stepKey - The key of the step to scroll to
+ * @param {Object} options - Additional options for scrolling
+ */
+export function scrollToStepForced(stepKey, options = {}) {
+    if (!stepKey) {
+        console.warn('[SCROLL] No stepKey provided for scrollToStepForced');
+        return;
+    }
+    
+    const stepElement = document.getElementById(`step-${stepKey}`);
+    if (!stepElement) {
+        console.warn(`[SCROLL] Step element not found: step-${stepKey}`);
+        return;
+    }
+    
+    const config = { ...SCROLL_CONFIG, ...options };
+    
+    // Forcer le scroll avec scrollIntoView direct (plus efficace pour les grids)
+    console.log(`[SCROLL] Forced scrolling to step: ${stepKey}`);
+    
+    try {
+        // Utiliser scrollIntoView avec block 'center' pour forcer le positionnement
+        stepElement.scrollIntoView({
+            behavior: config.behavior,
+            block: 'center',
+            inline: 'nearest'
+        });
+        
+        console.log(`[SCROLL] Applied scrollIntoView with block: center`);
+        
+        // Backup : forcer avec window.scrollTo si scrollIntoView ne fonctionne pas
+        setTimeout(() => {
+            const rect = stepElement.getBoundingClientRect();
+            const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+            
+            // Calcul simple : centrer l'élément dans le viewport
+            const elementCenter = rect.top + currentScrollTop + (rect.height / 2);
+            const viewportCenter = windowHeight / 2;
+            const targetScrollTop = elementCenter - viewportCenter;
+            
+            console.log(`[SCROLL] Backup scroll calculation:`, {
+                rectTop: rect.top,
+                currentScrollTop,
+                windowHeight,
+                elementCenter,
+                viewportCenter,
+                targetScrollTop
+            });
+            
+            window.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'instant' // instant pour le backup
+            });
+        }, 50);
+        
+    } catch (error) {
+        console.warn('[SCROLL] scrollIntoView failed, using manual calculation:', error);
+        
+        // Fallback manuel
+        const optimalScrollTop = calculateOptimalScrollPosition(stepElement);
+        window.scrollTo({
+            top: optimalScrollTop,
+            behavior: config.behavior
+        });
+    }
+}
+
+/**
  * Checks if auto-scroll should be enabled based on user preferences and context
  * @returns {boolean} True if auto-scroll should be active
  */
@@ -220,6 +268,141 @@ export function isAutoScrollEnabled() {
 export function setAutoScrollEnabled(enabled) {
     localStorage.setItem('workflow-auto-scroll', enabled ? 'enabled' : 'disabled');
     console.log(`[SCROLL] Auto-scroll ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Checks if auto-scroll for sequences should be enabled based on user preferences
+ * @returns {boolean} True if sequence auto-scroll should be active
+ */
+export function isSequenceAutoScrollEnabled() {
+    const sequencePreference = localStorage.getItem('workflow-sequence-auto-scroll');
+    if (sequencePreference === 'disabled') {
+        return false;
+    }
+    
+    if (sequencePreference === 'enabled') {
+        return true;
+    }
+    
+    // Par défaut, activer l'auto-scroll pour les séquences
+    return true;
+}
+
+/**
+ * Enables or disables auto-scroll for sequences specifically
+ * @param {boolean} enabled - Whether to enable sequence auto-scroll
+ */
+export function setSequenceAutoScrollEnabled(enabled) {
+    localStorage.setItem('workflow-sequence-auto-scroll', enabled ? 'enabled' : 'disabled');
+    console.log(`[SCROLL] Sequence auto-scroll ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Scrolls to a step with ultra-aggressive repositioning (instant scroll)
+ * @param {string} stepKey - The key of the step to scroll to
+ * @param {Object} options - Additional options for scrolling
+ */
+export function scrollToStepUltraAggressive(stepKey, options = {}) {
+    if (!stepKey) {
+        console.warn('[SCROLL] No stepKey provided for scrollToStepUltraAggressive');
+        return;
+    }
+    
+    const stepElement = document.getElementById(`step-${stepKey}`);
+    if (!stepElement) {
+        console.warn(`[SCROLL] Step element not found: step-${stepKey}`);
+        return;
+    }
+    
+    console.log(`[SCROLL] Ultra-aggressive scrolling to step: ${stepKey}`);
+    
+    // Scroll instantané avec scrollIntoView
+    stepElement.scrollIntoView({
+        behavior: 'instant',
+        block: 'center',
+        inline: 'nearest'
+    });
+    
+    // Forcer un second scroll immédiat après
+    setTimeout(() => {
+        const rect = stepElement.getBoundingClientRect();
+        const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+        const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        // Calcul ultra-simple : centrer parfaitement
+        const elementCenter = rect.top + currentScrollTop + (rect.height / 2);
+        const viewportCenter = (windowHeight / 2);
+        const targetScrollTop = elementCenter - viewportCenter;
+        
+        console.log(`[SCROLL] Ultra-aggressive calculation:`, {
+            rectTop: rect.top,
+            rectHeight: rect.height,
+            elementCenter,
+            viewportCenter,
+            targetScrollTop
+        });
+        
+        window.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: 'instant'
+        });
+    }, 10);
+}
+
+/**
+ * Scrolls to a step with absolute forced repositioning (ignores all CSS and layout factors)
+ * @param {string} stepKey - The key of the step to scroll to
+ * @param {Object} options - Additional options for scrolling
+ */
+export function scrollToStepAbsolute(stepKey, options = {}) {
+    if (!stepKey) {
+        console.warn('[SCROLL] No stepKey provided for scrollToStepAbsolute');
+        return;
+    }
+    
+    const stepElement = document.getElementById(`step-${stepKey}`);
+    if (!stepElement) {
+        console.warn(`[SCROLL] Step element not found: step-${stepKey}`);
+        return;
+    }
+    
+    console.log(`[SCROLL] Absolute forced scrolling to step: ${stepKey}`);
+    
+    // Forcer un scroll absolu en calculant la position exacte
+    const rect = stepElement.getBoundingClientRect();
+    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    
+    // Calcul absolu : centrer l'élément parfaitement au milieu du viewport
+    const elementAbsoluteTop = rect.top + currentScrollTop;
+    const elementCenter = elementAbsoluteTop + (rect.height / 2);
+    const viewportCenter = windowHeight / 2;
+    const absoluteScrollTop = elementCenter - viewportCenter;
+    
+    console.log(`[SCROLL] Absolute calculation:`, {
+        rectTop: rect.top,
+        rectHeight: rect.height,
+        currentScrollTop,
+        elementAbsoluteTop,
+        elementCenter,
+        viewportCenter,
+        absoluteScrollTop
+    });
+    
+    // Appliquer le scroll absolu instantané
+    window.scrollTo({
+        top: Math.max(0, absoluteScrollTop),
+        behavior: 'instant'
+    });
+    
+    // Forcer un second scroll après un court delay pour contrer toute animation CSS
+    setTimeout(() => {
+        window.scrollTo({
+            top: Math.max(0, absoluteScrollTop),
+            behavior: 'instant'
+        });
+        console.log(`[SCROLL] Applied absolute scroll to: ${Math.max(0, absoluteScrollTop)}px`);
+    }, 5);
 }
 
 export { SCROLL_CONFIG };

@@ -4,6 +4,14 @@
 
 Ce document résume les mises à jour apportées à la documentation pour refléter les optimisations v4.1 incluant les améliorations de progression, le mode CPU-only pour le tracking, et les optimisations audio ffmpeg.
 
+## 2026-01-20 — Timeline Connectée Phase 3 (Advanced Features) - COMPLET
+- ✅ **Panneau détails contextuel** : Module `static/stepDetailsPanel.js` avec sélection par clic/clavier, synchronisation AppState/DOMBatcher, fermeture auto logs, focus trap/restore, gestion Escape
+- ✅ **Accessibilité WCAG** : `aria-expanded`, navigation clavier complète, aria-live, support `prefers-reduced-motion`
+- ✅ **Optimisations UI** : Layout compact coexistence logs/détails, rafraîchissement différé via import dynamique, cache léger WeakMap
+- ✅ **Tests frontend** : `tests/frontend/test_step_details_panel.mjs` (Given/When/Then) intégré à `npm run test:frontend`
+- **Validation** : `npm run test:frontend` OK, audit mis à jour avec Phase 3 ✅
+- **Impact** : Timeline Connectée production-ready avec expérience utilisateur premium, aucune régression fonctionnelle
+
 ## 2026-01-20 — Maintenance Tests Backend — Phase 1-3 (COMPLET)
 - ✅ **Phase 1 (Corrections Critiques)** : Migration `_get_app_state` → `get_workflow_state` dans `tests/unit/test_workflow_service.py` et `tests/integration/test_workflow_routes.py`, suppression méthodes obsolètes `convert_expanded_onedrive_url` et `fetch_csv_data` dans `tests/unit/test_csv_service_refactored.py`, correction imports `app_new` → `create_app` dans `tests/integration/test_lemonfox_api_endpoint.py`, implémentation locale `parse_progress_from_log_line`.
 - ✅ **Phase 2 (Isolation Environnement)** : Scripts spécialisés `run_step3_tests.sh`, `run_step5_tests.sh`, `run_main_tests.sh` et configuration `pytest.ini` pour isoler les tests par environnement virtuel.

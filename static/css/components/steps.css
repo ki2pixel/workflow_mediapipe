@@ -16,7 +16,7 @@
         margin-bottom 0.4s ease-in-out,
         padding 0.4s ease-in-out,
         box-shadow 0.3s ease;
-    scroll-margin-top: 80px; /* Ensures proper spacing when scrolling to steps */
+    scroll-margin-top: 0; /* Désactivé pour permettre un centrage parfait */
 }
 
 .step[data-status="running"],
@@ -453,4 +453,371 @@
 .workflow-wrapper:not(.logs-active) .steps-column .step:hover:not(.active-for-log-panel) {
     transform: translateY(-4px);
     box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+}
+
+.workflow-wrapper.compact-mode .steps-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--pipeline-gap);
+}
+
+.workflow-pipeline {
+    width: 100%;
+}
+
+.pipeline-timeline {
+    position: relative;
+    width: 100%;
+    max-width: var(--pipeline-card-max-width);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--pipeline-gap);
+}
+
+.timeline-scroll-spacer {
+    width: 100%;
+    height: calc(100vh - var(--topbar-height));
+    min-height: 520px;
+}
+
+.timeline-row {
+    display: grid;
+    grid-template-columns: var(--pipeline-rail-column-width) minmax(0, 1fr);
+    column-gap: var(--pipeline-rail-gap);
+    align-items: stretch;
+}
+
+.timeline-rail-column {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--pipeline-card-padding) 0;
+}
+
+.timeline-cards-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-axis {
+    position: absolute;
+    left: calc((var(--pipeline-rail-column-width) / 2) - (var(--pipeline-axis-width) / 2));
+    top: 0;
+    bottom: 0;
+    width: var(--pipeline-axis-width);
+    background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
+    border-radius: 999px;
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.timeline-step {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: var(--pipeline-card-max-width);
+    margin: 0;
+    border-left: none;
+    padding: 0;
+    border-radius: var(--pipeline-card-radius);
+    background: color-mix(in oklab, var(--bg-card) 92%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.22);
+    scroll-margin-top: 0;
+    transition:
+        transform var(--motion-duration-slow) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-medium) var(--motion-ease-standard),
+        background var(--motion-duration-medium) var(--motion-ease-standard),
+        border-color var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.timeline-step:hover:not(.active-for-log-panel) {
+    transform: translateY(-6px) scale(1.008);
+    box-shadow:
+        0 20px 40px rgba(0,0,0,0.25),
+        0 0 0 1px rgba(var(--accent-primary-rgb), 0.2);
+}
+
+.timeline-step:focus-within:not(.active-for-log-panel) {
+    box-shadow:
+        0 16px 34px rgba(0,0,0,0.24),
+        0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+    transform: translateY(-2px);
+}
+
+.timeline-step[data-status="running"],
+.timeline-step[data-status="starting"],
+.timeline-step[data-status="initiated"] {
+    background: color-mix(in oklab, var(--status-running) 12%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-running) 65%, var(--border-color));
+    box-shadow: 0 10px 30px rgba(var(--status-running-rgb), 0.25);
+}
+
+.timeline-step[data-status="failed"],
+.timeline-step[data-status="error"],
+.timeline-step[data-status="cancelled"] {
+    background: color-mix(in oklab, var(--status-error) 10%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-error) 55%, var(--border-color));
+}
+
+.timeline-step[data-status="completed"],
+.timeline-step[data-status="success"] {
+    background: color-mix(in oklab, var(--status-success) 10%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-success) 55%, var(--border-color));
+}
+
+.timeline-step[data-status="warning"],
+.timeline-step[data-status="paused"],
+.timeline-step[data-status="pending"] {
+    background: color-mix(in oklab, var(--status-warning) 10%, var(--bg-card));
+    border-color: color-mix(in oklab, var(--status-warning) 55%, var(--border-color));
+}
+
+.timeline-node {
+    position: relative;
+    z-index: 2;
+    width: var(--pipeline-node-dot-size);
+    height: var(--pipeline-node-dot-size);
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--bg-dark) 72%, transparent);
+    border: var(--pipeline-node-border-width) solid var(--pipeline-color-idle);
+    box-shadow: 0 0 12px rgba(0,0,0,0.25);
+    transition:
+        transform var(--motion-duration-fast) var(--motion-ease-standard),
+        background var(--motion-duration-medium) var(--motion-ease-standard),
+        border-color var(--motion-duration-medium) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.timeline-step:hover:not(.active-for-log-panel) .timeline-node {
+    transform: scale(1.08);
+}
+
+.timeline-step.is-selected {
+    border-color: color-mix(in oklab, var(--accent-primary) 65%, var(--border-color));
+    box-shadow:
+        0 16px 34px rgba(0,0,0,0.24),
+        0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+}
+
+.timeline-step[data-status="running"] .timeline-node,
+.timeline-step[data-status="starting"] .timeline-node,
+.timeline-step[data-status="initiated"] .timeline-node {
+    border-color: var(--pipeline-color-running);
+    box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-running) 45%, transparent);
+}
+
+.timeline-step[data-status="completed"] .timeline-node,
+.timeline-step[data-status="success"] .timeline-node {
+    border-color: var(--pipeline-color-success);
+    box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-success) 45%, transparent);
+}
+
+.timeline-step[data-status="failed"] .timeline-node,
+.timeline-step[data-status="error"] .timeline-node,
+.timeline-step[data-status="cancelled"] .timeline-node {
+    border-color: var(--pipeline-color-error);
+    box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-error) 45%, transparent);
+}
+
+.timeline-content {
+    display: grid;
+    gap: 0.85rem;
+    padding: var(--pipeline-card-padding);
+}
+
+.timeline-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+}
+
+.node-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.timeline-step .step-controls button,
+.timeline-step .specific-log-button {
+    border-radius: 999px;
+    padding: 10px 18px;
+    margin: 0;
+}
+
+.timeline-step .specific-log-controls-wrapper {
+    margin-top: 4px;
+}
+
+.steps-column .step[data-status="initiated"] {
+    animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-step {
+        transition: none !important;
+    }
+    .timeline-step:hover:not(.active-for-log-panel) {
+        transform: none;
+    }
+    .timeline-axis {
+        transition: none !important;
+    }
+    .timeline-node {
+        transition: none !important;
+    }
+}
+
+@media (max-width: 860px) {
+    .workflow-pipeline {
+        --pipeline-node-size: 68px;
+        --pipeline-card-padding: 1.25rem;
+        --pipeline-gap: 1.6rem;
+        --pipeline-rail-column-width: 84px;
+    }
+
+    .timeline-step:hover:not(.active-for-log-panel) {
+        transform: translateY(-4px) scale(1.006);
+    }
+}
+
+@media (max-width: 720px) {
+    .workflow-pipeline {
+        --pipeline-rail-column-width: 72px;
+        --pipeline-rail-gap: 0.85rem;
+    }
+}
+
+@media (max-width: 620px) {
+    .timeline-axis {
+        display: none;
+    }
+
+    .timeline-step {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-rail {
+        flex-direction: row;
+        justify-content: flex-start;
+        margin-bottom: 10px;
+        gap: 12px;
+    }
+
+    .timeline-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .step-selection-control {
+        align-self: flex-end;
+    }
+
+    .node-actions {
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .timeline-step .step-controls button,
+    .timeline-step .specific-log-button {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 520px) {
+    .workflow-pipeline {
+        --pipeline-node-size: 60px;
+        --pipeline-card-padding: 1rem;
+        --pipeline-gap: 1.25rem;
+    }
+}
+
+.step-details-panel {
+    background: color-mix(in oklab, var(--bg-card) 92%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
+    border-radius: var(--pipeline-card-radius);
+    box-shadow: -5px 0 18px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+
+.step-details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+}
+
+.step-details-title {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--text-primary);
+}
+
+.step-details-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    background: color-mix(in oklab, var(--bg-tertiary) 40%, transparent);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.step-details-close:hover {
+    background: color-mix(in oklab, var(--accent-primary) 18%, var(--bg-tertiary));
+}
+
+.step-details-body {
+    padding: 14px;
+    display: grid;
+    gap: 12px;
+}
+
+.step-details-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.step-details-progress {
+    background: color-mix(in oklab, var(--bg-dark) 45%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.step-details-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.step-details-actions .run-button,
+.step-details-actions .cancel-button,
+.step-details-actions .step-details-open-logs {
+    width: 100%;
+    justify-content: center;
+    margin: 0;
+}
+
+.step-details-open-logs {
+    background-color: color-mix(in oklab, var(--accent-primary) 60%, var(--bg-tertiary));
+    color: white;
+}
+
+.step-details-open-logs:hover {
+    background-color: color-mix(in oklab, var(--accent-primary) 72%, var(--bg-tertiary));
 }

@@ -134,7 +134,15 @@ npm run test:frontend
 npm run test:dom-batcher      # Performance batching DOM
 npm run test:focus-trap      # A11y focus management
 npm run test:xss-safety      # Sécurité XSS logs
+npm run test:step-details    # Timeline Connectée Phase 3 (StepDetailsPanel)
 ```
+
+### Couverture des Tests
+Exécuter la suite de tests frontend pour valider :
+- DOMBatcher et performances
+- Focus trap et accessibilité WCAG
+- Timeline Connectée Phase 3 (StepDetailsPanel)
+- Sécurité XSS et échappement HTML
 
 ### Sécurité XSS
 - Échappement systématique des contenus dynamiques via `DOMUpdateUtils.escapeHtml()`
@@ -258,6 +266,7 @@ FONCTIONNALITÉS DISPONIBLES:
   • Suivi des logs en temps réel
   • Séquences personnalisées
   • Monitoring Webhook (surveillance automatique des téléchargements)
+  • Timeline Connectée : ✅ Pipeline visuel moderne complet avec nœuds connectés et micro-interactions premium
 ========================================================
 ```
 

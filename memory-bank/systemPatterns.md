@@ -91,6 +91,7 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
 -   **État Centralisé (`AppState.js`)** : L'état de l'interface est immutable et géré de manière centralisée.
 -   **Optimisation des Mises à Jour DOM (`DOMBatcher.js`)** : Les manipulations du DOM sont groupées pour de meilleures performances.
 -   **Modals Conditionnelles** : Pour les types de contenu spécifiques (ex: FromSmash), adapter dynamiquement le titre, contenu et actions de la modale.
+-   **Auto-scroll Timeline Connectée (2026-01-20)** : Utiliser un scroll déterministe basé sur `calculateOptimalScrollPosition()` + `window.scrollTo()` pour respecter la topbar. Éviter `scrollIntoView()` qui ignore les éléments fixes. Ajouter un espace scrollable en bas de timeline (`timeline-scroll-spacer`) pour permettre le centrage de la dernière étape. Supprimer les `scroll-margin-top` qui interfèrent avec le calcul. Recentrer de manière throttlée pendant les séquences pour compenser les changements de hauteur dynamiques.
 
 ## Général
 -   **Logging** : Utiliser le logger centralisé et les logs spécifiques à chaque étape.
