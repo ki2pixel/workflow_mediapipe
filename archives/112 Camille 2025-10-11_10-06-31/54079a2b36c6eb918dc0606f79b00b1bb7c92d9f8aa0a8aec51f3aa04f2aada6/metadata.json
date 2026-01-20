@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/112 Camille/docs/M6 - LMP - Son kouign-amann cannelle et poires bluffe le jury.mp4",
+  "video_stem": "M6 - LMP - Son kouign-amann cannelle et poires bluffe le jury",
+  "video_hash": "54079a2b36c6eb918dc0606f79b00b1bb7c92d9f8aa0a8aec51f3aa04f2aada6",
+  "created_at": "2025-10-11T10:06:31.924586+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/112 Camille 2025-10-11_10-06-31/54079a2b36c6eb918dc0606f79b00b1bb7c92d9f8aa0a8aec51f3aa04f2aada6/M6 - LMP - Son kouign-amann cannelle et poires bluffe le jury_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/112 Camille 2025-10-11_10-06-31/54079a2b36c6eb918dc0606f79b00b1bb7c92d9f8aa0a8aec51f3aa04f2aada6/M6 - LMP - Son kouign-amann cannelle et poires bluffe le jury_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/112 Camille 2025-10-11_10-06-31/54079a2b36c6eb918dc0606f79b00b1bb7c92d9f8aa0a8aec51f3aa04f2aada6/M6 - LMP - Son kouign-amann cannelle et poires bluffe le jury_tracking.json"
+  }
+}

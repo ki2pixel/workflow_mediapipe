@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/305 Camille/docs/EXTRAIT POSTDIFF 2 – Sa mère veut se faire pardonner après 6 ans d’absence.mp4",
+  "video_stem": "EXTRAIT POSTDIFF 2 – Sa mère veut se faire pardonner après 6 ans d’absence",
+  "video_hash": "26c5f06cb85503366dbbd5cb18e03ebfa089491420e7562843c3d65ab67ebb82",
+  "created_at": "2025-10-30T19:58:52.249219+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/305 Camille 2025-10-30_19-58-52/26c5f06cb85503366dbbd5cb18e03ebfa089491420e7562843c3d65ab67ebb82/EXTRAIT POSTDIFF 2 – Sa mère veut se faire pardonner après 6 ans d’absence_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/305 Camille 2025-10-30_19-58-52/26c5f06cb85503366dbbd5cb18e03ebfa089491420e7562843c3d65ab67ebb82/EXTRAIT POSTDIFF 2 – Sa mère veut se faire pardonner après 6 ans d’absence_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/305 Camille 2025-10-30_19-58-52/26c5f06cb85503366dbbd5cb18e03ebfa089491420e7562843c3d65ab67ebb82/EXTRAIT POSTDIFF 2 – Sa mère veut se faire pardonner après 6 ans d’absence_tracking.json"
+  }
+}

@@ -1,0 +1,3783 @@
+{
+  "frames_analysis": [
+    {
+      "frame": 1,
+      "tracked_objects": []
+    },
+    {
+      "frame": 2,
+      "tracked_objects": []
+    },
+    {
+      "frame": 3,
+      "tracked_objects": []
+    },
+    {
+      "frame": 4,
+      "tracked_objects": []
+    },
+    {
+      "frame": 5,
+      "tracked_objects": []
+    },
+    {
+      "frame": 6,
+      "tracked_objects": []
+    },
+    {
+      "frame": 7,
+      "tracked_objects": []
+    },
+    {
+      "frame": 8,
+      "tracked_objects": []
+    },
+    {
+      "frame": 9,
+      "tracked_objects": []
+    },
+    {
+      "frame": 10,
+      "tracked_objects": []
+    },
+    {
+      "frame": 11,
+      "tracked_objects": []
+    },
+    {
+      "frame": 12,
+      "tracked_objects": []
+    },
+    {
+      "frame": 13,
+      "tracked_objects": []
+    },
+    {
+      "frame": 14,
+      "tracked_objects": []
+    },
+    {
+      "frame": 15,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 1674,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 16,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 1650,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 17,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 1649,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 18,
+      "tracked_objects": []
+    },
+    {
+      "frame": 19,
+      "tracked_objects": []
+    },
+    {
+      "frame": 20,
+      "tracked_objects": []
+    },
+    {
+      "frame": 21,
+      "tracked_objects": []
+    },
+    {
+      "frame": 22,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1470,
+          "source": "object_detector",
+          "label": "umbrella",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 23,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1471,
+          "source": "object_detector",
+          "label": "umbrella",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 24,
+      "tracked_objects": []
+    },
+    {
+      "frame": 25,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 1404,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 26,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 1405,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 27,
+      "tracked_objects": []
+    },
+    {
+      "frame": 28,
+      "tracked_objects": []
+    },
+    {
+      "frame": 29,
+      "tracked_objects": []
+    },
+    {
+      "frame": 30,
+      "tracked_objects": []
+    },
+    {
+      "frame": 31,
+      "tracked_objects": []
+    },
+    {
+      "frame": 32,
+      "tracked_objects": []
+    },
+    {
+      "frame": 33,
+      "tracked_objects": []
+    },
+    {
+      "frame": 34,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 1083,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 35,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 1075,
+          "source": "object_detector",
+          "label": "kite",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 36,
+      "tracked_objects": []
+    },
+    {
+      "frame": 37,
+      "tracked_objects": []
+    },
+    {
+      "frame": 38,
+      "tracked_objects": []
+    },
+    {
+      "frame": 39,
+      "tracked_objects": []
+    },
+    {
+      "frame": 40,
+      "tracked_objects": []
+    },
+    {
+      "frame": 41,
+      "tracked_objects": []
+    },
+    {
+      "frame": 42,
+      "tracked_objects": []
+    },
+    {
+      "frame": 43,
+      "tracked_objects": []
+    },
+    {
+      "frame": 44,
+      "tracked_objects": []
+    },
+    {
+      "frame": 45,
+      "tracked_objects": []
+    },
+    {
+      "frame": 46,
+      "tracked_objects": []
+    },
+    {
+      "frame": 47,
+      "tracked_objects": []
+    },
+    {
+      "frame": 48,
+      "tracked_objects": []
+    },
+    {
+      "frame": 49,
+      "tracked_objects": []
+    },
+    {
+      "frame": 50,
+      "tracked_objects": []
+    },
+    {
+      "frame": 51,
+      "tracked_objects": []
+    },
+    {
+      "frame": 52,
+      "tracked_objects": []
+    },
+    {
+      "frame": 53,
+      "tracked_objects": []
+    },
+    {
+      "frame": 54,
+      "tracked_objects": []
+    },
+    {
+      "frame": 55,
+      "tracked_objects": []
+    },
+    {
+      "frame": 56,
+      "tracked_objects": []
+    },
+    {
+      "frame": 57,
+      "tracked_objects": []
+    },
+    {
+      "frame": 58,
+      "tracked_objects": []
+    },
+    {
+      "frame": 59,
+      "tracked_objects": []
+    },
+    {
+      "frame": 60,
+      "tracked_objects": []
+    },
+    {
+      "frame": 61,
+      "tracked_objects": []
+    },
+    {
+      "frame": 62,
+      "tracked_objects": []
+    },
+    {
+      "frame": 63,
+      "tracked_objects": []
+    },
+    {
+      "frame": 64,
+      "tracked_objects": []
+    },
+    {
+      "frame": 65,
+      "tracked_objects": []
+    },
+    {
+      "frame": 66,
+      "tracked_objects": []
+    },
+    {
+      "frame": 67,
+      "tracked_objects": []
+    },
+    {
+      "frame": 68,
+      "tracked_objects": []
+    },
+    {
+      "frame": 69,
+      "tracked_objects": []
+    },
+    {
+      "frame": 70,
+      "tracked_objects": []
+    },
+    {
+      "frame": 71,
+      "tracked_objects": []
+    },
+    {
+      "frame": 72,
+      "tracked_objects": []
+    },
+    {
+      "frame": 73,
+      "tracked_objects": []
+    },
+    {
+      "frame": 74,
+      "tracked_objects": []
+    },
+    {
+      "frame": 75,
+      "tracked_objects": []
+    },
+    {
+      "frame": 76,
+      "tracked_objects": []
+    },
+    {
+      "frame": 77,
+      "tracked_objects": []
+    },
+    {
+      "frame": 78,
+      "tracked_objects": []
+    },
+    {
+      "frame": 79,
+      "tracked_objects": []
+    },
+    {
+      "frame": 80,
+      "tracked_objects": []
+    },
+    {
+      "frame": 81,
+      "tracked_objects": []
+    },
+    {
+      "frame": 82,
+      "tracked_objects": []
+    },
+    {
+      "frame": 83,
+      "tracked_objects": []
+    },
+    {
+      "frame": 84,
+      "tracked_objects": []
+    },
+    {
+      "frame": 85,
+      "tracked_objects": []
+    },
+    {
+      "frame": 86,
+      "tracked_objects": []
+    },
+    {
+      "frame": 87,
+      "tracked_objects": []
+    },
+    {
+      "frame": 88,
+      "tracked_objects": []
+    },
+    {
+      "frame": 89,
+      "tracked_objects": []
+    },
+    {
+      "frame": 90,
+      "tracked_objects": []
+    },
+    {
+      "frame": 91,
+      "tracked_objects": []
+    },
+    {
+      "frame": 92,
+      "tracked_objects": []
+    },
+    {
+      "frame": 93,
+      "tracked_objects": []
+    },
+    {
+      "frame": 94,
+      "tracked_objects": []
+    },
+    {
+      "frame": 95,
+      "tracked_objects": []
+    },
+    {
+      "frame": 96,
+      "tracked_objects": []
+    },
+    {
+      "frame": 97,
+      "tracked_objects": []
+    },
+    {
+      "frame": 98,
+      "tracked_objects": []
+    },
+    {
+      "frame": 99,
+      "tracked_objects": []
+    },
+    {
+      "frame": 100,
+      "tracked_objects": []
+    },
+    {
+      "frame": 101,
+      "tracked_objects": []
+    },
+    {
+      "frame": 102,
+      "tracked_objects": []
+    },
+    {
+      "frame": 103,
+      "tracked_objects": []
+    },
+    {
+      "frame": 104,
+      "tracked_objects": []
+    },
+    {
+      "frame": 105,
+      "tracked_objects": []
+    },
+    {
+      "frame": 106,
+      "tracked_objects": []
+    },
+    {
+      "frame": 107,
+      "tracked_objects": [
+        {
+          "id": "obj_5",
+          "centroid_x": 835,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 108,
+      "tracked_objects": []
+    },
+    {
+      "frame": 109,
+      "tracked_objects": [
+        {
+          "id": "obj_5",
+          "centroid_x": 826,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 110,
+      "tracked_objects": [
+        {
+          "id": "obj_5",
+          "centroid_x": 826,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 111,
+      "tracked_objects": []
+    },
+    {
+      "frame": 112,
+      "tracked_objects": []
+    },
+    {
+      "frame": 113,
+      "tracked_objects": []
+    },
+    {
+      "frame": 114,
+      "tracked_objects": []
+    },
+    {
+      "frame": 115,
+      "tracked_objects": []
+    },
+    {
+      "frame": 116,
+      "tracked_objects": []
+    },
+    {
+      "frame": 117,
+      "tracked_objects": []
+    },
+    {
+      "frame": 118,
+      "tracked_objects": []
+    },
+    {
+      "frame": 119,
+      "tracked_objects": []
+    },
+    {
+      "frame": 120,
+      "tracked_objects": []
+    },
+    {
+      "frame": 121,
+      "tracked_objects": []
+    },
+    {
+      "frame": 122,
+      "tracked_objects": []
+    },
+    {
+      "frame": 123,
+      "tracked_objects": []
+    },
+    {
+      "frame": 124,
+      "tracked_objects": []
+    },
+    {
+      "frame": 125,
+      "tracked_objects": []
+    },
+    {
+      "frame": 126,
+      "tracked_objects": []
+    },
+    {
+      "frame": 127,
+      "tracked_objects": []
+    },
+    {
+      "frame": 128,
+      "tracked_objects": []
+    },
+    {
+      "frame": 129,
+      "tracked_objects": []
+    },
+    {
+      "frame": 130,
+      "tracked_objects": []
+    },
+    {
+      "frame": 131,
+      "tracked_objects": []
+    },
+    {
+      "frame": 132,
+      "tracked_objects": []
+    },
+    {
+      "frame": 133,
+      "tracked_objects": []
+    },
+    {
+      "frame": 134,
+      "tracked_objects": []
+    },
+    {
+      "frame": 135,
+      "tracked_objects": [
+        {
+          "id": "obj_7",
+          "centroid_x": 634,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_6",
+          "centroid_x": 695,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 136,
+      "tracked_objects": [
+        {
+          "id": "obj_6",
+          "centroid_x": 695,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 137,
+      "tracked_objects": []
+    },
+    {
+      "frame": 138,
+      "tracked_objects": []
+    },
+    {
+      "frame": 139,
+      "tracked_objects": []
+    },
+    {
+      "frame": 140,
+      "tracked_objects": []
+    },
+    {
+      "frame": 141,
+      "tracked_objects": []
+    },
+    {
+      "frame": 142,
+      "tracked_objects": []
+    },
+    {
+      "frame": 143,
+      "tracked_objects": []
+    },
+    {
+      "frame": 144,
+      "tracked_objects": []
+    },
+    {
+      "frame": 145,
+      "tracked_objects": []
+    },
+    {
+      "frame": 146,
+      "tracked_objects": []
+    },
+    {
+      "frame": 147,
+      "tracked_objects": []
+    },
+    {
+      "frame": 148,
+      "tracked_objects": []
+    },
+    {
+      "frame": 149,
+      "tracked_objects": []
+    },
+    {
+      "frame": 150,
+      "tracked_objects": []
+    },
+    {
+      "frame": 151,
+      "tracked_objects": []
+    },
+    {
+      "frame": 152,
+      "tracked_objects": []
+    },
+    {
+      "frame": 153,
+      "tracked_objects": []
+    },
+    {
+      "frame": 154,
+      "tracked_objects": []
+    },
+    {
+      "frame": 155,
+      "tracked_objects": []
+    },
+    {
+      "frame": 156,
+      "tracked_objects": []
+    },
+    {
+      "frame": 157,
+      "tracked_objects": []
+    },
+    {
+      "frame": 158,
+      "tracked_objects": []
+    },
+    {
+      "frame": 159,
+      "tracked_objects": []
+    },
+    {
+      "frame": 160,
+      "tracked_objects": []
+    },
+    {
+      "frame": 161,
+      "tracked_objects": []
+    },
+    {
+      "frame": 162,
+      "tracked_objects": []
+    },
+    {
+      "frame": 163,
+      "tracked_objects": []
+    },
+    {
+      "frame": 164,
+      "tracked_objects": []
+    },
+    {
+      "frame": 165,
+      "tracked_objects": []
+    },
+    {
+      "frame": 166,
+      "tracked_objects": []
+    },
+    {
+      "frame": 167,
+      "tracked_objects": []
+    },
+    {
+      "frame": 168,
+      "tracked_objects": []
+    },
+    {
+      "frame": 169,
+      "tracked_objects": []
+    },
+    {
+      "frame": 170,
+      "tracked_objects": []
+    },
+    {
+      "frame": 171,
+      "tracked_objects": []
+    },
+    {
+      "frame": 172,
+      "tracked_objects": []
+    },
+    {
+      "frame": 173,
+      "tracked_objects": []
+    },
+    {
+      "frame": 174,
+      "tracked_objects": []
+    },
+    {
+      "frame": 175,
+      "tracked_objects": []
+    },
+    {
+      "frame": 176,
+      "tracked_objects": []
+    },
+    {
+      "frame": 177,
+      "tracked_objects": []
+    },
+    {
+      "frame": 178,
+      "tracked_objects": []
+    },
+    {
+      "frame": 179,
+      "tracked_objects": []
+    },
+    {
+      "frame": 180,
+      "tracked_objects": []
+    },
+    {
+      "frame": 181,
+      "tracked_objects": []
+    },
+    {
+      "frame": 182,
+      "tracked_objects": []
+    },
+    {
+      "frame": 183,
+      "tracked_objects": []
+    },
+    {
+      "frame": 184,
+      "tracked_objects": []
+    },
+    {
+      "frame": 185,
+      "tracked_objects": []
+    },
+    {
+      "frame": 186,
+      "tracked_objects": []
+    },
+    {
+      "frame": 187,
+      "tracked_objects": []
+    },
+    {
+      "frame": 188,
+      "tracked_objects": []
+    },
+    {
+      "frame": 189,
+      "tracked_objects": []
+    },
+    {
+      "frame": 190,
+      "tracked_objects": []
+    },
+    {
+      "frame": 191,
+      "tracked_objects": []
+    },
+    {
+      "frame": 192,
+      "tracked_objects": []
+    },
+    {
+      "frame": 193,
+      "tracked_objects": []
+    },
+    {
+      "frame": 194,
+      "tracked_objects": []
+    },
+    {
+      "frame": 195,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1168,
+          "source": "object_detector",
+          "label": "bicycle",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 196,
+      "tracked_objects": []
+    },
+    {
+      "frame": 197,
+      "tracked_objects": []
+    },
+    {
+      "frame": 198,
+      "tracked_objects": []
+    },
+    {
+      "frame": 199,
+      "tracked_objects": []
+    },
+    {
+      "frame": 200,
+      "tracked_objects": []
+    },
+    {
+      "frame": 201,
+      "tracked_objects": []
+    },
+    {
+      "frame": 202,
+      "tracked_objects": []
+    },
+    {
+      "frame": 203,
+      "tracked_objects": []
+    },
+    {
+      "frame": 204,
+      "tracked_objects": []
+    },
+    {
+      "frame": 205,
+      "tracked_objects": []
+    },
+    {
+      "frame": 206,
+      "tracked_objects": []
+    },
+    {
+      "frame": 207,
+      "tracked_objects": []
+    },
+    {
+      "frame": 208,
+      "tracked_objects": []
+    },
+    {
+      "frame": 209,
+      "tracked_objects": []
+    },
+    {
+      "frame": 210,
+      "tracked_objects": []
+    },
+    {
+      "frame": 211,
+      "tracked_objects": []
+    },
+    {
+      "frame": 212,
+      "tracked_objects": []
+    },
+    {
+      "frame": 213,
+      "tracked_objects": []
+    },
+    {
+      "frame": 214,
+      "tracked_objects": []
+    },
+    {
+      "frame": 215,
+      "tracked_objects": []
+    },
+    {
+      "frame": 216,
+      "tracked_objects": []
+    },
+    {
+      "frame": 217,
+      "tracked_objects": []
+    },
+    {
+      "frame": 218,
+      "tracked_objects": []
+    },
+    {
+      "frame": 219,
+      "tracked_objects": []
+    },
+    {
+      "frame": 220,
+      "tracked_objects": []
+    },
+    {
+      "frame": 221,
+      "tracked_objects": []
+    },
+    {
+      "frame": 222,
+      "tracked_objects": []
+    },
+    {
+      "frame": 223,
+      "tracked_objects": []
+    },
+    {
+      "frame": 224,
+      "tracked_objects": []
+    },
+    {
+      "frame": 225,
+      "tracked_objects": []
+    },
+    {
+      "frame": 226,
+      "tracked_objects": []
+    },
+    {
+      "frame": 227,
+      "tracked_objects": []
+    },
+    {
+      "frame": 228,
+      "tracked_objects": []
+    },
+    {
+      "frame": 229,
+      "tracked_objects": []
+    },
+    {
+      "frame": 230,
+      "tracked_objects": []
+    },
+    {
+      "frame": 231,
+      "tracked_objects": []
+    },
+    {
+      "frame": 232,
+      "tracked_objects": []
+    },
+    {
+      "frame": 233,
+      "tracked_objects": []
+    },
+    {
+      "frame": 234,
+      "tracked_objects": []
+    },
+    {
+      "frame": 235,
+      "tracked_objects": []
+    },
+    {
+      "frame": 236,
+      "tracked_objects": []
+    },
+    {
+      "frame": 237,
+      "tracked_objects": []
+    },
+    {
+      "frame": 238,
+      "tracked_objects": []
+    },
+    {
+      "frame": 239,
+      "tracked_objects": []
+    },
+    {
+      "frame": 240,
+      "tracked_objects": []
+    },
+    {
+      "frame": 241,
+      "tracked_objects": []
+    },
+    {
+      "frame": 242,
+      "tracked_objects": []
+    },
+    {
+      "frame": 243,
+      "tracked_objects": []
+    },
+    {
+      "frame": 244,
+      "tracked_objects": []
+    },
+    {
+      "frame": 245,
+      "tracked_objects": []
+    },
+    {
+      "frame": 246,
+      "tracked_objects": []
+    },
+    {
+      "frame": 247,
+      "tracked_objects": []
+    },
+    {
+      "frame": 248,
+      "tracked_objects": []
+    },
+    {
+      "frame": 249,
+      "tracked_objects": []
+    },
+    {
+      "frame": 250,
+      "tracked_objects": []
+    },
+    {
+      "frame": 251,
+      "tracked_objects": []
+    },
+    {
+      "frame": 252,
+      "tracked_objects": []
+    },
+    {
+      "frame": 253,
+      "tracked_objects": []
+    },
+    {
+      "frame": 254,
+      "tracked_objects": []
+    },
+    {
+      "frame": 255,
+      "tracked_objects": []
+    },
+    {
+      "frame": 256,
+      "tracked_objects": []
+    },
+    {
+      "frame": 257,
+      "tracked_objects": []
+    },
+    {
+      "frame": 258,
+      "tracked_objects": []
+    },
+    {
+      "frame": 259,
+      "tracked_objects": []
+    },
+    {
+      "frame": 260,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 863,
+          "source": "object_detector",
+          "label": "banana",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 928,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 261,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 862,
+          "source": "object_detector",
+          "label": "banana",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 930,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 262,
+      "tracked_objects": []
+    },
+    {
+      "frame": 263,
+      "tracked_objects": []
+    },
+    {
+      "frame": 264,
+      "tracked_objects": []
+    },
+    {
+      "frame": 265,
+      "tracked_objects": []
+    },
+    {
+      "frame": 266,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 624,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 932,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 267,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 622,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 932,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 268,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 587,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 269,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 586,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 270,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 553,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 934,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 271,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 552,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 932,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 272,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 540,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 273,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 540,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 274,
+      "tracked_objects": []
+    },
+    {
+      "frame": 275,
+      "tracked_objects": []
+    },
+    {
+      "frame": 276,
+      "tracked_objects": []
+    },
+    {
+      "frame": 277,
+      "tracked_objects": []
+    },
+    {
+      "frame": 278,
+      "tracked_objects": []
+    },
+    {
+      "frame": 279,
+      "tracked_objects": []
+    },
+    {
+      "frame": 280,
+      "tracked_objects": []
+    },
+    {
+      "frame": 281,
+      "tracked_objects": []
+    },
+    {
+      "frame": 282,
+      "tracked_objects": []
+    },
+    {
+      "frame": 283,
+      "tracked_objects": []
+    },
+    {
+      "frame": 284,
+      "tracked_objects": []
+    },
+    {
+      "frame": 285,
+      "tracked_objects": []
+    },
+    {
+      "frame": 286,
+      "tracked_objects": []
+    },
+    {
+      "frame": 287,
+      "tracked_objects": []
+    },
+    {
+      "frame": 288,
+      "tracked_objects": []
+    },
+    {
+      "frame": 289,
+      "tracked_objects": []
+    },
+    {
+      "frame": 290,
+      "tracked_objects": []
+    },
+    {
+      "frame": 291,
+      "tracked_objects": []
+    },
+    {
+      "frame": 292,
+      "tracked_objects": []
+    },
+    {
+      "frame": 293,
+      "tracked_objects": []
+    },
+    {
+      "frame": 294,
+      "tracked_objects": []
+    },
+    {
+      "frame": 295,
+      "tracked_objects": []
+    },
+    {
+      "frame": 296,
+      "tracked_objects": []
+    },
+    {
+      "frame": 297,
+      "tracked_objects": []
+    },
+    {
+      "frame": 298,
+      "tracked_objects": []
+    },
+    {
+      "frame": 299,
+      "tracked_objects": []
+    },
+    {
+      "frame": 300,
+      "tracked_objects": []
+    },
+    {
+      "frame": 301,
+      "tracked_objects": []
+    },
+    {
+      "frame": 302,
+      "tracked_objects": []
+    },
+    {
+      "frame": 303,
+      "tracked_objects": []
+    },
+    {
+      "frame": 304,
+      "tracked_objects": []
+    },
+    {
+      "frame": 305,
+      "tracked_objects": []
+    },
+    {
+      "frame": 306,
+      "tracked_objects": []
+    },
+    {
+      "frame": 307,
+      "tracked_objects": [
+        {
+          "id": "obj_12",
+          "centroid_x": 870,
+          "source": "object_detector",
+          "label": "hair drier",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 308,
+      "tracked_objects": []
+    },
+    {
+      "frame": 309,
+      "tracked_objects": []
+    },
+    {
+      "frame": 310,
+      "tracked_objects": []
+    },
+    {
+      "frame": 311,
+      "tracked_objects": []
+    },
+    {
+      "frame": 312,
+      "tracked_objects": []
+    },
+    {
+      "frame": 313,
+      "tracked_objects": []
+    },
+    {
+      "frame": 314,
+      "tracked_objects": []
+    },
+    {
+      "frame": 315,
+      "tracked_objects": []
+    },
+    {
+      "frame": 316,
+      "tracked_objects": []
+    },
+    {
+      "frame": 317,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 458,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 318,
+      "tracked_objects": [
+        {
+          "id": "obj_14",
+          "centroid_x": 510,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 319,
+      "tracked_objects": []
+    },
+    {
+      "frame": 320,
+      "tracked_objects": []
+    },
+    {
+      "frame": 321,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 322,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 952,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 323,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 951,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 324,
+      "tracked_objects": [
+        {
+          "id": "obj_16",
+          "centroid_x": 597,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_15",
+          "centroid_x": 938,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 325,
+      "tracked_objects": [
+        {
+          "id": "obj_16",
+          "centroid_x": 600,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_15",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 326,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 942,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 327,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 943,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 328,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "keyboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 329,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "keyboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 330,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 966,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 331,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 966,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 332,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 956,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 333,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 956,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 334,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 943,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 335,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 943,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 336,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 945,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 337,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 945,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 338,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 953,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 339,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 340,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 939,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 341,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 940,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 342,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 953,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 343,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 953,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 344,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 951,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 345,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 950,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 346,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 950,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 347,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 950,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 348,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 349,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 350,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 351,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 352,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 948,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 353,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 953,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 354,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 950,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 355,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 950,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 356,
+      "tracked_objects": [
+        {
+          "id": "obj_19",
+          "centroid_x": 592,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_18",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 357,
+      "tracked_objects": [
+        {
+          "id": "obj_19",
+          "centroid_x": 589,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_18",
+          "centroid_x": 937,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 358,
+      "tracked_objects": []
+    },
+    {
+      "frame": 359,
+      "tracked_objects": []
+    },
+    {
+      "frame": 360,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "keyboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 361,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 952,
+          "source": "object_detector",
+          "label": "keyboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 362,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 363,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 967,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 364,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 956,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 365,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 946,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 366,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 947,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 367,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 946,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 368,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 947,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 369,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 947,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 370,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 959,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 371,
+      "tracked_objects": [
+        {
+          "id": "obj_21",
+          "centroid_x": 992,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 681,
+          "bbox_height": 505
+        }
+      ]
+    },
+    {
+      "frame": 372,
+      "tracked_objects": []
+    },
+    {
+      "frame": 373,
+      "tracked_objects": []
+    },
+    {
+      "frame": 374,
+      "tracked_objects": [
+        {
+          "id": "obj_22",
+          "centroid_x": 1310,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 431,
+          "bbox_height": 356
+        }
+      ]
+    },
+    {
+      "frame": 375,
+      "tracked_objects": []
+    },
+    {
+      "frame": 376,
+      "tracked_objects": []
+    },
+    {
+      "frame": 377,
+      "tracked_objects": []
+    },
+    {
+      "frame": 378,
+      "tracked_objects": []
+    },
+    {
+      "frame": 379,
+      "tracked_objects": []
+    },
+    {
+      "frame": 380,
+      "tracked_objects": []
+    },
+    {
+      "frame": 381,
+      "tracked_objects": []
+    },
+    {
+      "frame": 382,
+      "tracked_objects": []
+    },
+    {
+      "frame": 383,
+      "tracked_objects": []
+    },
+    {
+      "frame": 384,
+      "tracked_objects": []
+    },
+    {
+      "frame": 385,
+      "tracked_objects": [
+        {
+          "id": "obj_23",
+          "centroid_x": 947,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 386,
+      "tracked_objects": []
+    },
+    {
+      "frame": 387,
+      "tracked_objects": []
+    },
+    {
+      "frame": 388,
+      "tracked_objects": []
+    },
+    {
+      "frame": 389,
+      "tracked_objects": []
+    },
+    {
+      "frame": 390,
+      "tracked_objects": []
+    },
+    {
+      "frame": 391,
+      "tracked_objects": []
+    },
+    {
+      "frame": 392,
+      "tracked_objects": []
+    },
+    {
+      "frame": 393,
+      "tracked_objects": []
+    },
+    {
+      "frame": 394,
+      "tracked_objects": []
+    },
+    {
+      "frame": 395,
+      "tracked_objects": []
+    },
+    {
+      "frame": 396,
+      "tracked_objects": []
+    },
+    {
+      "frame": 397,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 991,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 398,
+      "tracked_objects": [
+        {
+          "id": "obj_25",
+          "centroid_x": 981,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 399,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 989,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 400,
+      "tracked_objects": []
+    },
+    {
+      "frame": 401,
+      "tracked_objects": []
+    },
+    {
+      "frame": 402,
+      "tracked_objects": []
+    },
+    {
+      "frame": 403,
+      "tracked_objects": []
+    },
+    {
+      "frame": 404,
+      "tracked_objects": []
+    },
+    {
+      "frame": 405,
+      "tracked_objects": []
+    },
+    {
+      "frame": 406,
+      "tracked_objects": []
+    },
+    {
+      "frame": 407,
+      "tracked_objects": []
+    },
+    {
+      "frame": 408,
+      "tracked_objects": []
+    },
+    {
+      "frame": 409,
+      "tracked_objects": []
+    },
+    {
+      "frame": 410,
+      "tracked_objects": []
+    },
+    {
+      "frame": 411,
+      "tracked_objects": []
+    },
+    {
+      "frame": 412,
+      "tracked_objects": []
+    },
+    {
+      "frame": 413,
+      "tracked_objects": []
+    },
+    {
+      "frame": 414,
+      "tracked_objects": []
+    },
+    {
+      "frame": 415,
+      "tracked_objects": []
+    },
+    {
+      "frame": 416,
+      "tracked_objects": []
+    },
+    {
+      "frame": 417,
+      "tracked_objects": []
+    },
+    {
+      "frame": 418,
+      "tracked_objects": []
+    },
+    {
+      "frame": 419,
+      "tracked_objects": []
+    },
+    {
+      "frame": 420,
+      "tracked_objects": []
+    },
+    {
+      "frame": 421,
+      "tracked_objects": []
+    },
+    {
+      "frame": 422,
+      "tracked_objects": []
+    },
+    {
+      "frame": 423,
+      "tracked_objects": []
+    },
+    {
+      "frame": 424,
+      "tracked_objects": []
+    },
+    {
+      "frame": 425,
+      "tracked_objects": []
+    },
+    {
+      "frame": 426,
+      "tracked_objects": []
+    },
+    {
+      "frame": 427,
+      "tracked_objects": []
+    },
+    {
+      "frame": 428,
+      "tracked_objects": []
+    },
+    {
+      "frame": 429,
+      "tracked_objects": []
+    },
+    {
+      "frame": 430,
+      "tracked_objects": []
+    },
+    {
+      "frame": 431,
+      "tracked_objects": []
+    },
+    {
+      "frame": 432,
+      "tracked_objects": [
+        {
+          "id": "obj_27",
+          "centroid_x": 1088,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 433,
+      "tracked_objects": [
+        {
+          "id": "obj_27",
+          "centroid_x": 1039,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 434,
+      "tracked_objects": []
+    },
+    {
+      "frame": 435,
+      "tracked_objects": []
+    },
+    {
+      "frame": 436,
+      "tracked_objects": []
+    },
+    {
+      "frame": 437,
+      "tracked_objects": []
+    },
+    {
+      "frame": 438,
+      "tracked_objects": []
+    },
+    {
+      "frame": 439,
+      "tracked_objects": []
+    },
+    {
+      "frame": 440,
+      "tracked_objects": []
+    },
+    {
+      "frame": 441,
+      "tracked_objects": []
+    },
+    {
+      "frame": 442,
+      "tracked_objects": []
+    },
+    {
+      "frame": 443,
+      "tracked_objects": []
+    },
+    {
+      "frame": 444,
+      "tracked_objects": []
+    },
+    {
+      "frame": 445,
+      "tracked_objects": []
+    },
+    {
+      "frame": 446,
+      "tracked_objects": []
+    },
+    {
+      "frame": 447,
+      "tracked_objects": []
+    },
+    {
+      "frame": 448,
+      "tracked_objects": []
+    },
+    {
+      "frame": 449,
+      "tracked_objects": []
+    },
+    {
+      "frame": 450,
+      "tracked_objects": []
+    },
+    {
+      "frame": 451,
+      "tracked_objects": []
+    },
+    {
+      "frame": 452,
+      "tracked_objects": []
+    },
+    {
+      "frame": 453,
+      "tracked_objects": []
+    },
+    {
+      "frame": 454,
+      "tracked_objects": []
+    },
+    {
+      "frame": 455,
+      "tracked_objects": []
+    },
+    {
+      "frame": 456,
+      "tracked_objects": []
+    },
+    {
+      "frame": 457,
+      "tracked_objects": []
+    },
+    {
+      "frame": 458,
+      "tracked_objects": []
+    },
+    {
+      "frame": 459,
+      "tracked_objects": []
+    },
+    {
+      "frame": 460,
+      "tracked_objects": []
+    },
+    {
+      "frame": 461,
+      "tracked_objects": []
+    },
+    {
+      "frame": 462,
+      "tracked_objects": []
+    },
+    {
+      "frame": 463,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1104,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 464,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1156,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 465,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1154,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 466,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1143,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 467,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1142,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 468,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1137,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 469,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 1133,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 470,
+      "tracked_objects": []
+    },
+    {
+      "frame": 471,
+      "tracked_objects": []
+    },
+    {
+      "frame": 472,
+      "tracked_objects": []
+    },
+    {
+      "frame": 473,
+      "tracked_objects": []
+    },
+    {
+      "frame": 474,
+      "tracked_objects": []
+    },
+    {
+      "frame": 475,
+      "tracked_objects": []
+    },
+    {
+      "frame": 476,
+      "tracked_objects": []
+    },
+    {
+      "frame": 477,
+      "tracked_objects": []
+    },
+    {
+      "frame": 478,
+      "tracked_objects": []
+    },
+    {
+      "frame": 479,
+      "tracked_objects": []
+    },
+    {
+      "frame": 480,
+      "tracked_objects": []
+    },
+    {
+      "frame": 481,
+      "tracked_objects": []
+    },
+    {
+      "frame": 482,
+      "tracked_objects": []
+    },
+    {
+      "frame": 483,
+      "tracked_objects": []
+    },
+    {
+      "frame": 484,
+      "tracked_objects": []
+    },
+    {
+      "frame": 485,
+      "tracked_objects": []
+    },
+    {
+      "frame": 486,
+      "tracked_objects": []
+    },
+    {
+      "frame": 487,
+      "tracked_objects": []
+    },
+    {
+      "frame": 488,
+      "tracked_objects": [
+        {
+          "id": "obj_29",
+          "centroid_x": 1232,
+          "source": "object_detector",
+          "label": "scissors",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 489,
+      "tracked_objects": [
+        {
+          "id": "obj_29",
+          "centroid_x": 1237,
+          "source": "object_detector",
+          "label": "scissors",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 490,
+      "tracked_objects": []
+    },
+    {
+      "frame": 491,
+      "tracked_objects": []
+    },
+    {
+      "frame": 492,
+      "tracked_objects": []
+    },
+    {
+      "frame": 493,
+      "tracked_objects": []
+    },
+    {
+      "frame": 494,
+      "tracked_objects": []
+    },
+    {
+      "frame": 495,
+      "tracked_objects": []
+    },
+    {
+      "frame": 496,
+      "tracked_objects": []
+    },
+    {
+      "frame": 497,
+      "tracked_objects": []
+    },
+    {
+      "frame": 498,
+      "tracked_objects": []
+    },
+    {
+      "frame": 499,
+      "tracked_objects": []
+    },
+    {
+      "frame": 500,
+      "tracked_objects": []
+    },
+    {
+      "frame": 501,
+      "tracked_objects": []
+    },
+    {
+      "frame": 502,
+      "tracked_objects": []
+    },
+    {
+      "frame": 503,
+      "tracked_objects": []
+    },
+    {
+      "frame": 504,
+      "tracked_objects": []
+    },
+    {
+      "frame": 505,
+      "tracked_objects": []
+    },
+    {
+      "frame": 506,
+      "tracked_objects": []
+    },
+    {
+      "frame": 507,
+      "tracked_objects": []
+    },
+    {
+      "frame": 508,
+      "tracked_objects": []
+    },
+    {
+      "frame": 509,
+      "tracked_objects": []
+    },
+    {
+      "frame": 510,
+      "tracked_objects": []
+    },
+    {
+      "frame": 511,
+      "tracked_objects": []
+    },
+    {
+      "frame": 512,
+      "tracked_objects": []
+    },
+    {
+      "frame": 513,
+      "tracked_objects": [
+        {
+          "id": "obj_30",
+          "centroid_x": 245,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 514,
+      "tracked_objects": []
+    },
+    {
+      "frame": 515,
+      "tracked_objects": []
+    },
+    {
+      "frame": 516,
+      "tracked_objects": []
+    },
+    {
+      "frame": 517,
+      "tracked_objects": [
+        {
+          "id": "obj_30",
+          "centroid_x": 247,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 518,
+      "tracked_objects": [
+        {
+          "id": "obj_30",
+          "centroid_x": 245,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 519,
+      "tracked_objects": []
+    },
+    {
+      "frame": 520,
+      "tracked_objects": []
+    },
+    {
+      "frame": 521,
+      "tracked_objects": []
+    },
+    {
+      "frame": 522,
+      "tracked_objects": []
+    },
+    {
+      "frame": 523,
+      "tracked_objects": []
+    },
+    {
+      "frame": 524,
+      "tracked_objects": []
+    },
+    {
+      "frame": 525,
+      "tracked_objects": []
+    },
+    {
+      "frame": 526,
+      "tracked_objects": []
+    },
+    {
+      "frame": 527,
+      "tracked_objects": []
+    },
+    {
+      "frame": 528,
+      "tracked_objects": []
+    },
+    {
+      "frame": 529,
+      "tracked_objects": []
+    },
+    {
+      "frame": 530,
+      "tracked_objects": []
+    },
+    {
+      "frame": 531,
+      "tracked_objects": []
+    },
+    {
+      "frame": 532,
+      "tracked_objects": []
+    },
+    {
+      "frame": 533,
+      "tracked_objects": []
+    },
+    {
+      "frame": 534,
+      "tracked_objects": []
+    },
+    {
+      "frame": 535,
+      "tracked_objects": []
+    },
+    {
+      "frame": 536,
+      "tracked_objects": []
+    },
+    {
+      "frame": 537,
+      "tracked_objects": []
+    },
+    {
+      "frame": 538,
+      "tracked_objects": []
+    },
+    {
+      "frame": 539,
+      "tracked_objects": []
+    },
+    {
+      "frame": 540,
+      "tracked_objects": []
+    },
+    {
+      "frame": 541,
+      "tracked_objects": []
+    },
+    {
+      "frame": 542,
+      "tracked_objects": []
+    },
+    {
+      "frame": 543,
+      "tracked_objects": []
+    },
+    {
+      "frame": 544,
+      "tracked_objects": []
+    },
+    {
+      "frame": 545,
+      "tracked_objects": []
+    },
+    {
+      "frame": 546,
+      "tracked_objects": []
+    },
+    {
+      "frame": 547,
+      "tracked_objects": []
+    },
+    {
+      "frame": 548,
+      "tracked_objects": []
+    },
+    {
+      "frame": 549,
+      "tracked_objects": []
+    },
+    {
+      "frame": 550,
+      "tracked_objects": []
+    },
+    {
+      "frame": 551,
+      "tracked_objects": []
+    },
+    {
+      "frame": 552,
+      "tracked_objects": []
+    },
+    {
+      "frame": 553,
+      "tracked_objects": []
+    },
+    {
+      "frame": 554,
+      "tracked_objects": []
+    },
+    {
+      "frame": 555,
+      "tracked_objects": []
+    },
+    {
+      "frame": 556,
+      "tracked_objects": []
+    },
+    {
+      "frame": 557,
+      "tracked_objects": []
+    },
+    {
+      "frame": 558,
+      "tracked_objects": []
+    },
+    {
+      "frame": 559,
+      "tracked_objects": []
+    },
+    {
+      "frame": 560,
+      "tracked_objects": []
+    },
+    {
+      "frame": 561,
+      "tracked_objects": []
+    },
+    {
+      "frame": 562,
+      "tracked_objects": []
+    },
+    {
+      "frame": 563,
+      "tracked_objects": []
+    },
+    {
+      "frame": 564,
+      "tracked_objects": []
+    },
+    {
+      "frame": 565,
+      "tracked_objects": []
+    },
+    {
+      "frame": 566,
+      "tracked_objects": []
+    },
+    {
+      "frame": 567,
+      "tracked_objects": []
+    },
+    {
+      "frame": 568,
+      "tracked_objects": []
+    },
+    {
+      "frame": 569,
+      "tracked_objects": []
+    },
+    {
+      "frame": 570,
+      "tracked_objects": []
+    },
+    {
+      "frame": 571,
+      "tracked_objects": []
+    },
+    {
+      "frame": 572,
+      "tracked_objects": []
+    },
+    {
+      "frame": 573,
+      "tracked_objects": []
+    },
+    {
+      "frame": 574,
+      "tracked_objects": []
+    },
+    {
+      "frame": 575,
+      "tracked_objects": []
+    },
+    {
+      "frame": 576,
+      "tracked_objects": [
+        {
+          "id": "obj_31",
+          "centroid_x": 270,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 577,
+      "tracked_objects": [
+        {
+          "id": "obj_31",
+          "centroid_x": 270,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 578,
+      "tracked_objects": []
+    },
+    {
+      "frame": 579,
+      "tracked_objects": []
+    },
+    {
+      "frame": 580,
+      "tracked_objects": []
+    },
+    {
+      "frame": 581,
+      "tracked_objects": []
+    },
+    {
+      "frame": 582,
+      "tracked_objects": []
+    },
+    {
+      "frame": 583,
+      "tracked_objects": []
+    },
+    {
+      "frame": 584,
+      "tracked_objects": []
+    },
+    {
+      "frame": 585,
+      "tracked_objects": []
+    },
+    {
+      "frame": 586,
+      "tracked_objects": []
+    },
+    {
+      "frame": 587,
+      "tracked_objects": []
+    },
+    {
+      "frame": 588,
+      "tracked_objects": []
+    },
+    {
+      "frame": 589,
+      "tracked_objects": []
+    },
+    {
+      "frame": 590,
+      "tracked_objects": []
+    },
+    {
+      "frame": 591,
+      "tracked_objects": []
+    },
+    {
+      "frame": 592,
+      "tracked_objects": []
+    },
+    {
+      "frame": 593,
+      "tracked_objects": []
+    },
+    {
+      "frame": 594,
+      "tracked_objects": []
+    },
+    {
+      "frame": 595,
+      "tracked_objects": []
+    },
+    {
+      "frame": 596,
+      "tracked_objects": []
+    },
+    {
+      "frame": 597,
+      "tracked_objects": []
+    },
+    {
+      "frame": 598,
+      "tracked_objects": []
+    },
+    {
+      "frame": 599,
+      "tracked_objects": []
+    },
+    {
+      "frame": 600,
+      "tracked_objects": []
+    },
+    {
+      "frame": 601,
+      "tracked_objects": []
+    },
+    {
+      "frame": 602,
+      "tracked_objects": []
+    },
+    {
+      "frame": 603,
+      "tracked_objects": []
+    },
+    {
+      "frame": 604,
+      "tracked_objects": []
+    },
+    {
+      "frame": 605,
+      "tracked_objects": []
+    },
+    {
+      "frame": 606,
+      "tracked_objects": []
+    },
+    {
+      "frame": 607,
+      "tracked_objects": []
+    },
+    {
+      "frame": 608,
+      "tracked_objects": []
+    },
+    {
+      "frame": 609,
+      "tracked_objects": []
+    },
+    {
+      "frame": 610,
+      "tracked_objects": []
+    },
+    {
+      "frame": 611,
+      "tracked_objects": []
+    },
+    {
+      "frame": 612,
+      "tracked_objects": []
+    },
+    {
+      "frame": 613,
+      "tracked_objects": []
+    },
+    {
+      "frame": 614,
+      "tracked_objects": []
+    },
+    {
+      "frame": 615,
+      "tracked_objects": []
+    },
+    {
+      "frame": 616,
+      "tracked_objects": []
+    },
+    {
+      "frame": 617,
+      "tracked_objects": []
+    },
+    {
+      "frame": 618,
+      "tracked_objects": []
+    },
+    {
+      "frame": 619,
+      "tracked_objects": []
+    },
+    {
+      "frame": 620,
+      "tracked_objects": []
+    },
+    {
+      "frame": 621,
+      "tracked_objects": []
+    },
+    {
+      "frame": 622,
+      "tracked_objects": []
+    },
+    {
+      "frame": 623,
+      "tracked_objects": []
+    },
+    {
+      "frame": 624,
+      "tracked_objects": []
+    },
+    {
+      "frame": 625,
+      "tracked_objects": []
+    },
+    {
+      "frame": 626,
+      "tracked_objects": []
+    },
+    {
+      "frame": 627,
+      "tracked_objects": []
+    },
+    {
+      "frame": 628,
+      "tracked_objects": []
+    },
+    {
+      "frame": 629,
+      "tracked_objects": []
+    },
+    {
+      "frame": 630,
+      "tracked_objects": []
+    },
+    {
+      "frame": 631,
+      "tracked_objects": []
+    },
+    {
+      "frame": 632,
+      "tracked_objects": []
+    },
+    {
+      "frame": 633,
+      "tracked_objects": []
+    },
+    {
+      "frame": 634,
+      "tracked_objects": []
+    },
+    {
+      "frame": 635,
+      "tracked_objects": []
+    },
+    {
+      "frame": 636,
+      "tracked_objects": []
+    },
+    {
+      "frame": 637,
+      "tracked_objects": []
+    },
+    {
+      "frame": 638,
+      "tracked_objects": []
+    },
+    {
+      "frame": 639,
+      "tracked_objects": []
+    },
+    {
+      "frame": 640,
+      "tracked_objects": []
+    },
+    {
+      "frame": 641,
+      "tracked_objects": []
+    },
+    {
+      "frame": 642,
+      "tracked_objects": []
+    },
+    {
+      "frame": 643,
+      "tracked_objects": []
+    },
+    {
+      "frame": 644,
+      "tracked_objects": []
+    },
+    {
+      "frame": 645,
+      "tracked_objects": []
+    },
+    {
+      "frame": 646,
+      "tracked_objects": []
+    },
+    {
+      "frame": 647,
+      "tracked_objects": []
+    },
+    {
+      "frame": 648,
+      "tracked_objects": []
+    },
+    {
+      "frame": 649,
+      "tracked_objects": []
+    },
+    {
+      "frame": 650,
+      "tracked_objects": []
+    },
+    {
+      "frame": 651,
+      "tracked_objects": []
+    },
+    {
+      "frame": 652,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 793,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 329,
+          "bbox_height": 395
+        }
+      ]
+    },
+    {
+      "frame": 653,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 793,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 340,
+          "bbox_height": 421
+        }
+      ]
+    },
+    {
+      "frame": 654,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 814,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 335,
+          "bbox_height": 403
+        }
+      ]
+    },
+    {
+      "frame": 655,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 814,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 328,
+          "bbox_height": 405
+        }
+      ]
+    },
+    {
+      "frame": 656,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 832,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 346,
+          "bbox_height": 406
+        }
+      ]
+    },
+    {
+      "frame": 657,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 837,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 340,
+          "bbox_height": 399
+        }
+      ]
+    },
+    {
+      "frame": 658,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 856,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 343,
+          "bbox_height": 411
+        }
+      ]
+    },
+    {
+      "frame": 659,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 851,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 363,
+          "bbox_height": 428
+        }
+      ]
+    },
+    {
+      "frame": 660,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 837,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 342,
+          "bbox_height": 406
+        }
+      ]
+    },
+    {
+      "frame": 661,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 831,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 348,
+          "bbox_height": 437
+        }
+      ]
+    },
+    {
+      "frame": 662,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 832,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 357,
+          "bbox_height": 435
+        }
+      ]
+    },
+    {
+      "frame": 663,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 840,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 341,
+          "bbox_height": 406
+        }
+      ]
+    },
+    {
+      "frame": 664,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 834,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 342,
+          "bbox_height": 409
+        }
+      ]
+    },
+    {
+      "frame": 665,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 835,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 341,
+          "bbox_height": 412
+        }
+      ]
+    },
+    {
+      "frame": 666,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 834,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 334,
+          "bbox_height": 424
+        }
+      ]
+    },
+    {
+      "frame": 667,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 839,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 335,
+          "bbox_height": 403
+        }
+      ]
+    },
+    {
+      "frame": 668,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 836,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 341,
+          "bbox_height": 400
+        }
+      ]
+    },
+    {
+      "frame": 669,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 837,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 326,
+          "bbox_height": 390
+        }
+      ]
+    },
+    {
+      "frame": 670,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 839,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 340,
+          "bbox_height": 399
+        }
+      ]
+    },
+    {
+      "frame": 671,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 839,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 327,
+          "bbox_height": 404
+        }
+      ]
+    },
+    {
+      "frame": 672,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 839,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 332,
+          "bbox_height": 410
+        }
+      ]
+    },
+    {
+      "frame": 673,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 837,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [
+            "SPEAKER_00"
+          ],
+          "bbox_width": 335,
+          "bbox_height": 414
+        }
+      ]
+    }
+  ]
+}

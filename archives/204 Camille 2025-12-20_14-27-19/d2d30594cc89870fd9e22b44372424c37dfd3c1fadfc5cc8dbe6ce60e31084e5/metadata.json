@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/204 Camille/docs/66M - TESTEUR HOTEL DE LUXE.mp4",
+  "video_stem": "66M - TESTEUR HOTEL DE LUXE",
+  "video_hash": "d2d30594cc89870fd9e22b44372424c37dfd3c1fadfc5cc8dbe6ce60e31084e5",
+  "created_at": "2025-12-20T14:27:19.685153+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/204 Camille 2025-12-20_14-27-19/d2d30594cc89870fd9e22b44372424c37dfd3c1fadfc5cc8dbe6ce60e31084e5/66M - TESTEUR HOTEL DE LUXE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/204 Camille 2025-12-20_14-27-19/d2d30594cc89870fd9e22b44372424c37dfd3c1fadfc5cc8dbe6ce60e31084e5/66M - TESTEUR HOTEL DE LUXE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/204 Camille 2025-12-20_14-27-19/d2d30594cc89870fd9e22b44372424c37dfd3c1fadfc5cc8dbe6ce60e31084e5/66M - TESTEUR HOTEL DE LUXE_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/185 Camille/docs/Postdiff.mp4",
+  "video_stem": "Postdiff",
+  "video_hash": "a4618e05a8e78cb7054062251a413fc1f48278f88fc3d0f055dbea72e42e699d",
+  "created_at": "2025-11-17T14:44:02.914840+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/185 Camille 2025-11-17_14-44-02/a4618e05a8e78cb7054062251a413fc1f48278f88fc3d0f055dbea72e42e699d/Postdiff_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/185 Camille 2025-11-17_14-44-02/a4618e05a8e78cb7054062251a413fc1f48278f88fc3d0f055dbea72e42e699d/Postdiff_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/185 Camille 2025-11-17_14-44-02/a4618e05a8e78cb7054062251a413fc1f48278f88fc3d0f055dbea72e42e699d/Postdiff_tracking.json"
+  }
+}

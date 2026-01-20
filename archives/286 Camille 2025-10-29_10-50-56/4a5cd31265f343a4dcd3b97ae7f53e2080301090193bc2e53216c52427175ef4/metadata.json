@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/286 Camille/docs/Extrait_GTO_EP1.mp4",
+  "video_stem": "Extrait_GTO_EP1",
+  "video_hash": "4a5cd31265f343a4dcd3b97ae7f53e2080301090193bc2e53216c52427175ef4",
+  "created_at": "2025-10-29T10:50:56.814584+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/4a5cd31265f343a4dcd3b97ae7f53e2080301090193bc2e53216c52427175ef4/Extrait_GTO_EP1_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/4a5cd31265f343a4dcd3b97ae7f53e2080301090193bc2e53216c52427175ef4/Extrait_GTO_EP1_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/4a5cd31265f343a4dcd3b97ae7f53e2080301090193bc2e53216c52427175ef4/Extrait_GTO_EP1_tracking.json"
+  }
+}

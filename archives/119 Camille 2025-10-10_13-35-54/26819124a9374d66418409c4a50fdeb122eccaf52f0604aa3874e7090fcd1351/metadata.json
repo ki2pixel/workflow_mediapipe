@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/119 Camille/docs/6TER_Véto&Co_Ce chiot a été attaqué par un autre chien et est mal-en-point .mp4",
+  "video_stem": "6TER_Véto&Co_Ce chiot a été attaqué par un autre chien et est mal-en-point ",
+  "video_hash": "26819124a9374d66418409c4a50fdeb122eccaf52f0604aa3874e7090fcd1351",
+  "created_at": "2025-10-10T13:35:54.709952+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/26819124a9374d66418409c4a50fdeb122eccaf52f0604aa3874e7090fcd1351/6TER_Véto&Co_Ce chiot a été attaqué par un autre chien et est mal-en-point _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/26819124a9374d66418409c4a50fdeb122eccaf52f0604aa3874e7090fcd1351/6TER_Véto&Co_Ce chiot a été attaqué par un autre chien et est mal-en-point _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/26819124a9374d66418409c4a50fdeb122eccaf52f0604aa3874e7090fcd1351/6TER_Véto&Co_Ce chiot a été attaqué par un autre chien et est mal-en-point _tracking.json"
+  }
+}

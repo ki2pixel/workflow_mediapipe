@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/161 Camille/docs/EP62_Benji écrase Niko sur ce parcours du combattant !.mp4",
+  "video_stem": "EP62_Benji écrase Niko sur ce parcours du combattant !",
+  "video_hash": "e6fb5169c62e57bfa385aa03381a925cd1dca5865a841bf8e0037b5a5ae10aaf",
+  "created_at": "2025-12-17T09:19:29.214155+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/161 Camille 2025-12-17_09-19-28/e6fb5169c62e57bfa385aa03381a925cd1dca5865a841bf8e0037b5a5ae10aaf/EP62_Benji écrase Niko sur ce parcours du combattant !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/161 Camille 2025-12-17_09-19-28/e6fb5169c62e57bfa385aa03381a925cd1dca5865a841bf8e0037b5a5ae10aaf/EP62_Benji écrase Niko sur ce parcours du combattant !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/161 Camille 2025-12-17_09-19-28/e6fb5169c62e57bfa385aa03381a925cd1dca5865a841bf8e0037b5a5ae10aaf/EP62_Benji écrase Niko sur ce parcours du combattant !_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/136 Camille/docs/MAGNETO_PIQUANTES_E02_MARION.mp4",
+  "video_stem": "MAGNETO_PIQUANTES_E02_MARION",
+  "video_hash": "84b6a387397c89e5baddbcd208fbfb9c47614a287164b5513f7fb54d239b8cfb",
+  "created_at": "2025-11-13T11:32:13.617025+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/136 Camille 2025-11-13_11-32-13/84b6a387397c89e5baddbcd208fbfb9c47614a287164b5513f7fb54d239b8cfb/MAGNETO_PIQUANTES_E02_MARION_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/136 Camille 2025-11-13_11-32-13/84b6a387397c89e5baddbcd208fbfb9c47614a287164b5513f7fb54d239b8cfb/MAGNETO_PIQUANTES_E02_MARION_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/136 Camille 2025-11-13_11-32-13/84b6a387397c89e5baddbcd208fbfb9c47614a287164b5513f7fb54d239b8cfb/MAGNETO_PIQUANTES_E02_MARION_tracking.json"
+  }
+}

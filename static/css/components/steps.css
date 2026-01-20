@@ -1,0 +1,456 @@
+.step {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--border-color);
+    padding: 25px;
+    margin-bottom: 25px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 700px;
+    transition:
+        transform 0.4s ease-out,
+        opacity 0.4s ease-in-out,
+        border-color 0.3s ease,
+        border-left-color 0.3s ease,
+        margin-bottom 0.4s ease-in-out,
+        padding 0.4s ease-in-out,
+        box-shadow 0.3s ease;
+    scroll-margin-top: 80px; /* Ensures proper spacing when scrolling to steps */
+}
+
+.step[data-status="running"],
+.step[data-status="starting"],
+.step[data-status="initiated"] {
+    border-left-color: var(--status-running);
+}
+
+.step[data-status="completed"],
+.step[data-status="success"] {
+    border-left-color: var(--status-success);
+}
+
+.step[data-status="failed"],
+.step[data-status="error"],
+.step[data-status="cancelled"] {
+    border-left-color: var(--status-error);
+}
+
+.step[data-status="warning"],
+.step[data-status="paused"] {
+    border-left-color: var(--status-warning);
+}
+
+/* Compact mode reduces padding/margins and typography to fit viewport */
+.workflow-wrapper.compact-mode:not(.logs-active) .step {
+    max-width: 100%;
+    /* Reduce bottom padding to limit empty space below last controls/log buttons */
+    padding: 14px 14px 10px; /* top right bottom left */
+    margin-bottom: 0; /* handled by grid gap */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12); /* softer shadow to reduce visual noise */
+    align-self: start; /* avoid vertical stretch inside grid on desktop */
+}
+
+/* Smooth reappearance after closing logs panel - now only affects opacity/transform */
+.workflow-wrapper.logs-leaving .steps-column .step {
+    will-change: opacity, transform;
+}
+
+/* Utility class applied via JS for deterministic transitions */
+.step.steps-hidden {
+    opacity: 0 !important;
+    transform: translateY(8px) scale(0.97) !important;
+    pointer-events: none;
+}
+
+/* Staggered delays in compact mode - no longer needed since layout is stable */
+.workflow-wrapper.compact-mode.logs-leaving .steps-column .step {
+    transition-timing-function: cubic-bezier(0.2, 0.6, 0.2, 1);
+    transition-duration: 0.4s;
+}
+.step:hover:not(.active-for-log-panel) {
+     transform: translateY(-4px);
+     box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+}
+ .step.active-for-log-panel {
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 8px 25px rgba(121, 134, 203, 0.3), 0 0 0 1px var(--accent-primary);
+    transform: translateY(-2px);
+}
+.step.custom-sequence-selected {
+    border: 2px solid var(--orange);
+    box-shadow: 0 0 15px var(--orange);
+}
+
+.step-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.step-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.step h2 {
+    margin-top: 0;
+    font-size: 1.5em;
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+.step h2 .step-icon { margin-right: 12px; font-size: 1.6em; }
+
+/* Icon accent on hover for better affordance */
+.step:hover h2 .step-icon {
+    color: var(--accent-primary);
+    transform: translateY(-1px);
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.workflow-wrapper.compact-mode:not(.logs-active) .step h2 {
+    font-size: 1.05em; /* slightly smaller titles in compact */
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step h2 .step-icon {
+    font-size: 1.1em;
+    margin-right: 6px;
+}
+
+.step-state-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78em;
+    font-weight: 600;
+    text-transform: capitalize;
+    border: 1px solid transparent;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    letter-spacing: 0.02em;
+}
+
+.step-state-chip span {
+    font-size: 0.9em;
+}
+
+.state-running {
+    background: color-mix(in oklab, var(--status-running) 18%, transparent);
+    color: var(--status-running);
+    border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--status-running) 16%, transparent);
+}
+
+.state-success {
+    background: color-mix(in oklab, var(--status-success) 18%, transparent);
+    color: var(--status-success);
+    border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
+}
+
+.state-error {
+    background: color-mix(in oklab, var(--status-error) 18%, transparent);
+    color: var(--status-error);
+    border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
+}
+
+.state-warning {
+    background: color-mix(in oklab, var(--status-warning) 18%, transparent);
+    color: var(--status-warning);
+    border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
+}
+
+.state-idle {
+    background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+    color: var(--status-idle);
+    border-color: color-mix(in oklab, var(--status-idle) 35%, transparent);
+}
+
+/* Hover tuning for processing/active steps: keep subtle, avoid large motion */
+.steps-column .step[data-status="running"]:hover,
+.steps-column .step[data-status="starting"]:hover,
+.steps-column .step[data-status="initiated"]:hover,
+.steps-column .step.active-for-log-panel:hover {
+    transform: translateY(-2px) scale(1.005);
+    box-shadow: 0 10px 24px rgba(121, 134, 203, 0.22), 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Respect reduced motion for hover effects */
+@media (prefers-reduced-motion: reduce) {
+    .step:hover:not(.active-for-log-panel),
+    .steps-column .step[data-status="running"]:hover,
+    .steps-column .step[data-status="starting"]:hover,
+    .steps-column .step[data-status="initiated"]:hover,
+    .steps-column .step.active-for-log-panel:hover {
+        transform: none !important;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+    }
+}
+
+.step-selection-control {
+    display: flex;
+    align-items: center;
+}
+.step-selection-control input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    cursor: pointer;
+}
+.step-selection-order-number {
+    font-size: 1em;
+    font-weight: bold;
+    color: var(--orange);
+    min-width: 20px;
+    text-align: center;
+}
+
+.step-controls button,
+.specific-log-button {
+    padding: 12px 22px;
+    margin-right: 12px;
+    margin-bottom: 12px;
+    font-size: 0.95em;
+    cursor: pointer;
+    border: none;
+    border-radius: 25px;
+    color: var(--bg-dark);
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    font-weight: 600;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    min-height: var(--touch-target-min);
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step-controls button,
+.workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button {
+    padding: var(--button-compact-padding);
+    font-size: 0.86em;
+    margin-right: 6px;
+    /* Reduce vertical gap below the last row of buttons */
+    margin-bottom: 3px;
+    border-radius: 16px;
+}
+
+/* Remove extra bottom gap under the final log button in compact mode */
+.workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button:last-child {
+    margin-bottom: 0;
+}
+.step-controls button:hover, .specific-log-button:hover {
+     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.step-controls button:active, .specific-log-button:active { transform: scale(0.97); }
+
+.run-button { background-color: var(--green); color: white; }
+.run-button:hover { background-color: #5cb85c; }
+.run-button:disabled,
+.cancel-button:disabled,
+.specific-log-button:disabled {
+    background: color-mix(in oklab, var(--bg-tertiary) 80%, black 8%);
+    color: var(--text-muted);
+    border-color: var(--border-color);
+}
+
+.cancel-button { background-color: var(--red); color: white;}
+.cancel-button:hover { background-color: #d9534f; }
+/* Universal focus-visible for action buttons (keyboard accessibility) */
+.run-button:focus-visible,
+.cancel-button:focus-visible,
+.specific-log-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-primary) 35%, transparent);
+    border-color: var(--accent-primary);
+}
+
+.specific-log-button { background-color: var(--yellow); color: #333; }
+.specific-log-button:hover { background-color: #ffeb3b; }
+
+.status-line { margin-top: 15px; margin-bottom:10px; font-weight: bold; font-size: 1.05em; }
+.workflow-wrapper.compact-mode:not(.logs-active) .status-line {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+}
+.status-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.85em;
+    letter-spacing: 0.01em;
+    text-transform: capitalize;
+    background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+    color: var(--status-idle);
+    border: 1px solid color-mix(in oklab, var(--status-idle) 35%, transparent);
+}
+.status-running,
+.status-starting,
+.status-initiated {
+    background: color-mix(in oklab, var(--status-running) 18%, transparent);
+    color: var(--status-running);
+    border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
+    animation: pulseStatus 1.8s infinite ease-in-out;
+}
+.status-success,
+.status-completed {
+    background: color-mix(in oklab, var(--status-success) 18%, transparent);
+    color: var(--status-success);
+    border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
+}
+.status-error,
+.status-failed,
+.status-cancelled {
+    background: color-mix(in oklab, var(--status-error) 18%, transparent);
+    color: var(--status-error);
+    border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
+}
+.status-warning,
+.status-paused {
+    background: color-mix(in oklab, var(--status-warning) 18%, transparent);
+    color: var(--status-warning);
+    border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
+}
+.status-idle {
+    background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+    color: var(--status-idle);
+}
+.status-line span.timer {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    margin-left: 10px;
+}
+
+.step-progress-container {
+    width: 100%;
+    margin-top:10px;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step-progress-container { margin-top: 6px; }
+.progress-bar-wrapper {
+    background-color: var(--border-color);
+    border-radius: 8px;
+    padding: 3px;
+}
+.progress-bar-step {
+    width: 0%;
+    height: 18px;
+    background-color: var(--blue);
+    border-radius: 5px;
+    text-align: center;
+    line-height: 18px;
+    color: white;
+    font-size: 0.85em;
+    font-weight: bold;
+    /* Smoother width transition */
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+    position: relative;
+    overflow: hidden; /* for shine effect */
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .progress-bar-step {
+    height: 12px;
+    line-height: 12px;
+    font-size: 0.76em;
+}
+.progress-bar-step[data-active="true"]::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+    animation: progressShine 2.0s infinite;
+}
+.progress-text-step {
+    text-align: center;
+    margin-top: 4px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    white-space: pre-line;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 3.6em;
+    line-height: 1.2em;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .progress-text-step {
+    font-size: 0.76em;
+}
+
+/* Subtle pulse for current filename while processing */
+.progress-text-step[data-processing="true"] {
+    animation: textPulse 1.5s ease-in-out infinite;
+}
+
+/* Reduce extra spacing around specific log controls to avoid empty space under buttons */
+.workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper {
+    margin-top: 8px; /* was 15px in logs.css; tighter in compact mode */
+    margin-bottom: 0;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper h4 {
+    margin-bottom: 6px; /* override logs.css (10px) to reduce vertical gap */
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper > div {
+    /* the immediate container of buttons; ensure no unintended bottom margin */
+    margin-bottom: 0;
+}
+
+/* ========== Micro-interactions for steps ========== */
+/* Non-active steps get a very subtle halo when any step is running */
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"],
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"],
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"] {
+    position: relative;
+}
+
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"]::after,
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"]::after,
+.workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    pointer-events: none;
+    box-shadow: 0 0 0 2px rgba(121, 134, 203, 0.35);
+    opacity: 0.22;
+    animation: subtleOpacityPulse 2.8s ease-in-out infinite;
+}
+
+/* Active/processing step: breathing effect to indicate ongoing work */
+.steps-column .step.active-for-log-panel,
+.steps-column .step[data-status="running"],
+.steps-column .step[data-status="starting"],
+.steps-column .step[data-status="initiated"] {
+    will-change: transform;
+    animation: cardBreath 3.2s ease-in-out infinite;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status]::after,
+    .steps-column .step.active-for-log-panel,
+    .steps-column .step[data-status="running"],
+    .steps-column .step[data-status="starting"],
+    .steps-column .step[data-status="initiated"] {
+        animation: none !important;
+    }
+}
+
+/* Override transform reset from layout.css to allow hover lift on idle steps */
+.workflow-wrapper:not(.logs-active) .steps-column .step:hover:not(.active-for-log-panel) {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+}

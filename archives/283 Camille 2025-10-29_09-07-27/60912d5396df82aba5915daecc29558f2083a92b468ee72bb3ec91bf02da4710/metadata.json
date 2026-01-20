@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/283 Camille/docs/Virginie tacle Vincent dès le début !.mp4",
+  "video_stem": "Virginie tacle Vincent dès le début !",
+  "video_hash": "60912d5396df82aba5915daecc29558f2083a92b468ee72bb3ec91bf02da4710",
+  "created_at": "2025-10-29T09:07:27.610784+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/283 Camille 2025-10-29_09-07-27/60912d5396df82aba5915daecc29558f2083a92b468ee72bb3ec91bf02da4710/Virginie tacle Vincent dès le début !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/283 Camille 2025-10-29_09-07-27/60912d5396df82aba5915daecc29558f2083a92b468ee72bb3ec91bf02da4710/Virginie tacle Vincent dès le début !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/283 Camille 2025-10-29_09-07-27/60912d5396df82aba5915daecc29558f2083a92b468ee72bb3ec91bf02da4710/Virginie tacle Vincent dès le début !_tracking.json"
+  }
+}

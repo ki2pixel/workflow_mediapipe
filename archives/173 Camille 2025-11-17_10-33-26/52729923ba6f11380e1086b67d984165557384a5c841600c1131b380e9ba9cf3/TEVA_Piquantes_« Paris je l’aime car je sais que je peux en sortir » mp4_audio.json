@@ -1,0 +1,9244 @@
+{
+  "frames_analysis": [
+    {
+      "frame": 1,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 2,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 3,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 4,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 5,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 6,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 7,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 8,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 9,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 10,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 11,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 12,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 13,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 14,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 15,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 16,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 17,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 18,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 19,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 20,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 21,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 22,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 23,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 24,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 25,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 26,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 27,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 28,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 29,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 30,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 31,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 32,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 33,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 34,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 35,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 36,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 37,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 38,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 39,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 40,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 41,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 42,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 43,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 44,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 45,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 46,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 47,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 48,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 49,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 50,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 51,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 52,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 53,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 54,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 55,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 56,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 57,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 58,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 59,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 60,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 61,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 62,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 63,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 64,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 65,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 66,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 67,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 68,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 69,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 70,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 71,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 72,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 73,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 74,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 75,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 76,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 77,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 78,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 79,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 80,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 81,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 82,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 83,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 84,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 85,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 86,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 87,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 88,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 89,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 90,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 91,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 92,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 93,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 94,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 95,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 96,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 97,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 98,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 99,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 100,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 101,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 102,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 103,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 104,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 105,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 106,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 107,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 108,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 109,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 110,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 111,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 112,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 113,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 114,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 115,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 116,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 117,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 118,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 119,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 120,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 121,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 122,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 123,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 124,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 125,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 126,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 127,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 128,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 129,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 130,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 131,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 132,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 133,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 134,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 135,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 136,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 137,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 138,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 139,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 140,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 141,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 142,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 143,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 144,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 145,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 146,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 147,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 148,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 149,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 150,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 151,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 152,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 153,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 154,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 155,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 156,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 157,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 158,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 159,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 160,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 161,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 162,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 163,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 164,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 165,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 166,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 167,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 168,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 169,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 170,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 171,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 172,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 173,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 174,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 175,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 176,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 177,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 178,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 179,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 180,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 181,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 182,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 183,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 184,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 185,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 186,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 187,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 188,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 189,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 190,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 191,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 192,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 193,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 194,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 195,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 196,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 197,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 198,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 199,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 200,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 201,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 202,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 203,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 204,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 205,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 206,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 207,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 208,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 209,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 210,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 211,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 212,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 213,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 214,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 215,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 216,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 217,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 218,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 219,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 220,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 221,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 222,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 223,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 224,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 225,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 226,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 227,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 228,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 229,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 230,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 231,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 232,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 233,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 234,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 235,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 236,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 237,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 238,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 239,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 240,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 241,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 242,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 243,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 244,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 245,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 246,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 247,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 248,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 249,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 250,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 251,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 252,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 253,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 254,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 255,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 256,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 257,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 258,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 259,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 260,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 261,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 262,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 263,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 264,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 265,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 266,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 267,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 268,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 269,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 270,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 271,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 272,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 273,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 274,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 275,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 276,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 277,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 278,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 279,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 280,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 281,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 282,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 283,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 284,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 285,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 286,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 287,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 288,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 289,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 290,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 291,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 292,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 293,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 294,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 295,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 296,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 297,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 298,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 299,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 300,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 301,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 302,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 303,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 304,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 305,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 306,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 307,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 308,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 309,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 310,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 311,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 312,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 313,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 314,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 315,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 316,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 317,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 318,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 319,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 320,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 321,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 322,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 323,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 324,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 325,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 326,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 327,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 328,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 329,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 330,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 331,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 332,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 333,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 334,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 335,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 336,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 337,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 338,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 339,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 340,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 341,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 342,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 343,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 344,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 345,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 346,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 347,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 348,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 349,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 350,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 351,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 352,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 353,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 354,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 355,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 356,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 357,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 358,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 359,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 360,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 361,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 362,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 363,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 364,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 365,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 366,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 367,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 368,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 369,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 370,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 371,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 372,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 373,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 374,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 375,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 376,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 377,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 378,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 379,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 380,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 381,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 382,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 383,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 384,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 385,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 386,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 387,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 388,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 389,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 390,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 391,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 392,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 393,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 394,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 395,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 396,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 397,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 398,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 399,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 400,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 401,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 402,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 403,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 404,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 405,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 406,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 407,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 408,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 409,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 410,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 411,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 412,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 413,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 414,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 415,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 416,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 417,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 418,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 419,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 420,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 421,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 422,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 423,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 424,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 425,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 426,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 427,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 428,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 429,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 430,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 431,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 432,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 433,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 434,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 435,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 436,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 437,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 438,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 439,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 440,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 441,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 442,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 443,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 444,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 445,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 446,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 447,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 448,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 449,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 450,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 451,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 452,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 453,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 454,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 455,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 456,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 457,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 458,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 459,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 460,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 461,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 462,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 463,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 464,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 465,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 466,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 467,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 468,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 469,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 470,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 471,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 472,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 473,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 474,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 475,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 476,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 477,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 478,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 479,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 480,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 481,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 482,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 483,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 484,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 485,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 486,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 487,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 488,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 489,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 490,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 491,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 492,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 493,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 494,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 495,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 496,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 497,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 498,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 499,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 500,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 501,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 502,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 503,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 504,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 505,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 506,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 507,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 508,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 509,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 510,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 511,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 512,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 513,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 514,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 515,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 516,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 517,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 518,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 519,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 520,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 521,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 522,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 523,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 524,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 525,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 526,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 527,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 528,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 529,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 530,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 531,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 532,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 533,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 534,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 535,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 536,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 537,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 538,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 539,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 540,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 541,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 542,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 543,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 544,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 545,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 546,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 547,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 548,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 549,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 550,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 551,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 552,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 553,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 554,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 555,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 556,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 557,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 558,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 559,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 560,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 561,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 562,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 563,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 564,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 565,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 566,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 567,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 568,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 569,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 570,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 571,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 572,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 573,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 574,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 575,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 576,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 577,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 578,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 579,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 580,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 581,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 582,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 583,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 584,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 585,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 586,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 587,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 588,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 589,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 590,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 591,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 592,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 593,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 594,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 595,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 596,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 597,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 598,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 599,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 600,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 601,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 602,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 603,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 604,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 605,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 606,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 607,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 608,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 609,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 610,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 611,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 612,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 613,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 614,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 615,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 616,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 617,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 618,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 619,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 620,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 621,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 622,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 623,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 624,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 625,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 626,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 627,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 628,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 629,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 630,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 631,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 632,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 633,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 634,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 635,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 636,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 637,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 638,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 639,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 640,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 641,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 642,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 643,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 644,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 645,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 646,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 647,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 648,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 649,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 650,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 651,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 652,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 653,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 654,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 655,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 656,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 657,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 658,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 659,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 660,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 661,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 662,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 663,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 664,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 665,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 666,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 667,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 668,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 669,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 670,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 671,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 672,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 673,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 674,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 675,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 676,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 677,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 678,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 679,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 680,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 681,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 682,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 683,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 684,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 685,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 686,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 687,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 688,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 689,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 690,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 691,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 692,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 693,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 694,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 695,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 696,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 697,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 698,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 699,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 700,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 701,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 702,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 703,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 704,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 705,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 706,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 707,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 708,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 709,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 710,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 711,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 712,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 713,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 714,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 715,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 716,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 717,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 718,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 719,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 720,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 721,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 722,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 723,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 724,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 725,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 726,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 727,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 728,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 729,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 730,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 731,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 732,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 733,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 734,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 735,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 736,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 737,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 738,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 739,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 740,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 741,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 742,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 743,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 744,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 745,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 746,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 747,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 748,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 749,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 750,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 751,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 752,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 753,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 754,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 755,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 756,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 757,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 758,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 759,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 760,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 761,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 762,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 763,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 764,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 765,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 766,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 767,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 768,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 769,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 770,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 771,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 772,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 773,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 774,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 775,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 776,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 777,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 778,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 779,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 780,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 781,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 782,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 783,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 784,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 785,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 786,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 787,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 788,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 789,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 790,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 791,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 792,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 793,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 794,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 795,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 796,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 797,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 798,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 799,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 800,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 801,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 802,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 803,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 804,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 805,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 806,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 807,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 808,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 809,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 810,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 811,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 812,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 813,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 814,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 815,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 816,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 817,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 818,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 819,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 820,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 821,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 822,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 823,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 824,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 825,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 826,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 827,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 828,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 829,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 830,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 831,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 832,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 833,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 834,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 835,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 836,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 837,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 838,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 839,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 840,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 841,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 842,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 843,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 844,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 845,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 846,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 847,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 848,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 849,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 850,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 851,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 852,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 853,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 854,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 855,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 856,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 857,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 858,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 859,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 860,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 861,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 862,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 863,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 864,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 865,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 866,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 867,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 868,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 869,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 870,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 871,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 872,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 873,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 874,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 875,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 876,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 877,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 878,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 879,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 880,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 881,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 882,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 883,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 884,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 885,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 886,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 887,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 888,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 889,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 890,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 891,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 892,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 893,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 894,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 895,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 896,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 897,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 898,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 899,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 900,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 901,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 902,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 903,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 904,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 905,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 906,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 907,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 908,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 909,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 910,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 911,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 912,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 913,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 914,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 915,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 916,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 917,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 918,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 919,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 920,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 921,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 922,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 923,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 924,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 925,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 926,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 927,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 928,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 929,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 930,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 931,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 932,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 933,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 934,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 935,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 936,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 937,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 938,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 939,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 940,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 941,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 942,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 943,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 944,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 945,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 946,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 947,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 948,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 949,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 950,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 951,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 952,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 953,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 954,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 955,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 956,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 957,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 958,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 959,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 960,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 961,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 962,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 963,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 964,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 965,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 966,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 967,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 968,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 969,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 970,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 971,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 972,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 973,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 974,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 975,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 976,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 977,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 978,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00",
+          "SPEAKER_01"
+        ]
+      }
+    },
+    {
+      "frame": 979,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 980,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 981,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 982,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 983,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 984,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 985,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 986,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 987,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 988,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 989,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 990,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 991,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 992,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 993,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 994,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 995,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 996,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 997,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 998,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 999,
+      "audio_info": {
+        "is_speech_present": true,
+        "active_speaker_labels": [
+          "SPEAKER_00"
+        ]
+      }
+    },
+    {
+      "frame": 1000,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1001,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1002,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1003,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1004,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1005,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1006,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1007,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1008,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1009,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1010,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1011,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1012,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1013,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1014,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1015,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1016,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1017,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1018,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1019,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1020,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1021,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1022,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1023,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1024,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1025,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1026,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1027,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1028,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1029,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1030,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    },
+    {
+      "frame": 1031,
+      "audio_info": {
+        "is_speech_present": false,
+        "active_speaker_labels": []
+      }
+    }
+  ]
+}

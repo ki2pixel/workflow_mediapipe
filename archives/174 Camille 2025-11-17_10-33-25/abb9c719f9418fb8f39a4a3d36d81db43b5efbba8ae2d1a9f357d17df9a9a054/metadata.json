@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/174 Camille/docs/TEVA_Piquantes_Il a eu une intoxication alimentaire pendant un concert mp4.mp4",
+  "video_stem": "TEVA_Piquantes_Il a eu une intoxication alimentaire pendant un concert mp4",
+  "video_hash": "abb9c719f9418fb8f39a4a3d36d81db43b5efbba8ae2d1a9f357d17df9a9a054",
+  "created_at": "2025-11-17T10:33:25.812615+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/174 Camille 2025-11-17_10-33-25/abb9c719f9418fb8f39a4a3d36d81db43b5efbba8ae2d1a9f357d17df9a9a054/TEVA_Piquantes_Il a eu une intoxication alimentaire pendant un concert mp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/174 Camille 2025-11-17_10-33-25/abb9c719f9418fb8f39a4a3d36d81db43b5efbba8ae2d1a9f357d17df9a9a054/TEVA_Piquantes_Il a eu une intoxication alimentaire pendant un concert mp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/174 Camille 2025-11-17_10-33-25/abb9c719f9418fb8f39a4a3d36d81db43b5efbba8ae2d1a9f357d17df9a9a054/TEVA_Piquantes_Il a eu une intoxication alimentaire pendant un concert mp4_tracking.json"
+  }
+}

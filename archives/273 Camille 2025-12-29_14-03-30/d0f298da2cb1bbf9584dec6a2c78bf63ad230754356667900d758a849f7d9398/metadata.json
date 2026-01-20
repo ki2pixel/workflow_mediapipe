@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/273 Camille/docs/UJUD - DIRECTRICE CIRQUE.mp4",
+  "video_stem": "UJUD - DIRECTRICE CIRQUE",
+  "video_hash": "d0f298da2cb1bbf9584dec6a2c78bf63ad230754356667900d758a849f7d9398",
+  "created_at": "2025-12-29T14:03:30.704930+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-12-29_14-03-30/d0f298da2cb1bbf9584dec6a2c78bf63ad230754356667900d758a849f7d9398/UJUD - DIRECTRICE CIRQUE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-12-29_14-03-30/d0f298da2cb1bbf9584dec6a2c78bf63ad230754356667900d758a849f7d9398/UJUD - DIRECTRICE CIRQUE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-12-29_14-03-30/d0f298da2cb1bbf9584dec6a2c78bf63ad230754356667900d758a849f7d9398/UJUD - DIRECTRICE CIRQUE_tracking.json"
+  }
+}

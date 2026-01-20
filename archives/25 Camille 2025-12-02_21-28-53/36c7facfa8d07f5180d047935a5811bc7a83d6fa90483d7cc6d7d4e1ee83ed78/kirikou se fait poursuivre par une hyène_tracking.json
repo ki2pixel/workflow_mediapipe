@@ -1,0 +1,7566 @@
+{
+  "frames_analysis": [
+    {
+      "frame": 1,
+      "tracked_objects": []
+    },
+    {
+      "frame": 2,
+      "tracked_objects": []
+    },
+    {
+      "frame": 3,
+      "tracked_objects": []
+    },
+    {
+      "frame": 4,
+      "tracked_objects": []
+    },
+    {
+      "frame": 5,
+      "tracked_objects": []
+    },
+    {
+      "frame": 6,
+      "tracked_objects": []
+    },
+    {
+      "frame": 7,
+      "tracked_objects": []
+    },
+    {
+      "frame": 8,
+      "tracked_objects": []
+    },
+    {
+      "frame": 9,
+      "tracked_objects": []
+    },
+    {
+      "frame": 10,
+      "tracked_objects": []
+    },
+    {
+      "frame": 11,
+      "tracked_objects": []
+    },
+    {
+      "frame": 12,
+      "tracked_objects": []
+    },
+    {
+      "frame": 13,
+      "tracked_objects": []
+    },
+    {
+      "frame": 14,
+      "tracked_objects": []
+    },
+    {
+      "frame": 15,
+      "tracked_objects": []
+    },
+    {
+      "frame": 16,
+      "tracked_objects": []
+    },
+    {
+      "frame": 17,
+      "tracked_objects": []
+    },
+    {
+      "frame": 18,
+      "tracked_objects": []
+    },
+    {
+      "frame": 19,
+      "tracked_objects": []
+    },
+    {
+      "frame": 20,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 804,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 21,
+      "tracked_objects": []
+    },
+    {
+      "frame": 22,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 764,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 23,
+      "tracked_objects": []
+    },
+    {
+      "frame": 24,
+      "tracked_objects": []
+    },
+    {
+      "frame": 25,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 666,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 26,
+      "tracked_objects": []
+    },
+    {
+      "frame": 27,
+      "tracked_objects": []
+    },
+    {
+      "frame": 28,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 580,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 29,
+      "tracked_objects": []
+    },
+    {
+      "frame": 30,
+      "tracked_objects": []
+    },
+    {
+      "frame": 31,
+      "tracked_objects": []
+    },
+    {
+      "frame": 32,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 556,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 33,
+      "tracked_objects": []
+    },
+    {
+      "frame": 34,
+      "tracked_objects": []
+    },
+    {
+      "frame": 35,
+      "tracked_objects": []
+    },
+    {
+      "frame": 36,
+      "tracked_objects": []
+    },
+    {
+      "frame": 37,
+      "tracked_objects": []
+    },
+    {
+      "frame": 38,
+      "tracked_objects": []
+    },
+    {
+      "frame": 39,
+      "tracked_objects": []
+    },
+    {
+      "frame": 40,
+      "tracked_objects": []
+    },
+    {
+      "frame": 41,
+      "tracked_objects": []
+    },
+    {
+      "frame": 42,
+      "tracked_objects": [
+        {
+          "id": "obj_5",
+          "centroid_x": 1747,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 43,
+      "tracked_objects": []
+    },
+    {
+      "frame": 44,
+      "tracked_objects": []
+    },
+    {
+      "frame": 45,
+      "tracked_objects": []
+    },
+    {
+      "frame": 46,
+      "tracked_objects": []
+    },
+    {
+      "frame": 47,
+      "tracked_objects": [
+        {
+          "id": "obj_6",
+          "centroid_x": 1638,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 48,
+      "tracked_objects": [
+        {
+          "id": "obj_6",
+          "centroid_x": 1658,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 49,
+      "tracked_objects": [
+        {
+          "id": "obj_7",
+          "centroid_x": 1559,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 50,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 135,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_7",
+          "centroid_x": 1591,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 51,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 95,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_9",
+          "centroid_x": 1485,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 52,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 1530,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 53,
+      "tracked_objects": [
+        {
+          "id": "obj_10",
+          "centroid_x": 1425,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 54,
+      "tracked_objects": [
+        {
+          "id": "obj_10",
+          "centroid_x": 1440,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 55,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 174,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 56,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 198,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 57,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 225,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 619,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_12",
+          "centroid_x": 1290,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 58,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 234,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 634,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_12",
+          "centroid_x": 1325,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 59,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 248,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_14",
+          "centroid_x": 527,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 60,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 251,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_14",
+          "centroid_x": 529,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 61,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 382,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 62,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 383,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 63,
+      "tracked_objects": []
+    },
+    {
+      "frame": 64,
+      "tracked_objects": []
+    },
+    {
+      "frame": 65,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 365,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 66,
+      "tracked_objects": [
+        {
+          "id": "obj_15",
+          "centroid_x": 364,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 67,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 240,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_16",
+          "centroid_x": 242,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 68,
+      "tracked_objects": [
+        {
+          "id": "obj_11",
+          "centroid_x": 242,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 69,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 173,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 70,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 165,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 71,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 933,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 72,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 935,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_19",
+          "centroid_x": 1173,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 73,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 948,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 74,
+      "tracked_objects": []
+    },
+    {
+      "frame": 75,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 967,
+          "source": "object_detector",
+          "label": "skis",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_21",
+          "centroid_x": 1316,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 76,
+      "tracked_objects": [
+        {
+          "id": "obj_22",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_21",
+          "centroid_x": 1320,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 77,
+      "tracked_objects": [
+        {
+          "id": "obj_22",
+          "centroid_x": 952,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 78,
+      "tracked_objects": [
+        {
+          "id": "obj_22",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 79,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 974,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 80,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 81,
+      "tracked_objects": []
+    },
+    {
+      "frame": 82,
+      "tracked_objects": [
+        {
+          "id": "obj_22",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 83,
+      "tracked_objects": [
+        {
+          "id": "obj_22",
+          "centroid_x": 948,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 84,
+      "tracked_objects": [
+        {
+          "id": "obj_23",
+          "centroid_x": 1173,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 85,
+      "tracked_objects": []
+    },
+    {
+      "frame": 86,
+      "tracked_objects": []
+    },
+    {
+      "frame": 87,
+      "tracked_objects": []
+    },
+    {
+      "frame": 88,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "traffic light",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 89,
+      "tracked_objects": [
+        {
+          "id": "obj_25",
+          "centroid_x": 365,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_24",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 90,
+      "tracked_objects": [
+        {
+          "id": "obj_25",
+          "centroid_x": 360,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_26",
+          "centroid_x": 997,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 91,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 958,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_27",
+          "centroid_x": 1574,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 92,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 988,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 93,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 94,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 956,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 95,
+      "tracked_objects": []
+    },
+    {
+      "frame": 96,
+      "tracked_objects": []
+    },
+    {
+      "frame": 97,
+      "tracked_objects": []
+    },
+    {
+      "frame": 98,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 99,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 959,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_28",
+          "centroid_x": 1327,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 100,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_28",
+          "centroid_x": 1319,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 101,
+      "tracked_objects": [
+        {
+          "id": "obj_30",
+          "centroid_x": 364,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_29",
+          "centroid_x": 988,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 102,
+      "tracked_objects": [
+        {
+          "id": "obj_29",
+          "centroid_x": 976,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 103,
+      "tracked_objects": []
+    },
+    {
+      "frame": 104,
+      "tracked_objects": [
+        {
+          "id": "obj_31",
+          "centroid_x": 1566,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 105,
+      "tracked_objects": [
+        {
+          "id": "obj_29",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 106,
+      "tracked_objects": []
+    },
+    {
+      "frame": 107,
+      "tracked_objects": []
+    },
+    {
+      "frame": 108,
+      "tracked_objects": []
+    },
+    {
+      "frame": 109,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 723,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_32",
+          "centroid_x": 949,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 110,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 951,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 111,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 951,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1698,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 112,
+      "tracked_objects": [
+        {
+          "id": "obj_29",
+          "centroid_x": 982,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1695,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 113,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 351,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_29",
+          "centroid_x": 974,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 114,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 972,
+          "source": "object_detector",
+          "label": "traffic light",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 115,
+      "tracked_objects": [
+        {
+          "id": "obj_36",
+          "centroid_x": 381,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_32",
+          "centroid_x": 951,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 116,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 117,
+      "tracked_objects": [
+        {
+          "id": "obj_38",
+          "centroid_x": 1383,
+          "source": "object_detector",
+          "label": "cell phone",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_37",
+          "centroid_x": 1508,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 118,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1519,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 119,
+      "tracked_objects": []
+    },
+    {
+      "frame": 120,
+      "tracked_objects": [
+        {
+          "id": "obj_39",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 121,
+      "tracked_objects": [
+        {
+          "id": "obj_39",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 122,
+      "tracked_objects": [
+        {
+          "id": "obj_39",
+          "centroid_x": 953,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 123,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 1017,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 124,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_41",
+          "centroid_x": 1326,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 125,
+      "tracked_objects": [
+        {
+          "id": "obj_39",
+          "centroid_x": 978,
+          "source": "object_detector",
+          "label": "traffic light",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 126,
+      "tracked_objects": [
+        {
+          "id": "obj_39",
+          "centroid_x": 959,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 127,
+      "tracked_objects": [
+        {
+          "id": "obj_39",
+          "centroid_x": 953,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 128,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 926,
+          "source": "object_detector",
+          "label": "skateboard",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 129,
+      "tracked_objects": []
+    },
+    {
+      "frame": 130,
+      "tracked_objects": []
+    },
+    {
+      "frame": 131,
+      "tracked_objects": [
+        {
+          "id": "obj_42",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 132,
+      "tracked_objects": [
+        {
+          "id": "obj_42",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 133,
+      "tracked_objects": [
+        {
+          "id": "obj_42",
+          "centroid_x": 954,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 134,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 942,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 135,
+      "tracked_objects": []
+    },
+    {
+      "frame": 136,
+      "tracked_objects": []
+    },
+    {
+      "frame": 137,
+      "tracked_objects": []
+    },
+    {
+      "frame": 138,
+      "tracked_objects": []
+    },
+    {
+      "frame": 139,
+      "tracked_objects": []
+    },
+    {
+      "frame": 140,
+      "tracked_objects": []
+    },
+    {
+      "frame": 141,
+      "tracked_objects": []
+    },
+    {
+      "frame": 142,
+      "tracked_objects": []
+    },
+    {
+      "frame": 143,
+      "tracked_objects": []
+    },
+    {
+      "frame": 144,
+      "tracked_objects": []
+    },
+    {
+      "frame": 145,
+      "tracked_objects": []
+    },
+    {
+      "frame": 146,
+      "tracked_objects": []
+    },
+    {
+      "frame": 147,
+      "tracked_objects": []
+    },
+    {
+      "frame": 148,
+      "tracked_objects": []
+    },
+    {
+      "frame": 149,
+      "tracked_objects": []
+    },
+    {
+      "frame": 150,
+      "tracked_objects": []
+    },
+    {
+      "frame": 151,
+      "tracked_objects": []
+    },
+    {
+      "frame": 152,
+      "tracked_objects": []
+    },
+    {
+      "frame": 153,
+      "tracked_objects": []
+    },
+    {
+      "frame": 154,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 331,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 155,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 333,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 156,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 333,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 157,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 334,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 158,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 329,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 159,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 333,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 160,
+      "tracked_objects": []
+    },
+    {
+      "frame": 161,
+      "tracked_objects": []
+    },
+    {
+      "frame": 162,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 331,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 163,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 329,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 164,
+      "tracked_objects": []
+    },
+    {
+      "frame": 165,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 166,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 167,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 326,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 168,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 169,
+      "tracked_objects": []
+    },
+    {
+      "frame": 170,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 171,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 330,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 172,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 327,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 173,
+      "tracked_objects": []
+    },
+    {
+      "frame": 174,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 175,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 176,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 177,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1228,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 178,
+      "tracked_objects": [
+        {
+          "id": "obj_44",
+          "centroid_x": 1229,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 179,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 326,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 180,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 329,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 181,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 380,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 182,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 385,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 183,
+      "tracked_objects": []
+    },
+    {
+      "frame": 184,
+      "tracked_objects": []
+    },
+    {
+      "frame": 185,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 416,
+          "source": "object_detector",
+          "label": "elephant",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 186,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 415,
+          "source": "object_detector",
+          "label": "elephant",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 187,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 428,
+          "source": "object_detector",
+          "label": "elephant",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 188,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 462,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 189,
+      "tracked_objects": [
+        {
+          "id": "obj_45",
+          "centroid_x": 1229,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 190,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 515,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 191,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 450,
+          "source": "object_detector",
+          "label": "fire hydrant",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 192,
+      "tracked_objects": [
+        {
+          "id": "obj_46",
+          "centroid_x": 533,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 193,
+      "tracked_objects": []
+    },
+    {
+      "frame": 194,
+      "tracked_objects": []
+    },
+    {
+      "frame": 195,
+      "tracked_objects": []
+    },
+    {
+      "frame": 196,
+      "tracked_objects": []
+    },
+    {
+      "frame": 197,
+      "tracked_objects": []
+    },
+    {
+      "frame": 198,
+      "tracked_objects": []
+    },
+    {
+      "frame": 199,
+      "tracked_objects": []
+    },
+    {
+      "frame": 200,
+      "tracked_objects": []
+    },
+    {
+      "frame": 201,
+      "tracked_objects": []
+    },
+    {
+      "frame": 202,
+      "tracked_objects": []
+    },
+    {
+      "frame": 203,
+      "tracked_objects": []
+    },
+    {
+      "frame": 204,
+      "tracked_objects": []
+    },
+    {
+      "frame": 205,
+      "tracked_objects": []
+    },
+    {
+      "frame": 206,
+      "tracked_objects": []
+    },
+    {
+      "frame": 207,
+      "tracked_objects": []
+    },
+    {
+      "frame": 208,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 1463,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 209,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 1484,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 210,
+      "tracked_objects": []
+    },
+    {
+      "frame": 211,
+      "tracked_objects": []
+    },
+    {
+      "frame": 212,
+      "tracked_objects": []
+    },
+    {
+      "frame": 213,
+      "tracked_objects": []
+    },
+    {
+      "frame": 214,
+      "tracked_objects": [
+        {
+          "id": "obj_48",
+          "centroid_x": 419,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 215,
+      "tracked_objects": [
+        {
+          "id": "obj_49",
+          "centroid_x": 603,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 216,
+      "tracked_objects": []
+    },
+    {
+      "frame": 217,
+      "tracked_objects": [
+        {
+          "id": "obj_50",
+          "centroid_x": 893,
+          "source": "object_detector",
+          "label": "airplane",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 218,
+      "tracked_objects": []
+    },
+    {
+      "frame": 219,
+      "tracked_objects": []
+    },
+    {
+      "frame": 220,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 972,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 221,
+      "tracked_objects": [
+        {
+          "id": "obj_52",
+          "centroid_x": 462,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 222,
+      "tracked_objects": []
+    },
+    {
+      "frame": 223,
+      "tracked_objects": []
+    },
+    {
+      "frame": 224,
+      "tracked_objects": []
+    },
+    {
+      "frame": 225,
+      "tracked_objects": [
+        {
+          "id": "obj_53",
+          "centroid_x": 795,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 226,
+      "tracked_objects": [
+        {
+          "id": "obj_53",
+          "centroid_x": 797,
+          "source": "object_detector",
+          "label": "surfboard",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 227,
+      "tracked_objects": [
+        {
+          "id": "obj_54",
+          "centroid_x": 693,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 228,
+      "tracked_objects": [
+        {
+          "id": "obj_54",
+          "centroid_x": 692,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 229,
+      "tracked_objects": [
+        {
+          "id": "obj_53",
+          "centroid_x": 770,
+          "source": "object_detector",
+          "label": "airplane",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 230,
+      "tracked_objects": [
+        {
+          "id": "obj_53",
+          "centroid_x": 770,
+          "source": "object_detector",
+          "label": "airplane",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 231,
+      "tracked_objects": []
+    },
+    {
+      "frame": 232,
+      "tracked_objects": []
+    },
+    {
+      "frame": 233,
+      "tracked_objects": []
+    },
+    {
+      "frame": 234,
+      "tracked_objects": []
+    },
+    {
+      "frame": 235,
+      "tracked_objects": []
+    },
+    {
+      "frame": 236,
+      "tracked_objects": []
+    },
+    {
+      "frame": 237,
+      "tracked_objects": []
+    },
+    {
+      "frame": 238,
+      "tracked_objects": []
+    },
+    {
+      "frame": 239,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1107,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 240,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1084,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 241,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1010,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 242,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1009,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 243,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1013,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 244,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1011,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 245,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1011,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 246,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1057,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 247,
+      "tracked_objects": [
+        {
+          "id": "obj_55",
+          "centroid_x": 1008,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 248,
+      "tracked_objects": []
+    },
+    {
+      "frame": 249,
+      "tracked_objects": []
+    },
+    {
+      "frame": 250,
+      "tracked_objects": []
+    },
+    {
+      "frame": 251,
+      "tracked_objects": []
+    },
+    {
+      "frame": 252,
+      "tracked_objects": []
+    },
+    {
+      "frame": 253,
+      "tracked_objects": []
+    },
+    {
+      "frame": 254,
+      "tracked_objects": []
+    },
+    {
+      "frame": 255,
+      "tracked_objects": []
+    },
+    {
+      "frame": 256,
+      "tracked_objects": []
+    },
+    {
+      "frame": 257,
+      "tracked_objects": []
+    },
+    {
+      "frame": 258,
+      "tracked_objects": []
+    },
+    {
+      "frame": 259,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1069,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 260,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1070,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 261,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1072,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 262,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1042,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 263,
+      "tracked_objects": []
+    },
+    {
+      "frame": 264,
+      "tracked_objects": []
+    },
+    {
+      "frame": 265,
+      "tracked_objects": []
+    },
+    {
+      "frame": 266,
+      "tracked_objects": []
+    },
+    {
+      "frame": 267,
+      "tracked_objects": []
+    },
+    {
+      "frame": 268,
+      "tracked_objects": []
+    },
+    {
+      "frame": 269,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1069,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 270,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1069,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 271,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1075,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 272,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1072,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 273,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1070,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 274,
+      "tracked_objects": [
+        {
+          "id": "obj_56",
+          "centroid_x": 1067,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 275,
+      "tracked_objects": []
+    },
+    {
+      "frame": 276,
+      "tracked_objects": []
+    },
+    {
+      "frame": 277,
+      "tracked_objects": []
+    },
+    {
+      "frame": 278,
+      "tracked_objects": []
+    },
+    {
+      "frame": 279,
+      "tracked_objects": []
+    },
+    {
+      "frame": 280,
+      "tracked_objects": []
+    },
+    {
+      "frame": 281,
+      "tracked_objects": []
+    },
+    {
+      "frame": 282,
+      "tracked_objects": []
+    },
+    {
+      "frame": 283,
+      "tracked_objects": []
+    },
+    {
+      "frame": 284,
+      "tracked_objects": []
+    },
+    {
+      "frame": 285,
+      "tracked_objects": []
+    },
+    {
+      "frame": 286,
+      "tracked_objects": []
+    },
+    {
+      "frame": 287,
+      "tracked_objects": [
+        {
+          "id": "obj_57",
+          "centroid_x": 1271,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 625,
+          "bbox_height": 628
+        }
+      ]
+    },
+    {
+      "frame": 288,
+      "tracked_objects": [
+        {
+          "id": "obj_57",
+          "centroid_x": 1217,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 658,
+          "bbox_height": 642
+        }
+      ]
+    },
+    {
+      "frame": 289,
+      "tracked_objects": [
+        {
+          "id": "obj_57",
+          "centroid_x": 1226,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 660,
+          "bbox_height": 642
+        }
+      ]
+    },
+    {
+      "frame": 290,
+      "tracked_objects": []
+    },
+    {
+      "frame": 291,
+      "tracked_objects": []
+    },
+    {
+      "frame": 292,
+      "tracked_objects": []
+    },
+    {
+      "frame": 293,
+      "tracked_objects": []
+    },
+    {
+      "frame": 294,
+      "tracked_objects": []
+    },
+    {
+      "frame": 295,
+      "tracked_objects": []
+    },
+    {
+      "frame": 296,
+      "tracked_objects": []
+    },
+    {
+      "frame": 297,
+      "tracked_objects": []
+    },
+    {
+      "frame": 298,
+      "tracked_objects": []
+    },
+    {
+      "frame": 299,
+      "tracked_objects": []
+    },
+    {
+      "frame": 300,
+      "tracked_objects": []
+    },
+    {
+      "frame": 301,
+      "tracked_objects": []
+    },
+    {
+      "frame": 302,
+      "tracked_objects": [
+        {
+          "id": "obj_58",
+          "centroid_x": 1332,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 303,
+      "tracked_objects": [
+        {
+          "id": "obj_58",
+          "centroid_x": 1332,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 304,
+      "tracked_objects": []
+    },
+    {
+      "frame": 305,
+      "tracked_objects": []
+    },
+    {
+      "frame": 306,
+      "tracked_objects": []
+    },
+    {
+      "frame": 307,
+      "tracked_objects": []
+    },
+    {
+      "frame": 308,
+      "tracked_objects": []
+    },
+    {
+      "frame": 309,
+      "tracked_objects": []
+    },
+    {
+      "frame": 310,
+      "tracked_objects": [
+        {
+          "id": "obj_59",
+          "centroid_x": 1497,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 311,
+      "tracked_objects": [
+        {
+          "id": "obj_59",
+          "centroid_x": 1518,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 312,
+      "tracked_objects": [
+        {
+          "id": "obj_59",
+          "centroid_x": 1539,
+          "source": "object_detector",
+          "label": "bear",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 313,
+      "tracked_objects": [
+        {
+          "id": "obj_59",
+          "centroid_x": 1548,
+          "source": "object_detector",
+          "label": "bear",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 314,
+      "tracked_objects": [
+        {
+          "id": "obj_59",
+          "centroid_x": 1574,
+          "source": "object_detector",
+          "label": "bear",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 315,
+      "tracked_objects": [
+        {
+          "id": "obj_59",
+          "centroid_x": 1585,
+          "source": "object_detector",
+          "label": "bear",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 316,
+      "tracked_objects": []
+    },
+    {
+      "frame": 317,
+      "tracked_objects": []
+    },
+    {
+      "frame": 318,
+      "tracked_objects": []
+    },
+    {
+      "frame": 319,
+      "tracked_objects": []
+    },
+    {
+      "frame": 320,
+      "tracked_objects": []
+    },
+    {
+      "frame": 321,
+      "tracked_objects": []
+    },
+    {
+      "frame": 322,
+      "tracked_objects": []
+    },
+    {
+      "frame": 323,
+      "tracked_objects": []
+    },
+    {
+      "frame": 324,
+      "tracked_objects": []
+    },
+    {
+      "frame": 325,
+      "tracked_objects": []
+    },
+    {
+      "frame": 326,
+      "tracked_objects": []
+    },
+    {
+      "frame": 327,
+      "tracked_objects": []
+    },
+    {
+      "frame": 328,
+      "tracked_objects": []
+    },
+    {
+      "frame": 329,
+      "tracked_objects": []
+    },
+    {
+      "frame": 330,
+      "tracked_objects": []
+    },
+    {
+      "frame": 331,
+      "tracked_objects": []
+    },
+    {
+      "frame": 332,
+      "tracked_objects": []
+    },
+    {
+      "frame": 333,
+      "tracked_objects": []
+    },
+    {
+      "frame": 334,
+      "tracked_objects": []
+    },
+    {
+      "frame": 335,
+      "tracked_objects": []
+    },
+    {
+      "frame": 336,
+      "tracked_objects": []
+    },
+    {
+      "frame": 337,
+      "tracked_objects": []
+    },
+    {
+      "frame": 338,
+      "tracked_objects": []
+    },
+    {
+      "frame": 339,
+      "tracked_objects": []
+    },
+    {
+      "frame": 340,
+      "tracked_objects": []
+    },
+    {
+      "frame": 341,
+      "tracked_objects": []
+    },
+    {
+      "frame": 342,
+      "tracked_objects": []
+    },
+    {
+      "frame": 343,
+      "tracked_objects": []
+    },
+    {
+      "frame": 344,
+      "tracked_objects": []
+    },
+    {
+      "frame": 345,
+      "tracked_objects": []
+    },
+    {
+      "frame": 346,
+      "tracked_objects": []
+    },
+    {
+      "frame": 347,
+      "tracked_objects": []
+    },
+    {
+      "frame": 348,
+      "tracked_objects": []
+    },
+    {
+      "frame": 349,
+      "tracked_objects": []
+    },
+    {
+      "frame": 350,
+      "tracked_objects": []
+    },
+    {
+      "frame": 351,
+      "tracked_objects": []
+    },
+    {
+      "frame": 352,
+      "tracked_objects": []
+    },
+    {
+      "frame": 353,
+      "tracked_objects": []
+    },
+    {
+      "frame": 354,
+      "tracked_objects": []
+    },
+    {
+      "frame": 355,
+      "tracked_objects": []
+    },
+    {
+      "frame": 356,
+      "tracked_objects": []
+    },
+    {
+      "frame": 357,
+      "tracked_objects": []
+    },
+    {
+      "frame": 358,
+      "tracked_objects": []
+    },
+    {
+      "frame": 359,
+      "tracked_objects": []
+    },
+    {
+      "frame": 360,
+      "tracked_objects": []
+    },
+    {
+      "frame": 361,
+      "tracked_objects": []
+    },
+    {
+      "frame": 362,
+      "tracked_objects": []
+    },
+    {
+      "frame": 363,
+      "tracked_objects": []
+    },
+    {
+      "frame": 364,
+      "tracked_objects": []
+    },
+    {
+      "frame": 365,
+      "tracked_objects": []
+    },
+    {
+      "frame": 366,
+      "tracked_objects": []
+    },
+    {
+      "frame": 367,
+      "tracked_objects": []
+    },
+    {
+      "frame": 368,
+      "tracked_objects": []
+    },
+    {
+      "frame": 369,
+      "tracked_objects": []
+    },
+    {
+      "frame": 370,
+      "tracked_objects": []
+    },
+    {
+      "frame": 371,
+      "tracked_objects": []
+    },
+    {
+      "frame": 372,
+      "tracked_objects": []
+    },
+    {
+      "frame": 373,
+      "tracked_objects": []
+    },
+    {
+      "frame": 374,
+      "tracked_objects": []
+    },
+    {
+      "frame": 375,
+      "tracked_objects": []
+    },
+    {
+      "frame": 376,
+      "tracked_objects": []
+    },
+    {
+      "frame": 377,
+      "tracked_objects": []
+    },
+    {
+      "frame": 378,
+      "tracked_objects": []
+    },
+    {
+      "frame": 379,
+      "tracked_objects": []
+    },
+    {
+      "frame": 380,
+      "tracked_objects": []
+    },
+    {
+      "frame": 381,
+      "tracked_objects": []
+    },
+    {
+      "frame": 382,
+      "tracked_objects": []
+    },
+    {
+      "frame": 383,
+      "tracked_objects": []
+    },
+    {
+      "frame": 384,
+      "tracked_objects": []
+    },
+    {
+      "frame": 385,
+      "tracked_objects": []
+    },
+    {
+      "frame": 386,
+      "tracked_objects": []
+    },
+    {
+      "frame": 387,
+      "tracked_objects": []
+    },
+    {
+      "frame": 388,
+      "tracked_objects": []
+    },
+    {
+      "frame": 389,
+      "tracked_objects": []
+    },
+    {
+      "frame": 390,
+      "tracked_objects": []
+    },
+    {
+      "frame": 391,
+      "tracked_objects": []
+    },
+    {
+      "frame": 392,
+      "tracked_objects": []
+    },
+    {
+      "frame": 393,
+      "tracked_objects": []
+    },
+    {
+      "frame": 394,
+      "tracked_objects": []
+    },
+    {
+      "frame": 395,
+      "tracked_objects": []
+    },
+    {
+      "frame": 396,
+      "tracked_objects": []
+    },
+    {
+      "frame": 397,
+      "tracked_objects": []
+    },
+    {
+      "frame": 398,
+      "tracked_objects": []
+    },
+    {
+      "frame": 399,
+      "tracked_objects": []
+    },
+    {
+      "frame": 400,
+      "tracked_objects": []
+    },
+    {
+      "frame": 401,
+      "tracked_objects": []
+    },
+    {
+      "frame": 402,
+      "tracked_objects": []
+    },
+    {
+      "frame": 403,
+      "tracked_objects": []
+    },
+    {
+      "frame": 404,
+      "tracked_objects": []
+    },
+    {
+      "frame": 405,
+      "tracked_objects": []
+    },
+    {
+      "frame": 406,
+      "tracked_objects": []
+    },
+    {
+      "frame": 407,
+      "tracked_objects": []
+    },
+    {
+      "frame": 408,
+      "tracked_objects": []
+    },
+    {
+      "frame": 409,
+      "tracked_objects": []
+    },
+    {
+      "frame": 410,
+      "tracked_objects": []
+    },
+    {
+      "frame": 411,
+      "tracked_objects": []
+    },
+    {
+      "frame": 412,
+      "tracked_objects": []
+    },
+    {
+      "frame": 413,
+      "tracked_objects": []
+    },
+    {
+      "frame": 414,
+      "tracked_objects": []
+    },
+    {
+      "frame": 415,
+      "tracked_objects": []
+    },
+    {
+      "frame": 416,
+      "tracked_objects": []
+    },
+    {
+      "frame": 417,
+      "tracked_objects": []
+    },
+    {
+      "frame": 418,
+      "tracked_objects": []
+    },
+    {
+      "frame": 419,
+      "tracked_objects": []
+    },
+    {
+      "frame": 420,
+      "tracked_objects": []
+    },
+    {
+      "frame": 421,
+      "tracked_objects": []
+    },
+    {
+      "frame": 422,
+      "tracked_objects": []
+    },
+    {
+      "frame": 423,
+      "tracked_objects": []
+    },
+    {
+      "frame": 424,
+      "tracked_objects": []
+    },
+    {
+      "frame": 425,
+      "tracked_objects": []
+    },
+    {
+      "frame": 426,
+      "tracked_objects": []
+    },
+    {
+      "frame": 427,
+      "tracked_objects": []
+    },
+    {
+      "frame": 428,
+      "tracked_objects": []
+    },
+    {
+      "frame": 429,
+      "tracked_objects": []
+    },
+    {
+      "frame": 430,
+      "tracked_objects": []
+    },
+    {
+      "frame": 431,
+      "tracked_objects": []
+    },
+    {
+      "frame": 432,
+      "tracked_objects": []
+    },
+    {
+      "frame": 433,
+      "tracked_objects": []
+    },
+    {
+      "frame": 434,
+      "tracked_objects": []
+    },
+    {
+      "frame": 435,
+      "tracked_objects": []
+    },
+    {
+      "frame": 436,
+      "tracked_objects": []
+    },
+    {
+      "frame": 437,
+      "tracked_objects": []
+    },
+    {
+      "frame": 438,
+      "tracked_objects": []
+    },
+    {
+      "frame": 439,
+      "tracked_objects": []
+    },
+    {
+      "frame": 440,
+      "tracked_objects": []
+    },
+    {
+      "frame": 441,
+      "tracked_objects": []
+    },
+    {
+      "frame": 442,
+      "tracked_objects": []
+    },
+    {
+      "frame": 443,
+      "tracked_objects": []
+    },
+    {
+      "frame": 444,
+      "tracked_objects": [
+        {
+          "id": "obj_60",
+          "centroid_x": 1046,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_02"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 445,
+      "tracked_objects": [
+        {
+          "id": "obj_60",
+          "centroid_x": 1045,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_02"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 446,
+      "tracked_objects": []
+    },
+    {
+      "frame": 447,
+      "tracked_objects": []
+    },
+    {
+      "frame": 448,
+      "tracked_objects": []
+    },
+    {
+      "frame": 449,
+      "tracked_objects": []
+    },
+    {
+      "frame": 450,
+      "tracked_objects": []
+    },
+    {
+      "frame": 451,
+      "tracked_objects": []
+    },
+    {
+      "frame": 452,
+      "tracked_objects": []
+    },
+    {
+      "frame": 453,
+      "tracked_objects": []
+    },
+    {
+      "frame": 454,
+      "tracked_objects": []
+    },
+    {
+      "frame": 455,
+      "tracked_objects": []
+    },
+    {
+      "frame": 456,
+      "tracked_objects": []
+    },
+    {
+      "frame": 457,
+      "tracked_objects": []
+    },
+    {
+      "frame": 458,
+      "tracked_objects": []
+    },
+    {
+      "frame": 459,
+      "tracked_objects": []
+    },
+    {
+      "frame": 460,
+      "tracked_objects": []
+    },
+    {
+      "frame": 461,
+      "tracked_objects": []
+    },
+    {
+      "frame": 462,
+      "tracked_objects": []
+    },
+    {
+      "frame": 463,
+      "tracked_objects": []
+    },
+    {
+      "frame": 464,
+      "tracked_objects": []
+    },
+    {
+      "frame": 465,
+      "tracked_objects": []
+    },
+    {
+      "frame": 466,
+      "tracked_objects": []
+    },
+    {
+      "frame": 467,
+      "tracked_objects": []
+    },
+    {
+      "frame": 468,
+      "tracked_objects": []
+    },
+    {
+      "frame": 469,
+      "tracked_objects": []
+    },
+    {
+      "frame": 470,
+      "tracked_objects": []
+    },
+    {
+      "frame": 471,
+      "tracked_objects": [
+        {
+          "id": "obj_61",
+          "centroid_x": 1165,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_02"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 472,
+      "tracked_objects": []
+    },
+    {
+      "frame": 473,
+      "tracked_objects": [
+        {
+          "id": "obj_62",
+          "centroid_x": 795,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_02"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 474,
+      "tracked_objects": []
+    },
+    {
+      "frame": 475,
+      "tracked_objects": [
+        {
+          "id": "obj_63",
+          "centroid_x": 995,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 476,
+      "tracked_objects": []
+    },
+    {
+      "frame": 477,
+      "tracked_objects": []
+    },
+    {
+      "frame": 478,
+      "tracked_objects": []
+    },
+    {
+      "frame": 479,
+      "tracked_objects": []
+    },
+    {
+      "frame": 480,
+      "tracked_objects": []
+    },
+    {
+      "frame": 481,
+      "tracked_objects": []
+    },
+    {
+      "frame": 482,
+      "tracked_objects": []
+    },
+    {
+      "frame": 483,
+      "tracked_objects": []
+    },
+    {
+      "frame": 484,
+      "tracked_objects": []
+    },
+    {
+      "frame": 485,
+      "tracked_objects": []
+    },
+    {
+      "frame": 486,
+      "tracked_objects": []
+    },
+    {
+      "frame": 487,
+      "tracked_objects": []
+    },
+    {
+      "frame": 488,
+      "tracked_objects": []
+    },
+    {
+      "frame": 489,
+      "tracked_objects": []
+    },
+    {
+      "frame": 490,
+      "tracked_objects": [
+        {
+          "id": "obj_64",
+          "centroid_x": 919,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 491,
+      "tracked_objects": [
+        {
+          "id": "obj_64",
+          "centroid_x": 919,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 492,
+      "tracked_objects": []
+    },
+    {
+      "frame": 493,
+      "tracked_objects": []
+    },
+    {
+      "frame": 494,
+      "tracked_objects": []
+    },
+    {
+      "frame": 495,
+      "tracked_objects": []
+    },
+    {
+      "frame": 496,
+      "tracked_objects": []
+    },
+    {
+      "frame": 497,
+      "tracked_objects": []
+    },
+    {
+      "frame": 498,
+      "tracked_objects": []
+    },
+    {
+      "frame": 499,
+      "tracked_objects": []
+    },
+    {
+      "frame": 500,
+      "tracked_objects": []
+    },
+    {
+      "frame": 501,
+      "tracked_objects": []
+    },
+    {
+      "frame": 502,
+      "tracked_objects": []
+    },
+    {
+      "frame": 503,
+      "tracked_objects": []
+    },
+    {
+      "frame": 504,
+      "tracked_objects": []
+    },
+    {
+      "frame": 505,
+      "tracked_objects": []
+    },
+    {
+      "frame": 506,
+      "tracked_objects": []
+    },
+    {
+      "frame": 507,
+      "tracked_objects": []
+    },
+    {
+      "frame": 508,
+      "tracked_objects": []
+    },
+    {
+      "frame": 509,
+      "tracked_objects": []
+    },
+    {
+      "frame": 510,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1202,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 511,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1193,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 512,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1190,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 513,
+      "tracked_objects": []
+    },
+    {
+      "frame": 514,
+      "tracked_objects": []
+    },
+    {
+      "frame": 515,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1182,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 516,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1183,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 517,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1182,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 518,
+      "tracked_objects": [
+        {
+          "id": "obj_65",
+          "centroid_x": 1182,
+          "source": "object_detector",
+          "label": "dog",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 519,
+      "tracked_objects": []
+    },
+    {
+      "frame": 520,
+      "tracked_objects": []
+    },
+    {
+      "frame": 521,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1114,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 522,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1117,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 523,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1121,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 524,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1122,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 525,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1131,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 526,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1134,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 527,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1128,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 528,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1123,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 529,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1115,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 530,
+      "tracked_objects": [
+        {
+          "id": "obj_66",
+          "centroid_x": 1190,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 341,
+          "bbox_height": 371
+        }
+      ]
+    },
+    {
+      "frame": 531,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1106,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 532,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1098,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 533,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1098,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 534,
+      "tracked_objects": [
+        {
+          "id": "obj_68",
+          "centroid_x": 454,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_67",
+          "centroid_x": 1093,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 535,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1092,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 536,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1086,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 537,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1081,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 538,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1077,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 539,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1073,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 540,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1078,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 541,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1078,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 542,
+      "tracked_objects": []
+    },
+    {
+      "frame": 543,
+      "tracked_objects": []
+    },
+    {
+      "frame": 544,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1097,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 545,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1099,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 546,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1106,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 547,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1108,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 548,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1111,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 549,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1120,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 550,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1119,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 551,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1126,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 552,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1134,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 553,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1124,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 554,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1121,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 555,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1117,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 556,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1113,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 557,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1104,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 558,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1095,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 559,
+      "tracked_objects": []
+    },
+    {
+      "frame": 560,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1096,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 561,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1097,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 562,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1086,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 563,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1089,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 564,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1083,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 565,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1079,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 566,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1082,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 567,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1084,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 568,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1089,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 569,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1092,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 570,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1094,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 571,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1096,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 572,
+      "tracked_objects": []
+    },
+    {
+      "frame": 573,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1101,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 574,
+      "tracked_objects": [
+        {
+          "id": "obj_69",
+          "centroid_x": 454,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_67",
+          "centroid_x": 1102,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 575,
+      "tracked_objects": [
+        {
+          "id": "obj_69",
+          "centroid_x": 454,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_67",
+          "centroid_x": 1111,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 576,
+      "tracked_objects": [
+        {
+          "id": "obj_69",
+          "centroid_x": 454,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_67",
+          "centroid_x": 1116,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 577,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1135,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 578,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1138,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 579,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1132,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 580,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1128,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 581,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1115,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 582,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1111,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 583,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1106,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 584,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1102,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 585,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1098,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 586,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1094,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 587,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1089,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 588,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1084,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 589,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1080,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 590,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1081,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 591,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1076,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 592,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1081,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 593,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1082,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 594,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1089,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 595,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1092,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 596,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1090,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 597,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1095,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 598,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1095,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 599,
+      "tracked_objects": []
+    },
+    {
+      "frame": 600,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1106,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 601,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1117,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 602,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1125,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 603,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1126,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 604,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1130,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 605,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1131,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 606,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1123,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 607,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1119,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 608,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1111,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 609,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1109,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 610,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1104,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 611,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1095,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 612,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1096,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 613,
+      "tracked_objects": [
+        {
+          "id": "obj_70",
+          "centroid_x": 455,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_67",
+          "centroid_x": 1093,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 614,
+      "tracked_objects": [
+        {
+          "id": "obj_70",
+          "centroid_x": 455,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_67",
+          "centroid_x": 1088,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 615,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1083,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 616,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1084,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 617,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1081,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 618,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1079,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 619,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1081,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 620,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1091,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 621,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1086,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 622,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1086,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 623,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1093,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 624,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1100,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 625,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1100,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 626,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1109,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 627,
+      "tracked_objects": [
+        {
+          "id": "obj_67",
+          "centroid_x": 1121,
+          "source": "object_detector",
+          "label": "clock",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 628,
+      "tracked_objects": [
+        {
+          "id": "obj_71",
+          "centroid_x": 794,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 629,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 676,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 630,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 675,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 631,
+      "tracked_objects": []
+    },
+    {
+      "frame": 632,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 700,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 633,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 743,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 634,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 742,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 635,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 686,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 636,
+      "tracked_objects": [
+        {
+          "id": "obj_72",
+          "centroid_x": 689,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 637,
+      "tracked_objects": []
+    },
+    {
+      "frame": 638,
+      "tracked_objects": [
+        {
+          "id": "obj_73",
+          "centroid_x": 964,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [
+            "SPEAKER_01"
+          ],
+          "bbox_width": 494,
+          "bbox_height": 479
+        }
+      ]
+    },
+    {
+      "frame": 639,
+      "tracked_objects": []
+    },
+    {
+      "frame": 640,
+      "tracked_objects": []
+    },
+    {
+      "frame": 641,
+      "tracked_objects": []
+    },
+    {
+      "frame": 642,
+      "tracked_objects": []
+    },
+    {
+      "frame": 643,
+      "tracked_objects": []
+    },
+    {
+      "frame": 644,
+      "tracked_objects": []
+    },
+    {
+      "frame": 645,
+      "tracked_objects": []
+    },
+    {
+      "frame": 646,
+      "tracked_objects": []
+    },
+    {
+      "frame": 647,
+      "tracked_objects": []
+    },
+    {
+      "frame": 648,
+      "tracked_objects": []
+    },
+    {
+      "frame": 649,
+      "tracked_objects": []
+    },
+    {
+      "frame": 650,
+      "tracked_objects": []
+    },
+    {
+      "frame": 651,
+      "tracked_objects": []
+    },
+    {
+      "frame": 652,
+      "tracked_objects": []
+    },
+    {
+      "frame": 653,
+      "tracked_objects": [
+        {
+          "id": "obj_74",
+          "centroid_x": 141,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 654,
+      "tracked_objects": [
+        {
+          "id": "obj_74",
+          "centroid_x": 141,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 655,
+      "tracked_objects": []
+    },
+    {
+      "frame": 656,
+      "tracked_objects": [
+        {
+          "id": "obj_75",
+          "centroid_x": 579,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 657,
+      "tracked_objects": [
+        {
+          "id": "obj_76",
+          "centroid_x": 704,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 658,
+      "tracked_objects": [
+        {
+          "id": "obj_76",
+          "centroid_x": 701,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 659,
+      "tracked_objects": []
+    },
+    {
+      "frame": 660,
+      "tracked_objects": []
+    },
+    {
+      "frame": 661,
+      "tracked_objects": [
+        {
+          "id": "obj_76",
+          "centroid_x": 673,
+          "source": "object_detector",
+          "label": "airplane",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 662,
+      "tracked_objects": [
+        {
+          "id": "obj_76",
+          "centroid_x": 694,
+          "source": "object_detector",
+          "label": "airplane",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 663,
+      "tracked_objects": []
+    },
+    {
+      "frame": 664,
+      "tracked_objects": []
+    },
+    {
+      "frame": 665,
+      "tracked_objects": []
+    },
+    {
+      "frame": 666,
+      "tracked_objects": []
+    },
+    {
+      "frame": 667,
+      "tracked_objects": []
+    },
+    {
+      "frame": 668,
+      "tracked_objects": []
+    },
+    {
+      "frame": 669,
+      "tracked_objects": []
+    },
+    {
+      "frame": 670,
+      "tracked_objects": []
+    },
+    {
+      "frame": 671,
+      "tracked_objects": []
+    },
+    {
+      "frame": 672,
+      "tracked_objects": []
+    },
+    {
+      "frame": 673,
+      "tracked_objects": []
+    },
+    {
+      "frame": 674,
+      "tracked_objects": [
+        {
+          "id": "obj_77",
+          "centroid_x": 1025,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 675,
+      "tracked_objects": []
+    },
+    {
+      "frame": 676,
+      "tracked_objects": []
+    },
+    {
+      "frame": 677,
+      "tracked_objects": []
+    },
+    {
+      "frame": 678,
+      "tracked_objects": []
+    },
+    {
+      "frame": 679,
+      "tracked_objects": []
+    },
+    {
+      "frame": 680,
+      "tracked_objects": []
+    },
+    {
+      "frame": 681,
+      "tracked_objects": []
+    },
+    {
+      "frame": 682,
+      "tracked_objects": []
+    },
+    {
+      "frame": 683,
+      "tracked_objects": []
+    },
+    {
+      "frame": 684,
+      "tracked_objects": []
+    },
+    {
+      "frame": 685,
+      "tracked_objects": []
+    },
+    {
+      "frame": 686,
+      "tracked_objects": []
+    },
+    {
+      "frame": 687,
+      "tracked_objects": []
+    },
+    {
+      "frame": 688,
+      "tracked_objects": []
+    },
+    {
+      "frame": 689,
+      "tracked_objects": []
+    },
+    {
+      "frame": 690,
+      "tracked_objects": []
+    },
+    {
+      "frame": 691,
+      "tracked_objects": []
+    },
+    {
+      "frame": 692,
+      "tracked_objects": []
+    },
+    {
+      "frame": 693,
+      "tracked_objects": []
+    },
+    {
+      "frame": 694,
+      "tracked_objects": []
+    },
+    {
+      "frame": 695,
+      "tracked_objects": []
+    },
+    {
+      "frame": 696,
+      "tracked_objects": []
+    },
+    {
+      "frame": 697,
+      "tracked_objects": []
+    },
+    {
+      "frame": 698,
+      "tracked_objects": []
+    },
+    {
+      "frame": 699,
+      "tracked_objects": []
+    },
+    {
+      "frame": 700,
+      "tracked_objects": []
+    },
+    {
+      "frame": 701,
+      "tracked_objects": []
+    },
+    {
+      "frame": 702,
+      "tracked_objects": []
+    },
+    {
+      "frame": 703,
+      "tracked_objects": []
+    },
+    {
+      "frame": 704,
+      "tracked_objects": []
+    },
+    {
+      "frame": 705,
+      "tracked_objects": []
+    },
+    {
+      "frame": 706,
+      "tracked_objects": []
+    },
+    {
+      "frame": 707,
+      "tracked_objects": []
+    },
+    {
+      "frame": 708,
+      "tracked_objects": []
+    },
+    {
+      "frame": 709,
+      "tracked_objects": []
+    },
+    {
+      "frame": 710,
+      "tracked_objects": []
+    },
+    {
+      "frame": 711,
+      "tracked_objects": []
+    },
+    {
+      "frame": 712,
+      "tracked_objects": []
+    },
+    {
+      "frame": 713,
+      "tracked_objects": []
+    },
+    {
+      "frame": 714,
+      "tracked_objects": []
+    },
+    {
+      "frame": 715,
+      "tracked_objects": []
+    },
+    {
+      "frame": 716,
+      "tracked_objects": []
+    },
+    {
+      "frame": 717,
+      "tracked_objects": []
+    },
+    {
+      "frame": 718,
+      "tracked_objects": []
+    },
+    {
+      "frame": 719,
+      "tracked_objects": []
+    },
+    {
+      "frame": 720,
+      "tracked_objects": []
+    },
+    {
+      "frame": 721,
+      "tracked_objects": []
+    },
+    {
+      "frame": 722,
+      "tracked_objects": []
+    },
+    {
+      "frame": 723,
+      "tracked_objects": []
+    },
+    {
+      "frame": 724,
+      "tracked_objects": []
+    },
+    {
+      "frame": 725,
+      "tracked_objects": []
+    },
+    {
+      "frame": 726,
+      "tracked_objects": []
+    },
+    {
+      "frame": 727,
+      "tracked_objects": []
+    },
+    {
+      "frame": 728,
+      "tracked_objects": []
+    },
+    {
+      "frame": 729,
+      "tracked_objects": []
+    },
+    {
+      "frame": 730,
+      "tracked_objects": []
+    },
+    {
+      "frame": 731,
+      "tracked_objects": []
+    },
+    {
+      "frame": 732,
+      "tracked_objects": []
+    },
+    {
+      "frame": 733,
+      "tracked_objects": []
+    },
+    {
+      "frame": 734,
+      "tracked_objects": []
+    },
+    {
+      "frame": 735,
+      "tracked_objects": []
+    },
+    {
+      "frame": 736,
+      "tracked_objects": []
+    },
+    {
+      "frame": 737,
+      "tracked_objects": []
+    },
+    {
+      "frame": 738,
+      "tracked_objects": []
+    },
+    {
+      "frame": 739,
+      "tracked_objects": []
+    },
+    {
+      "frame": 740,
+      "tracked_objects": []
+    },
+    {
+      "frame": 741,
+      "tracked_objects": []
+    },
+    {
+      "frame": 742,
+      "tracked_objects": []
+    },
+    {
+      "frame": 743,
+      "tracked_objects": []
+    },
+    {
+      "frame": 744,
+      "tracked_objects": []
+    },
+    {
+      "frame": 745,
+      "tracked_objects": []
+    },
+    {
+      "frame": 746,
+      "tracked_objects": []
+    },
+    {
+      "frame": 747,
+      "tracked_objects": []
+    },
+    {
+      "frame": 748,
+      "tracked_objects": []
+    },
+    {
+      "frame": 749,
+      "tracked_objects": []
+    },
+    {
+      "frame": 750,
+      "tracked_objects": []
+    },
+    {
+      "frame": 751,
+      "tracked_objects": []
+    },
+    {
+      "frame": 752,
+      "tracked_objects": []
+    },
+    {
+      "frame": 753,
+      "tracked_objects": []
+    },
+    {
+      "frame": 754,
+      "tracked_objects": []
+    },
+    {
+      "frame": 755,
+      "tracked_objects": []
+    },
+    {
+      "frame": 756,
+      "tracked_objects": []
+    },
+    {
+      "frame": 757,
+      "tracked_objects": []
+    },
+    {
+      "frame": 758,
+      "tracked_objects": []
+    },
+    {
+      "frame": 759,
+      "tracked_objects": []
+    },
+    {
+      "frame": 760,
+      "tracked_objects": []
+    },
+    {
+      "frame": 761,
+      "tracked_objects": []
+    },
+    {
+      "frame": 762,
+      "tracked_objects": []
+    },
+    {
+      "frame": 763,
+      "tracked_objects": []
+    },
+    {
+      "frame": 764,
+      "tracked_objects": []
+    },
+    {
+      "frame": 765,
+      "tracked_objects": []
+    },
+    {
+      "frame": 766,
+      "tracked_objects": []
+    },
+    {
+      "frame": 767,
+      "tracked_objects": []
+    },
+    {
+      "frame": 768,
+      "tracked_objects": []
+    },
+    {
+      "frame": 769,
+      "tracked_objects": []
+    },
+    {
+      "frame": 770,
+      "tracked_objects": []
+    },
+    {
+      "frame": 771,
+      "tracked_objects": []
+    },
+    {
+      "frame": 772,
+      "tracked_objects": []
+    },
+    {
+      "frame": 773,
+      "tracked_objects": []
+    },
+    {
+      "frame": 774,
+      "tracked_objects": []
+    },
+    {
+      "frame": 775,
+      "tracked_objects": []
+    },
+    {
+      "frame": 776,
+      "tracked_objects": []
+    },
+    {
+      "frame": 777,
+      "tracked_objects": []
+    },
+    {
+      "frame": 778,
+      "tracked_objects": []
+    },
+    {
+      "frame": 779,
+      "tracked_objects": []
+    },
+    {
+      "frame": 780,
+      "tracked_objects": []
+    },
+    {
+      "frame": 781,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 782,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 783,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 784,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 785,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 786,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 610,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 787,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 788,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 789,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 790,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 791,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 792,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 610,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 793,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 610,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 794,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 610,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 795,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 796,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 797,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 798,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 799,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 800,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 801,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 802,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 609,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 803,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 804,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 805,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 806,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 807,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 808,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 809,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 810,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 811,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 812,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 813,
+      "tracked_objects": [
+        {
+          "id": "obj_78",
+          "centroid_x": 607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 814,
+      "tracked_objects": []
+    },
+    {
+      "frame": 815,
+      "tracked_objects": []
+    },
+    {
+      "frame": 816,
+      "tracked_objects": []
+    },
+    {
+      "frame": 817,
+      "tracked_objects": []
+    },
+    {
+      "frame": 818,
+      "tracked_objects": []
+    },
+    {
+      "frame": 819,
+      "tracked_objects": []
+    },
+    {
+      "frame": 820,
+      "tracked_objects": []
+    },
+    {
+      "frame": 821,
+      "tracked_objects": []
+    },
+    {
+      "frame": 822,
+      "tracked_objects": []
+    },
+    {
+      "frame": 823,
+      "tracked_objects": []
+    },
+    {
+      "frame": 824,
+      "tracked_objects": []
+    },
+    {
+      "frame": 825,
+      "tracked_objects": []
+    },
+    {
+      "frame": 826,
+      "tracked_objects": []
+    },
+    {
+      "frame": 827,
+      "tracked_objects": []
+    },
+    {
+      "frame": 828,
+      "tracked_objects": []
+    },
+    {
+      "frame": 829,
+      "tracked_objects": []
+    },
+    {
+      "frame": 830,
+      "tracked_objects": []
+    },
+    {
+      "frame": 831,
+      "tracked_objects": []
+    },
+    {
+      "frame": 832,
+      "tracked_objects": []
+    },
+    {
+      "frame": 833,
+      "tracked_objects": []
+    },
+    {
+      "frame": 834,
+      "tracked_objects": []
+    },
+    {
+      "frame": 835,
+      "tracked_objects": [
+        {
+          "id": "obj_79",
+          "centroid_x": 835,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 836,
+      "tracked_objects": [
+        {
+          "id": "obj_79",
+          "centroid_x": 835,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 837,
+      "tracked_objects": [
+        {
+          "id": "obj_79",
+          "centroid_x": 851,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 838,
+      "tracked_objects": [
+        {
+          "id": "obj_79",
+          "centroid_x": 851,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 839,
+      "tracked_objects": []
+    },
+    {
+      "frame": 840,
+      "tracked_objects": []
+    },
+    {
+      "frame": 841,
+      "tracked_objects": []
+    },
+    {
+      "frame": 842,
+      "tracked_objects": []
+    },
+    {
+      "frame": 843,
+      "tracked_objects": []
+    },
+    {
+      "frame": 844,
+      "tracked_objects": []
+    },
+    {
+      "frame": 845,
+      "tracked_objects": []
+    },
+    {
+      "frame": 846,
+      "tracked_objects": []
+    },
+    {
+      "frame": 847,
+      "tracked_objects": [
+        {
+          "id": "obj_80",
+          "centroid_x": 1029,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 848,
+      "tracked_objects": []
+    },
+    {
+      "frame": 849,
+      "tracked_objects": []
+    },
+    {
+      "frame": 850,
+      "tracked_objects": []
+    },
+    {
+      "frame": 851,
+      "tracked_objects": []
+    },
+    {
+      "frame": 852,
+      "tracked_objects": [
+        {
+          "id": "obj_81",
+          "centroid_x": 849,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 853,
+      "tracked_objects": [
+        {
+          "id": "obj_81",
+          "centroid_x": 849,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 854,
+      "tracked_objects": []
+    },
+    {
+      "frame": 855,
+      "tracked_objects": []
+    },
+    {
+      "frame": 856,
+      "tracked_objects": [
+        {
+          "id": "obj_82",
+          "centroid_x": 871,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_83",
+          "centroid_x": 1029,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 857,
+      "tracked_objects": [
+        {
+          "id": "obj_82",
+          "centroid_x": 872,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 858,
+      "tracked_objects": [
+        {
+          "id": "obj_82",
+          "centroid_x": 892,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 859,
+      "tracked_objects": []
+    },
+    {
+      "frame": 860,
+      "tracked_objects": []
+    },
+    {
+      "frame": 861,
+      "tracked_objects": []
+    },
+    {
+      "frame": 862,
+      "tracked_objects": [
+        {
+          "id": "obj_84",
+          "centroid_x": 364,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 863,
+      "tracked_objects": [
+        {
+          "id": "obj_84",
+          "centroid_x": 363,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 864,
+      "tracked_objects": [
+        {
+          "id": "obj_84",
+          "centroid_x": 430,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 865,
+      "tracked_objects": [
+        {
+          "id": "obj_84",
+          "centroid_x": 433,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 866,
+      "tracked_objects": []
+    },
+    {
+      "frame": 867,
+      "tracked_objects": [
+        {
+          "id": "obj_85",
+          "centroid_x": 982,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 868,
+      "tracked_objects": []
+    },
+    {
+      "frame": 869,
+      "tracked_objects": []
+    },
+    {
+      "frame": 870,
+      "tracked_objects": []
+    },
+    {
+      "frame": 871,
+      "tracked_objects": []
+    },
+    {
+      "frame": 872,
+      "tracked_objects": []
+    },
+    {
+      "frame": 873,
+      "tracked_objects": []
+    },
+    {
+      "frame": 874,
+      "tracked_objects": []
+    },
+    {
+      "frame": 875,
+      "tracked_objects": []
+    },
+    {
+      "frame": 876,
+      "tracked_objects": []
+    },
+    {
+      "frame": 877,
+      "tracked_objects": []
+    },
+    {
+      "frame": 878,
+      "tracked_objects": []
+    },
+    {
+      "frame": 879,
+      "tracked_objects": []
+    },
+    {
+      "frame": 880,
+      "tracked_objects": []
+    },
+    {
+      "frame": 881,
+      "tracked_objects": []
+    },
+    {
+      "frame": 882,
+      "tracked_objects": []
+    },
+    {
+      "frame": 883,
+      "tracked_objects": []
+    },
+    {
+      "frame": 884,
+      "tracked_objects": []
+    },
+    {
+      "frame": 885,
+      "tracked_objects": []
+    },
+    {
+      "frame": 886,
+      "tracked_objects": []
+    },
+    {
+      "frame": 887,
+      "tracked_objects": []
+    },
+    {
+      "frame": 888,
+      "tracked_objects": []
+    },
+    {
+      "frame": 889,
+      "tracked_objects": []
+    },
+    {
+      "frame": 890,
+      "tracked_objects": []
+    },
+    {
+      "frame": 891,
+      "tracked_objects": []
+    },
+    {
+      "frame": 892,
+      "tracked_objects": []
+    },
+    {
+      "frame": 893,
+      "tracked_objects": []
+    },
+    {
+      "frame": 894,
+      "tracked_objects": []
+    },
+    {
+      "frame": 895,
+      "tracked_objects": []
+    },
+    {
+      "frame": 896,
+      "tracked_objects": []
+    },
+    {
+      "frame": 897,
+      "tracked_objects": []
+    },
+    {
+      "frame": 898,
+      "tracked_objects": []
+    },
+    {
+      "frame": 899,
+      "tracked_objects": []
+    },
+    {
+      "frame": 900,
+      "tracked_objects": []
+    },
+    {
+      "frame": 901,
+      "tracked_objects": []
+    },
+    {
+      "frame": 902,
+      "tracked_objects": []
+    },
+    {
+      "frame": 903,
+      "tracked_objects": []
+    },
+    {
+      "frame": 904,
+      "tracked_objects": []
+    },
+    {
+      "frame": 905,
+      "tracked_objects": []
+    },
+    {
+      "frame": 906,
+      "tracked_objects": []
+    },
+    {
+      "frame": 907,
+      "tracked_objects": []
+    },
+    {
+      "frame": 908,
+      "tracked_objects": []
+    },
+    {
+      "frame": 909,
+      "tracked_objects": []
+    },
+    {
+      "frame": 910,
+      "tracked_objects": []
+    },
+    {
+      "frame": 911,
+      "tracked_objects": [
+        {
+          "id": "obj_86",
+          "centroid_x": 898,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 912,
+      "tracked_objects": []
+    },
+    {
+      "frame": 913,
+      "tracked_objects": []
+    },
+    {
+      "frame": 914,
+      "tracked_objects": [
+        {
+          "id": "obj_87",
+          "centroid_x": 911,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 915,
+      "tracked_objects": []
+    },
+    {
+      "frame": 916,
+      "tracked_objects": []
+    },
+    {
+      "frame": 917,
+      "tracked_objects": []
+    },
+    {
+      "frame": 918,
+      "tracked_objects": []
+    },
+    {
+      "frame": 919,
+      "tracked_objects": []
+    },
+    {
+      "frame": 920,
+      "tracked_objects": []
+    },
+    {
+      "frame": 921,
+      "tracked_objects": []
+    },
+    {
+      "frame": 922,
+      "tracked_objects": []
+    },
+    {
+      "frame": 923,
+      "tracked_objects": []
+    },
+    {
+      "frame": 924,
+      "tracked_objects": []
+    },
+    {
+      "frame": 925,
+      "tracked_objects": []
+    },
+    {
+      "frame": 926,
+      "tracked_objects": []
+    },
+    {
+      "frame": 927,
+      "tracked_objects": []
+    },
+    {
+      "frame": 928,
+      "tracked_objects": []
+    },
+    {
+      "frame": 929,
+      "tracked_objects": []
+    },
+    {
+      "frame": 930,
+      "tracked_objects": []
+    },
+    {
+      "frame": 931,
+      "tracked_objects": []
+    },
+    {
+      "frame": 932,
+      "tracked_objects": []
+    },
+    {
+      "frame": 933,
+      "tracked_objects": []
+    },
+    {
+      "frame": 934,
+      "tracked_objects": []
+    },
+    {
+      "frame": 935,
+      "tracked_objects": []
+    },
+    {
+      "frame": 936,
+      "tracked_objects": []
+    },
+    {
+      "frame": 937,
+      "tracked_objects": []
+    },
+    {
+      "frame": 938,
+      "tracked_objects": []
+    },
+    {
+      "frame": 939,
+      "tracked_objects": []
+    },
+    {
+      "frame": 940,
+      "tracked_objects": []
+    },
+    {
+      "frame": 941,
+      "tracked_objects": []
+    },
+    {
+      "frame": 942,
+      "tracked_objects": []
+    },
+    {
+      "frame": 943,
+      "tracked_objects": []
+    },
+    {
+      "frame": 944,
+      "tracked_objects": []
+    },
+    {
+      "frame": 945,
+      "tracked_objects": []
+    },
+    {
+      "frame": 946,
+      "tracked_objects": []
+    },
+    {
+      "frame": 947,
+      "tracked_objects": []
+    },
+    {
+      "frame": 948,
+      "tracked_objects": []
+    },
+    {
+      "frame": 949,
+      "tracked_objects": []
+    },
+    {
+      "frame": 950,
+      "tracked_objects": []
+    },
+    {
+      "frame": 951,
+      "tracked_objects": []
+    },
+    {
+      "frame": 952,
+      "tracked_objects": []
+    },
+    {
+      "frame": 953,
+      "tracked_objects": []
+    },
+    {
+      "frame": 954,
+      "tracked_objects": []
+    },
+    {
+      "frame": 955,
+      "tracked_objects": []
+    },
+    {
+      "frame": 956,
+      "tracked_objects": []
+    },
+    {
+      "frame": 957,
+      "tracked_objects": []
+    },
+    {
+      "frame": 958,
+      "tracked_objects": []
+    },
+    {
+      "frame": 959,
+      "tracked_objects": []
+    },
+    {
+      "frame": 960,
+      "tracked_objects": []
+    },
+    {
+      "frame": 961,
+      "tracked_objects": []
+    },
+    {
+      "frame": 962,
+      "tracked_objects": []
+    },
+    {
+      "frame": 963,
+      "tracked_objects": []
+    },
+    {
+      "frame": 964,
+      "tracked_objects": []
+    },
+    {
+      "frame": 965,
+      "tracked_objects": []
+    },
+    {
+      "frame": 966,
+      "tracked_objects": []
+    },
+    {
+      "frame": 967,
+      "tracked_objects": []
+    },
+    {
+      "frame": 968,
+      "tracked_objects": []
+    },
+    {
+      "frame": 969,
+      "tracked_objects": []
+    },
+    {
+      "frame": 970,
+      "tracked_objects": []
+    },
+    {
+      "frame": 971,
+      "tracked_objects": []
+    },
+    {
+      "frame": 972,
+      "tracked_objects": [
+        {
+          "id": "obj_88",
+          "centroid_x": 973,
+          "source": "object_detector",
+          "label": "umbrella",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 973,
+      "tracked_objects": []
+    },
+    {
+      "frame": 974,
+      "tracked_objects": []
+    },
+    {
+      "frame": 975,
+      "tracked_objects": []
+    },
+    {
+      "frame": 976,
+      "tracked_objects": []
+    },
+    {
+      "frame": 977,
+      "tracked_objects": []
+    },
+    {
+      "frame": 978,
+      "tracked_objects": []
+    },
+    {
+      "frame": 979,
+      "tracked_objects": []
+    },
+    {
+      "frame": 980,
+      "tracked_objects": []
+    },
+    {
+      "frame": 981,
+      "tracked_objects": []
+    },
+    {
+      "frame": 982,
+      "tracked_objects": []
+    },
+    {
+      "frame": 983,
+      "tracked_objects": []
+    },
+    {
+      "frame": 984,
+      "tracked_objects": []
+    },
+    {
+      "frame": 985,
+      "tracked_objects": []
+    },
+    {
+      "frame": 986,
+      "tracked_objects": []
+    },
+    {
+      "frame": 987,
+      "tracked_objects": []
+    },
+    {
+      "frame": 988,
+      "tracked_objects": []
+    },
+    {
+      "frame": 989,
+      "tracked_objects": []
+    },
+    {
+      "frame": 990,
+      "tracked_objects": []
+    },
+    {
+      "frame": 991,
+      "tracked_objects": []
+    },
+    {
+      "frame": 992,
+      "tracked_objects": []
+    },
+    {
+      "frame": 993,
+      "tracked_objects": []
+    },
+    {
+      "frame": 994,
+      "tracked_objects": []
+    },
+    {
+      "frame": 995,
+      "tracked_objects": []
+    },
+    {
+      "frame": 996,
+      "tracked_objects": []
+    },
+    {
+      "frame": 997,
+      "tracked_objects": []
+    },
+    {
+      "frame": 998,
+      "tracked_objects": []
+    },
+    {
+      "frame": 999,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1000,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1001,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1002,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1003,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1004,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1005,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1006,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1007,
+      "tracked_objects": [
+        {
+          "id": "obj_89",
+          "centroid_x": 987,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_90",
+          "centroid_x": 1180,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1008,
+      "tracked_objects": [
+        {
+          "id": "obj_89",
+          "centroid_x": 987,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_90",
+          "centroid_x": 1182,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1009,
+      "tracked_objects": [
+        {
+          "id": "obj_89",
+          "centroid_x": 988,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1010,
+      "tracked_objects": [
+        {
+          "id": "obj_89",
+          "centroid_x": 988,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1011,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1012,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1013,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1014,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1015,
+      "tracked_objects": [
+        {
+          "id": "obj_91",
+          "centroid_x": 1660,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1016,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1017,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1018,
+      "tracked_objects": [
+        {
+          "id": "obj_92",
+          "centroid_x": 1442,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1019,
+      "tracked_objects": [
+        {
+          "id": "obj_92",
+          "centroid_x": 1436,
+          "source": "object_detector",
+          "label": "giraffe",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1020,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1021,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1022,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1023,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1024,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1025,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1026,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1027,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1028,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1029,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1030,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1031,
+      "tracked_objects": [
+        {
+          "id": "obj_93",
+          "centroid_x": 906,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1032,
+      "tracked_objects": [
+        {
+          "id": "obj_93",
+          "centroid_x": 903,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1033,
+      "tracked_objects": [
+        {
+          "id": "obj_94",
+          "centroid_x": 740,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1034,
+      "tracked_objects": [
+        {
+          "id": "obj_94",
+          "centroid_x": 740,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1035,
+      "tracked_objects": [
+        {
+          "id": "obj_94",
+          "centroid_x": 690,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1036,
+      "tracked_objects": [
+        {
+          "id": "obj_94",
+          "centroid_x": 690,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1037,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1038,
+      "tracked_objects": []
+    },
+    {
+      "frame": 1039,
+      "tracked_objects": [
+        {
+          "id": "obj_95",
+          "centroid_x": 413,
+          "source": "object_detector",
+          "label": "horse",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 1040,
+      "tracked_objects": [
+        {
+          "id": "obj_96",
+          "centroid_x": 321,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    }
+  ]
+}

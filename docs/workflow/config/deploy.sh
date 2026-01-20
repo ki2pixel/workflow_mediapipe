@@ -1,0 +1,644 @@
+#!/bin/bash
+
+# Deploy script
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Config
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_NAME="workflow-mediapipe-docs"
+VERSION="4.0"
+
+# Functions
+print_header() {
+    echo -e "${BLUE}================================================${NC}"
+    echo -e "${BLUE}  MediaPipe Workflow Documentation Portal${NC}"
+    echo -e "${BLUE}  Deployment Script v${VERSION}${NC}"
+    echo -e "${BLUE}================================================${NC}"
+    echo
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+check_dependencies() {
+    print_info "Checking dependencies..."
+
+    local missing_deps=()
+
+    if ! command -v python3 &> /dev/null; then
+        missing_deps+=("python3")
+    fi
+
+    if ! command -v curl &> /dev/null; then
+        missing_deps+=("curl")
+    fi
+
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        print_error "Missing dependencies: ${missing_deps[*]}"
+        echo "Please install the missing dependencies and try again."
+        exit 1
+    fi
+
+    print_success "All dependencies are available"
+}
+
+check_offline_dependencies() {
+    print_info "Checking offline archive dependencies..."
+
+    local missing_deps=()
+
+    if ! command -v zip &> /dev/null; then
+        missing_deps+=("zip")
+    fi
+
+    if ! command -v sed &> /dev/null; then
+        missing_deps+=("sed")
+    fi
+
+    if ! command -v node &> /dev/null && ! command -v python3 &> /dev/null; then
+        missing_deps+=("node or python3 (for markdown processing)")
+    fi
+
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        print_error "Missing dependencies for offline archive: ${missing_deps[*]}"
+        echo "Please install the missing dependencies and try again."
+        echo "On Ubuntu/Debian: sudo apt-get install zip nodejs"
+        echo "On macOS: zip and node are usually available via Homebrew"
+        exit 1
+    fi
+
+    print_success "All offline archive dependencies are available"
+}
+
+validate_files() {
+    print_info "Validating documentation files..."
+    
+    local required_files=(
+        "index.html"
+        "assets/styles.css"
+        "assets/app.js"
+        "assets/config.js"
+        "README.md"
+        "ARCHITECTURE_COMPLETE_FR.md"
+        "GUIDE_DEMARRAGE_RAPIDE.md"
+        "REFERENCE_RAPIDE_DEVELOPPEURS.md"
+        "STEP1_EXTRACTION.md"
+        "STEP2_CONVERSION.md"
+        "STEP3_DETECTION_SCENES.md"
+        "STEP4_ANALYSE_AUDIO.md"
+        "STEP5_SUIVI_VIDEO.md"
+        "STEP6_REDUCTION_JSON.md"
+        "STEP7_FINALISATION.md"
+    )
+
+    local missing_files=()
+
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$SCRIPT_DIR/$file" ]; then
+            missing_files+=("$file")
+        fi
+    done
+
+    if [ ${#missing_files[@]} -ne 0 ]; then
+        print_error "Missing required files:"
+        for file in "${missing_files[@]}"; do
+            echo "  - $file"
+        done
+        exit 1
+    fi
+
+    print_success "All required files are present"
+}
+
+test_portal() {
+    print_info "Testing portal functionality..."
+
+    local port=8080
+    local max_attempts=10
+
+    while [ $max_attempts -gt 0 ]; do
+        if ! lsof -i :$port &> /dev/null; then
+            break
+        fi
+        port=$((port + 1))
+        max_attempts=$((max_attempts - 1))
+    done
+
+    if [ $max_attempts -eq 0 ]; then
+        print_warning "Could not find an available port for testing"
+        return 1
+    fi
+
+    print_info "Starting test server on port $port..."
+
+    cd "$SCRIPT_DIR"
+    python3 -m http.server $port > /dev/null 2>&1 &
+    local server_pid=$!
+
+    sleep 2
+
+    if curl -s "http://localhost:$port" > /dev/null; then
+        print_success "Portal is accessible at http://localhost:$port"
+
+        local test_files=("assets/styles.css" "assets/app.js" "ARCHITECTURE_COMPLETE_FR.md")
+        for file in "${test_files[@]}"; do
+            if curl -s "http://localhost:$port/$file" > /dev/null; then
+                print_success "✓ $file is accessible"
+            else
+                print_warning "✗ $file is not accessible"
+            fi
+        done
+
+        echo
+        print_info "Test server is running. Press Ctrl+C to stop and continue with deployment."
+        print_info "You can test the portal at: http://localhost:$port"
+        echo
+
+        read -p "Press Enter to stop the test server and continue..."
+
+    else
+        print_error "Failed to start test server"
+    fi
+
+    kill $server_pid 2> /dev/null || true
+    wait $server_pid 2> /dev/null || true
+
+    print_success "Test server stopped"
+}
+
+deploy_local() {
+    print_info "Deploying to local development server..."
+
+    local port=${1:-8000}
+
+    cd "$SCRIPT_DIR"
+
+    print_success "Starting local server on port $port"
+    print_info "Portal will be available at: http://localhost:$port"
+    print_info "Press Ctrl+C to stop the server"
+    echo
+
+    python3 -m http.server $port
+}
+
+deploy_github_pages() {
+    print_info "Preparing for GitHub Pages deployment..."
+
+    if [ ! -d ".git" ]; then
+        print_error "Not in a Git repository. Initialize Git first:"
+        echo "  git init"
+        echo "  git add ."
+        echo "  git commit -m 'Initial commit'"
+        echo "  git remote add origin <your-repo-url>"
+        echo "  git push -u origin main"
+        exit 1
+    fi
+
+    print_info "To deploy to GitHub Pages:"
+    echo "1. Push this repository to GitHub"
+    echo "2. Go to repository Settings > Pages"
+    echo "3. Set source to 'Deploy from a branch'"
+    echo "4. Select branch 'main' and folder '/docs/workflow'"
+    echo "5. Save the settings"
+    echo
+    print_success "Your documentation will be available at: https://username.github.io/repository-name/"
+}
+
+deploy_static() {
+    local target_dir="$1"
+
+    if [ -z "$target_dir" ]; then
+        print_error "Target directory not specified"
+        echo "Usage: $0 static /path/to/web/directory"
+        exit 1
+    fi
+
+    print_info "Deploying to static web directory: $target_dir"
+
+    if [ ! -d "$target_dir" ]; then
+        print_error "Target directory does not exist: $target_dir"
+        exit 1
+    fi
+
+    # Create docs subdirectory
+    local docs_dir="$target_dir/$PROJECT_NAME"
+
+    if [ -d "$docs_dir" ]; then
+        print_warning "Target directory already exists. Backing up..."
+        mv "$docs_dir" "$docs_dir.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+
+    mkdir -p "$docs_dir"
+
+    cp -r "$SCRIPT_DIR"/* "$docs_dir/"
+
+    rm -f "$docs_dir/deploy.sh"
+
+    print_success "Documentation deployed to: $docs_dir"
+    print_info "Configure your web server to serve files from this directory"
+}
+
+create_archive() {
+    print_info "Creating deployment archive..."
+
+    local archive_name="${PROJECT_NAME}-v${VERSION}-$(date +%Y%m%d).tar.gz"
+    local temp_dir=$(mktemp -d)
+    local package_dir="$temp_dir/$PROJECT_NAME"
+
+    mkdir -p "$package_dir"
+    cp -r "$SCRIPT_DIR"/* "$package_dir/"
+
+    rm -f "$package_dir/deploy.sh"
+
+    cd "$temp_dir"
+    tar -czf "$SCRIPT_DIR/$archive_name" "$PROJECT_NAME"
+
+    rm -rf "$temp_dir"
+
+    print_success "Archive created: $archive_name"
+    print_info "Extract and serve the contents with any web server"
+}
+
+create_offline_archive() {
+    print_info "Creating self-contained offline documentation archive..."
+
+    local archive_name="${PROJECT_NAME}-offline-v${VERSION}-$(date +%Y%m%d).zip"
+    local temp_dir=$(mktemp -d)
+    local package_dir="$temp_dir/$PROJECT_NAME-offline"
+
+    print_info "Preparing offline-compatible files..."
+
+    mkdir -p "$package_dir"
+    cp -r "$SCRIPT_DIR"/* "$package_dir/"
+
+    rm -f "$package_dir/deploy.sh"
+
+    print_info "Optimizing for offline viewing..."
+
+    create_offline_readme "$package_dir"
+
+    check_external_dependencies "$package_dir"
+
+    preprocess_markdown_content "$package_dir"
+
+    modify_html_for_offline "$package_dir"
+
+    optimize_for_offline "$package_dir"
+
+    cd "$temp_dir"
+    zip -r "$SCRIPT_DIR/$archive_name" "$PROJECT_NAME-offline" > /dev/null
+
+    rm -rf "$temp_dir"
+
+    print_success "Offline archive created: $archive_name"
+    print_info "Extract the archive and open index.html in any modern browser"
+    print_info "All navigation features work offline, including:"
+    echo "  ✓ Cross-page anchor navigation"
+    echo "  ✓ Interactive diagrams"
+    echo "  ✓ Theme switching"
+    echo "  ✓ Document loading"
+    echo "  ✓ Sidebar navigation"
+}
+
+create_offline_readme() {
+    local package_dir="$1"
+
+    cat > "$package_dir/OFFLINE_VIEWING_INSTRUCTIONS.md" << 'EOF'
+# Offline Documentation Viewing Instructions
+
+## Quick Start
+1. Extract this archive to any location on your computer
+2. Open `index.html` in any modern web browser
+3. All features work offline - no internet connection required!
+
+## Supported Browsers
+- ✅ Chrome/Chromium (recommended)
+- ✅ Firefox
+- ✅ Safari
+- ✅ Edge
+
+## Features Available Offline
+- ✅ Complete documentation portal
+- ✅ Interactive diagram navigation
+- ✅ Cross-page anchor links
+- ✅ Theme switching (light/dark)
+- ✅ Sidebar navigation
+- ✅ Document search and loading
+- ✅ Responsive design
+- ✅ CORS-free document loading (pre-processed content)
+- ✅ All Markdown content embedded for offline access
+
+## External Dependencies
+This documentation uses the following external CDN resources:
+- Marked.js (Markdown parsing)
+- Mermaid.js (Diagram rendering)
+- Prism.js (Syntax highlighting)
+- Panzoom.js (Diagram interaction)
+- JS-Confetti (Celebration effects)
+
+These are loaded from CDNs and require an internet connection for full functionality.
+The core navigation and documentation viewing works completely offline.
+
+## Troubleshooting
+- If diagrams don't render: Check internet connection for CDN resources
+- If navigation doesn't work: Ensure you're opening index.html directly
+- For best experience: Use Chrome or Firefox with internet connection
+- CORS issues resolved: All documentation content is pre-processed and embedded
+- No server required: Works completely offline with file:// protocol
+
+## Version Information
+- Documentation Version: 4.0
+- Generated: $(date)
+- Source: MediaPipe Workflow Documentation Portal
+EOF
+
+    print_success "Created offline viewing instructions"
+}
+
+check_external_dependencies() {
+    local package_dir="$1"
+
+    print_info "Checking for external dependencies..."
+
+    local cdn_count=$(grep -r "cdn\." "$package_dir" --include="*.html" | wc -l)
+
+    if [ $cdn_count -gt 0 ]; then
+        print_warning "Found $cdn_count CDN references - internet connection recommended for full functionality"
+
+        cat > "$package_dir/EXTERNAL_DEPENDENCIES.txt" << EOF
+External Dependencies Report
+Generated: $(date)
+
+The following external resources are used by this documentation:
+
+CDN Resources Found:
+EOF
+        grep -r "cdn\." "$package_dir" --include="*.html" | sed 's/.*src="//;s/.*href="//;s/".*$//' | sort | uniq >> "$package_dir/EXTERNAL_DEPENDENCIES.txt"
+
+        print_info "Created external dependencies report"
+    else
+        print_success "No external CDN dependencies found"
+    fi
+}
+
+optimize_for_offline() {
+    local package_dir="$1"
+
+    print_info "Optimizing files for offline viewing..."
+
+    if [ -f "$package_dir/index.html" ]; then
+        sed -i.bak 's/<title>/<meta name="offline-documentation" content="true"><title>/' "$package_dir/index.html"
+
+        sed -i.bak 's/<h1>Documentation Workflow MediaPipe v4.0<\/h1>/<h1>Documentation Workflow MediaPipe v4.0 <span style="font-size: 0.7em; color: var(--text-muted);">[Offline]<\/span><\/h1>/' "$package_dir/index.html"
+
+        rm -f "$package_dir/index.html.bak"
+
+        print_success "Optimized index.html for offline viewing"
+    fi
+
+    find "$package_dir" -name "*.html" -exec sed -i.bak 's/href="\/\//href="https:\/\//g' {} \;
+    find "$package_dir" -name "*.html" -exec sed -i.bak 's/src="\/\//src="https:\/\//g' {} \;
+
+    find "$package_dir" -name "*.bak" -delete
+
+    print_success "Optimized all HTML files for offline compatibility"
+}
+
+preprocess_markdown_content() {
+    local package_dir="$1"
+
+    print_info "Pre-processing Markdown files for offline compatibility..."
+
+    local js_content_file="$package_dir/assets/offline-content.js"
+
+    cat > "$js_content_file" << 'EOF'
+// Pre-processed Markdown content for offline viewing
+// This file contains all documentation content to avoid CORS issues with file:// protocol
+
+window.OFFLINE_CONTENT = {
+EOF
+
+    local md_files=(
+        "ARCHITECTURE_COMPLETE_FR.md"
+        "GUIDE_DEMARRAGE_RAPIDE.md"
+        "REFERENCE_RAPIDE_DEVELOPPEURS.md"
+        "STEP1_EXTRACTION.md"
+        "STEP2_CONVERSION.md"
+        "STEP3_DETECTION_SCENES.md"
+        "STEP4_ANALYSE_AUDIO.md"
+        "STEP5_SUIVI_VIDEO.md"
+        "STEP6_REDUCTION_JSON.md"
+        "STEP7_FINALISATION.md"
+    )
+
+    for md_file in "${md_files[@]}"; do
+        if [ -f "$package_dir/$md_file" ]; then
+            print_info "Processing $md_file..."
+
+            local doc_name="${md_file%.md}"
+
+            local escaped_content=$(cat "$package_dir/$md_file" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n')
+
+            echo "    \"$doc_name\": \"$escaped_content\"," >> "$js_content_file"
+
+            print_success "✓ Processed $md_file"
+        else
+            print_warning "✗ $md_file not found, skipping"
+        fi
+    done
+
+    cat >> "$js_content_file" << 'EOF'
+};
+
+// Offline-compatible document loader
+window.loadOfflineDocument = function(docName) {
+    const content = window.OFFLINE_CONTENT[docName];
+    if (content) {
+        return Promise.resolve(content);
+    } else {
+        return Promise.reject(new Error(`Document ${docName} not found in offline content`));
+    }
+};
+EOF
+
+    print_success "Created offline content bundle: assets/offline-content.js"
+}
+
+modify_html_for_offline() {
+    local package_dir="$1"
+    local index_file="$package_dir/index.html"
+
+    print_info "Modifying HTML for offline document loading..."
+
+    sed -i.bak 's|<script src="assets/app.js"></script>|<script src="assets/offline-content.js"></script>\n    <script src="assets/app.js"></script>|' "$index_file"
+
+    cat >> "$index_file" << 'EOF'
+
+    <script>
+        // Override the loadDocument function for offline compatibility
+        const originalLoadDocument = window.loadDocument;
+
+        window.loadDocument = async function(docName) {
+            const contentArea = document.getElementById('content-area');
+
+            if (docName === 'welcome') {
+                loadWelcomeContent();
+                app.currentDoc = 'welcome';
+                updateBreadcrumb('Accueil');
+                return;
+            }
+
+            // Show loading state
+            contentArea.innerHTML = '<div class="loading">Chargement du document...</div>';
+
+            try {
+                // Use offline content instead of fetch
+                const markdown = await window.loadOfflineDocument(docName);
+                const html = marked.parse(markdown);
+
+                contentArea.innerHTML = `
+                    <div class="document-content">
+                        <div class="breadcrumb">
+                            <a href="#" onclick="loadDocument('welcome')">Accueil</a>
+                            <span>›</span>
+                            <span>${getDocumentTitle(docName)}</span>
+                        </div>
+                        <div class="markdown-content">${html}</div>
+                    </div>
+                `;
+
+                app.currentDoc = docName;
+
+                // Apply syntax highlighting
+                if (typeof Prism !== 'undefined') {
+                    Prism.highlightAll();
+                }
+
+                // Re-initialize Mermaid for any diagrams in the document
+                if (typeof mermaid !== 'undefined') {
+                    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+                }
+
+                // Generate table of contents for offline content
+                setTimeout(() => {
+                    if (typeof generateTOC === 'function') {
+                        generateTOC();
+                    }
+                }, 100);
+
+                // Scroll to top
+                window.scrollTo(0, 0);
+
+            } catch (error) {
+                contentArea.innerHTML = `
+                    <div class="error">
+                        <h3>Erreur de chargement</h3>
+                        <p>Impossible de charger le document "${docName}"</p>
+                        <p>Erreur: ${error.message}</p>
+                        <p><strong>Mode hors ligne:</strong> Vérifiez que le document existe dans le contenu pré-chargé.</p>
+                    </div>
+                `;
+                console.error('Offline document loading error:', error);
+            }
+        };
+
+        // Add offline status indicator
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📱 Documentation running in offline mode');
+            console.log('📦 Pre-loaded documents:', Object.keys(window.OFFLINE_CONTENT || {}));
+        });
+    </script>
+EOF
+
+    rm -f "$index_file.bak"
+
+    print_success "Modified index.html for offline document loading"
+}
+
+show_help() {
+    echo "Usage: $0 [COMMAND] [OPTIONS]"
+    echo
+    echo "Commands:"
+    echo "  test                    Test the portal locally"
+    echo "  local [PORT]           Deploy to local development server (default port: 8000)"
+    echo "  github                 Show GitHub Pages deployment instructions"
+    echo "  static TARGET_DIR      Deploy to static web directory"
+    echo "  archive                Create deployment archive (requires web server)"
+    echo "  offline                Create self-contained offline archive"
+    echo "  help                   Show this help message"
+    echo
+    echo "Examples:"
+    echo "  $0 test                # Test the portal"
+    echo "  $0 local 3000          # Start local server on port 3000"
+    echo "  $0 static /var/www     # Deploy to /var/www/workflow-mediapipe-docs"
+    echo "  $0 archive             # Create deployment archive"
+    echo "  $0 offline             # Create offline-viewable ZIP archive"
+    echo
+    echo "Archive Types:"
+    echo "  archive                Server-based deployment (TAR.GZ)"
+    echo "  offline                Self-contained offline viewing (ZIP)"
+    echo
+}
+
+main() {
+    print_header
+
+    cd "$SCRIPT_DIR"
+
+    case "${1:-help}" in
+        "test")
+            check_dependencies
+            validate_files
+            test_portal
+            ;;
+        "local")
+            check_dependencies
+            validate_files
+            deploy_local "$2"
+            ;;
+        "github")
+            validate_files
+            deploy_github_pages
+            ;;
+        "static")
+            check_dependencies
+            validate_files
+            deploy_static "$2"
+            ;;
+        "archive")
+            validate_files
+            create_archive
+            ;;
+        "offline")
+            check_offline_dependencies
+            validate_files
+            create_offline_archive
+            ;;
+        "help"|*)
+            show_help
+            ;;
+    esac
+}
+
+main "$@"

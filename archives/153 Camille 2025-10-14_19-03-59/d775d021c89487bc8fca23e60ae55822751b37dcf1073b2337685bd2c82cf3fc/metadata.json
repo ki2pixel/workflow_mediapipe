@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/153 Camille/Gulli - Les Goonies - Scène culte monstre.mp4",
+  "video_stem": "Gulli - Les Goonies - Scène culte monstre",
+  "video_hash": "d775d021c89487bc8fca23e60ae55822751b37dcf1073b2337685bd2c82cf3fc",
+  "created_at": "2025-10-14T19:03:59.921359+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-10-14_19-03-59/d775d021c89487bc8fca23e60ae55822751b37dcf1073b2337685bd2c82cf3fc/Gulli - Les Goonies - Scène culte monstre_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-10-14_19-03-59/d775d021c89487bc8fca23e60ae55822751b37dcf1073b2337685bd2c82cf3fc/Gulli - Les Goonies - Scène culte monstre_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-10-14_19-03-59/d775d021c89487bc8fca23e60ae55822751b37dcf1073b2337685bd2c82cf3fc/Gulli - Les Goonies - Scène culte monstre_tracking.json"
+  }
+}

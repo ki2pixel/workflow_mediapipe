@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/166 Camille/docs/TEVA_Laurie Peret_Quand t’as un date .mp4",
+  "video_stem": "TEVA_Laurie Peret_Quand t’as un date ",
+  "video_hash": "aa337e68d4f21df88f3d385f4d335123b55bac0335554527b2f4be8e111fba10",
+  "created_at": "2025-12-17T10:49:53.360918+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/166 Camille 2025-12-17_10-49-53/aa337e68d4f21df88f3d385f4d335123b55bac0335554527b2f4be8e111fba10/TEVA_Laurie Peret_Quand t’as un date _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/166 Camille 2025-12-17_10-49-53/aa337e68d4f21df88f3d385f4d335123b55bac0335554527b2f4be8e111fba10/TEVA_Laurie Peret_Quand t’as un date _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/166 Camille 2025-12-17_10-49-53/aa337e68d4f21df88f3d385f4d335123b55bac0335554527b2f4be8e111fba10/TEVA_Laurie Peret_Quand t’as un date _tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/162 Camille/docs/BEURRE.mp4",
+  "video_stem": "BEURRE",
+  "video_hash": "5fa4557b61cf63040fb754662b8fbad655d79a393817ab1546d3d9042dabc187",
+  "created_at": "2025-11-15T11:48:52.572463+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/162 Camille 2025-11-15_11-48-52/5fa4557b61cf63040fb754662b8fbad655d79a393817ab1546d3d9042dabc187/BEURRE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/162 Camille 2025-11-15_11-48-52/5fa4557b61cf63040fb754662b8fbad655d79a393817ab1546d3d9042dabc187/BEURRE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/162 Camille 2025-11-15_11-48-52/5fa4557b61cf63040fb754662b8fbad655d79a393817ab1546d3d9042dabc187/BEURRE_tracking.json"
+  }
+}

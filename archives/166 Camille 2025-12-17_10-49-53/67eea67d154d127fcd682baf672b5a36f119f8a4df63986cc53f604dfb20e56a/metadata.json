@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/166 Camille/docs/TEVA_Laurie Peret_Quand tu as grandi en cité .mp4",
+  "video_stem": "TEVA_Laurie Peret_Quand tu as grandi en cité ",
+  "video_hash": "67eea67d154d127fcd682baf672b5a36f119f8a4df63986cc53f604dfb20e56a",
+  "created_at": "2025-12-17T10:49:53.348277+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/166 Camille 2025-12-17_10-49-53/67eea67d154d127fcd682baf672b5a36f119f8a4df63986cc53f604dfb20e56a/TEVA_Laurie Peret_Quand tu as grandi en cité _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/166 Camille 2025-12-17_10-49-53/67eea67d154d127fcd682baf672b5a36f119f8a4df63986cc53f604dfb20e56a/TEVA_Laurie Peret_Quand tu as grandi en cité _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/166 Camille 2025-12-17_10-49-53/67eea67d154d127fcd682baf672b5a36f119f8a4df63986cc53f604dfb20e56a/TEVA_Laurie Peret_Quand tu as grandi en cité _tracking.json"
+  }
+}

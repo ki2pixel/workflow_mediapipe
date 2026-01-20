@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/67 Camille/docs/JO.mp4",
+  "video_stem": "JO",
+  "video_hash": "df4d8c6ed53e0bb42617665735b31917a061a32fdbd06488c12481ded38dc8e8",
+  "created_at": "2025-11-07T18:44:33.959033+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/df4d8c6ed53e0bb42617665735b31917a061a32fdbd06488c12481ded38dc8e8/JO_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/df4d8c6ed53e0bb42617665735b31917a061a32fdbd06488c12481ded38dc8e8/JO_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/df4d8c6ed53e0bb42617665735b31917a061a32fdbd06488c12481ded38dc8e8/JO_tracking.json"
+  }
+}

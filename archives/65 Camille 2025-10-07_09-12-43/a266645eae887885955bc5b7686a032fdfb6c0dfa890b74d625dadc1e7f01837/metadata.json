@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/65 Camille/docs/L’équipe Grise rejoint le banc des éliminés .mp4",
+  "video_stem": "L’équipe Grise rejoint le banc des éliminés ",
+  "video_hash": "a266645eae887885955bc5b7686a032fdfb6c0dfa890b74d625dadc1e7f01837",
+  "created_at": "2025-10-07T09:12:43.386740+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/65 Camille 2025-10-07_09-12-43/a266645eae887885955bc5b7686a032fdfb6c0dfa890b74d625dadc1e7f01837/L’équipe Grise rejoint le banc des éliminés _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/65 Camille 2025-10-07_09-12-43/a266645eae887885955bc5b7686a032fdfb6c0dfa890b74d625dadc1e7f01837/L’équipe Grise rejoint le banc des éliminés _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/65 Camille 2025-10-07_09-12-43/a266645eae887885955bc5b7686a032fdfb6c0dfa890b74d625dadc1e7f01837/L’équipe Grise rejoint le banc des éliminés _tracking.json"
+  }
+}

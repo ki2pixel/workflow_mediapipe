@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/57 Camille/docs/Gulli - Ma Super Ligue 1 - Goaaal_TAT_Gulli.mp4",
+  "video_stem": "Gulli - Ma Super Ligue 1 - Goaaal_TAT_Gulli",
+  "video_hash": "0cf376aae4b9eae2898ecf4a078a131290d2f5c758c0877a93920852828490d4",
+  "created_at": "2025-11-07T09:15:06.907234+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2025-11-07_09-15-06/0cf376aae4b9eae2898ecf4a078a131290d2f5c758c0877a93920852828490d4/Gulli - Ma Super Ligue 1 - Goaaal_TAT_Gulli_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2025-11-07_09-15-06/0cf376aae4b9eae2898ecf4a078a131290d2f5c758c0877a93920852828490d4/Gulli - Ma Super Ligue 1 - Goaaal_TAT_Gulli_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2025-11-07_09-15-06/0cf376aae4b9eae2898ecf4a078a131290d2f5c758c0877a93920852828490d4/Gulli - Ma Super Ligue 1 - Goaaal_TAT_Gulli_tracking.json"
+  }
+}

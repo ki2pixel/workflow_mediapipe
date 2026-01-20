@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/286 Camille/docs/TEVA_Copycat_Il avoue son meurtre mais il ne le croit pas.mp4",
+  "video_stem": "TEVA_Copycat_Il avoue son meurtre mais il ne le croit pas",
+  "video_hash": "7d283c920bb3b89878a6524cadfa029c1489c0cd168b786025b4b5a75986d1dd",
+  "created_at": "2025-10-29T10:50:56.769479+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/7d283c920bb3b89878a6524cadfa029c1489c0cd168b786025b4b5a75986d1dd/TEVA_Copycat_Il avoue son meurtre mais il ne le croit pas_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/7d283c920bb3b89878a6524cadfa029c1489c0cd168b786025b4b5a75986d1dd/TEVA_Copycat_Il avoue son meurtre mais il ne le croit pas_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/7d283c920bb3b89878a6524cadfa029c1489c0cd168b786025b4b5a75986d1dd/TEVA_Copycat_Il avoue son meurtre mais il ne le croit pas_tracking.json"
+  }
+}

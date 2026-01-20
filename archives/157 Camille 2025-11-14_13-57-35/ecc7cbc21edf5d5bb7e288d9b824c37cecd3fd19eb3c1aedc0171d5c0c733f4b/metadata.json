@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/157 Camille/docs/M6 - LMP - Extrait 2 (EM11 P1)  Un pâtissier éliminé revient dans la compétition.mp4",
+  "video_stem": "M6 - LMP - Extrait 2 (EM11 P1)  Un pâtissier éliminé revient dans la compétition",
+  "video_hash": "ecc7cbc21edf5d5bb7e288d9b824c37cecd3fd19eb3c1aedc0171d5c0c733f4b",
+  "created_at": "2025-11-14T13:57:35.919471+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-11-14_13-57-35/ecc7cbc21edf5d5bb7e288d9b824c37cecd3fd19eb3c1aedc0171d5c0c733f4b/M6 - LMP - Extrait 2 (EM11 P1)  Un pâtissier éliminé revient dans la compétition_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-11-14_13-57-35/ecc7cbc21edf5d5bb7e288d9b824c37cecd3fd19eb3c1aedc0171d5c0c733f4b/M6 - LMP - Extrait 2 (EM11 P1)  Un pâtissier éliminé revient dans la compétition_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-11-14_13-57-35/ecc7cbc21edf5d5bb7e288d9b824c37cecd3fd19eb3c1aedc0171d5c0c733f4b/M6 - LMP - Extrait 2 (EM11 P1)  Un pâtissier éliminé revient dans la compétition_tracking.json"
+  }
+}

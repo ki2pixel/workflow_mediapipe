@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/199 Camille/docs/66M - EMPLACEMENT VILLAGE.mp4",
+  "video_stem": "66M - EMPLACEMENT VILLAGE",
+  "video_hash": "be4d86cf1af707363a36a01db247965847b8381a7f6279bdc7625abd239be5ee",
+  "created_at": "2025-12-19T15:34:52.325060+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/be4d86cf1af707363a36a01db247965847b8381a7f6279bdc7625abd239be5ee/66M - EMPLACEMENT VILLAGE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/be4d86cf1af707363a36a01db247965847b8381a7f6279bdc7625abd239be5ee/66M - EMPLACEMENT VILLAGE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/be4d86cf1af707363a36a01db247965847b8381a7f6279bdc7625abd239be5ee/66M - EMPLACEMENT VILLAGE_tracking.json"
+  }
+}

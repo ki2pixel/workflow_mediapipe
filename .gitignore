@@ -1,0 +1,59 @@
+# Fichiers de configuration sensibles - CRUCIAL
+.env
+.env.*
+!/.env.example
+
+# Fichiers de cache Python / outils QA
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.python-version
+.coverage
+htmlcov/
+
+# Artefacts Node/Frontend
+node_modules/
+dist/
+build/
+npm-debug.log*
+yarn-error.log*
+
+# Dossiers et fichiers IDE/éditeurs
+.idea/
+.vscode/
+*.iml
+*.suo
+*.user
+*.orig
+*.swp
+
+# Logs & dossiers temporaires générés par le workflow
+logs/
+debug/
+*.log
+*_debug.log
+_finalized_output/
+csv_downloads/
+projets_extraits/
+temp_audio/
+tmp/
+*.tmp
+*.temp_conversion.*
+ort
+
+# Fichiers runtime spécifiques (reconstituables)
+videos_to_track.json
+videos_to_track_eos_smoke.json
+step5_metrics.csv
+
+# Modèles lourds maintenus hors Git (stockage externe)
+workflow_scripts/step5/models/engines/insightface/1k3d68.onnx
+workflow_scripts/step5/models/engines/insightface/glintr100.onnx
+
+# Fichiers système
+.DS_Store
+Thumbs.db

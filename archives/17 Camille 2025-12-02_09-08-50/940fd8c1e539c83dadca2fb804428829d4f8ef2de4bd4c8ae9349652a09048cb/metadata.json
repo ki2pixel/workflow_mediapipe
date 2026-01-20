@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/17 Camille/docs/M6 - HALLYDAY PAR DAVID - Extrait  David Hallyday  la vérité sur son combat pour être reconnu VDEF.mp4",
+  "video_stem": "M6 - HALLYDAY PAR DAVID - Extrait  David Hallyday  la vérité sur son combat pour être reconnu VDEF",
+  "video_hash": "940fd8c1e539c83dadca2fb804428829d4f8ef2de4bd4c8ae9349652a09048cb",
+  "created_at": "2025-12-02T09:08:50.824054+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/17 Camille 2025-12-02_09-08-50/940fd8c1e539c83dadca2fb804428829d4f8ef2de4bd4c8ae9349652a09048cb/M6 - HALLYDAY PAR DAVID - Extrait  David Hallyday  la vérité sur son combat pour être reconnu VDEF_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/17 Camille 2025-12-02_09-08-50/940fd8c1e539c83dadca2fb804428829d4f8ef2de4bd4c8ae9349652a09048cb/M6 - HALLYDAY PAR DAVID - Extrait  David Hallyday  la vérité sur son combat pour être reconnu VDEF_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/17 Camille 2025-12-02_09-08-50/940fd8c1e539c83dadca2fb804428829d4f8ef2de4bd4c8ae9349652a09048cb/M6 - HALLYDAY PAR DAVID - Extrait  David Hallyday  la vérité sur son combat pour être reconnu VDEF_tracking.json"
+  }
+}

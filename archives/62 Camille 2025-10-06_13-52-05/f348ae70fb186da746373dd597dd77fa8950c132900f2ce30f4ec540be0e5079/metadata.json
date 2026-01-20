@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/62 Camille/docs/UJUD - DECEPTION BRADERIE.mp4",
+  "video_stem": "UJUD - DECEPTION BRADERIE",
+  "video_hash": "f348ae70fb186da746373dd597dd77fa8950c132900f2ce30f4ec540be0e5079",
+  "created_at": "2025-10-06T13:52:05.576271+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/62 Camille 2025-10-06_13-52-05/f348ae70fb186da746373dd597dd77fa8950c132900f2ce30f4ec540be0e5079/UJUD - DECEPTION BRADERIE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/62 Camille 2025-10-06_13-52-05/f348ae70fb186da746373dd597dd77fa8950c132900f2ce30f4ec540be0e5079/UJUD - DECEPTION BRADERIE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/62 Camille 2025-10-06_13-52-05/f348ae70fb186da746373dd597dd77fa8950c132900f2ce30f4ec540be0e5079/UJUD - DECEPTION BRADERIE_tracking.json"
+  }
+}

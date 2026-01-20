@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/243 Camille/docs/M6 - LMP - Il heurte son gâteau et doit refaire la décoration.mp4",
+  "video_stem": "M6 - LMP - Il heurte son gâteau et doit refaire la décoration",
+  "video_hash": "bddb80c78fcf2e8b311e9c6d5096a29506a2dc4652829d7cd1d61c73f7220fa7",
+  "created_at": "2025-10-24T08:12:34.462434+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/243 Camille 2025-10-24_08-12-34/bddb80c78fcf2e8b311e9c6d5096a29506a2dc4652829d7cd1d61c73f7220fa7/M6 - LMP - Il heurte son gâteau et doit refaire la décoration_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/243 Camille 2025-10-24_08-12-34/bddb80c78fcf2e8b311e9c6d5096a29506a2dc4652829d7cd1d61c73f7220fa7/M6 - LMP - Il heurte son gâteau et doit refaire la décoration_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/243 Camille 2025-10-24_08-12-34/bddb80c78fcf2e8b311e9c6d5096a29506a2dc4652829d7cd1d61c73f7220fa7/M6 - LMP - Il heurte son gâteau et doit refaire la décoration_tracking.json"
+  }
+}

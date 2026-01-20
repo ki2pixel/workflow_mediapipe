@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/124 Camille/docs/postdiff – Le gagnant de The Cerveau face à Jonathan est....mp4",
+  "video_stem": "postdiff – Le gagnant de The Cerveau face à Jonathan est...",
+  "video_hash": "406279caf371a2127c52d4d08a33b631a699e560c31fe93f835d71ca303a0c43",
+  "created_at": "2026-01-15T10:44:04.115348+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2026-01-15_10-44-04/406279caf371a2127c52d4d08a33b631a699e560c31fe93f835d71ca303a0c43/postdiff – Le gagnant de The Cerveau face à Jonathan est..._scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2026-01-15_10-44-04/406279caf371a2127c52d4d08a33b631a699e560c31fe93f835d71ca303a0c43/postdiff – Le gagnant de The Cerveau face à Jonathan est..._audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2026-01-15_10-44-04/406279caf371a2127c52d4d08a33b631a699e560c31fe93f835d71ca303a0c43/postdiff – Le gagnant de The Cerveau face à Jonathan est..._tracking.json"
+  }
+}

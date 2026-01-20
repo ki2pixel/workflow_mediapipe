@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/226 Camille/docs/M6 - SDM - Liliane et José font leur liste au père noël.mp4",
+  "video_stem": "M6 - SDM - Liliane et José font leur liste au père noël",
+  "video_hash": "dae8afe190dc36db0c4e892b232522da96ae38ecbc90cb562eacc0121c3596ee",
+  "created_at": "2025-11-21T09:29:03.833670+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/dae8afe190dc36db0c4e892b232522da96ae38ecbc90cb562eacc0121c3596ee/M6 - SDM - Liliane et José font leur liste au père noël_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/dae8afe190dc36db0c4e892b232522da96ae38ecbc90cb562eacc0121c3596ee/M6 - SDM - Liliane et José font leur liste au père noël_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/dae8afe190dc36db0c4e892b232522da96ae38ecbc90cb562eacc0121c3596ee/M6 - SDM - Liliane et José font leur liste au père noël_tracking.json"
+  }
+}

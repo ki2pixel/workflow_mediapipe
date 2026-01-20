@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/107 Camille/docs/EP15_Greg est nul en épreuve et énerve tous les marseillais !.mp4",
+  "video_stem": "EP15_Greg est nul en épreuve et énerve tous les marseillais !",
+  "video_hash": "bed3f222b3e057870624a6f6e1e75e71e7ee0b60f0c7113933f79a8a83aee147",
+  "created_at": "2026-01-13T15:21:52.687837+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/107 Camille 2026-01-13_15-21-52/bed3f222b3e057870624a6f6e1e75e71e7ee0b60f0c7113933f79a8a83aee147/EP15_Greg est nul en épreuve et énerve tous les marseillais !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/107 Camille 2026-01-13_15-21-52/bed3f222b3e057870624a6f6e1e75e71e7ee0b60f0c7113933f79a8a83aee147/EP15_Greg est nul en épreuve et énerve tous les marseillais !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/107 Camille 2026-01-13_15-21-52/bed3f222b3e057870624a6f6e1e75e71e7ee0b60f0c7113933f79a8a83aee147/EP15_Greg est nul en épreuve et énerve tous les marseillais !_tracking.json"
+  }
+}

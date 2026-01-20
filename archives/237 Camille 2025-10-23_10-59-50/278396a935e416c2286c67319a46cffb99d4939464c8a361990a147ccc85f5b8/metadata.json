@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/237 Camille/docs/Extrait prédiff – Laura est la 1ère joueuse à se qualifier au premier jeu en individuel ! .mp4",
+  "video_stem": "Extrait prédiff – Laura est la 1ère joueuse à se qualifier au premier jeu en individuel ! ",
+  "video_hash": "278396a935e416c2286c67319a46cffb99d4939464c8a361990a147ccc85f5b8",
+  "created_at": "2025-10-23T10:59:51.106938+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/278396a935e416c2286c67319a46cffb99d4939464c8a361990a147ccc85f5b8/Extrait prédiff – Laura est la 1ère joueuse à se qualifier au premier jeu en individuel ! _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/278396a935e416c2286c67319a46cffb99d4939464c8a361990a147ccc85f5b8/Extrait prédiff – Laura est la 1ère joueuse à se qualifier au premier jeu en individuel ! _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/278396a935e416c2286c67319a46cffb99d4939464c8a361990a147ccc85f5b8/Extrait prédiff – Laura est la 1ère joueuse à se qualifier au premier jeu en individuel ! _tracking.json"
+  }
+}

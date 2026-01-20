@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/109 Camille/docs/PP - La grande bagarre de Don Camillo - Fernandel.mp4",
+  "video_stem": "PP - La grande bagarre de Don Camillo - Fernandel",
+  "video_hash": "57d59e72fa7e962dacbd511333cd92fdd26c97b954ed20b48ea7d9165879eb15",
+  "created_at": "2025-12-11T11:38:16.570784+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/109 Camille 2025-12-11_11-38-16/57d59e72fa7e962dacbd511333cd92fdd26c97b954ed20b48ea7d9165879eb15/PP - La grande bagarre de Don Camillo - Fernandel_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/109 Camille 2025-12-11_11-38-16/57d59e72fa7e962dacbd511333cd92fdd26c97b954ed20b48ea7d9165879eb15/PP - La grande bagarre de Don Camillo - Fernandel_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/109 Camille 2025-12-11_11-38-16/57d59e72fa7e962dacbd511333cd92fdd26c97b954ed20b48ea7d9165879eb15/PP - La grande bagarre de Don Camillo - Fernandel_tracking.json"
+  }
+}

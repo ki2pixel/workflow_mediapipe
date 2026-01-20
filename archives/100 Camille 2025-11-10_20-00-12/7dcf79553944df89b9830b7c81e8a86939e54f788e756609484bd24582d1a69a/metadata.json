@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/100 Camille/docs/Gulli - Cabaret - Cartes à l'infini.mp4",
+  "video_stem": "Gulli - Cabaret - Cartes à l'infini",
+  "video_hash": "7dcf79553944df89b9830b7c81e8a86939e54f788e756609484bd24582d1a69a",
+  "created_at": "2025-11-10T20:00:12.992878+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/100 Camille 2025-11-10_20-00-12/7dcf79553944df89b9830b7c81e8a86939e54f788e756609484bd24582d1a69a/Gulli - Cabaret - Cartes à l'infini_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/100 Camille 2025-11-10_20-00-12/7dcf79553944df89b9830b7c81e8a86939e54f788e756609484bd24582d1a69a/Gulli - Cabaret - Cartes à l'infini_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/100 Camille 2025-11-10_20-00-12/7dcf79553944df89b9830b7c81e8a86939e54f788e756609484bd24582d1a69a/Gulli - Cabaret - Cartes à l'infini_tracking.json"
+  }
+}

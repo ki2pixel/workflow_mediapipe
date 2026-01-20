@@ -1,0 +1,1207 @@
+{
+  "metadata": {
+    "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/27 Camille/docs/IDLT_RS_alpha.mov",
+    "total_frames": 279,
+    "fps": 25.0,
+    "tracking_engine": "insightface"
+  },
+  "frames": [
+    {
+      "frame": 1,
+      "tracked_objects": []
+    },
+    {
+      "frame": 2,
+      "tracked_objects": []
+    },
+    {
+      "frame": 3,
+      "tracked_objects": []
+    },
+    {
+      "frame": 4,
+      "tracked_objects": []
+    },
+    {
+      "frame": 5,
+      "tracked_objects": []
+    },
+    {
+      "frame": 6,
+      "tracked_objects": []
+    },
+    {
+      "frame": 7,
+      "tracked_objects": []
+    },
+    {
+      "frame": 8,
+      "tracked_objects": []
+    },
+    {
+      "frame": 9,
+      "tracked_objects": []
+    },
+    {
+      "frame": 10,
+      "tracked_objects": []
+    },
+    {
+      "frame": 11,
+      "tracked_objects": []
+    },
+    {
+      "frame": 12,
+      "tracked_objects": []
+    },
+    {
+      "frame": 13,
+      "tracked_objects": []
+    },
+    {
+      "frame": 14,
+      "tracked_objects": []
+    },
+    {
+      "frame": 15,
+      "tracked_objects": []
+    },
+    {
+      "frame": 16,
+      "tracked_objects": []
+    },
+    {
+      "frame": 17,
+      "tracked_objects": []
+    },
+    {
+      "frame": 18,
+      "tracked_objects": []
+    },
+    {
+      "frame": 19,
+      "tracked_objects": []
+    },
+    {
+      "frame": 20,
+      "tracked_objects": []
+    },
+    {
+      "frame": 21,
+      "tracked_objects": []
+    },
+    {
+      "frame": 22,
+      "tracked_objects": []
+    },
+    {
+      "frame": 23,
+      "tracked_objects": []
+    },
+    {
+      "frame": 24,
+      "tracked_objects": []
+    },
+    {
+      "frame": 25,
+      "tracked_objects": []
+    },
+    {
+      "frame": 26,
+      "tracked_objects": []
+    },
+    {
+      "frame": 27,
+      "tracked_objects": []
+    },
+    {
+      "frame": 28,
+      "tracked_objects": []
+    },
+    {
+      "frame": 29,
+      "tracked_objects": []
+    },
+    {
+      "frame": 30,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 971,
+          "centroid_y": 542,
+          "bbox_xmin": 896,
+          "bbox_xmax": 1047,
+          "source": "object_detector",
+          "label": "kite",
+          "confidence": 0.793,
+          "blendshapes": null,
+          "bbox_ymin": 458,
+          "bbox_ymax": 627,
+          "bbox_width": 151,
+          "bbox_height": 169,
+          "is_speaking": false,
+          "speaking_confidence": 0.0,
+          "speaking_method": "object_detection_fallback",
+          "speaking_sources": {
+            "segment": {
+              "segment_id": 1,
+              "frame_position": 0.10431654676258993,
+              "segment_duration": 278,
+              "is_zero_duration": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "frame": 31,
+      "tracked_objects": []
+    },
+    {
+      "frame": 32,
+      "tracked_objects": []
+    },
+    {
+      "frame": 33,
+      "tracked_objects": []
+    },
+    {
+      "frame": 34,
+      "tracked_objects": []
+    },
+    {
+      "frame": 35,
+      "tracked_objects": []
+    },
+    {
+      "frame": 36,
+      "tracked_objects": []
+    },
+    {
+      "frame": 37,
+      "tracked_objects": []
+    },
+    {
+      "frame": 38,
+      "tracked_objects": []
+    },
+    {
+      "frame": 39,
+      "tracked_objects": []
+    },
+    {
+      "frame": 40,
+      "tracked_objects": []
+    },
+    {
+      "frame": 41,
+      "tracked_objects": []
+    },
+    {
+      "frame": 42,
+      "tracked_objects": []
+    },
+    {
+      "frame": 43,
+      "tracked_objects": []
+    },
+    {
+      "frame": 44,
+      "tracked_objects": []
+    },
+    {
+      "frame": 45,
+      "tracked_objects": []
+    },
+    {
+      "frame": 46,
+      "tracked_objects": []
+    },
+    {
+      "frame": 47,
+      "tracked_objects": []
+    },
+    {
+      "frame": 48,
+      "tracked_objects": []
+    },
+    {
+      "frame": 49,
+      "tracked_objects": []
+    },
+    {
+      "frame": 50,
+      "tracked_objects": []
+    },
+    {
+      "frame": 51,
+      "tracked_objects": []
+    },
+    {
+      "frame": 52,
+      "tracked_objects": []
+    },
+    {
+      "frame": 53,
+      "tracked_objects": []
+    },
+    {
+      "frame": 54,
+      "tracked_objects": []
+    },
+    {
+      "frame": 55,
+      "tracked_objects": []
+    },
+    {
+      "frame": 56,
+      "tracked_objects": []
+    },
+    {
+      "frame": 57,
+      "tracked_objects": []
+    },
+    {
+      "frame": 58,
+      "tracked_objects": []
+    },
+    {
+      "frame": 59,
+      "tracked_objects": []
+    },
+    {
+      "frame": 60,
+      "tracked_objects": []
+    },
+    {
+      "frame": 61,
+      "tracked_objects": []
+    },
+    {
+      "frame": 62,
+      "tracked_objects": []
+    },
+    {
+      "frame": 63,
+      "tracked_objects": []
+    },
+    {
+      "frame": 64,
+      "tracked_objects": []
+    },
+    {
+      "frame": 65,
+      "tracked_objects": []
+    },
+    {
+      "frame": 66,
+      "tracked_objects": []
+    },
+    {
+      "frame": 67,
+      "tracked_objects": []
+    },
+    {
+      "frame": 68,
+      "tracked_objects": []
+    },
+    {
+      "frame": 69,
+      "tracked_objects": []
+    },
+    {
+      "frame": 70,
+      "tracked_objects": []
+    },
+    {
+      "frame": 71,
+      "tracked_objects": []
+    },
+    {
+      "frame": 72,
+      "tracked_objects": []
+    },
+    {
+      "frame": 73,
+      "tracked_objects": []
+    },
+    {
+      "frame": 74,
+      "tracked_objects": []
+    },
+    {
+      "frame": 75,
+      "tracked_objects": []
+    },
+    {
+      "frame": 76,
+      "tracked_objects": []
+    },
+    {
+      "frame": 77,
+      "tracked_objects": []
+    },
+    {
+      "frame": 78,
+      "tracked_objects": []
+    },
+    {
+      "frame": 79,
+      "tracked_objects": []
+    },
+    {
+      "frame": 80,
+      "tracked_objects": []
+    },
+    {
+      "frame": 81,
+      "tracked_objects": []
+    },
+    {
+      "frame": 82,
+      "tracked_objects": []
+    },
+    {
+      "frame": 83,
+      "tracked_objects": []
+    },
+    {
+      "frame": 84,
+      "tracked_objects": []
+    },
+    {
+      "frame": 85,
+      "tracked_objects": []
+    },
+    {
+      "frame": 86,
+      "tracked_objects": []
+    },
+    {
+      "frame": 87,
+      "tracked_objects": []
+    },
+    {
+      "frame": 88,
+      "tracked_objects": []
+    },
+    {
+      "frame": 89,
+      "tracked_objects": []
+    },
+    {
+      "frame": 90,
+      "tracked_objects": []
+    },
+    {
+      "frame": 91,
+      "tracked_objects": []
+    },
+    {
+      "frame": 92,
+      "tracked_objects": []
+    },
+    {
+      "frame": 93,
+      "tracked_objects": []
+    },
+    {
+      "frame": 94,
+      "tracked_objects": []
+    },
+    {
+      "frame": 95,
+      "tracked_objects": []
+    },
+    {
+      "frame": 96,
+      "tracked_objects": []
+    },
+    {
+      "frame": 97,
+      "tracked_objects": []
+    },
+    {
+      "frame": 98,
+      "tracked_objects": []
+    },
+    {
+      "frame": 99,
+      "tracked_objects": []
+    },
+    {
+      "frame": 100,
+      "tracked_objects": []
+    },
+    {
+      "frame": 101,
+      "tracked_objects": []
+    },
+    {
+      "frame": 102,
+      "tracked_objects": []
+    },
+    {
+      "frame": 103,
+      "tracked_objects": []
+    },
+    {
+      "frame": 104,
+      "tracked_objects": []
+    },
+    {
+      "frame": 105,
+      "tracked_objects": []
+    },
+    {
+      "frame": 106,
+      "tracked_objects": []
+    },
+    {
+      "frame": 107,
+      "tracked_objects": []
+    },
+    {
+      "frame": 108,
+      "tracked_objects": []
+    },
+    {
+      "frame": 109,
+      "tracked_objects": []
+    },
+    {
+      "frame": 110,
+      "tracked_objects": []
+    },
+    {
+      "frame": 111,
+      "tracked_objects": []
+    },
+    {
+      "frame": 112,
+      "tracked_objects": []
+    },
+    {
+      "frame": 113,
+      "tracked_objects": []
+    },
+    {
+      "frame": 114,
+      "tracked_objects": []
+    },
+    {
+      "frame": 115,
+      "tracked_objects": []
+    },
+    {
+      "frame": 116,
+      "tracked_objects": []
+    },
+    {
+      "frame": 117,
+      "tracked_objects": []
+    },
+    {
+      "frame": 118,
+      "tracked_objects": []
+    },
+    {
+      "frame": 119,
+      "tracked_objects": []
+    },
+    {
+      "frame": 120,
+      "tracked_objects": []
+    },
+    {
+      "frame": 121,
+      "tracked_objects": []
+    },
+    {
+      "frame": 122,
+      "tracked_objects": []
+    },
+    {
+      "frame": 123,
+      "tracked_objects": []
+    },
+    {
+      "frame": 124,
+      "tracked_objects": []
+    },
+    {
+      "frame": 125,
+      "tracked_objects": []
+    },
+    {
+      "frame": 126,
+      "tracked_objects": []
+    },
+    {
+      "frame": 127,
+      "tracked_objects": []
+    },
+    {
+      "frame": 128,
+      "tracked_objects": []
+    },
+    {
+      "frame": 129,
+      "tracked_objects": []
+    },
+    {
+      "frame": 130,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 757,
+          "centroid_y": 543,
+          "bbox_xmin": 668,
+          "bbox_xmax": 847,
+          "source": "object_detector",
+          "label": "kite",
+          "confidence": 0.793,
+          "blendshapes": null,
+          "bbox_ymin": 438,
+          "bbox_ymax": 648,
+          "bbox_width": 179,
+          "bbox_height": 210,
+          "is_speaking": false,
+          "speaking_confidence": 0.0,
+          "speaking_method": "object_detection_fallback",
+          "speaking_sources": {
+            "segment": {
+              "segment_id": 1,
+              "frame_position": 0.46402877697841727,
+              "segment_duration": 278,
+              "is_zero_duration": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "frame": 131,
+      "tracked_objects": []
+    },
+    {
+      "frame": 132,
+      "tracked_objects": []
+    },
+    {
+      "frame": 133,
+      "tracked_objects": []
+    },
+    {
+      "frame": 134,
+      "tracked_objects": []
+    },
+    {
+      "frame": 135,
+      "tracked_objects": []
+    },
+    {
+      "frame": 136,
+      "tracked_objects": []
+    },
+    {
+      "frame": 137,
+      "tracked_objects": []
+    },
+    {
+      "frame": 138,
+      "tracked_objects": []
+    },
+    {
+      "frame": 139,
+      "tracked_objects": []
+    },
+    {
+      "frame": 140,
+      "tracked_objects": []
+    },
+    {
+      "frame": 141,
+      "tracked_objects": []
+    },
+    {
+      "frame": 142,
+      "tracked_objects": []
+    },
+    {
+      "frame": 143,
+      "tracked_objects": []
+    },
+    {
+      "frame": 144,
+      "tracked_objects": []
+    },
+    {
+      "frame": 145,
+      "tracked_objects": []
+    },
+    {
+      "frame": 146,
+      "tracked_objects": []
+    },
+    {
+      "frame": 147,
+      "tracked_objects": []
+    },
+    {
+      "frame": 148,
+      "tracked_objects": []
+    },
+    {
+      "frame": 149,
+      "tracked_objects": []
+    },
+    {
+      "frame": 150,
+      "tracked_objects": []
+    },
+    {
+      "frame": 151,
+      "tracked_objects": []
+    },
+    {
+      "frame": 152,
+      "tracked_objects": []
+    },
+    {
+      "frame": 153,
+      "tracked_objects": []
+    },
+    {
+      "frame": 154,
+      "tracked_objects": []
+    },
+    {
+      "frame": 155,
+      "tracked_objects": []
+    },
+    {
+      "frame": 156,
+      "tracked_objects": []
+    },
+    {
+      "frame": 157,
+      "tracked_objects": []
+    },
+    {
+      "frame": 158,
+      "tracked_objects": []
+    },
+    {
+      "frame": 159,
+      "tracked_objects": []
+    },
+    {
+      "frame": 160,
+      "tracked_objects": []
+    },
+    {
+      "frame": 161,
+      "tracked_objects": []
+    },
+    {
+      "frame": 162,
+      "tracked_objects": []
+    },
+    {
+      "frame": 163,
+      "tracked_objects": []
+    },
+    {
+      "frame": 164,
+      "tracked_objects": []
+    },
+    {
+      "frame": 165,
+      "tracked_objects": []
+    },
+    {
+      "frame": 166,
+      "tracked_objects": []
+    },
+    {
+      "frame": 167,
+      "tracked_objects": []
+    },
+    {
+      "frame": 168,
+      "tracked_objects": []
+    },
+    {
+      "frame": 169,
+      "tracked_objects": []
+    },
+    {
+      "frame": 170,
+      "tracked_objects": []
+    },
+    {
+      "frame": 171,
+      "tracked_objects": []
+    },
+    {
+      "frame": 172,
+      "tracked_objects": []
+    },
+    {
+      "frame": 173,
+      "tracked_objects": []
+    },
+    {
+      "frame": 174,
+      "tracked_objects": []
+    },
+    {
+      "frame": 175,
+      "tracked_objects": []
+    },
+    {
+      "frame": 176,
+      "tracked_objects": []
+    },
+    {
+      "frame": 177,
+      "tracked_objects": []
+    },
+    {
+      "frame": 178,
+      "tracked_objects": []
+    },
+    {
+      "frame": 179,
+      "tracked_objects": []
+    },
+    {
+      "frame": 180,
+      "tracked_objects": []
+    },
+    {
+      "frame": 181,
+      "tracked_objects": []
+    },
+    {
+      "frame": 182,
+      "tracked_objects": []
+    },
+    {
+      "frame": 183,
+      "tracked_objects": []
+    },
+    {
+      "frame": 184,
+      "tracked_objects": []
+    },
+    {
+      "frame": 185,
+      "tracked_objects": []
+    },
+    {
+      "frame": 186,
+      "tracked_objects": []
+    },
+    {
+      "frame": 187,
+      "tracked_objects": []
+    },
+    {
+      "frame": 188,
+      "tracked_objects": []
+    },
+    {
+      "frame": 189,
+      "tracked_objects": []
+    },
+    {
+      "frame": 190,
+      "tracked_objects": []
+    },
+    {
+      "frame": 191,
+      "tracked_objects": []
+    },
+    {
+      "frame": 192,
+      "tracked_objects": []
+    },
+    {
+      "frame": 193,
+      "tracked_objects": []
+    },
+    {
+      "frame": 194,
+      "tracked_objects": []
+    },
+    {
+      "frame": 195,
+      "tracked_objects": []
+    },
+    {
+      "frame": 196,
+      "tracked_objects": []
+    },
+    {
+      "frame": 197,
+      "tracked_objects": []
+    },
+    {
+      "frame": 198,
+      "tracked_objects": []
+    },
+    {
+      "frame": 199,
+      "tracked_objects": []
+    },
+    {
+      "frame": 200,
+      "tracked_objects": []
+    },
+    {
+      "frame": 201,
+      "tracked_objects": []
+    },
+    {
+      "frame": 202,
+      "tracked_objects": []
+    },
+    {
+      "frame": 203,
+      "tracked_objects": []
+    },
+    {
+      "frame": 204,
+      "tracked_objects": []
+    },
+    {
+      "frame": 205,
+      "tracked_objects": []
+    },
+    {
+      "frame": 206,
+      "tracked_objects": []
+    },
+    {
+      "frame": 207,
+      "tracked_objects": []
+    },
+    {
+      "frame": 208,
+      "tracked_objects": []
+    },
+    {
+      "frame": 209,
+      "tracked_objects": []
+    },
+    {
+      "frame": 210,
+      "tracked_objects": []
+    },
+    {
+      "frame": 211,
+      "tracked_objects": []
+    },
+    {
+      "frame": 212,
+      "tracked_objects": []
+    },
+    {
+      "frame": 213,
+      "tracked_objects": []
+    },
+    {
+      "frame": 214,
+      "tracked_objects": []
+    },
+    {
+      "frame": 215,
+      "tracked_objects": []
+    },
+    {
+      "frame": 216,
+      "tracked_objects": []
+    },
+    {
+      "frame": 217,
+      "tracked_objects": []
+    },
+    {
+      "frame": 218,
+      "tracked_objects": []
+    },
+    {
+      "frame": 219,
+      "tracked_objects": []
+    },
+    {
+      "frame": 220,
+      "tracked_objects": []
+    },
+    {
+      "frame": 221,
+      "tracked_objects": []
+    },
+    {
+      "frame": 222,
+      "tracked_objects": []
+    },
+    {
+      "frame": 223,
+      "tracked_objects": []
+    },
+    {
+      "frame": 224,
+      "tracked_objects": []
+    },
+    {
+      "frame": 225,
+      "tracked_objects": []
+    },
+    {
+      "frame": 226,
+      "tracked_objects": []
+    },
+    {
+      "frame": 227,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 976,
+          "centroid_y": 543,
+          "bbox_xmin": 881,
+          "bbox_xmax": 1071,
+          "source": "object_detector",
+          "label": "kite",
+          "confidence": 0.844,
+          "blendshapes": null,
+          "bbox_ymin": 438,
+          "bbox_ymax": 648,
+          "bbox_width": 190,
+          "bbox_height": 210,
+          "is_speaking": false,
+          "speaking_confidence": 0.0,
+          "speaking_method": "object_detection_fallback",
+          "speaking_sources": {
+            "segment": {
+              "segment_id": 1,
+              "frame_position": 0.8129496402877698,
+              "segment_duration": 278,
+              "is_zero_duration": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "frame": 228,
+      "tracked_objects": []
+    },
+    {
+      "frame": 229,
+      "tracked_objects": []
+    },
+    {
+      "frame": 230,
+      "tracked_objects": []
+    },
+    {
+      "frame": 231,
+      "tracked_objects": []
+    },
+    {
+      "frame": 232,
+      "tracked_objects": []
+    },
+    {
+      "frame": 233,
+      "tracked_objects": []
+    },
+    {
+      "frame": 234,
+      "tracked_objects": []
+    },
+    {
+      "frame": 235,
+      "tracked_objects": []
+    },
+    {
+      "frame": 236,
+      "tracked_objects": []
+    },
+    {
+      "frame": 237,
+      "tracked_objects": []
+    },
+    {
+      "frame": 238,
+      "tracked_objects": []
+    },
+    {
+      "frame": 239,
+      "tracked_objects": []
+    },
+    {
+      "frame": 240,
+      "tracked_objects": []
+    },
+    {
+      "frame": 241,
+      "tracked_objects": []
+    },
+    {
+      "frame": 242,
+      "tracked_objects": []
+    },
+    {
+      "frame": 243,
+      "tracked_objects": []
+    },
+    {
+      "frame": 244,
+      "tracked_objects": []
+    },
+    {
+      "frame": 245,
+      "tracked_objects": []
+    },
+    {
+      "frame": 246,
+      "tracked_objects": []
+    },
+    {
+      "frame": 247,
+      "tracked_objects": []
+    },
+    {
+      "frame": 248,
+      "tracked_objects": []
+    },
+    {
+      "frame": 249,
+      "tracked_objects": []
+    },
+    {
+      "frame": 250,
+      "tracked_objects": []
+    },
+    {
+      "frame": 251,
+      "tracked_objects": []
+    },
+    {
+      "frame": 252,
+      "tracked_objects": []
+    },
+    {
+      "frame": 253,
+      "tracked_objects": []
+    },
+    {
+      "frame": 254,
+      "tracked_objects": []
+    },
+    {
+      "frame": 255,
+      "tracked_objects": []
+    },
+    {
+      "frame": 256,
+      "tracked_objects": []
+    },
+    {
+      "frame": 257,
+      "tracked_objects": []
+    },
+    {
+      "frame": 258,
+      "tracked_objects": []
+    },
+    {
+      "frame": 259,
+      "tracked_objects": []
+    },
+    {
+      "frame": 260,
+      "tracked_objects": []
+    },
+    {
+      "frame": 261,
+      "tracked_objects": []
+    },
+    {
+      "frame": 262,
+      "tracked_objects": []
+    },
+    {
+      "frame": 263,
+      "tracked_objects": []
+    },
+    {
+      "frame": 264,
+      "tracked_objects": []
+    },
+    {
+      "frame": 265,
+      "tracked_objects": []
+    },
+    {
+      "frame": 266,
+      "tracked_objects": []
+    },
+    {
+      "frame": 267,
+      "tracked_objects": []
+    },
+    {
+      "frame": 268,
+      "tracked_objects": []
+    },
+    {
+      "frame": 269,
+      "tracked_objects": []
+    },
+    {
+      "frame": 270,
+      "tracked_objects": []
+    },
+    {
+      "frame": 271,
+      "tracked_objects": []
+    },
+    {
+      "frame": 272,
+      "tracked_objects": []
+    },
+    {
+      "frame": 273,
+      "tracked_objects": []
+    },
+    {
+      "frame": 274,
+      "tracked_objects": []
+    },
+    {
+      "frame": 275,
+      "tracked_objects": []
+    },
+    {
+      "frame": 276,
+      "tracked_objects": []
+    },
+    {
+      "frame": 277,
+      "tracked_objects": []
+    },
+    {
+      "frame": 278,
+      "tracked_objects": []
+    },
+    {
+      "frame": 279,
+      "tracked_objects": []
+    }
+  ]
+}

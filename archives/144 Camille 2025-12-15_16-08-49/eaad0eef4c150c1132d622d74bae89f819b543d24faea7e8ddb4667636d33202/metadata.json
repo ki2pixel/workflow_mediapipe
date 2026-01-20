@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/144 Camille/docs/66M - PREPARATION WELSH.mp4",
+  "video_stem": "66M - PREPARATION WELSH",
+  "video_hash": "eaad0eef4c150c1132d622d74bae89f819b543d24faea7e8ddb4667636d33202",
+  "created_at": "2025-12-15T16:08:49.695354+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/144 Camille 2025-12-15_16-08-49/eaad0eef4c150c1132d622d74bae89f819b543d24faea7e8ddb4667636d33202/66M - PREPARATION WELSH_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/144 Camille 2025-12-15_16-08-49/eaad0eef4c150c1132d622d74bae89f819b543d24faea7e8ddb4667636d33202/66M - PREPARATION WELSH_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/144 Camille 2025-12-15_16-08-49/eaad0eef4c150c1132d622d74bae89f819b543d24faea7e8ddb4667636d33202/66M - PREPARATION WELSH_tracking.json"
+  }
+}

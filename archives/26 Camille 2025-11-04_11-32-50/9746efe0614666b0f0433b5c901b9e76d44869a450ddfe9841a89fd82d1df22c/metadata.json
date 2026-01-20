@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/26 Camille/docs/Extrait post-diff – Les joueurs éliminés aux portes de la finale.mp4",
+  "video_stem": "Extrait post-diff – Les joueurs éliminés aux portes de la finale",
+  "video_hash": "9746efe0614666b0f0433b5c901b9e76d44869a450ddfe9841a89fd82d1df22c",
+  "created_at": "2025-11-04T11:32:50.254376+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/9746efe0614666b0f0433b5c901b9e76d44869a450ddfe9841a89fd82d1df22c/Extrait post-diff – Les joueurs éliminés aux portes de la finale_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/9746efe0614666b0f0433b5c901b9e76d44869a450ddfe9841a89fd82d1df22c/Extrait post-diff – Les joueurs éliminés aux portes de la finale_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/9746efe0614666b0f0433b5c901b9e76d44869a450ddfe9841a89fd82d1df22c/Extrait post-diff – Les joueurs éliminés aux portes de la finale_tracking.json"
+  }
+}

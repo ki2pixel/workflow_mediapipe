@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/198 Camille/docs/EP46_Thibault est de retour dans l'aventure ! .mp4",
+  "video_stem": "EP46_Thibault est de retour dans l'aventure ! ",
+  "video_hash": "998b619e57b4c37b709d79f45daae75f95d923dd8f7389cc6fb02512fe5ebb8b",
+  "created_at": "2025-11-18T19:17:15.805467+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/998b619e57b4c37b709d79f45daae75f95d923dd8f7389cc6fb02512fe5ebb8b/EP46_Thibault est de retour dans l'aventure ! _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/998b619e57b4c37b709d79f45daae75f95d923dd8f7389cc6fb02512fe5ebb8b/EP46_Thibault est de retour dans l'aventure ! _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/998b619e57b4c37b709d79f45daae75f95d923dd8f7389cc6fb02512fe5ebb8b/EP46_Thibault est de retour dans l'aventure ! _tracking.json"
+  }
+}

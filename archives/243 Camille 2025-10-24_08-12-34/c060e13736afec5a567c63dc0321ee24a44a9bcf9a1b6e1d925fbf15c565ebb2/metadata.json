@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/243 Camille/docs/M6 - LMP - Le jury est ébloui par son gâteau sur le thème de La Petite Sirène.mp4",
+  "video_stem": "M6 - LMP - Le jury est ébloui par son gâteau sur le thème de La Petite Sirène",
+  "video_hash": "c060e13736afec5a567c63dc0321ee24a44a9bcf9a1b6e1d925fbf15c565ebb2",
+  "created_at": "2025-10-24T08:12:34.484082+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/243 Camille 2025-10-24_08-12-34/c060e13736afec5a567c63dc0321ee24a44a9bcf9a1b6e1d925fbf15c565ebb2/M6 - LMP - Le jury est ébloui par son gâteau sur le thème de La Petite Sirène_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/243 Camille 2025-10-24_08-12-34/c060e13736afec5a567c63dc0321ee24a44a9bcf9a1b6e1d925fbf15c565ebb2/M6 - LMP - Le jury est ébloui par son gâteau sur le thème de La Petite Sirène_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/243 Camille 2025-10-24_08-12-34/c060e13736afec5a567c63dc0321ee24a44a9bcf9a1b6e1d925fbf15c565ebb2/M6 - LMP - Le jury est ébloui par son gâteau sur le thème de La Petite Sirène_tracking.json"
+  }
+}

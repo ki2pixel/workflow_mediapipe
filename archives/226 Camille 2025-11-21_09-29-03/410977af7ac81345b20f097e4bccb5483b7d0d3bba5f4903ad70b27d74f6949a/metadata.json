@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/226 Camille/docs/M6 - LMBF - Bruno répond au téléphone de cette boulangerie.mp4",
+  "video_stem": "M6 - LMBF - Bruno répond au téléphone de cette boulangerie",
+  "video_hash": "410977af7ac81345b20f097e4bccb5483b7d0d3bba5f4903ad70b27d74f6949a",
+  "created_at": "2025-11-21T09:29:03.847987+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/410977af7ac81345b20f097e4bccb5483b7d0d3bba5f4903ad70b27d74f6949a/M6 - LMBF - Bruno répond au téléphone de cette boulangerie_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/410977af7ac81345b20f097e4bccb5483b7d0d3bba5f4903ad70b27d74f6949a/M6 - LMBF - Bruno répond au téléphone de cette boulangerie_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/410977af7ac81345b20f097e4bccb5483b7d0d3bba5f4903ad70b27d74f6949a/M6 - LMBF - Bruno répond au téléphone de cette boulangerie_tracking.json"
+  }
+}

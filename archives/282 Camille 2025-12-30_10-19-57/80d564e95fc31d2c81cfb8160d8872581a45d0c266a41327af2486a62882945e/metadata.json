@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/282 Camille/docs/PP - Les Barbouzes - Monsieur déjeune.mp4",
+  "video_stem": "PP - Les Barbouzes - Monsieur déjeune",
+  "video_hash": "80d564e95fc31d2c81cfb8160d8872581a45d0c266a41327af2486a62882945e",
+  "created_at": "2025-12-30T10:19:57.556665+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/282 Camille 2025-12-30_10-19-57/80d564e95fc31d2c81cfb8160d8872581a45d0c266a41327af2486a62882945e/PP - Les Barbouzes - Monsieur déjeune_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/282 Camille 2025-12-30_10-19-57/80d564e95fc31d2c81cfb8160d8872581a45d0c266a41327af2486a62882945e/PP - Les Barbouzes - Monsieur déjeune_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/282 Camille 2025-12-30_10-19-57/80d564e95fc31d2c81cfb8160d8872581a45d0c266a41327af2486a62882945e/PP - Les Barbouzes - Monsieur déjeune_tracking.json"
+  }
+}

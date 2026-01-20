@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/123 Camille/docs/Gulli - Battlebots - Un combat intense.mp4",
+  "video_stem": "Gulli - Battlebots - Un combat intense",
+  "video_hash": "6d9ef2634ab180f648121e0303f1d38bd0a5890b0c6ea4e1ef6a3522fcab36d7",
+  "created_at": "2025-10-11T08:53:05.368567+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/123 Camille 2025-10-11_08-53-05/6d9ef2634ab180f648121e0303f1d38bd0a5890b0c6ea4e1ef6a3522fcab36d7/Gulli - Battlebots - Un combat intense_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/123 Camille 2025-10-11_08-53-05/6d9ef2634ab180f648121e0303f1d38bd0a5890b0c6ea4e1ef6a3522fcab36d7/Gulli - Battlebots - Un combat intense_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/123 Camille 2025-10-11_08-53-05/6d9ef2634ab180f648121e0303f1d38bd0a5890b0c6ea4e1ef6a3522fcab36d7/Gulli - Battlebots - Un combat intense_tracking.json"
+  }
+}

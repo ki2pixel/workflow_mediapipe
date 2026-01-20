@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/31 Camille/docs/Benji prend la défense de Nico contre Greg !.mp4",
+  "video_stem": "Benji prend la défense de Nico contre Greg !",
+  "video_hash": "98d8f0acdf831b21bf13accca859b1be3ceed5bd7d7e8c8406a0bd856fc8f1ac",
+  "created_at": "2026-01-06T14:37:32.408769+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2026-01-06_14-37-32/98d8f0acdf831b21bf13accca859b1be3ceed5bd7d7e8c8406a0bd856fc8f1ac/Benji prend la défense de Nico contre Greg !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2026-01-06_14-37-32/98d8f0acdf831b21bf13accca859b1be3ceed5bd7d7e8c8406a0bd856fc8f1ac/Benji prend la défense de Nico contre Greg !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2026-01-06_14-37-32/98d8f0acdf831b21bf13accca859b1be3ceed5bd7d7e8c8406a0bd856fc8f1ac/Benji prend la défense de Nico contre Greg !_tracking.json"
+  }
+}

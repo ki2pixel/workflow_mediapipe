@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/210 Camille/docs/TEVA_Piquantes_Laëtitia  elle a envoyé une note vocale de plus d’1h .mp4",
+  "video_stem": "TEVA_Piquantes_Laëtitia  elle a envoyé une note vocale de plus d’1h ",
+  "video_hash": "38c21454ac6b34f82d1308a7122ba44d149a26b8dfc74ddee3a96adbcfde3e83",
+  "created_at": "2025-11-19T11:19:21.274469+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/210 Camille 2025-11-19_11-19-21/38c21454ac6b34f82d1308a7122ba44d149a26b8dfc74ddee3a96adbcfde3e83/TEVA_Piquantes_Laëtitia  elle a envoyé une note vocale de plus d’1h _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/210 Camille 2025-11-19_11-19-21/38c21454ac6b34f82d1308a7122ba44d149a26b8dfc74ddee3a96adbcfde3e83/TEVA_Piquantes_Laëtitia  elle a envoyé une note vocale de plus d’1h _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/210 Camille 2025-11-19_11-19-21/38c21454ac6b34f82d1308a7122ba44d149a26b8dfc74ddee3a96adbcfde3e83/TEVA_Piquantes_Laëtitia  elle a envoyé une note vocale de plus d’1h _tracking.json"
+  }
+}

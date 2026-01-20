@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/45 Camille/docs/Elle confond les commandes de ses clients !.mp4",
+  "video_stem": "Elle confond les commandes de ses clients !",
+  "video_hash": "a128edc1bc0806900386fa75fd0b4b69201cf78f619aeefff47c65c5e9d48148",
+  "created_at": "2026-01-07T22:57:03.156042+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/a128edc1bc0806900386fa75fd0b4b69201cf78f619aeefff47c65c5e9d48148/Elle confond les commandes de ses clients !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/a128edc1bc0806900386fa75fd0b4b69201cf78f619aeefff47c65c5e9d48148/Elle confond les commandes de ses clients !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/a128edc1bc0806900386fa75fd0b4b69201cf78f619aeefff47c65c5e9d48148/Elle confond les commandes de ses clients !_tracking.json"
+  }
+}

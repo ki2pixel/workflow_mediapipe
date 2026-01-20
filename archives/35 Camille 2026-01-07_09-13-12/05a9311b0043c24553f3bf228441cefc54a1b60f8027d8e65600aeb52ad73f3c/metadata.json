@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/35 Camille/docs/M6 - LMBF - Elle ne vend ni pâtisserie ni viennoiserie dans sa boulangerie !.mp4",
+  "video_stem": "M6 - LMBF - Elle ne vend ni pâtisserie ni viennoiserie dans sa boulangerie !",
+  "video_hash": "05a9311b0043c24553f3bf228441cefc54a1b60f8027d8e65600aeb52ad73f3c",
+  "created_at": "2026-01-07T09:13:12.733370+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2026-01-07_09-13-12/05a9311b0043c24553f3bf228441cefc54a1b60f8027d8e65600aeb52ad73f3c/M6 - LMBF - Elle ne vend ni pâtisserie ni viennoiserie dans sa boulangerie !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2026-01-07_09-13-12/05a9311b0043c24553f3bf228441cefc54a1b60f8027d8e65600aeb52ad73f3c/M6 - LMBF - Elle ne vend ni pâtisserie ni viennoiserie dans sa boulangerie !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2026-01-07_09-13-12/05a9311b0043c24553f3bf228441cefc54a1b60f8027d8e65600aeb52ad73f3c/M6 - LMBF - Elle ne vend ni pâtisserie ni viennoiserie dans sa boulangerie !_tracking.json"
+  }
+}

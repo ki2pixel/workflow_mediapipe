@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/311 Camille/docs/UJUD - MAISON HANTEE.mp4",
+  "video_stem": "UJUD - MAISON HANTEE",
+  "video_hash": "d4d3138ddf4493d39c4c85ed84825595f59c7bb91f1c49e9aa512c71723dfe35",
+  "created_at": "2025-10-31T11:47:21.168206+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/311 Camille 2025-10-31_11-47-21/d4d3138ddf4493d39c4c85ed84825595f59c7bb91f1c49e9aa512c71723dfe35/UJUD - MAISON HANTEE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/311 Camille 2025-10-31_11-47-21/d4d3138ddf4493d39c4c85ed84825595f59c7bb91f1c49e9aa512c71723dfe35/UJUD - MAISON HANTEE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/311 Camille 2025-10-31_11-47-21/d4d3138ddf4493d39c4c85ed84825595f59c7bb91f1c49e9aa512c71723dfe35/UJUD - MAISON HANTEE_tracking.json"
+  }
+}

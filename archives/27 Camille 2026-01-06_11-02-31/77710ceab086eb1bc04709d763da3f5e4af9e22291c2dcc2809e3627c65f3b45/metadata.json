@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/27 Camille/docs/IDLT4 PREGEN.mp4",
+  "video_stem": "IDLT4 PREGEN",
+  "video_hash": "77710ceab086eb1bc04709d763da3f5e4af9e22291c2dcc2809e3627c65f3b45",
+  "created_at": "2026-01-06T11:02:31.571422+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/27 Camille 2026-01-06_11-02-31/77710ceab086eb1bc04709d763da3f5e4af9e22291c2dcc2809e3627c65f3b45/IDLT4 PREGEN_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/27 Camille 2026-01-06_11-02-31/77710ceab086eb1bc04709d763da3f5e4af9e22291c2dcc2809e3627c65f3b45/IDLT4 PREGEN_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/27 Camille 2026-01-06_11-02-31/77710ceab086eb1bc04709d763da3f5e4af9e22291c2dcc2809e3627c65f3b45/IDLT4 PREGEN_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/31 Camille/docs/Maeva a poussé Manon dans les bras d'un mec .mp4",
+  "video_stem": "Maeva a poussé Manon dans les bras d'un mec ",
+  "video_hash": "8ae89c8367c0bf164b2c115df1b21c5201965e97fbaf60e3336e4eb9ffa411ae",
+  "created_at": "2025-11-04T21:00:14.998325+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2025-11-04_21-00-14/8ae89c8367c0bf164b2c115df1b21c5201965e97fbaf60e3336e4eb9ffa411ae/Maeva a poussé Manon dans les bras d'un mec _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2025-11-04_21-00-14/8ae89c8367c0bf164b2c115df1b21c5201965e97fbaf60e3336e4eb9ffa411ae/Maeva a poussé Manon dans les bras d'un mec _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2025-11-04_21-00-14/8ae89c8367c0bf164b2c115df1b21c5201965e97fbaf60e3336e4eb9ffa411ae/Maeva a poussé Manon dans les bras d'un mec _tracking.json"
+  }
+}

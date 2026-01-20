@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/114 Camille/docs/Extrait 3 serpent queen.mp4",
+  "video_stem": "Extrait 3 serpent queen",
+  "video_hash": "bf62d4d9b89768400911cfea2386469e8e8e5d113aa4b6b9221b3b83c2440f3f",
+  "created_at": "2025-12-11T14:36:43.159881+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/114 Camille 2025-12-11_14-36-43/bf62d4d9b89768400911cfea2386469e8e8e5d113aa4b6b9221b3b83c2440f3f/Extrait 3 serpent queen_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/114 Camille 2025-12-11_14-36-43/bf62d4d9b89768400911cfea2386469e8e8e5d113aa4b6b9221b3b83c2440f3f/Extrait 3 serpent queen_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/114 Camille 2025-12-11_14-36-43/bf62d4d9b89768400911cfea2386469e8e8e5d113aa4b6b9221b3b83c2440f3f/Extrait 3 serpent queen_tracking.json"
+  }
+}

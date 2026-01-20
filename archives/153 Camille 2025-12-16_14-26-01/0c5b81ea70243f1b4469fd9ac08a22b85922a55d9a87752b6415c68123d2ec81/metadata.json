@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/153 Camille/docs/Julien raconte l'histoire de sa relation avec Manon !.mp4",
+  "video_stem": "Julien raconte l'histoire de sa relation avec Manon !",
+  "video_hash": "0c5b81ea70243f1b4469fd9ac08a22b85922a55d9a87752b6415c68123d2ec81",
+  "created_at": "2025-12-16T14:26:02.057492+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-12-16_14-26-01/0c5b81ea70243f1b4469fd9ac08a22b85922a55d9a87752b6415c68123d2ec81/Julien raconte l'histoire de sa relation avec Manon !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-12-16_14-26-01/0c5b81ea70243f1b4469fd9ac08a22b85922a55d9a87752b6415c68123d2ec81/Julien raconte l'histoire de sa relation avec Manon !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-12-16_14-26-01/0c5b81ea70243f1b4469fd9ac08a22b85922a55d9a87752b6415c68123d2ec81/Julien raconte l'histoire de sa relation avec Manon !_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/88 Camille/docs/FONDERIE.mp4",
+  "video_stem": "FONDERIE",
+  "video_hash": "e027fe62aef6af76f157686ca1d2abc9f7dab95f722512c6e245f8a656c05648",
+  "created_at": "2025-11-10T11:34:02.680524+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/88 Camille 2025-11-10_11-34-02/e027fe62aef6af76f157686ca1d2abc9f7dab95f722512c6e245f8a656c05648/FONDERIE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/88 Camille 2025-11-10_11-34-02/e027fe62aef6af76f157686ca1d2abc9f7dab95f722512c6e245f8a656c05648/FONDERIE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/88 Camille 2025-11-10_11-34-02/e027fe62aef6af76f157686ca1d2abc9f7dab95f722512c6e245f8a656c05648/FONDERIE_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/199 Camille/docs/M6 - LMBF - Extrait 2 (EM2 - E3006511)  Bruno tente de chiper une brioche dans une boulangerie.mp4",
+  "video_stem": "M6 - LMBF - Extrait 2 (EM2 - E3006511)  Bruno tente de chiper une brioche dans une boulangerie",
+  "video_hash": "fc9b0d9a1da6732724e50136e6001336f43f17857d88d513c6f1df26ce0f6a93",
+  "created_at": "2025-12-19T15:34:52.333446+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/fc9b0d9a1da6732724e50136e6001336f43f17857d88d513c6f1df26ce0f6a93/M6 - LMBF - Extrait 2 (EM2 - E3006511)  Bruno tente de chiper une brioche dans une boulangerie_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/fc9b0d9a1da6732724e50136e6001336f43f17857d88d513c6f1df26ce0f6a93/M6 - LMBF - Extrait 2 (EM2 - E3006511)  Bruno tente de chiper une brioche dans une boulangerie_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/fc9b0d9a1da6732724e50136e6001336f43f17857d88d513c6f1df26ce0f6a93/M6 - LMBF - Extrait 2 (EM2 - E3006511)  Bruno tente de chiper une brioche dans une boulangerie_tracking.json"
+  }
+}

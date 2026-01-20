@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/122 Camille/docs/Le plat signature du restaurant déçoit le chef ! mp4.mp4",
+  "video_stem": "Le plat signature du restaurant déçoit le chef ! mp4",
+  "video_hash": "66c9baa1fbc822fb11bb9030c6a2bd9d2f7e50fe5bedd5cd72115758123241b1",
+  "created_at": "2026-01-15T00:42:24.482913+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/122 Camille 2026-01-15_00-42-24/66c9baa1fbc822fb11bb9030c6a2bd9d2f7e50fe5bedd5cd72115758123241b1/Le plat signature du restaurant déçoit le chef ! mp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/122 Camille 2026-01-15_00-42-24/66c9baa1fbc822fb11bb9030c6a2bd9d2f7e50fe5bedd5cd72115758123241b1/Le plat signature du restaurant déçoit le chef ! mp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/122 Camille 2026-01-15_00-42-24/66c9baa1fbc822fb11bb9030c6a2bd9d2f7e50fe5bedd5cd72115758123241b1/Le plat signature du restaurant déçoit le chef ! mp4_tracking.json"
+  }
+}

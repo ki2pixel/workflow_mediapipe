@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/70 Camille/docs/Marco Laura.mp4",
+  "video_stem": "Marco Laura",
+  "video_hash": "79792236e5debca9ab11b55f4af2a00b7e083acacfc378befe215f7c3edcefa2",
+  "created_at": "2025-11-08T10:10:51.943862+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/70 Camille 2025-11-08_10-10-51/79792236e5debca9ab11b55f4af2a00b7e083acacfc378befe215f7c3edcefa2/Marco Laura_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/70 Camille 2025-11-08_10-10-51/79792236e5debca9ab11b55f4af2a00b7e083acacfc378befe215f7c3edcefa2/Marco Laura_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/70 Camille 2025-11-08_10-10-51/79792236e5debca9ab11b55f4af2a00b7e083acacfc378befe215f7c3edcefa2/Marco Laura_tracking.json"
+  }
+}

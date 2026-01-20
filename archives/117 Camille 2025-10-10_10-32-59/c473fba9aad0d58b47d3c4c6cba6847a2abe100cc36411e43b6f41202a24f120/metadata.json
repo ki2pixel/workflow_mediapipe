@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/117 Camille/docs/Gulli - UDPP - Les convives mangent avec les mains.mp4",
+  "video_stem": "Gulli - UDPP - Les convives mangent avec les mains",
+  "video_hash": "c473fba9aad0d58b47d3c4c6cba6847a2abe100cc36411e43b6f41202a24f120",
+  "created_at": "2025-10-10T10:32:59.366117+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/117 Camille 2025-10-10_10-32-59/c473fba9aad0d58b47d3c4c6cba6847a2abe100cc36411e43b6f41202a24f120/Gulli - UDPP - Les convives mangent avec les mains_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/117 Camille 2025-10-10_10-32-59/c473fba9aad0d58b47d3c4c6cba6847a2abe100cc36411e43b6f41202a24f120/Gulli - UDPP - Les convives mangent avec les mains_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/117 Camille 2025-10-10_10-32-59/c473fba9aad0d58b47d3c4c6cba6847a2abe100cc36411e43b6f41202a24f120/Gulli - UDPP - Les convives mangent avec les mains_tracking.json"
+  }
+}

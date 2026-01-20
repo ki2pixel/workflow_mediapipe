@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/14 Camille/docs/PP - Cauchemar en cuisine - Le restaurant a 1M de dollars de dette.mp4",
+  "video_stem": "PP - Cauchemar en cuisine - Le restaurant a 1M de dollars de dette",
+  "video_hash": "29d54ca1c64d3c2fb18f6f6efe58bc66f15a4b74a5875de385017d8af23aec96",
+  "created_at": "2025-12-01T15:07:57.393779+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/14 Camille 2025-12-01_15-07-57/29d54ca1c64d3c2fb18f6f6efe58bc66f15a4b74a5875de385017d8af23aec96/PP - Cauchemar en cuisine - Le restaurant a 1M de dollars de dette_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/14 Camille 2025-12-01_15-07-57/29d54ca1c64d3c2fb18f6f6efe58bc66f15a4b74a5875de385017d8af23aec96/PP - Cauchemar en cuisine - Le restaurant a 1M de dollars de dette_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/14 Camille 2025-12-01_15-07-57/29d54ca1c64d3c2fb18f6f6efe58bc66f15a4b74a5875de385017d8af23aec96/PP - Cauchemar en cuisine - Le restaurant a 1M de dollars de dette_tracking.json"
+  }
+}

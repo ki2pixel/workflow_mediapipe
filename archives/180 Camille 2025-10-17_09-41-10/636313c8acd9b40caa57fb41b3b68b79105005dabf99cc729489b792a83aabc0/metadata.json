@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/180 Camille/docs/Gulli - Ma Super Ligue 1 - Inès rencontre son idole, Florian Thauvin_TAT_Gulli.mp4",
+  "video_stem": "Gulli - Ma Super Ligue 1 - Inès rencontre son idole, Florian Thauvin_TAT_Gulli",
+  "video_hash": "636313c8acd9b40caa57fb41b3b68b79105005dabf99cc729489b792a83aabc0",
+  "created_at": "2025-10-17T09:41:11.000252+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/636313c8acd9b40caa57fb41b3b68b79105005dabf99cc729489b792a83aabc0/Gulli - Ma Super Ligue 1 - Inès rencontre son idole, Florian Thauvin_TAT_Gulli_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/636313c8acd9b40caa57fb41b3b68b79105005dabf99cc729489b792a83aabc0/Gulli - Ma Super Ligue 1 - Inès rencontre son idole, Florian Thauvin_TAT_Gulli_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/636313c8acd9b40caa57fb41b3b68b79105005dabf99cc729489b792a83aabc0/Gulli - Ma Super Ligue 1 - Inès rencontre son idole, Florian Thauvin_TAT_Gulli_tracking.json"
+  }
+}

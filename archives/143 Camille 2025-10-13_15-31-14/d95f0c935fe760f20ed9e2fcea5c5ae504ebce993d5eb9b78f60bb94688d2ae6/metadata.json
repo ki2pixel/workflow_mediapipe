@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/143 Camille/docs/TEVA_Nos meilleures années_Quand tu essayes de te rapprocher de tes fillesmp4.mp4",
+  "video_stem": "TEVA_Nos meilleures années_Quand tu essayes de te rapprocher de tes fillesmp4",
+  "video_hash": "d95f0c935fe760f20ed9e2fcea5c5ae504ebce993d5eb9b78f60bb94688d2ae6",
+  "created_at": "2025-10-13T15:31:14.104756+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/143 Camille 2025-10-13_15-31-14/d95f0c935fe760f20ed9e2fcea5c5ae504ebce993d5eb9b78f60bb94688d2ae6/TEVA_Nos meilleures années_Quand tu essayes de te rapprocher de tes fillesmp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/143 Camille 2025-10-13_15-31-14/d95f0c935fe760f20ed9e2fcea5c5ae504ebce993d5eb9b78f60bb94688d2ae6/TEVA_Nos meilleures années_Quand tu essayes de te rapprocher de tes fillesmp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/143 Camille 2025-10-13_15-31-14/d95f0c935fe760f20ed9e2fcea5c5ae504ebce993d5eb9b78f60bb94688d2ae6/TEVA_Nos meilleures années_Quand tu essayes de te rapprocher de tes fillesmp4_tracking.json"
+  }
+}

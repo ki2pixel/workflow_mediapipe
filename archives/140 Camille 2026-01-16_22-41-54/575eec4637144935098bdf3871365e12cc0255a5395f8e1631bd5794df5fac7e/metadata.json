@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/140 Camille/docs/le polyamour.mp4",
+  "video_stem": "le polyamour",
+  "video_hash": "575eec4637144935098bdf3871365e12cc0255a5395f8e1631bd5794df5fac7e",
+  "created_at": "2026-01-16T22:41:54.058682+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/140 Camille 2026-01-16_22-41-54/575eec4637144935098bdf3871365e12cc0255a5395f8e1631bd5794df5fac7e/le polyamour_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/140 Camille 2026-01-16_22-41-54/575eec4637144935098bdf3871365e12cc0255a5395f8e1631bd5794df5fac7e/le polyamour_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/140 Camille 2026-01-16_22-41-54/575eec4637144935098bdf3871365e12cc0255a5395f8e1631bd5794df5fac7e/le polyamour_tracking.json"
+  }
+}

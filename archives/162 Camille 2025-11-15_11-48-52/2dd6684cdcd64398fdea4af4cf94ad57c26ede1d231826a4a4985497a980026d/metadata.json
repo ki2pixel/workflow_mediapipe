@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/162 Camille/docs/CIBLE JEUNE_TAT_M6.mp4",
+  "video_stem": "CIBLE JEUNE_TAT_M6",
+  "video_hash": "2dd6684cdcd64398fdea4af4cf94ad57c26ede1d231826a4a4985497a980026d",
+  "created_at": "2025-11-15T11:48:52.621090+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/162 Camille 2025-11-15_11-48-52/2dd6684cdcd64398fdea4af4cf94ad57c26ede1d231826a4a4985497a980026d/CIBLE JEUNE_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/162 Camille 2025-11-15_11-48-52/2dd6684cdcd64398fdea4af4cf94ad57c26ede1d231826a4a4985497a980026d/CIBLE JEUNE_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/162 Camille 2025-11-15_11-48-52/2dd6684cdcd64398fdea4af4cf94ad57c26ede1d231826a4a4985497a980026d/CIBLE JEUNE_TAT_M6_tracking.json"
+  }
+}

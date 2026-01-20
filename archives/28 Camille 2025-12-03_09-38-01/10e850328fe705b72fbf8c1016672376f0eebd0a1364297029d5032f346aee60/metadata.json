@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/28 Camille/docs/Greg fait trop le canard avec Maeva .mp4",
+  "video_stem": "Greg fait trop le canard avec Maeva ",
+  "video_hash": "10e850328fe705b72fbf8c1016672376f0eebd0a1364297029d5032f346aee60",
+  "created_at": "2025-12-03T09:38:01.539934+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/28 Camille 2025-12-03_09-38-01/10e850328fe705b72fbf8c1016672376f0eebd0a1364297029d5032f346aee60/Greg fait trop le canard avec Maeva _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/28 Camille 2025-12-03_09-38-01/10e850328fe705b72fbf8c1016672376f0eebd0a1364297029d5032f346aee60/Greg fait trop le canard avec Maeva _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/28 Camille 2025-12-03_09-38-01/10e850328fe705b72fbf8c1016672376f0eebd0a1364297029d5032f346aee60/Greg fait trop le canard avec Maeva _tracking.json"
+  }
+}

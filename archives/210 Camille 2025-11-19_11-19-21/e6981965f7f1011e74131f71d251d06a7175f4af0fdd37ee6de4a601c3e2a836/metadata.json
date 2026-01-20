@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/210 Camille/docs/TEVA_Piquantes_Sa mort approchant, elle nous dévoile ses derniers jours idéaux mp4.mp4",
+  "video_stem": "TEVA_Piquantes_Sa mort approchant, elle nous dévoile ses derniers jours idéaux mp4",
+  "video_hash": "e6981965f7f1011e74131f71d251d06a7175f4af0fdd37ee6de4a601c3e2a836",
+  "created_at": "2025-11-19T11:19:21.413484+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/210 Camille 2025-11-19_11-19-21/e6981965f7f1011e74131f71d251d06a7175f4af0fdd37ee6de4a601c3e2a836/TEVA_Piquantes_Sa mort approchant, elle nous dévoile ses derniers jours idéaux mp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/210 Camille 2025-11-19_11-19-21/e6981965f7f1011e74131f71d251d06a7175f4af0fdd37ee6de4a601c3e2a836/TEVA_Piquantes_Sa mort approchant, elle nous dévoile ses derniers jours idéaux mp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/210 Camille 2025-11-19_11-19-21/e6981965f7f1011e74131f71d251d06a7175f4af0fdd37ee6de4a601c3e2a836/TEVA_Piquantes_Sa mort approchant, elle nous dévoile ses derniers jours idéaux mp4_tracking.json"
+  }
+}

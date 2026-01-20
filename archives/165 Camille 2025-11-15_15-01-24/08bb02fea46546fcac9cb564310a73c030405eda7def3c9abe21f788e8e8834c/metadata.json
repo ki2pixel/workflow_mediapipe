@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/165 Camille/docs/66M - DECOUVERTE CAMPING.mp4",
+  "video_stem": "66M - DECOUVERTE CAMPING",
+  "video_hash": "08bb02fea46546fcac9cb564310a73c030405eda7def3c9abe21f788e8e8834c",
+  "created_at": "2025-11-15T15:01:24.567746+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/165 Camille 2025-11-15_15-01-24/08bb02fea46546fcac9cb564310a73c030405eda7def3c9abe21f788e8e8834c/66M - DECOUVERTE CAMPING_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/165 Camille 2025-11-15_15-01-24/08bb02fea46546fcac9cb564310a73c030405eda7def3c9abe21f788e8e8834c/66M - DECOUVERTE CAMPING_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/165 Camille 2025-11-15_15-01-24/08bb02fea46546fcac9cb564310a73c030405eda7def3c9abe21f788e8e8834c/66M - DECOUVERTE CAMPING_tracking.json"
+  }
+}

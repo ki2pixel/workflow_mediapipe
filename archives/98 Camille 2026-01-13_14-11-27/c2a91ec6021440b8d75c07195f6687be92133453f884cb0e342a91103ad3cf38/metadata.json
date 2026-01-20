@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/98 Camille/docs/postdiff 2 – Tressia écarte Stéphanie de la finale  .mp4",
+  "video_stem": "postdiff 2 – Tressia écarte Stéphanie de la finale  ",
+  "video_hash": "c2a91ec6021440b8d75c07195f6687be92133453f884cb0e342a91103ad3cf38",
+  "created_at": "2026-01-13T14:11:27.404505+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/98 Camille 2026-01-13_14-11-27/c2a91ec6021440b8d75c07195f6687be92133453f884cb0e342a91103ad3cf38/postdiff 2 – Tressia écarte Stéphanie de la finale  _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/98 Camille 2026-01-13_14-11-27/c2a91ec6021440b8d75c07195f6687be92133453f884cb0e342a91103ad3cf38/postdiff 2 – Tressia écarte Stéphanie de la finale  _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/98 Camille 2026-01-13_14-11-27/c2a91ec6021440b8d75c07195f6687be92133453f884cb0e342a91103ad3cf38/postdiff 2 – Tressia écarte Stéphanie de la finale  _tracking.json"
+  }
+}

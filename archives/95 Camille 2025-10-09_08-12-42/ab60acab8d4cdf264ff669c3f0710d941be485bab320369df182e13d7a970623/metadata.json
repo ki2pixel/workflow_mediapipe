@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/95 Camille/docs/PP - LRDP - Karine Dubernet.mp4",
+  "video_stem": "PP - LRDP - Karine Dubernet",
+  "video_hash": "ab60acab8d4cdf264ff669c3f0710d941be485bab320369df182e13d7a970623",
+  "created_at": "2025-10-09T08:12:42.571346+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/95 Camille 2025-10-09_08-12-42/ab60acab8d4cdf264ff669c3f0710d941be485bab320369df182e13d7a970623/PP - LRDP - Karine Dubernet_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/95 Camille 2025-10-09_08-12-42/ab60acab8d4cdf264ff669c3f0710d941be485bab320369df182e13d7a970623/PP - LRDP - Karine Dubernet_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/95 Camille 2025-10-09_08-12-42/ab60acab8d4cdf264ff669c3f0710d941be485bab320369df182e13d7a970623/PP - LRDP - Karine Dubernet_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/116 Camille/docs/EP19 – Giu aimerait rencontrer la future compagne de Paga.mp4",
+  "video_stem": "EP19 – Giu aimerait rencontrer la future compagne de Paga",
+  "video_hash": "d89107b2a2048a2c30166fe936228a468c23b4e7d9a3bfbe109afee9e2c53921",
+  "created_at": "2025-12-11T20:22:14.020955+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/116 Camille 2025-12-11_20-22-13/d89107b2a2048a2c30166fe936228a468c23b4e7d9a3bfbe109afee9e2c53921/EP19 – Giu aimerait rencontrer la future compagne de Paga_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/116 Camille 2025-12-11_20-22-13/d89107b2a2048a2c30166fe936228a468c23b4e7d9a3bfbe109afee9e2c53921/EP19 – Giu aimerait rencontrer la future compagne de Paga_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/116 Camille 2025-12-11_20-22-13/d89107b2a2048a2c30166fe936228a468c23b4e7d9a3bfbe109afee9e2c53921/EP19 – Giu aimerait rencontrer la future compagne de Paga_tracking.json"
+  }
+}

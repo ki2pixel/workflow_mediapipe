@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/118 Camille/docs/Gulli - Marsupilamis - Hope une vraie pro du skate.mp4",
+  "video_stem": "Gulli - Marsupilamis - Hope une vraie pro du skate",
+  "video_hash": "d307d63def18e1b68247971d22fc14e50b919c0b3ef05f81e58772f160056ce1",
+  "created_at": "2025-12-12T23:44:30.901205+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/118 Camille 2025-12-12_23-44-30/d307d63def18e1b68247971d22fc14e50b919c0b3ef05f81e58772f160056ce1/Gulli - Marsupilamis - Hope une vraie pro du skate_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/118 Camille 2025-12-12_23-44-30/d307d63def18e1b68247971d22fc14e50b919c0b3ef05f81e58772f160056ce1/Gulli - Marsupilamis - Hope une vraie pro du skate_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/118 Camille 2025-12-12_23-44-30/d307d63def18e1b68247971d22fc14e50b919c0b3ef05f81e58772f160056ce1/Gulli - Marsupilamis - Hope une vraie pro du skate_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/62 Camille/docs/UJUD - ASTUCE VIDE GRENIER.mp4",
+  "video_stem": "UJUD - ASTUCE VIDE GRENIER",
+  "video_hash": "70471707548a5078479b56ed1fe96e764c59a3df7bd6d265aa9c5072ea5e8886",
+  "created_at": "2025-10-06T13:52:05.690103+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/62 Camille 2025-10-06_13-52-05/70471707548a5078479b56ed1fe96e764c59a3df7bd6d265aa9c5072ea5e8886/UJUD - ASTUCE VIDE GRENIER_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/62 Camille 2025-10-06_13-52-05/70471707548a5078479b56ed1fe96e764c59a3df7bd6d265aa9c5072ea5e8886/UJUD - ASTUCE VIDE GRENIER_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/62 Camille 2025-10-06_13-52-05/70471707548a5078479b56ed1fe96e764c59a3df7bd6d265aa9c5072ea5e8886/UJUD - ASTUCE VIDE GRENIER_tracking.json"
+  }
+}

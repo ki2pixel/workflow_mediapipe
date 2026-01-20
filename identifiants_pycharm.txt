@@ -1,0 +1,55 @@
+danner@boiledment.com
+Hx1X64/;`n.9
+
+shahzaib12@boiledment.com
+Hx1X64/;`n.9
+
+su - kidpixel2 -c "/home/kidpixel/launch_pycharm_kidpixel2.sh &"
+
+chown -R kidpixel2:kidpixel2 routes/ templates/ static/
+
+sudo chown -R kidpixel2:kidpixel2 /home/kidpixel2/kidpixel_files/kidpixel/workflow_mediapipe
+
+je dois investiguer un problème de permissions sur les fichiers de cette codebase
+
+----------
+
+ipe/logs/app.log
+
+==========================================================
+   LANCEUR DE WORKFLOW (Version Refactorisée)
+==========================================================
+
+Application: /home/kidpixel/workflow_mediapipe/app_new.py
+Environnement: /home/kidpixel/workflow_mediapipe/env/bin/python
+Port Flask: 5003
+Log unifié: /home/kidpixel/workflow_mediapipe/logs/app.log
+Log startup: /home/kidpixel/workflow_mediapipe/logs/startup.log
+
+STATUT DES FONCTIONNALITÉS:
+  ✓ Workflow principal: ACTIF
+  ✓ Monitoring système: ACTIF
+  ✓ Mode Auto CSV: ACTIF (désactivé par défaut)
+  ✓ Téléchargements CSV: ACTIF
+  ✓ Logging unifié: ACTIF (logs/app.log)
+  ✓ Debug AutoMode: ACTIF ([AUTO_MODE_DEBUG], [SEQUENCE_DEBUG], etc.)
+  ✗ Localtunnel: SUPPRIMÉ
+  ✗ Téléchargement Dropbox: SUPPRIMÉ
+
+tee: /home/kidpixel/workflow_mediapipe/logs/startup.log: Permission non accordée
+2025-10-02 19:03:26 - STARTUP - Application configuration validated
+tee: /home/kidpixel/workflow_mediapipe/logs/startup.log: Permission non accordée
+2025-10-02 19:03:26 - STARTUP - All file validations passed
+Lancement du serveur Flask (version CSV-based)...
+Note: Nouveau système CSV pour auto mode, Localtunnel et Dropbox supprimés
+Tous les logs (stdout/stderr) seront capturés dans: /home/kidpixel/workflow_mediapipe/logs/app.log
+tee: /home/kidpixel/workflow_mediapipe/logs/startup.log: Permission non accordée
+2025-10-02 19:03:26 - STARTUP - Starting Flask application with unified logging
+tee: /home/kidpixel/workflow_mediapipe/logs/startup.log: Permission non accordée
+2025-10-02 19:03:26 - STARTUP - Command: cd /home/kidpixel/workflow_mediapipe && /home/kidpixel/workflow_mediapipe/env/bin/python /home/kidpixel/workflow_mediapipe/app_new.py
+/home/kidpixel/workflow_mediapipe/start_workflow.sh: ligne 181: /home/kidpixel/workflow_mediapipe/logs/app.log: Permission non accordée
+tee: /home/kidpixel/workflow_mediapipe/logs/startup.log: Permission non accordée
+2025-10-02 19:03:26 - STARTUP - Flask application started with PID: 32478
+
+Attente de 2 secondes pour le démarrage complet...
+

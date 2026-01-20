@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/277 Camille/docs/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Les candidats tentent de corrompre Éric Antoine avec un cadeau personnalisé.mp4",
+  "video_stem": "M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Les candidats tentent de corrompre Éric Antoine avec un cadeau personnalisé",
+  "video_hash": "7e8139a24db2dd3cf68a80b728d9ff97056be694a434ce2ab3ffbf4a22e33148",
+  "created_at": "2025-10-28T13:31:49.239875+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/277 Camille 2025-10-28_13-31-49/7e8139a24db2dd3cf68a80b728d9ff97056be694a434ce2ab3ffbf4a22e33148/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Les candidats tentent de corrompre Éric Antoine avec un cadeau personnalisé_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/277 Camille 2025-10-28_13-31-49/7e8139a24db2dd3cf68a80b728d9ff97056be694a434ce2ab3ffbf4a22e33148/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Les candidats tentent de corrompre Éric Antoine avec un cadeau personnalisé_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/277 Camille 2025-10-28_13-31-49/7e8139a24db2dd3cf68a80b728d9ff97056be694a434ce2ab3ffbf4a22e33148/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Les candidats tentent de corrompre Éric Antoine avec un cadeau personnalisé_tracking.json"
+  }
+}

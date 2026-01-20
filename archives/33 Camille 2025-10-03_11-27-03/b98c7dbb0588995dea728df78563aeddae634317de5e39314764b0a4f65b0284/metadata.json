@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/33 Camille/docs/M6 - LMP - Il a réalisé une tarte en forme de poulpe.mp4",
+  "video_stem": "M6 - LMP - Il a réalisé une tarte en forme de poulpe",
+  "video_hash": "b98c7dbb0588995dea728df78563aeddae634317de5e39314764b0a4f65b0284",
+  "created_at": "2025-10-03T09:27:03.983480+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/33 Camille/b98c7dbb0588995dea728df78563aeddae634317de5e39314764b0a4f65b0284/M6 - LMP - Il a réalisé une tarte en forme de poulpe_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/33 Camille/b98c7dbb0588995dea728df78563aeddae634317de5e39314764b0a4f65b0284/M6 - LMP - Il a réalisé une tarte en forme de poulpe_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/33 Camille/b98c7dbb0588995dea728df78563aeddae634317de5e39314764b0a4f65b0284/M6 - LMP - Il a réalisé une tarte en forme de poulpe_tracking.json"
+  }
+}

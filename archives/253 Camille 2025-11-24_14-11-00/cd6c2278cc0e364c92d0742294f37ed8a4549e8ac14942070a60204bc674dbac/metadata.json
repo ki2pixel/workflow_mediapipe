@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/253 Camille/docs/PP - Perlimpinpin - Karine Dubernet et le COVID.mp4",
+  "video_stem": "PP - Perlimpinpin - Karine Dubernet et le COVID",
+  "video_hash": "cd6c2278cc0e364c92d0742294f37ed8a4549e8ac14942070a60204bc674dbac",
+  "created_at": "2025-11-24T14:11:00.170942+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/253 Camille 2025-11-24_14-11-00/cd6c2278cc0e364c92d0742294f37ed8a4549e8ac14942070a60204bc674dbac/PP - Perlimpinpin - Karine Dubernet et le COVID_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/253 Camille 2025-11-24_14-11-00/cd6c2278cc0e364c92d0742294f37ed8a4549e8ac14942070a60204bc674dbac/PP - Perlimpinpin - Karine Dubernet et le COVID_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/253 Camille 2025-11-24_14-11-00/cd6c2278cc0e364c92d0742294f37ed8a4549e8ac14942070a60204bc674dbac/PP - Perlimpinpin - Karine Dubernet et le COVID_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/277 Camille/docs/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Delphine Wespiser n’a pas pu trouver la réponse à l’énigme.mp4",
+  "video_stem": "M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Delphine Wespiser n’a pas pu trouver la réponse à l’énigme",
+  "video_hash": "6dcd3dc256aca6cad9cdd7132bba0c6510238187f9bfa99dab302e5f7da8564c",
+  "created_at": "2025-10-28T13:31:49.130251+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/277 Camille 2025-10-28_13-31-49/6dcd3dc256aca6cad9cdd7132bba0c6510238187f9bfa99dab302e5f7da8564c/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Delphine Wespiser n’a pas pu trouver la réponse à l’énigme_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/277 Camille 2025-10-28_13-31-49/6dcd3dc256aca6cad9cdd7132bba0c6510238187f9bfa99dab302e5f7da8564c/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Delphine Wespiser n’a pas pu trouver la réponse à l’énigme_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/277 Camille 2025-10-28_13-31-49/6dcd3dc256aca6cad9cdd7132bba0c6510238187f9bfa99dab302e5f7da8564c/M6 - LRDLF - Célébrités - Extrait EM3 Pt2 - Delphine Wespiser n’a pas pu trouver la réponse à l’énigme_tracking.json"
+  }
+}

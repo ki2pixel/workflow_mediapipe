@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/151 Camille/R1174411_LPHDF Les boutiques .mp4",
+  "video_stem": "R1174411_LPHDF Les boutiques ",
+  "video_hash": "cef116aeb8ea83ab2e2ff199d920bf642d8f1c13e75e557d322811543db736ed",
+  "created_at": "2025-10-14T14:35:57.668292+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/cef116aeb8ea83ab2e2ff199d920bf642d8f1c13e75e557d322811543db736ed/R1174411_LPHDF Les boutiques _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/cef116aeb8ea83ab2e2ff199d920bf642d8f1c13e75e557d322811543db736ed/R1174411_LPHDF Les boutiques _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/cef116aeb8ea83ab2e2ff199d920bf642d8f1c13e75e557d322811543db736ed/R1174411_LPHDF Les boutiques _tracking.json"
+  }
+}

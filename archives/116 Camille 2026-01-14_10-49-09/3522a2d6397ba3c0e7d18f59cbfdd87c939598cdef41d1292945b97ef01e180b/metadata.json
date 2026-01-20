@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/116 Camille/docs/EQA 2026 01 16 MOTARDS PS1 SUJET 1 EXTRAIT.mp4",
+  "video_stem": "EQA 2026 01 16 MOTARDS PS1 SUJET 1 EXTRAIT",
+  "video_hash": "3522a2d6397ba3c0e7d18f59cbfdd87c939598cdef41d1292945b97ef01e180b",
+  "created_at": "2026-01-14T10:49:09.628493+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/116 Camille 2026-01-14_10-49-09/3522a2d6397ba3c0e7d18f59cbfdd87c939598cdef41d1292945b97ef01e180b/EQA 2026 01 16 MOTARDS PS1 SUJET 1 EXTRAIT_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/116 Camille 2026-01-14_10-49-09/3522a2d6397ba3c0e7d18f59cbfdd87c939598cdef41d1292945b97ef01e180b/EQA 2026 01 16 MOTARDS PS1 SUJET 1 EXTRAIT_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/116 Camille 2026-01-14_10-49-09/3522a2d6397ba3c0e7d18f59cbfdd87c939598cdef41d1292945b97ef01e180b/EQA 2026 01 16 MOTARDS PS1 SUJET 1 EXTRAIT_tracking.json"
+  }
+}

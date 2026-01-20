@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/94 Camille/docs/GANTS STAR.mp4",
+  "video_stem": "GANTS STAR",
+  "video_hash": "2e483dcb5e75cb0a9ede3a46ffd00de78c1d386816f99c1d1e5b96230c4648b8",
+  "created_at": "2025-11-10T13:49:25.636568+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/94 Camille 2025-11-10_13-49-25/2e483dcb5e75cb0a9ede3a46ffd00de78c1d386816f99c1d1e5b96230c4648b8/GANTS STAR_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/94 Camille 2025-11-10_13-49-25/2e483dcb5e75cb0a9ede3a46ffd00de78c1d386816f99c1d1e5b96230c4648b8/GANTS STAR_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/94 Camille 2025-11-10_13-49-25/2e483dcb5e75cb0a9ede3a46ffd00de78c1d386816f99c1d1e5b96230c4648b8/GANTS STAR_tracking.json"
+  }
+}

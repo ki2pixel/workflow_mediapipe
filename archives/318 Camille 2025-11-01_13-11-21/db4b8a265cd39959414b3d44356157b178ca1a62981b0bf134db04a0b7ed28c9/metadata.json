@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/318 Camille/docs/UJUD - ACHAT MAISON VICE CACHE_TAT_M6.mp4",
+  "video_stem": "UJUD - ACHAT MAISON VICE CACHE_TAT_M6",
+  "video_hash": "db4b8a265cd39959414b3d44356157b178ca1a62981b0bf134db04a0b7ed28c9",
+  "created_at": "2025-11-01T13:11:21.358803+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/318 Camille 2025-11-01_13-11-21/db4b8a265cd39959414b3d44356157b178ca1a62981b0bf134db04a0b7ed28c9/UJUD - ACHAT MAISON VICE CACHE_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/318 Camille 2025-11-01_13-11-21/db4b8a265cd39959414b3d44356157b178ca1a62981b0bf134db04a0b7ed28c9/UJUD - ACHAT MAISON VICE CACHE_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/318 Camille 2025-11-01_13-11-21/db4b8a265cd39959414b3d44356157b178ca1a62981b0bf134db04a0b7ed28c9/UJUD - ACHAT MAISON VICE CACHE_TAT_M6_tracking.json"
+  }
+}

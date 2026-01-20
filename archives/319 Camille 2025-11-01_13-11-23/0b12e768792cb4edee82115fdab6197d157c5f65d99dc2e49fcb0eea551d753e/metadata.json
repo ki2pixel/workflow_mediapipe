@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/319 Camille/docs/UJUD - 70H PAR SEMAINE_TAT_M6.mp4",
+  "video_stem": "UJUD - 70H PAR SEMAINE_TAT_M6",
+  "video_hash": "0b12e768792cb4edee82115fdab6197d157c5f65d99dc2e49fcb0eea551d753e",
+  "created_at": "2025-11-01T13:11:23.083484+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/319 Camille 2025-11-01_13-11-23/0b12e768792cb4edee82115fdab6197d157c5f65d99dc2e49fcb0eea551d753e/UJUD - 70H PAR SEMAINE_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/319 Camille 2025-11-01_13-11-23/0b12e768792cb4edee82115fdab6197d157c5f65d99dc2e49fcb0eea551d753e/UJUD - 70H PAR SEMAINE_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/319 Camille 2025-11-01_13-11-23/0b12e768792cb4edee82115fdab6197d157c5f65d99dc2e49fcb0eea551d753e/UJUD - 70H PAR SEMAINE_TAT_M6_tracking.json"
+  }
+}

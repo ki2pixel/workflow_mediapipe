@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/321 Camille/docs/66M - 3000 SUSHIS_TAT_M6.mp4",
+  "video_stem": "66M - 3000 SUSHIS_TAT_M6",
+  "video_hash": "8140706e7149537d78c93ac3ca006942703a8539825e2b3a450b1fa851c110ff",
+  "created_at": "2025-11-01T14:31:31.602108+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/321 Camille 2025-11-01_14-31-31/8140706e7149537d78c93ac3ca006942703a8539825e2b3a450b1fa851c110ff/66M - 3000 SUSHIS_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/321 Camille 2025-11-01_14-31-31/8140706e7149537d78c93ac3ca006942703a8539825e2b3a450b1fa851c110ff/66M - 3000 SUSHIS_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/321 Camille 2025-11-01_14-31-31/8140706e7149537d78c93ac3ca006942703a8539825e2b3a450b1fa851c110ff/66M - 3000 SUSHIS_TAT_M6_tracking.json"
+  }
+}

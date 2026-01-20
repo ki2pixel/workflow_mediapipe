@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/89 Camille/docs/Virginie pète un plomb pendant cette épreuve !.mp4",
+  "video_stem": "Virginie pète un plomb pendant cette épreuve !",
+  "video_hash": "14fc95af2fc73c09ef7827d0be4df5c7cd266ba23ab5fb0d41038ea4cfc8a870",
+  "created_at": "2025-10-08T12:30:52.446473+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/14fc95af2fc73c09ef7827d0be4df5c7cd266ba23ab5fb0d41038ea4cfc8a870/Virginie pète un plomb pendant cette épreuve !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/14fc95af2fc73c09ef7827d0be4df5c7cd266ba23ab5fb0d41038ea4cfc8a870/Virginie pète un plomb pendant cette épreuve !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/14fc95af2fc73c09ef7827d0be4df5c7cd266ba23ab5fb0d41038ea4cfc8a870/Virginie pète un plomb pendant cette épreuve !_tracking.json"
+  }
+}

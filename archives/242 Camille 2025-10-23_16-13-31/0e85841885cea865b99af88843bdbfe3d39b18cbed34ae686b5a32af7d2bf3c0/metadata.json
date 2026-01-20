@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/242 Camille/docs/BEIGNET_TAT_M6.mp4",
+  "video_stem": "BEIGNET_TAT_M6",
+  "video_hash": "0e85841885cea865b99af88843bdbfe3d39b18cbed34ae686b5a32af7d2bf3c0",
+  "created_at": "2025-10-23T16:13:31.758510+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/242 Camille 2025-10-23_16-13-31/0e85841885cea865b99af88843bdbfe3d39b18cbed34ae686b5a32af7d2bf3c0/BEIGNET_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/242 Camille 2025-10-23_16-13-31/0e85841885cea865b99af88843bdbfe3d39b18cbed34ae686b5a32af7d2bf3c0/BEIGNET_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/242 Camille 2025-10-23_16-13-31/0e85841885cea865b99af88843bdbfe3d39b18cbed34ae686b5a32af7d2bf3c0/BEIGNET_TAT_M6_tracking.json"
+  }
+}

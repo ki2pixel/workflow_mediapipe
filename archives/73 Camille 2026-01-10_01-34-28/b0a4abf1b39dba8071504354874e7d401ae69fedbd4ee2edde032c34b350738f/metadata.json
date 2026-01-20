@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/73 Camille/docs/6ter - Veto and co - Ce furet a une grave anhémie et a besoin d’un donneur de sang.mp4",
+  "video_stem": "6ter - Veto and co - Ce furet a une grave anhémie et a besoin d’un donneur de sang",
+  "video_hash": "b0a4abf1b39dba8071504354874e7d401ae69fedbd4ee2edde032c34b350738f",
+  "created_at": "2026-01-10T01:34:28.630443+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/73 Camille 2026-01-10_01-34-28/b0a4abf1b39dba8071504354874e7d401ae69fedbd4ee2edde032c34b350738f/6ter - Veto and co - Ce furet a une grave anhémie et a besoin d’un donneur de sang_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/73 Camille 2026-01-10_01-34-28/b0a4abf1b39dba8071504354874e7d401ae69fedbd4ee2edde032c34b350738f/6ter - Veto and co - Ce furet a une grave anhémie et a besoin d’un donneur de sang_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/73 Camille 2026-01-10_01-34-28/b0a4abf1b39dba8071504354874e7d401ae69fedbd4ee2edde032c34b350738f/6ter - Veto and co - Ce furet a une grave anhémie et a besoin d’un donneur de sang_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/259 Camille/docs/6TER_Véto&co_Comment éviter que votre chien détruise votre intérieur en votre absence mp4.mp4",
+  "video_stem": "6TER_Véto&co_Comment éviter que votre chien détruise votre intérieur en votre absence mp4",
+  "video_hash": "fd4d0b4b07e3bf2957ece3eb0d75cdd40fc568a2303dd8ee7d26ead031ec61c5",
+  "created_at": "2025-10-27T10:05:33.106106+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/fd4d0b4b07e3bf2957ece3eb0d75cdd40fc568a2303dd8ee7d26ead031ec61c5/6TER_Véto&co_Comment éviter que votre chien détruise votre intérieur en votre absence mp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/fd4d0b4b07e3bf2957ece3eb0d75cdd40fc568a2303dd8ee7d26ead031ec61c5/6TER_Véto&co_Comment éviter que votre chien détruise votre intérieur en votre absence mp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/fd4d0b4b07e3bf2957ece3eb0d75cdd40fc568a2303dd8ee7d26ead031ec61c5/6TER_Véto&co_Comment éviter que votre chien détruise votre intérieur en votre absence mp4_tracking.json"
+  }
+}

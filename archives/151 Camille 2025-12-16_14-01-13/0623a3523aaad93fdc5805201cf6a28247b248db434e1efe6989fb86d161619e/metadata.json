@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/151 Camille/docs/M6 - Le Meilleur Pâtissier - Extrait 1 (EM1 P1)  Mercotte met une dernière fois les nerfs à vif des pâtissiers avec ses recettes emblématiques.mp4",
+  "video_stem": "M6 - Le Meilleur Pâtissier - Extrait 1 (EM1 P1)  Mercotte met une dernière fois les nerfs à vif des pâtissiers avec ses recettes emblématiques",
+  "video_hash": "0623a3523aaad93fdc5805201cf6a28247b248db434e1efe6989fb86d161619e",
+  "created_at": "2025-12-16T14:01:13.382870+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-12-16_14-01-13/0623a3523aaad93fdc5805201cf6a28247b248db434e1efe6989fb86d161619e/M6 - Le Meilleur Pâtissier - Extrait 1 (EM1 P1)  Mercotte met une dernière fois les nerfs à vif des pâtissiers avec ses recettes emblématiques_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-12-16_14-01-13/0623a3523aaad93fdc5805201cf6a28247b248db434e1efe6989fb86d161619e/M6 - Le Meilleur Pâtissier - Extrait 1 (EM1 P1)  Mercotte met une dernière fois les nerfs à vif des pâtissiers avec ses recettes emblématiques_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-12-16_14-01-13/0623a3523aaad93fdc5805201cf6a28247b248db434e1efe6989fb86d161619e/M6 - Le Meilleur Pâtissier - Extrait 1 (EM1 P1)  Mercotte met une dernière fois les nerfs à vif des pâtissiers avec ses recettes emblématiques_tracking.json"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "threshold": 0.5,
+  "window": 100,
+  "stride": 50,
+  "padding": 25,
+  "device": "auto",
+  "ffmpeg_threads": 0,
+  "mixed_precision": false,
+  "amp_dtype": "float16",
+  "num_workers": 1,
+  "torchscript": false,
+  "warmup": true,
+  "warmup_batches": 2,
+  "torchscript_auto_fallback": true
+}

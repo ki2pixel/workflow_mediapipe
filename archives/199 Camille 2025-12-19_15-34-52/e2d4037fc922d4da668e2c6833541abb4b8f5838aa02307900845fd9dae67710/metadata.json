@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/199 Camille/docs/66M BEBE DEHORS.mp4",
+  "video_stem": "66M BEBE DEHORS",
+  "video_hash": "e2d4037fc922d4da668e2c6833541abb4b8f5838aa02307900845fd9dae67710",
+  "created_at": "2025-12-19T15:34:52.272544+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/e2d4037fc922d4da668e2c6833541abb4b8f5838aa02307900845fd9dae67710/66M BEBE DEHORS_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/e2d4037fc922d4da668e2c6833541abb4b8f5838aa02307900845fd9dae67710/66M BEBE DEHORS_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/e2d4037fc922d4da668e2c6833541abb4b8f5838aa02307900845fd9dae67710/66M BEBE DEHORS_tracking.json"
+  }
+}

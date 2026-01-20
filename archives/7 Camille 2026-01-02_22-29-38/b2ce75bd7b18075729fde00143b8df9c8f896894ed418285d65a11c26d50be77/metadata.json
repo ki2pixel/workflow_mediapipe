@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/7 Camille/docs/M6 - SDM - Alice et Sofiane reçoivent une visite surprise_TAT_M6.mp4",
+  "video_stem": "M6 - SDM - Alice et Sofiane reçoivent une visite surprise_TAT_M6",
+  "video_hash": "b2ce75bd7b18075729fde00143b8df9c8f896894ed418285d65a11c26d50be77",
+  "created_at": "2026-01-02T22:29:38.305560+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/7 Camille 2026-01-02_22-29-38/b2ce75bd7b18075729fde00143b8df9c8f896894ed418285d65a11c26d50be77/M6 - SDM - Alice et Sofiane reçoivent une visite surprise_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/7 Camille 2026-01-02_22-29-38/b2ce75bd7b18075729fde00143b8df9c8f896894ed418285d65a11c26d50be77/M6 - SDM - Alice et Sofiane reçoivent une visite surprise_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/7 Camille 2026-01-02_22-29-38/b2ce75bd7b18075729fde00143b8df9c8f896894ed418285d65a11c26d50be77/M6 - SDM - Alice et Sofiane reçoivent une visite surprise_TAT_M6_tracking.json"
+  }
+}

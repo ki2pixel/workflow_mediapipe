@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/28 Camille/docs/Julien veut des clowns pour son mariage !.mp4",
+  "video_stem": "Julien veut des clowns pour son mariage !",
+  "video_hash": "089abfc2c84c43d70c5269aae3b81b17b5a1df70099616c08b9997f9d8276091",
+  "created_at": "2025-12-03T09:38:01.617449+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/28 Camille 2025-12-03_09-38-01/089abfc2c84c43d70c5269aae3b81b17b5a1df70099616c08b9997f9d8276091/Julien veut des clowns pour son mariage !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/28 Camille 2025-12-03_09-38-01/089abfc2c84c43d70c5269aae3b81b17b5a1df70099616c08b9997f9d8276091/Julien veut des clowns pour son mariage !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/28 Camille 2025-12-03_09-38-01/089abfc2c84c43d70c5269aae3b81b17b5a1df70099616c08b9997f9d8276091/Julien veut des clowns pour son mariage !_tracking.json"
+  }
+}

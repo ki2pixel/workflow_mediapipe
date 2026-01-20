@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/180 Camille/docs/Gulli - Ma Super Ligue 1 - Les enfants affrontent deux pros_TAT_Gulli.mp4",
+  "video_stem": "Gulli - Ma Super Ligue 1 - Les enfants affrontent deux pros_TAT_Gulli",
+  "video_hash": "06f279e0cda11f968aecf5a730c4f1d53a72ad2519f29e26a0b2bc9ddcbee600",
+  "created_at": "2025-10-17T09:41:11.091813+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/06f279e0cda11f968aecf5a730c4f1d53a72ad2519f29e26a0b2bc9ddcbee600/Gulli - Ma Super Ligue 1 - Les enfants affrontent deux pros_TAT_Gulli_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/06f279e0cda11f968aecf5a730c4f1d53a72ad2519f29e26a0b2bc9ddcbee600/Gulli - Ma Super Ligue 1 - Les enfants affrontent deux pros_TAT_Gulli_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/06f279e0cda11f968aecf5a730c4f1d53a72ad2519f29e26a0b2bc9ddcbee600/Gulli - Ma Super Ligue 1 - Les enfants affrontent deux pros_TAT_Gulli_tracking.json"
+  }
+}

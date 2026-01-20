@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/259 Camille/docs/6TER_Véto&co_Ce chat vomit du sang et a beaucoup de diarrhéemp4.mp4",
+  "video_stem": "6TER_Véto&co_Ce chat vomit du sang et a beaucoup de diarrhéemp4",
+  "video_hash": "f31a4c77e44670096879e4d94113b9c5ee156745c50123b03f21092e3ea283b2",
+  "created_at": "2025-10-27T10:05:33.076618+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/f31a4c77e44670096879e4d94113b9c5ee156745c50123b03f21092e3ea283b2/6TER_Véto&co_Ce chat vomit du sang et a beaucoup de diarrhéemp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/f31a4c77e44670096879e4d94113b9c5ee156745c50123b03f21092e3ea283b2/6TER_Véto&co_Ce chat vomit du sang et a beaucoup de diarrhéemp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/f31a4c77e44670096879e4d94113b9c5ee156745c50123b03f21092e3ea283b2/6TER_Véto&co_Ce chat vomit du sang et a beaucoup de diarrhéemp4_tracking.json"
+  }
+}

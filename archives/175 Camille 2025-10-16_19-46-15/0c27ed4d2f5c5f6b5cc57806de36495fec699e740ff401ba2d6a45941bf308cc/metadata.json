@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/175 Camille/docs/EP 46 - Postdiff 2 - Les Blancs gagnent le jeu.mp4",
+  "video_stem": "EP 46 - Postdiff 2 - Les Blancs gagnent le jeu",
+  "video_hash": "0c27ed4d2f5c5f6b5cc57806de36495fec699e740ff401ba2d6a45941bf308cc",
+  "created_at": "2025-10-16T19:46:15.137149+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/175 Camille 2025-10-16_19-46-15/0c27ed4d2f5c5f6b5cc57806de36495fec699e740ff401ba2d6a45941bf308cc/EP 46 - Postdiff 2 - Les Blancs gagnent le jeu_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/175 Camille 2025-10-16_19-46-15/0c27ed4d2f5c5f6b5cc57806de36495fec699e740ff401ba2d6a45941bf308cc/EP 46 - Postdiff 2 - Les Blancs gagnent le jeu_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/175 Camille 2025-10-16_19-46-15/0c27ed4d2f5c5f6b5cc57806de36495fec699e740ff401ba2d6a45941bf308cc/EP 46 - Postdiff 2 - Les Blancs gagnent le jeu_tracking.json"
+  }
+}

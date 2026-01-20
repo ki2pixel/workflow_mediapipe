@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/318 Camille/docs/66M - ATTAQUE SILURE_TAT_M6.mp4",
+  "video_stem": "66M - ATTAQUE SILURE_TAT_M6",
+  "video_hash": "3acbbf965e5d39afea7473586544131b216ddd196c90e0aa17035ddc4dc12470",
+  "created_at": "2025-11-01T13:11:21.294370+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/318 Camille 2025-11-01_13-11-21/3acbbf965e5d39afea7473586544131b216ddd196c90e0aa17035ddc4dc12470/66M - ATTAQUE SILURE_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/318 Camille 2025-11-01_13-11-21/3acbbf965e5d39afea7473586544131b216ddd196c90e0aa17035ddc4dc12470/66M - ATTAQUE SILURE_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/318 Camille 2025-11-01_13-11-21/3acbbf965e5d39afea7473586544131b216ddd196c90e0aa17035ddc4dc12470/66M - ATTAQUE SILURE_TAT_M6_tracking.json"
+  }
+}

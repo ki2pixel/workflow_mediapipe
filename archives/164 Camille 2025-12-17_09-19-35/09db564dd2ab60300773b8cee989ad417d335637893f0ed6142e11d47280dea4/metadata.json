@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/164 Camille/docs/EP59_Marine juge la lettre d'amour de Mélanie !.mp4",
+  "video_stem": "EP59_Marine juge la lettre d'amour de Mélanie !",
+  "video_hash": "09db564dd2ab60300773b8cee989ad417d335637893f0ed6142e11d47280dea4",
+  "created_at": "2025-12-17T09:19:35.988546+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/164 Camille 2025-12-17_09-19-35/09db564dd2ab60300773b8cee989ad417d335637893f0ed6142e11d47280dea4/EP59_Marine juge la lettre d'amour de Mélanie !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/164 Camille 2025-12-17_09-19-35/09db564dd2ab60300773b8cee989ad417d335637893f0ed6142e11d47280dea4/EP59_Marine juge la lettre d'amour de Mélanie !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/164 Camille 2025-12-17_09-19-35/09db564dd2ab60300773b8cee989ad417d335637893f0ed6142e11d47280dea4/EP59_Marine juge la lettre d'amour de Mélanie !_tracking.json"
+  }
+}

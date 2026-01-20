@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/242 Camille/docs/HOMME CANON_TAT_M6.mp4",
+  "video_stem": "HOMME CANON_TAT_M6",
+  "video_hash": "7ce274dbc312eff823d1ac3c2ddf22e36e9a0cd569aafe985a39a3d25d26465f",
+  "created_at": "2025-10-23T16:13:31.826155+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/242 Camille 2025-10-23_16-13-31/7ce274dbc312eff823d1ac3c2ddf22e36e9a0cd569aafe985a39a3d25d26465f/HOMME CANON_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/242 Camille 2025-10-23_16-13-31/7ce274dbc312eff823d1ac3c2ddf22e36e9a0cd569aafe985a39a3d25d26465f/HOMME CANON_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/242 Camille 2025-10-23_16-13-31/7ce274dbc312eff823d1ac3c2ddf22e36e9a0cd569aafe985a39a3d25d26465f/HOMME CANON_TAT_M6_tracking.json"
+  }
+}

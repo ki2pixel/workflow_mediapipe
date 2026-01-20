@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/40 Camille/docs/TEVA_Un silence si buryant_Sa fille lui confie les attouchements de son pèremp4.mp4",
+  "video_stem": "TEVA_Un silence si buryant_Sa fille lui confie les attouchements de son pèremp4",
+  "video_hash": "e01fe9f451b53550a89183ae44f0b62ccb1227988c0c91aebc745501b6dd1334",
+  "created_at": "2025-11-05T18:02:48.945290+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/40 Camille 2025-11-05_18-02-48/e01fe9f451b53550a89183ae44f0b62ccb1227988c0c91aebc745501b6dd1334/TEVA_Un silence si buryant_Sa fille lui confie les attouchements de son pèremp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/40 Camille 2025-11-05_18-02-48/e01fe9f451b53550a89183ae44f0b62ccb1227988c0c91aebc745501b6dd1334/TEVA_Un silence si buryant_Sa fille lui confie les attouchements de son pèremp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/40 Camille 2025-11-05_18-02-48/e01fe9f451b53550a89183ae44f0b62ccb1227988c0c91aebc745501b6dd1334/TEVA_Un silence si buryant_Sa fille lui confie les attouchements de son pèremp4_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/167 Camille/docs/Il se trompe de mot en anglais et dit une folie à Cassandra ! .mp4",
+  "video_stem": "Il se trompe de mot en anglais et dit une folie à Cassandra ! ",
+  "video_hash": "06ce40ef67d8f7633a9ba2faebc5fa1dd1ba3b4d754ecc472b32267564a4c14c",
+  "created_at": "2025-12-17T11:43:09.756686+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/167 Camille 2025-12-17_11-43-09/06ce40ef67d8f7633a9ba2faebc5fa1dd1ba3b4d754ecc472b32267564a4c14c/Il se trompe de mot en anglais et dit une folie à Cassandra ! _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/167 Camille 2025-12-17_11-43-09/06ce40ef67d8f7633a9ba2faebc5fa1dd1ba3b4d754ecc472b32267564a4c14c/Il se trompe de mot en anglais et dit une folie à Cassandra ! _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/167 Camille 2025-12-17_11-43-09/06ce40ef67d8f7633a9ba2faebc5fa1dd1ba3b4d754ecc472b32267564a4c14c/Il se trompe de mot en anglais et dit une folie à Cassandra ! _tracking.json"
+  }
+}

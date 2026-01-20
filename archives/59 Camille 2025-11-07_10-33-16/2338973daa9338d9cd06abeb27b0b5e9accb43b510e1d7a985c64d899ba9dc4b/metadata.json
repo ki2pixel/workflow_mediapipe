@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/59 Camille/docs/POSTDIFF 2 – Il accepte de laisser une 2nde chance à sa mère.mp4",
+  "video_stem": "POSTDIFF 2 – Il accepte de laisser une 2nde chance à sa mère",
+  "video_hash": "2338973daa9338d9cd06abeb27b0b5e9accb43b510e1d7a985c64d899ba9dc4b",
+  "created_at": "2025-11-07T10:33:16.424048+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/59 Camille 2025-11-07_10-33-16/2338973daa9338d9cd06abeb27b0b5e9accb43b510e1d7a985c64d899ba9dc4b/POSTDIFF 2 – Il accepte de laisser une 2nde chance à sa mère_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/59 Camille 2025-11-07_10-33-16/2338973daa9338d9cd06abeb27b0b5e9accb43b510e1d7a985c64d899ba9dc4b/POSTDIFF 2 – Il accepte de laisser une 2nde chance à sa mère_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/59 Camille 2025-11-07_10-33-16/2338973daa9338d9cd06abeb27b0b5e9accb43b510e1d7a985c64d899ba9dc4b/POSTDIFF 2 – Il accepte de laisser une 2nde chance à sa mère_tracking.json"
+  }
+}

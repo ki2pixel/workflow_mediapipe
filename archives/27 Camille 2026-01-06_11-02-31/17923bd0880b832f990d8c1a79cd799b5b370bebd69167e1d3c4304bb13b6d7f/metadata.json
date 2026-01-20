@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/27 Camille/docs/IDLT_RS_alpha.mov",
+  "video_stem": "IDLT_RS_alpha",
+  "video_hash": "17923bd0880b832f990d8c1a79cd799b5b370bebd69167e1d3c4304bb13b6d7f",
+  "created_at": "2026-01-06T11:02:31.619760+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/27 Camille 2026-01-06_11-02-31/17923bd0880b832f990d8c1a79cd799b5b370bebd69167e1d3c4304bb13b6d7f/IDLT_RS_alpha_scenes.csv",
+    "audio": null,
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/27 Camille 2026-01-06_11-02-31/17923bd0880b832f990d8c1a79cd799b5b370bebd69167e1d3c4304bb13b6d7f/IDLT_RS_alpha_tracking.json"
+  }
+}

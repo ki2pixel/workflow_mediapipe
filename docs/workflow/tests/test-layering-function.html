@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Layering Function - Interactive Pages</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .test-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .test-link:hover {
+            background: #0056b3;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Test Layering Function - Pages Interactives</h1>
+    
+    <div class="test-container">
+        <h2>📊 Workflow Execution - Test ensureProperLayering</h2>
+        <p>Vérification que la fonction <code>ensureProperLayering</code> est accessible et fonctionne.</p>
+        <a href="../workflow-execution-interactive/index.html" target="_blank" class="test-link">🔗 Ouvrir dans un nouvel onglet</a>
+        <button onclick="testWorkflowLayering()" class="test-link">🧪 Tester la fonction</button>
+        <div id="workflow-test-result" class="test-result info">⏳ Cliquez sur "Tester la fonction" pour vérifier...</div>
+        <iframe src="../workflow-execution-interactive/index.html" id="workflow-iframe" style="display: none;"></iframe>
+    </div>
+
+    <div class="test-container">
+        <h2>🏗️ Architecture Complete - Test ensureProperLayering</h2>
+        <p>Vérification que la fonction <code>ensureProperLayering</code> est accessible et fonctionne.</p>
+        <a href="../architecture-complete-interactive/index.html" target="_blank" class="test-link">🔗 Ouvrir dans un nouvel onglet</a>
+        <button onclick="testArchitectureLayering()" class="test-link">🧪 Tester la fonction</button>
+        <div id="architecture-test-result" class="test-result info">⏳ Cliquez sur "Tester la fonction" pour vérifier...</div>
+        <iframe src="../architecture-complete-interactive/index.html" id="architecture-iframe" style="display: none;"></iframe>
+    </div>
+
+    <div class="test-container">
+        <h2>📋 Console Logs</h2>
+        <p>Messages de la console pour diagnostiquer les erreurs:</p>
+        <div id="console-output" class="console-output">Aucun log pour le moment...</div>
+        <button onclick="clearConsole()" class="test-link">🗑️ Effacer</button>
+    </div>
+
+    <script>
+        let consoleOutput = document.getElementById('console-output');
+        let originalConsoleLog = console.log;
+        let originalConsoleError = console.error;
+        let originalConsoleWarn = console.warn;
+
+        // Capture console output
+        function logToOutput(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            consoleOutput.textContent += logEntry;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            logToOutput('log', args.join(' '));
+            originalConsoleLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            logToOutput('error', args.join(' '));
+            originalConsoleError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            logToOutput('warn', args.join(' '));
+            originalConsoleWarn.apply(console, args);
+        };
+
+        function clearConsole() {
+            consoleOutput.textContent = 'Console effacée...\n';
+        }
+
+        function testWorkflowLayering() {
+            const resultDiv = document.getElementById('workflow-test-result');
+            resultDiv.innerHTML = '🔄 Test en cours...';
+            resultDiv.className = 'test-result warning';
+
+            // Create a new iframe to test
+            const testFrame = document.createElement('iframe');
+            testFrame.src = 'workflow-execution-interactive/index.html';
+            testFrame.style.display = 'none';
+            document.body.appendChild(testFrame);
+
+            setTimeout(() => {
+                try {
+                    const iframeWindow = testFrame.contentWindow;
+                    
+                    // Check if ensureProperLayering function exists
+                    if (typeof iframeWindow.ensureProperLayering !== 'function') {
+                        resultDiv.innerHTML = '❌ ERREUR: ensureProperLayering n\'est pas définie dans window';
+                        resultDiv.className = 'test-result error';
+                        return;
+                    }
+
+                    // Check if the function is accessible in global scope
+                    const iframeDoc = testFrame.contentDocument;
+                    const scriptContent = iframeDoc.querySelector('script[src="./script.js"]');
+                    
+                    if (!scriptContent) {
+                        resultDiv.innerHTML = '⚠️ ATTENTION: Script non trouvé';
+                        resultDiv.className = 'test-result warning';
+                        return;
+                    }
+
+                    // Try to call the function
+                    try {
+                        // This should work without errors
+                        iframeWindow.ensureProperLayering();
+                        resultDiv.innerHTML = '✅ SUCCÈS: ensureProperLayering est accessible et exécutable';
+                        resultDiv.className = 'test-result success';
+                    } catch (funcError) {
+                        if (funcError.message.includes('Graph not initialized')) {
+                            resultDiv.innerHTML = '✅ FONCTION TROUVÉE: ensureProperLayering accessible (erreur attendue car graph pas encore initialisé)';
+                            resultDiv.className = 'test-result success';
+                        } else {
+                            resultDiv.innerHTML = `⚠️ FONCTION TROUVÉE mais erreur inattendue: ${funcError.message}`;
+                            resultDiv.className = 'test-result warning';
+                        }
+                    }
+
+                } catch (error) {
+                    resultDiv.innerHTML = `❌ ERREUR: ${error.message}`;
+                    resultDiv.className = 'test-result error';
+                    console.error('Test workflow layering error:', error);
+                } finally {
+                    document.body.removeChild(testFrame);
+                }
+            }, 4000); // Wait 4 seconds for page to fully load
+        }
+
+        function testArchitectureLayering() {
+            const resultDiv = document.getElementById('architecture-test-result');
+            resultDiv.innerHTML = '🔄 Test en cours...';
+            resultDiv.className = 'test-result warning';
+
+            // Create a new iframe to test
+            const testFrame = document.createElement('iframe');
+            testFrame.src = 'architecture-complete-interactive/index.html';
+            testFrame.style.display = 'none';
+            document.body.appendChild(testFrame);
+
+            setTimeout(() => {
+                try {
+                    const iframeWindow = testFrame.contentWindow;
+                    
+                    // Check if ensureProperLayering function exists
+                    if (typeof iframeWindow.ensureProperLayering !== 'function') {
+                        resultDiv.innerHTML = '❌ ERREUR: ensureProperLayering n\'est pas définie dans window';
+                        resultDiv.className = 'test-result error';
+                        return;
+                    }
+
+                    // Check if the function is accessible in global scope
+                    const iframeDoc = testFrame.contentDocument;
+                    const scriptContent = iframeDoc.querySelector('script[src="./script.js"]');
+                    
+                    if (!scriptContent) {
+                        resultDiv.innerHTML = '⚠️ ATTENTION: Script non trouvé';
+                        resultDiv.className = 'test-result warning';
+                        return;
+                    }
+
+                    // Try to call the function
+                    try {
+                        // This should work without errors
+                        iframeWindow.ensureProperLayering();
+                        resultDiv.innerHTML = '✅ SUCCÈS: ensureProperLayering est accessible et exécutable';
+                        resultDiv.className = 'test-result success';
+                    } catch (funcError) {
+                        if (funcError.message.includes('Graph not initialized')) {
+                            resultDiv.innerHTML = '✅ FONCTION TROUVÉE: ensureProperLayering accessible (erreur attendue car graph pas encore initialisé)';
+                            resultDiv.className = 'test-result success';
+                        } else {
+                            resultDiv.innerHTML = `⚠️ FONCTION TROUVÉE mais erreur inattendue: ${funcError.message}`;
+                            resultDiv.className = 'test-result warning';
+                        }
+                    }
+
+                } catch (error) {
+                    resultDiv.innerHTML = `❌ ERREUR: ${error.message}`;
+                    resultDiv.className = 'test-result error';
+                    console.error('Test architecture layering error:', error);
+                } finally {
+                    document.body.removeChild(testFrame);
+                }
+            }, 4000); // Wait 4 seconds for page to fully load
+        }
+
+        // Capture window errors
+        window.addEventListener('error', function(e) {
+            console.error(`JavaScript Error: ${e.message} at ${e.filename}:${e.lineno}`);
+        });
+
+        console.log('🧪 Test layering function page loaded');
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Interactive Diagrams</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Test Interactive Diagrams Integration</h1>
+        
+        <div style="margin: 20px 0;">
+            <h2>Workflow Execution Diagram</h2>
+            <p>This should open the interactive workflow execution diagram:</p>
+            <img src="assets/images/Flux d'Exécution d'un Workflow Complet.png"
+                 alt="Flux d'Exécution d'un Workflow Complet MediaPipe v4.0"
+                 class="clickable-diagram-image workflow-execution-diagram"
+                 style="max-width: 400px; border: 2px solid #ccc; margin: 10px;" />
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <h2>Architecture Diagram</h2>
+            <p>This should open the interactive architecture diagram:</p>
+            <img src="assets/images/Architecture Complète du Système.png"
+                 alt="Architecture Complète du Système de Workflow MediaPipe v4.0"
+                 class="clickable-diagram-image architecture-diagram"
+                 style="max-width: 400px; border: 2px solid #ccc; margin: 10px;" />
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <h2>Debug Functions</h2>
+            <p>Open browser console and run these commands:</p>
+            <ul>
+                <li><code>debugInteractiveDiagrams()</code> - Debug diagram detection</li>
+                <li><code>testLightboxVisibility()</code> - Test lightbox CSS and visibility</li>
+                <li><code>testClickFirstDiagram()</code> - Simulate click on first diagram</li>
+                <li><code>testSubpageLightbox()</code> - Test subpage functionality</li>
+                <li><code>forceSetupDiagrams()</code> - Force re-setup of clickable diagrams</li>
+                <li><code>testInteractiveDiagram('./workflow-execution-interactive/index.html')</code> - Test workflow diagram</li>
+                <li><code>testInteractiveDiagram('./architecture-complete-interactive/index.html')</code> - Test architecture diagram</li>
+            </ul>
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <h2>Direct Links</h2>
+            <p>Test the interactive diagrams directly:</p>
+            <ul>
+                <li><a href="../workflow-execution-interactive/index.html" target="_blank">Workflow Execution Interactive</a></li>
+                <li><a href="../architecture-complete-interactive/index.html" target="_blank">Architecture Complete Interactive</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Lightbox HTML -->
+    <div class="diagram-lightbox" id="diagram-lightbox">
+        <div class="diagram-lightbox-content">
+            <button class="diagram-lightbox-close" id="diagram-lightbox-close">&times;</button>
+            <div class="diagram-content"></div>
+            <div class="diagram-lightbox-controls">
+                <button class="zoom-btn" id="zoom-in">+</button>
+                <button class="zoom-btn" id="zoom-out">-</button>
+                <button class="zoom-btn" id="zoom-reset">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/129 Camille/docs/6TER_En famille_Comme frère et soeur.mp4",
+  "video_stem": "6TER_En famille_Comme frère et soeur",
+  "video_hash": "7576d9c37347f851517b57a8c54759262a44c4d22910ca712c2fd237ed03cc21",
+  "created_at": "2025-11-13T09:25:49.876726+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/7576d9c37347f851517b57a8c54759262a44c4d22910ca712c2fd237ed03cc21/6TER_En famille_Comme frère et soeur_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/7576d9c37347f851517b57a8c54759262a44c4d22910ca712c2fd237ed03cc21/6TER_En famille_Comme frère et soeur_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/7576d9c37347f851517b57a8c54759262a44c4d22910ca712c2fd237ed03cc21/6TER_En famille_Comme frère et soeur_tracking.json"
+  }
+}

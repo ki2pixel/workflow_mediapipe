@@ -1,0 +1,109 @@
+/* Workflow controls within unified section */
+.workflow-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px solid rgba(121, 134, 203, 0.1);
+}
+
+/* ===== WORKFLOW CONTROL BUTTONS STYLING ===== */
+#run-all-steps-button, #run-custom-sequence-button, #clear-custom-sequence-button {
+    background-color: var(--accent-secondary);
+    color: white;
+    padding: 15px 30px;
+    font-size: 1.1em;
+    font-weight: 500;
+    border-radius: 30px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: hidden;
+    min-width: 200px;
+    white-space: nowrap;
+}
+
+/* Add subtle shine effect on hover */
+#run-all-steps-button::before, #run-custom-sequence-button::before, #clear-custom-sequence-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+#run-all-steps-button:hover::before, #run-custom-sequence-button:hover::before, #clear-custom-sequence-button:hover::before {
+    left: 100%;
+}
+#run-all-steps-button:hover, #run-custom-sequence-button:hover, #clear-custom-sequence-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    filter: brightness(1.1);
+}
+
+#run-all-steps-button:active, #run-custom-sequence-button:active, #clear-custom-sequence-button:active {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.1s ease;
+}
+/* Individual button color schemes */
+#run-all-steps-button {
+    background: linear-gradient(135deg, var(--accent-secondary) 0%, rgba(121, 134, 203, 0.9) 100%);
+    border: 1px solid rgba(121, 134, 203, 0.3);
+}
+
+#run-custom-sequence-button {
+    background: linear-gradient(135deg, var(--orange) 0%, rgba(255, 152, 0, 0.9) 100%);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+#clear-custom-sequence-button {
+    background: linear-gradient(135deg, var(--text-secondary) 0%, rgba(108, 117, 125, 0.9) 100%);
+    border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+#run-all-steps-button:disabled, #run-custom-sequence-button:disabled, #clear-custom-sequence-button:disabled {
+    background: linear-gradient(135deg, #555 0%, #444 100%) !important;
+    color: #999 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+    filter: none !important;
+    border: 1px solid #666 !important;
+    opacity: 0.6;
+}
+
+.global-progress-container {
+    width: 80%;
+    max-width: 600px;
+    margin: 0 auto 20px auto;
+    background-color: var(--border-color);
+    border-radius: 10px;
+    padding: 4px;
+    display: none;
+}
+#global-progress-bar {
+    width: 0%;
+    height: 20px;
+    background-color: var(--green);
+    border-radius: 6px;
+    text-align: center;
+    line-height: 20px;
+    color: white;
+    font-weight: bold;
+    transition: width 0.4s ease;
+}
+#global-progress-text {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    display: none;
+}

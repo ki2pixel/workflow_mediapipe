@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/106 Camille/docs/Hilona revient en courant pour récupérer Julien !.mp4",
+  "video_stem": "Hilona revient en courant pour récupérer Julien !",
+  "video_hash": "574c055911bddb7f4f5ce40534b890a8d62a66a8bc504531992a27fa47ca898e",
+  "created_at": "2025-11-12T10:29:02.620959+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/106 Camille 2025-11-12_10-29-02/574c055911bddb7f4f5ce40534b890a8d62a66a8bc504531992a27fa47ca898e/Hilona revient en courant pour récupérer Julien !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/106 Camille 2025-11-12_10-29-02/574c055911bddb7f4f5ce40534b890a8d62a66a8bc504531992a27fa47ca898e/Hilona revient en courant pour récupérer Julien !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/106 Camille 2025-11-12_10-29-02/574c055911bddb7f4f5ce40534b890a8d62a66a8bc504531992a27fa47ca898e/Hilona revient en courant pour récupérer Julien !_tracking.json"
+  }
+}

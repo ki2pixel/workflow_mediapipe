@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/153 Camille/docs/UJUD - BOULES PUANTES.mp4",
+  "video_stem": "UJUD - BOULES PUANTES",
+  "video_hash": "2aead0309370ef39a5187edf1f033e6a068b7b14559d07fc09fab32c78e99e36",
+  "created_at": "2026-01-19T18:15:29.179181+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2026-01-19_18-15-29/2aead0309370ef39a5187edf1f033e6a068b7b14559d07fc09fab32c78e99e36/UJUD - BOULES PUANTES_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2026-01-19_18-15-29/2aead0309370ef39a5187edf1f033e6a068b7b14559d07fc09fab32c78e99e36/UJUD - BOULES PUANTES_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2026-01-19_18-15-29/2aead0309370ef39a5187edf1f033e6a068b7b14559d07fc09fab32c78e99e36/UJUD - BOULES PUANTES_tracking.json"
+  }
+}

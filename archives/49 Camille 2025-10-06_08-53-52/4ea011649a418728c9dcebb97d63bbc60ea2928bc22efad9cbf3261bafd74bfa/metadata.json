@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/49 Camille/docs/6TER_Mr Bean_Quand tu es plus qu’en retard-.mp4",
+  "video_stem": "6TER_Mr Bean_Quand tu es plus qu’en retard-",
+  "video_hash": "4ea011649a418728c9dcebb97d63bbc60ea2928bc22efad9cbf3261bafd74bfa",
+  "created_at": "2025-10-06T08:53:52.977841+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/4ea011649a418728c9dcebb97d63bbc60ea2928bc22efad9cbf3261bafd74bfa/6TER_Mr Bean_Quand tu es plus qu’en retard-_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/4ea011649a418728c9dcebb97d63bbc60ea2928bc22efad9cbf3261bafd74bfa/6TER_Mr Bean_Quand tu es plus qu’en retard-_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/4ea011649a418728c9dcebb97d63bbc60ea2928bc22efad9cbf3261bafd74bfa/6TER_Mr Bean_Quand tu es plus qu’en retard-_tracking.json"
+  }
+}

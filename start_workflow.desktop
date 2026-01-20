@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Workflow MediaPipe
+Comment=Launch the Workflow MediaPipe video processing application
+Exec=/bin/bash -c "cd /home/kidpixel2/kidpixel_files/kidpixel/workflow_mediapipe/ && ./start_workflow.sh"
+Icon=applications-development
+Terminal=true
+StartupNotify=true
+Categories=Utility;Development;
+MimeType=application/x-desktop;
+NoDisplay=false
+StartupWMClass=workflow-mediapipe

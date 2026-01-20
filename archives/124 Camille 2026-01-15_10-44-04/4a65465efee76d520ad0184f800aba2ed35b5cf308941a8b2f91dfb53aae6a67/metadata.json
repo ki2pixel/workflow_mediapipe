@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/124 Camille/docs/BA DIM COURSE.mp4",
+  "video_stem": "BA DIM COURSE",
+  "video_hash": "4a65465efee76d520ad0184f800aba2ed35b5cf308941a8b2f91dfb53aae6a67",
+  "created_at": "2026-01-15T10:44:04.028264+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2026-01-15_10-44-04/4a65465efee76d520ad0184f800aba2ed35b5cf308941a8b2f91dfb53aae6a67/BA DIM COURSE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2026-01-15_10-44-04/4a65465efee76d520ad0184f800aba2ed35b5cf308941a8b2f91dfb53aae6a67/BA DIM COURSE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2026-01-15_10-44-04/4a65465efee76d520ad0184f800aba2ed35b5cf308941a8b2f91dfb53aae6a67/BA DIM COURSE_tracking.json"
+  }
+}

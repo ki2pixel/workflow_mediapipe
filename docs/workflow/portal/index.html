@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation Workflow MediaPipe v4.1 avec Lemonfox</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="assets/styles.css">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --accent-color: #0ea5e9;
+            --background-color: #ffffff;
+            --surface-color: #f8fafc;
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+            
+            /* Dark theme variables */
+            --dark-background: #0f172a;
+            --dark-surface: #1e293b;
+            --dark-text: #f1f5f9;
+            --dark-text-muted: #94a3b8;
+            --dark-border: #334155;
+        }
+
+        [data-theme="dark"] {
+            --background-color: var(--dark-background);
+            --surface-color: var(--dark-surface);
+            --text-color: var(--dark-text);
+            --text-muted: var(--dark-text-muted);
+            --border-color: var(--dark-border);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Ensure anchor targets account for fixed header */
+        #architecture-section,
+        #workflow-section {
+            scroll-margin-top: calc(var(--header-height) + 2rem);
+        }
+
+        /* Highlight target sections when navigated via anchor links */
+        .diagram-container:target {
+            animation: highlight-section 3s ease-in-out;
+        }
+
+        @keyframes highlight-section {
+            0% {
+                background-color: rgba(37, 99, 235, 0.1);
+                border: 2px solid var(--primary-color);
+                transform: scale(1.02);
+            }
+            25% {
+                background-color: rgba(37, 99, 235, 0.15);
+                border: 2px solid var(--primary-color);
+                transform: scale(1.02);
+            }
+            75% {
+                background-color: rgba(37, 99, 235, 0.05);
+                border: 2px solid transparent;
+                transform: scale(1.01);
+            }
+            100% {
+                background-color: transparent;
+                border: 2px solid transparent;
+                transform: scale(1);
+            }
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem;
+            cursor: pointer;
+            color: var(--text-color);
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            background-color: var(--surface-color);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            z-index: 900;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.hidden {
+            transform: translateX(-100%);
+        }
+
+        .nav-section {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-section h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-color);
+            text-decoration: none;
+            border-radius: 6px;
+            margin-bottom: 0.25rem;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+        }
+
+        .nav-link:hover {
+            background-color: var(--border-color);
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            padding: 2rem;
+            min-height: calc(100vh - var(--header-height));
+            transition: margin-left 0.3s ease;
+        }
+
+        .main-content.expanded {
+            margin-left: 0;
+        }
+
+        /* Welcome Section */
+        .welcome-section {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            padding: 3rem 0;
+        }
+
+        .welcome-section h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .welcome-section p {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: left;
+        }
+
+        .feature-card h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Document Content */
+        .document-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        /* Markdown Styles */
+        .markdown-content h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .markdown-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 2rem 0 1rem 0;
+        }
+
+        .markdown-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 1.5rem 0 0.75rem 0;
+        }
+
+        .markdown-content h4 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 1rem 0 0.5rem 0;
+        }
+
+        .markdown-content p {
+            margin-bottom: 1rem;
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        .markdown-content li {
+            margin-bottom: 0.25rem;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .markdown-content code {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.125rem 0.25rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .markdown-content pre {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .markdown-content th,
+        .markdown-content td {
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            text-align: left;
+        }
+
+        .markdown-content th {
+            background-color: var(--surface-color);
+            font-weight: 600;
+        }
+
+        /* Links in markdown content */
+        .markdown-content a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .markdown-content a:hover {
+            color: var(--accent-color);
+            text-decoration: underline;
+        }
+
+        /* Dark theme specific styling for markdown links - Force white color */
+        [data-theme="dark"] .markdown-content a {
+            color: #ffffff !important;
+            text-decoration: none !important;
+        }
+
+        [data-theme="dark"] .markdown-content a:hover {
+            color: var(--primary-color) !important;
+            text-decoration: underline !important;
+        }
+
+        [data-theme="dark"] .markdown-content a:visited {
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .markdown-content a:link {
+            color: #ffffff !important;
+        }
+
+        /* Force white color for all link states in dark theme with maximum specificity */
+        html[data-theme="dark"] .markdown-content a,
+        html[data-theme="dark"] .markdown-content a:link,
+        html[data-theme="dark"] .markdown-content a:visited,
+        html[data-theme="dark"] .document-content a,
+        html[data-theme="dark"] .document-content a:link,
+        html[data-theme="dark"] .document-content a:visited {
+            color: #ffffff !important;
+            text-decoration: none !important;
+        }
+
+        html[data-theme="dark"] .markdown-content a:hover,
+        html[data-theme="dark"] .document-content a:hover {
+            color: var(--primary-color) !important;
+            text-decoration: underline !important;
+        }
+
+        /* Additional specificity for ordered and unordered list links */
+        html[data-theme="dark"] .markdown-content ol a,
+        html[data-theme="dark"] .markdown-content ul a,
+        html[data-theme="dark"] .document-content ol a,
+        html[data-theme="dark"] .document-content ul a {
+            color: #ffffff !important;
+            text-decoration: none !important;
+        }
+
+        html[data-theme="dark"] .markdown-content ol a:hover,
+        html[data-theme="dark"] .markdown-content ul a:hover,
+        html[data-theme="dark"] .document-content ol a:hover,
+        html[data-theme="dark"] .document-content ul a:hover {
+            color: var(--primary-color) !important;
+            text-decoration: underline !important;
+        }
+
+        /* Ultra-specific targeting for the problematic blue links */
+        html[data-theme="dark"] body .markdown-content ol li a,
+        html[data-theme="dark"] body .markdown-content ul li a,
+        html[data-theme="dark"] body .document-content ol li a,
+        html[data-theme="dark"] body .document-content ul li a,
+        html[data-theme="dark"] body ol li a,
+        html[data-theme="dark"] body ul li a {
+            color: #ffffff !important;
+            text-decoration: none !important;
+        }
+
+        html[data-theme="dark"] body .markdown-content ol li a:hover,
+        html[data-theme="dark"] body .markdown-content ul li a:hover,
+        html[data-theme="dark"] body .document-content ol li a:hover,
+        html[data-theme="dark"] body .document-content ul li a:hover,
+        html[data-theme="dark"] body ol li a:hover,
+        html[data-theme="dark"] body ul li a:hover {
+            color: var(--primary-color) !important;
+            text-decoration: underline !important;
+        }
+
+        /* Nuclear option - force all anchor tags in dark theme to be white */
+        html[data-theme="dark"] a:not(.nav-link):not(.btn):not(.toc-button):not(.anchor-link) {
+            color: #ffffff !important;
+        }
+
+        html[data-theme="dark"] a:not(.nav-link):not(.btn):not(.toc-button):not(.anchor-link):hover {
+            color: var(--primary-color) !important;
+            text-decoration: underline !important;
+        }
+
+        /* Mermaid Diagrams */
+        .mermaid {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-muted);
+        }
+
+        /* Error State */
+        .error {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 1rem;
+            color: #dc2626;
+            margin: 1rem 0;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.visible {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+
+            .welcome-section h1 {
+                font-size: 2rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .header,
+            .sidebar {
+                display: none;
+            }
+
+            .main-content {
+                margin-left: 0;
+                margin-top: 0;
+            }
+
+            .markdown-content {
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="sidebar-toggle" class="theme-toggle">☰</button>
+            <h1>Documentation Workflow MediaPipe v4.1 avec Lemonfox</h1>
+        </div>
+        <div class="header-controls">
+            <a href="#" onclick="loadDocument('UPDATE_DOCUMENTATION_SUMMARY')" class="theme-toggle" style="text-decoration: none; color: var(--text-color); background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; cursor: pointer; transition: all 0.2s ease; font-size: 0.875rem;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--surface-color)'">📝 Changelog</a>
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+        </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+        <div class="nav-section">
+            <h3>Vue d'ensemble</h3>
+            <a href="#" class="nav-link active" data-doc="welcome">Accueil</a>
+            <a href="#" class="nav-link" data-doc="ARCHITECTURE_COMPLETE_FR">Architecture Complète</a>
+        </div>
+
+        <div class="nav-section">
+            <h3>Diagrammes d'Architecture</h3>
+            <a href="#architecture-section" class="nav-link">🏗️ Architecture Système</a>
+            <a href="#workflow-section" class="nav-link">🔄 Flux d'Exécution</a>
+        </div>
+
+        <div class="nav-section">
+            <h3>Guides</h3>
+            <a href="#" class="nav-link" data-doc="GUIDE_DEMARRAGE_RAPIDE">Guide de Démarrage</a>
+            <a href="#" class="nav-link" data-doc="REFERENCE_RAPIDE_DEVELOPPEURS">Référence Développeurs</a>
+        </div>
+        
+        <div class="nav-section">
+            <h3>Étapes du Pipeline</h3>
+            <a href="#" class="nav-link" data-doc="STEP1_EXTRACTION">Étape 1: Extraction</a>
+            <a href="#" class="nav-link" data-doc="STEP2_CONVERSION">Étape 2: Conversion</a>
+            <a href="#" class="nav-link" data-doc="STEP3_DETECTION_SCENES">Étape 3: Détection Scènes</a>
+            <a href="#" class="nav-link" data-doc="STEP4_ANALYSE_AUDIO">Étape 4: Analyse Audio</a>
+            <a href="#" class="nav-link" data-doc="STEP4_LEMONFOX_IMPLEMENTATION_STATUS">STEP4 Lemonfox: Statut</a>
+            <a href="#" class="nav-link" data-doc="STEP4_LEMONFOX_AUDIO_PLAN">STEP4 Lemonfox: Plan</a>
+            <a href="#" class="nav-link" data-doc="STEP5_SUIVI_VIDEO">Étape 5: Suivi Vidéo</a>
+            <a href="#" class="nav-link" data-doc="STEP6_REDUCTION_JSON">Étape 6: Réduction JSON</a>
+            <a href="#" class="nav-link" data-doc="STEP7_FINALISATION">Étape 7: Finalisation</a>
+        </div>
+    </nav>
+
+    <!-- Table of Contents - Right Sidebar -->
+    <div class="toc-container hidden" id="toc-container">
+        <div style="padding: 1rem;">
+            <h3 class="toc-title">Table des Matières</h3>
+            <ul class="toc-list" id="toc-list">
+                <!-- TOC items will be generated dynamically -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- TOC Toggle Button for smaller screens -->
+    <button class="toc-toggle" id="toc-toggle" title="Afficher/Masquer la table des matières">
+        📋
+    </button>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+        <div id="content-area">
+            <!-- Welcome content will be loaded here -->
+        </div>
+    </main>
+
+    <script>
+        const app = {
+            currentDoc: 'welcome',
+            theme: localStorage.getItem('theme') || 'light',
+            sidebarVisible: window.innerWidth > 768,
+            pendingAnchorTarget: null // For cross-page anchor navigation
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTheme();
+            initializeNavigation();
+            initializeMermaid();
+            loadWelcomeContent();
+            setupEventListeners();
+        });
+
+        function initializeTheme() {
+            document.documentElement.setAttribute('data-theme', app.theme);
+            updateThemeToggle();
+        }
+
+        function toggleTheme() {
+            app.theme = app.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', app.theme);
+            localStorage.setItem('theme', app.theme);
+            updateThemeToggle();
+
+            initializeMermaid();
+
+            setTimeout(() => {
+                const diagrams = document.querySelectorAll('.mermaid');
+                diagrams.forEach((diagram, index) => {
+                    const originalContent = diagram.getAttribute('data-original-content') || diagram.textContent;
+                    if (!diagram.getAttribute('data-original-content')) {
+                        diagram.setAttribute('data-original-content', originalContent);
+                    }
+
+                    diagram.innerHTML = originalContent;
+                    diagram.removeAttribute('data-processed');
+
+                    mermaid.init(undefined, diagram);
+                });
+
+                if (app.currentDoc === 'welcome' && window.enhancedApp && window.enhancedApp.diagramLightbox) {
+                    setTimeout(() => {
+                        window.enhancedApp.diagramLightbox.setupClickableDiagrams();
+                    }, 200);
+                }
+            }, 150);
+        }
+
+        function updateThemeToggle() {
+            const toggle = document.getElementById('theme-toggle');
+            toggle.textContent = app.theme === 'light' ? '🌙' : '☀️';
+        }
+
+        function initializeNavigation() {
+            const links = document.querySelectorAll('.nav-link');
+            links.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const docName = this.getAttribute('data-doc');
+                    const href = this.getAttribute('href');
+
+                    if (docName) {
+                        e.preventDefault();
+                        loadDocument(docName);
+                        setActiveLink(this);
+                    } else if (href && href.startsWith('#')) {
+                        e.preventDefault(); // Prevent default to handle manually
+                        console.log('Anchor link clicked:', href);
+
+                        const targetId = href.substring(1); // Remove the '#'
+                        const targetElement = document.querySelector(href);
+
+                        console.log('Current page:', app.currentDoc);
+                        console.log('Looking for target:', href);
+                        console.log('Target element found:', !!targetElement);
+
+                        if (targetElement) {
+                            setActiveLink(this);
+                            targetElement.scrollIntoView({ behavior: 'smooth' });
+                        } else {
+                            console.log('Target not found on current page, initiating cross-page navigation');
+                            navigateToHomeWithAnchor(targetId, this);
+                        }
+                    }
+                });
+            });
+        }
+
+        function setActiveLink(activeLink) {
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            activeLink.classList.add('active');
+        }
+
+        function isOnWelcomePage() {
+            return app.currentDoc === 'welcome';
+        }
+
+        function navigateToHomeWithAnchor(targetId, linkElement) {
+            console.log('Navigating to home page with target:', targetId);
+
+            setActiveLink(linkElement);
+
+            if (isOnWelcomePage()) {
+                console.log('Already on welcome page, waiting for target to be available');
+                app.pendingAnchorTarget = targetId;
+
+                const targetElement = document.querySelector(`#${targetId}`);
+                if (targetElement) {
+                    console.log('Target immediately available, scrolling now');
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                    app.pendingAnchorTarget = null;
+                } else {
+                    console.log('Target not yet available, will scroll after content loads');
+                }
+            } else {
+                console.log('Not on welcome page, loading welcome content first');
+                app.pendingAnchorTarget = targetId;
+                loadDocument('welcome');
+
+                setTimeout(() => {
+                    const homeLink = document.querySelector('.nav-link[data-doc="welcome"]');
+                    if (homeLink && !linkElement.hasAttribute('data-doc')) {
+                        setActiveLink(homeLink);
+                        setTimeout(() => setActiveLink(linkElement), 100);
+                    }
+                }, 50);
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+
+            app.sidebarVisible = !app.sidebarVisible;
+
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('visible', app.sidebarVisible);
+            } else {
+                sidebar.classList.toggle('hidden', !app.sidebarVisible);
+                mainContent.classList.toggle('expanded', !app.sidebarVisible);
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+            document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+
+            const tocToggle = document.getElementById('toc-toggle');
+            if (tocToggle) {
+                tocToggle.addEventListener('click', toggleTOC);
+            }
+
+            window.addEventListener('resize', function() {
+                if (window.innerWidth <= 768) {
+                    document.getElementById('sidebar').classList.remove('hidden');
+                    document.getElementById('main-content').classList.remove('expanded');
+                    app.sidebarVisible = false;
+                }
+
+                const tocContainer = document.getElementById('toc-container');
+                const mainContent = document.getElementById('main-content');
+                if (tocContainer && mainContent) {
+                    if (window.innerWidth <= 1200) {
+                        mainContent.classList.remove('with-toc');
+                    } else if (!tocContainer.classList.contains('hidden')) {
+                        mainContent.classList.add('with-toc');
+                    }
+                }
+            });
+        }
+
+        function initializeMermaid() {
+            const isDark = app.theme === 'dark';
+            mermaid.initialize({
+                startOnLoad: true,
+                theme: isDark ? 'base' : 'base', // Use base theme for better control
+                securityLevel: 'loose',
+                fontFamily: 'inherit',
+                themeVariables: {
+                    primaryColor: isDark ? '#1e293b' : '#ffffff',
+                    primaryTextColor: isDark ? '#ffffff' : '#1e293b',
+                    primaryBorderColor: isDark ? '#60a5fa' : '#2563eb',
+                    lineColor: isDark ? '#94a3b8' : '#64748b',
+                    secondaryColor: isDark ? '#334155' : '#f8fafc',
+                    tertiaryColor: isDark ? '#475569' : '#e2e8f0',
+                    background: isDark ? '#0f172a' : '#ffffff',
+                    mainBkg: isDark ? '#1e293b' : '#ffffff',
+                    secondBkg: isDark ? '#334155' : '#f8fafc',
+                    tertiaryBkg: isDark ? '#475569' : '#e2e8f0',
+                    textColor: isDark ? '#ffffff' : '#1e293b',
+                    darkTextColor: isDark ? '#ffffff' : '#1e293b',
+                    nodeBkg: isDark ? '#1e293b' : '#ffffff',
+                    nodeBorder: isDark ? '#60a5fa' : '#2563eb',
+                    clusterBkg: isDark ? '#334155' : '#f8fafc',
+                    clusterBorder: isDark ? '#60a5fa' : '#2563eb',
+                    edgeLabelBackground: isDark ? '#1e293b' : '#ffffff'
+                },
+                flowchart: {
+                    nodeSpacing: 50,
+                    rankSpacing: 80,
+                    curve: 'basis'
+                },
+                sequence: {
+                    actorMargin: 50,
+                    width: 150,
+                    height: 65,
+                    boxMargin: 10,
+                    boxTextMargin: 5,
+                    noteMargin: 10,
+                    messageMargin: 35
+                }
+            });
+        }
+
+        function loadWelcomeContent() {
+            const contentArea = document.getElementById('content-area');
+            contentArea.innerHTML = `
+                <div class="welcome-section">
+                    <h1>Documentation Workflow MediaPipe v4.1 avec Lemonfox</h1>
+                    <p>Système de traitement vidéo automatisé en 7 étapes avec architecture orientée services</p>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h3>🏗️ Architecture Modulaire</h3>
+                            <p>5 services centralisés, routes Blueprint Flask, et frontend optimisé avec état centralisé</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🎬 Pipeline Complet</h3>
+                            <p>7 étapes automatisées : extraction, conversion, détection scènes, analyse audio, tracking, réduction JSON, finalisation</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🍋 Analyse Audio Lemonfox</h3>
+                            <p>Alternative cloud à Pyannote avec API Speech-to-Text, diarisation et fallback automatique</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>⚡ Performances Optimisées</h3>
+                            <p>GPU/CPU adaptatif, multiprocessing, environnements virtuels spécialisés</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🔒 Sécurité Renforcée</h3>
+                            <p>Sanitisation des fichiers, protection path traversal, validation d'intégrité</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>📊 Monitoring Avancé</h3>
+                            <p>Logs structurés, métriques temps réel, surveillance des ressources système</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🧪 Tests Complets</h3>
+                            <p>Tests unitaires, intégration, validation automatique, scripts de debugging</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>📦 Provenance des Données</h3>
+                            <p>Badges de provenance (Projet vs Archives) dans les rapports, avec date d’archivage</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>📑 Rapports Visuels</h3>
+                            <p>Génération de rapports HTML (PDF retiré) avec statistiques agrégées et template Jinja2</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Links Section -->
+                    <div style="margin-top: 3rem; padding: 2rem; background-color: var(--surface-color); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h2 style="color: var(--primary-color); margin-bottom: 1rem; text-align: center;">🚀 Par où commencer ?</h2>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                            <a href="#" onclick="loadDocument('ARCHITECTURE_COMPLETE_FR')" style="display: block; padding: 1rem; background: var(--primary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--accent-color)'" onmouseout="this.style.background='var(--primary-color)'">
+                                🏗️ Architecture Complète
+                            </a>
+                            <a href="#" onclick="loadDocument('SMART_UPLOAD_FEATURE')" style="display: block; padding: 1rem; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--secondary-color)'">
+                                📤 Smart Upload
+                            </a>
+                            <a href="#" onclick="loadDocument('SYSTEM_MONITORING_ENHANCEMENTS')" style="display: block; padding: 1rem; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--secondary-color)'">
+                                📊 Monitoring Système
+                            </a>
+                            <a href="#" onclick="loadDocument('STEP4_LEMONFOX_IMPLEMENTATION_STATUS')" style="display: block; padding: 1rem; background: var(--accent-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--primary-color)'" onmouseout="this.style.background='var(--accent-color)'">
+                                🍋 Documentation Lemonfox
+                            </a>
+                            <a href="#" onclick="loadDocument('TESTING_STRATEGY')" style="display: block; padding: 1rem; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--secondary-color)'">
+                                🧪 Stratégie de Tests
+                            </a>
+                            <a href="#" onclick="loadDocument('REFERENCE_RAPIDE_DEVELOPPEURS')" style="display: block; padding: 1rem; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--secondary-color)'">
+                                👨‍💻 Référence Développeurs
+                            </a>
+                            <a href="#" onclick="loadDocument('RESULTS_ARCHIVER_SERVICE')" style="display: block; padding: 1rem; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--secondary-color)'">
+                                📦 Service d'Archivage
+                            </a>
+                            <a href="#" onclick="loadDocument('REPORT_GENERATION_FEATURE')" style="display: block; padding: 1rem; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: all 0.2s ease;" onmouseover="this.style.background='var(--text-muted)'" onmouseout="this.style.background='var(--secondary-color)'">
+                                📑 Génération de Rapports
+                            </a>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 3rem; padding: 2rem; background-color: var(--surface-color); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h2 style="color: var(--primary-color); margin-bottom: 1rem;">Diagrammes d'Architecture</h2>
+                        <p style="color: var(--text-muted); margin-bottom: 2rem; text-align: center;">
+                            Explorez l'architecture complète du système avec nos diagrammes interactifs détaillés
+                        </p>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem;">
+                            <div id="architecture-section" class="diagram-container" style="text-align: center;">
+                                <h3>🏗️ Architecture Complète du Système</h3>
+                                <p>Vue d'ensemble de tous les composants et leurs interactions</p>
+                                <img src="assets/images/architecture-complete-interactive.png"
+                                     alt="Architecture Complète du Système de Workflow MediaPipe v4.1"
+                                     class="clickable-diagram-image architecture-diagram"
+                                     style="max-width: 100%; height: auto; margin-bottom: 1rem;" />
+                                <a href="diagrammes.html#architecture"
+                                   style="display: inline-block; background: var(--primary-color); color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: all 0.2s ease; margin-bottom: 0.5rem;"
+                                   onmouseover="this.style.background='var(--accent-color)'"
+                                   onmouseout="this.style.background='var(--primary-color)'">
+                                   📖 Diagramme Interactif
+                                </a>
+                                <br>
+                                <a href="architecture-systeme/index.html"
+                                   style="display: inline-block; background: var(--secondary-color); color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: all 0.2s ease;"
+                                   onmouseover="this.style.background='var(--text-muted)'"
+                                   onmouseout="this.style.background='var(--secondary-color)'">
+                                   📚 Documentation Détaillée
+                                </a>
+                            </div>
+
+                            <div id="workflow-section" class="diagram-container" style="text-align: center;">
+                                <h3>🔄 Flux d'Exécution d'un Workflow Complet</h3>
+                                <p>Processus étape par étape avec gestion d'erreurs et monitoring</p>
+                                <img src="assets/images/workflow-execution-interactive.png"
+                                     alt="Flux d'Exécution d'un Workflow Complet MediaPipe v4.1"
+                                     class="clickable-diagram-image workflow-execution-diagram"
+                                     style="max-width: 100%; height: auto; margin-bottom: 1rem;" />
+                                <a href="diagrammes.html#workflow"
+                                   style="display: inline-block; background: var(--primary-color); color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: all 0.2s ease; margin-bottom: 0.5rem;"
+                                   onmouseover="this.style.background='var(--accent-color)'"
+                                   onmouseout="this.style.background='var(--primary-color)'">
+                                   📖 Diagramme Interactif
+                                </a>
+                                <br>
+                                <a href="flux-execution/index.html"
+                                   style="display: inline-block; background: var(--secondary-color); color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 500; transition: all 0.2s ease;"
+                                   onmouseover="this.style.background='var(--text-muted)'"
+                                   onmouseout="this.style.background='var(--secondary-color)'">
+                                   📚 Documentation Détaillée
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    </div>
+                </div>
+            `;
+
+            
+            setTimeout(() => {
+                console.log('Attempting to setup clickable diagrams (100ms)...');
+                if (window.enhancedApp && window.enhancedApp.diagramLightbox) {
+                    window.enhancedApp.diagramLightbox.setupClickableDiagrams();
+                }
+            }, 100);
+
+            setTimeout(() => {
+                console.log('Attempting to setup clickable diagrams (500ms)...');
+                if (window.enhancedApp && window.enhancedApp.diagramLightbox) {
+                    window.enhancedApp.diagramLightbox.setupClickableDiagrams();
+                }
+            }, 500);
+
+            setTimeout(() => {
+                console.log('Attempting to setup clickable diagrams (1000ms)...');
+                if (window.enhancedApp && window.enhancedApp.diagramLightbox) {
+                    window.enhancedApp.diagramLightbox.setupClickableDiagrams();
+                }
+            }, 1000);
+
+            
+            if (app.pendingAnchorTarget) {
+                console.log('Processing pending anchor target:', app.pendingAnchorTarget);
+                const targetId = app.pendingAnchorTarget;
+
+                setTimeout(() => {
+                    const targetElement = document.querySelector(`#${targetId}`);
+                    if (targetElement) {
+                        console.log('Scrolling to pending target:', targetElement);
+                        targetElement.scrollIntoView({ behavior: 'smooth' });
+                        app.pendingAnchorTarget = null;
+                    } else {
+                        console.warn('Pending anchor target not found:', targetId);
+                    }
+                }, 300); // Slightly longer delay to ensure all content is rendered
+            }
+        }
+
+        async function loadDocument(docName) {
+            const contentArea = document.getElementById('content-area');
+
+            if (docName === 'welcome') {
+                loadWelcomeContent();
+                app.currentDoc = 'welcome';
+                updateBreadcrumb('Accueil');
+
+                
+                const tocContainer = document.getElementById('toc-container');
+                const mainContent = document.getElementById('main-content');
+                if (tocContainer) {
+                    tocContainer.classList.add('hidden');
+                    mainContent.classList.remove('with-toc');
+                }
+
+                return;
+            }
+
+            
+            contentArea.innerHTML = '<div class="loading">Chargement du document...</div>';
+
+            try {
+                const response = await fetch(`${docName}.md`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const markdown = await response.text();
+                const html = marked.parse(markdown);
+
+                contentArea.innerHTML = `
+                    <div class="document-content">
+                        <div class="breadcrumb">
+                            <a href="#" onclick="loadDocument('welcome')">Accueil</a>
+                            <span>›</span>
+                            <span>${getDocumentTitle(docName)}</span>
+                        </div>
+                        <div class="markdown-content">${html}</div>
+                    </div>
+                `;
+
+                app.currentDoc = docName;
+
+                
+                Prism.highlightAll();
+
+                
+                mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+
+                
+                setTimeout(() => {
+                    generateTOC();
+                }, 100);
+
+                
+                window.scrollTo(0, 0);
+
+            } catch (error) {
+                contentArea.innerHTML = `
+                    <div class="error">
+                        <h3>Erreur de chargement</h3>
+                        <p>Impossible de charger le document "${docName}.md"</p>
+                        <p>Erreur: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function getDocumentTitle(docName) {
+            const titles = {
+                'ARCHITECTURE_COMPLETE_FR': 'Architecture Complète',
+                'GUIDE_DEMARRAGE_RAPIDE': 'Guide de Démarrage',
+                'REFERENCE_RAPIDE_DEVELOPPEURS': 'Référence Développeurs',
+                'STEP1_EXTRACTION': 'Étape 1: Extraction',
+                'STEP2_CONVERSION': 'Étape 2: Conversion',
+                'STEP3_DETECTION_SCENES': 'Étape 3: Détection Scènes',
+                'STEP4_ANALYSE_AUDIO': 'Étape 4: Analyse Audio',
+                'STEP5_SUIVI_VIDEO': 'Étape 5: Suivi Vidéo',
+                'STEP6_REDUCTION_JSON': 'Étape 6: Réduction JSON',
+                'STEP7_FINALISATION': 'Étape 7: Finalisation'
+            };
+            return titles[docName] || docName;
+        }
+
+        function updateBreadcrumb(title) {
+            
+        }
+
+        
+        function generateTOC() {
+            const tocContainer = document.getElementById('toc-container');
+            const tocList = document.getElementById('toc-list');
+            const mainContent = document.getElementById('main-content');
+
+            if (!tocContainer || !tocList) return;
+
+            
+            tocList.innerHTML = '';
+
+            
+            const markdownContent = document.querySelector('.markdown-content');
+            if (!markdownContent) {
+                
+                tocContainer.classList.add('hidden');
+                mainContent.classList.remove('with-toc');
+                return;
+            }
+
+            const headings = markdownContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
+
+            if (headings.length === 0) {
+                
+                tocContainer.classList.add('hidden');
+                mainContent.classList.remove('with-toc');
+                return;
+            }
+
+            
+            headings.forEach((heading, index) => {
+                const level = parseInt(heading.tagName.charAt(1));
+                const text = heading.textContent.trim();
+                const id = heading.id || `heading-${index}`;
+
+                
+                if (!heading.id) {
+                    heading.id = id;
+                }
+
+                
+                const tocItem = document.createElement('li');
+                tocItem.className = `toc-item level-${level}`;
+
+                const tocButton = document.createElement('button');
+                tocButton.className = 'toc-button';
+                tocButton.textContent = text;
+                tocButton.setAttribute('data-target', id);
+
+                
+                tocButton.addEventListener('click', function() {
+                    const targetElement = document.getElementById(id);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+
+                        
+                        updateTOCActiveState(tocButton);
+                    }
+                });
+
+                tocItem.appendChild(tocButton);
+                tocList.appendChild(tocItem);
+            });
+
+            
+            tocContainer.classList.remove('hidden');
+            if (window.innerWidth > 1200) {
+                mainContent.classList.add('with-toc');
+            }
+
+            
+            setupScrollSpy();
+        }
+
+        function updateTOCActiveState(activeButton) {
+            
+            document.querySelectorAll('.toc-button').forEach(button => {
+                button.classList.remove('active');
+            });
+
+            
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+        }
+
+        function setupScrollSpy() {
+            const headings = document.querySelectorAll('.markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6');
+            const tocButtons = document.querySelectorAll('.toc-button');
+
+            if (headings.length === 0 || tocButtons.length === 0) return;
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id;
+                        const correspondingButton = document.querySelector(`[data-target="${id}"]`);
+                        if (correspondingButton) {
+                            updateTOCActiveState(correspondingButton);
+                        }
+                    }
+                });
+            }, {
+                rootMargin: '-20% 0px -70% 0px',
+                threshold: 0
+            });
+
+            headings.forEach(heading => {
+                observer.observe(heading);
+            });
+        }
+
+        function toggleTOC() {
+            const tocContainer = document.getElementById('toc-container');
+            const mainContent = document.getElementById('main-content');
+
+            if (tocContainer) {
+                tocContainer.classList.toggle('visible');
+
+                
+                if (window.innerWidth <= 1200) {
+                    return;
+                }
+
+                if (tocContainer.classList.contains('hidden')) {
+                    mainContent.classList.remove('with-toc');
+                } else {
+                    mainContent.classList.add('with-toc');
+                }
+            }
+        }
+    </script>
+
+    <!-- Enhanced functionality -->
+    <script src="assets/app.js"></script>
+</body>
+</html>

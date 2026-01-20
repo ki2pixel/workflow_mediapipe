@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/39 Camille/docs/M6 - SDM - Leslie et Léo s'inscrivent au casting de Pékin Express.mp4",
+  "video_stem": "M6 - SDM - Leslie et Léo s'inscrivent au casting de Pékin Express",
+  "video_hash": "c0b4f394f7aa1080ebe67733c057e7f38070c131860c98351f67c1e992061e1d",
+  "created_at": "2025-11-05T14:46:53.677130+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-11-05_14-46-53/c0b4f394f7aa1080ebe67733c057e7f38070c131860c98351f67c1e992061e1d/M6 - SDM - Leslie et Léo s'inscrivent au casting de Pékin Express_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-11-05_14-46-53/c0b4f394f7aa1080ebe67733c057e7f38070c131860c98351f67c1e992061e1d/M6 - SDM - Leslie et Léo s'inscrivent au casting de Pékin Express_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-11-05_14-46-53/c0b4f394f7aa1080ebe67733c057e7f38070c131860c98351f67c1e992061e1d/M6 - SDM - Leslie et Léo s'inscrivent au casting de Pékin Express_tracking.json"
+  }
+}

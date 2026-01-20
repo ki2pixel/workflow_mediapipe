@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/26 Camille/docs/Extrait post-diff – L’élimination a un gout amer pour Laura.mp4",
+  "video_stem": "Extrait post-diff – L’élimination a un gout amer pour Laura",
+  "video_hash": "f4196863de3145c58895f658176612022c192c56659ba4d7a144336fa36d32a0",
+  "created_at": "2025-11-04T11:32:50.346249+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/f4196863de3145c58895f658176612022c192c56659ba4d7a144336fa36d32a0/Extrait post-diff – L’élimination a un gout amer pour Laura_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/f4196863de3145c58895f658176612022c192c56659ba4d7a144336fa36d32a0/Extrait post-diff – L’élimination a un gout amer pour Laura_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/f4196863de3145c58895f658176612022c192c56659ba4d7a144336fa36d32a0/Extrait post-diff – L’élimination a un gout amer pour Laura_tracking.json"
+  }
+}

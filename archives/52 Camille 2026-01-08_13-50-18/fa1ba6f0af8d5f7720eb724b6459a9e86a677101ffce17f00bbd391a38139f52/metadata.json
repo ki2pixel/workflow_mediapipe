@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/52 Camille/docs/PP - LE SOLITAIRE - Jean-Paul Belmondo et Michel Beaune.mp4",
+  "video_stem": "PP - LE SOLITAIRE - Jean-Paul Belmondo et Michel Beaune",
+  "video_hash": "fa1ba6f0af8d5f7720eb724b6459a9e86a677101ffce17f00bbd391a38139f52",
+  "created_at": "2026-01-08T13:50:18.856710+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/52 Camille 2026-01-08_13-50-18/fa1ba6f0af8d5f7720eb724b6459a9e86a677101ffce17f00bbd391a38139f52/PP - LE SOLITAIRE - Jean-Paul Belmondo et Michel Beaune_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/52 Camille 2026-01-08_13-50-18/fa1ba6f0af8d5f7720eb724b6459a9e86a677101ffce17f00bbd391a38139f52/PP - LE SOLITAIRE - Jean-Paul Belmondo et Michel Beaune_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/52 Camille 2026-01-08_13-50-18/fa1ba6f0af8d5f7720eb724b6459a9e86a677101ffce17f00bbd391a38139f52/PP - LE SOLITAIRE - Jean-Paul Belmondo et Michel Beaune_tracking.json"
+  }
+}

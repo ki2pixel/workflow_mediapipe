@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/59 Camille/docs/CABANE_TAT_M6.mp4",
+  "video_stem": "CABANE_TAT_M6",
+  "video_hash": "3dc8ad9059376874fc1f8e3a9e70cb952565e4a7fcbf763816d5cfd498b8fd9b",
+  "created_at": "2025-12-05T16:55:32.668218+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/59 Camille 2025-12-05_16-55-32/3dc8ad9059376874fc1f8e3a9e70cb952565e4a7fcbf763816d5cfd498b8fd9b/CABANE_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/59 Camille 2025-12-05_16-55-32/3dc8ad9059376874fc1f8e3a9e70cb952565e4a7fcbf763816d5cfd498b8fd9b/CABANE_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/59 Camille 2025-12-05_16-55-32/3dc8ad9059376874fc1f8e3a9e70cb952565e4a7fcbf763816d5cfd498b8fd9b/CABANE_TAT_M6_tracking.json"
+  }
+}

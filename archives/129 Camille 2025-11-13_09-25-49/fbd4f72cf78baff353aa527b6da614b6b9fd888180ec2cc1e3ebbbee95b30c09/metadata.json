@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/129 Camille/docs/6TER_En famille_baisser la garde - M.mp4",
+  "video_stem": "6TER_En famille_baisser la garde - M",
+  "video_hash": "fbd4f72cf78baff353aa527b6da614b6b9fd888180ec2cc1e3ebbbee95b30c09",
+  "created_at": "2025-11-13T09:25:49.928288+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/fbd4f72cf78baff353aa527b6da614b6b9fd888180ec2cc1e3ebbbee95b30c09/6TER_En famille_baisser la garde - M_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/fbd4f72cf78baff353aa527b6da614b6b9fd888180ec2cc1e3ebbbee95b30c09/6TER_En famille_baisser la garde - M_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/fbd4f72cf78baff353aa527b6da614b6b9fd888180ec2cc1e3ebbbee95b30c09/6TER_En famille_baisser la garde - M_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/73 Camille/docs/EDUCATION NON GENREE_TAT_M6.mp4",
+  "video_stem": "EDUCATION NON GENREE_TAT_M6",
+  "video_hash": "de3ce77d836c2948771540452f12f4ea5f4a8b054712b1e05f49337272f05a31",
+  "created_at": "2025-12-08T14:48:02.323497+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/73 Camille 2025-12-08_14-48-02/de3ce77d836c2948771540452f12f4ea5f4a8b054712b1e05f49337272f05a31/EDUCATION NON GENREE_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/73 Camille 2025-12-08_14-48-02/de3ce77d836c2948771540452f12f4ea5f4a8b054712b1e05f49337272f05a31/EDUCATION NON GENREE_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/73 Camille 2025-12-08_14-48-02/de3ce77d836c2948771540452f12f4ea5f4a8b054712b1e05f49337272f05a31/EDUCATION NON GENREE_TAT_M6_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/180 Camille/docs/Gulli - Ma Super Ligue 1 - PSG et Paris FC, deux équipes pour une même ville_TAT_Gulli.mp4",
+  "video_stem": "Gulli - Ma Super Ligue 1 - PSG et Paris FC, deux équipes pour une même ville_TAT_Gulli",
+  "video_hash": "09a164c6384e45f983a33ff72f5b8585211b3bb6859dc18da0ec9908b6e526f7",
+  "created_at": "2025-10-17T09:41:11.046680+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/09a164c6384e45f983a33ff72f5b8585211b3bb6859dc18da0ec9908b6e526f7/Gulli - Ma Super Ligue 1 - PSG et Paris FC, deux équipes pour une même ville_TAT_Gulli_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/09a164c6384e45f983a33ff72f5b8585211b3bb6859dc18da0ec9908b6e526f7/Gulli - Ma Super Ligue 1 - PSG et Paris FC, deux équipes pour une même ville_TAT_Gulli_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/180 Camille 2025-10-17_09-41-10/09a164c6384e45f983a33ff72f5b8585211b3bb6859dc18da0ec9908b6e526f7/Gulli - Ma Super Ligue 1 - PSG et Paris FC, deux équipes pour une même ville_TAT_Gulli_tracking.json"
+  }
+}

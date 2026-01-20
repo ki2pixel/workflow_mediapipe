@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/67 Camille/docs/ROBOT TUEUR.mp4",
+  "video_stem": "ROBOT TUEUR",
+  "video_hash": "6fca2a9bffb3a6ae2a61d7849e8ebd9b71a8413210e7290bdbda3fbe85625de4",
+  "created_at": "2025-11-07T18:44:33.935455+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/6fca2a9bffb3a6ae2a61d7849e8ebd9b71a8413210e7290bdbda3fbe85625de4/ROBOT TUEUR_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/6fca2a9bffb3a6ae2a61d7849e8ebd9b71a8413210e7290bdbda3fbe85625de4/ROBOT TUEUR_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/6fca2a9bffb3a6ae2a61d7849e8ebd9b71a8413210e7290bdbda3fbe85625de4/ROBOT TUEUR_tracking.json"
+  }
+}

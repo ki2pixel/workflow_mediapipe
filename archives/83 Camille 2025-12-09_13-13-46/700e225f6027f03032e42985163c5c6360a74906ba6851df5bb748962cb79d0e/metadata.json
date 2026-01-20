@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/83 Camille/docs/FOIE GRAS_TAT_M6.mp4",
+  "video_stem": "FOIE GRAS_TAT_M6",
+  "video_hash": "700e225f6027f03032e42985163c5c6360a74906ba6851df5bb748962cb79d0e",
+  "created_at": "2025-12-09T13:13:46.684067+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/83 Camille 2025-12-09_13-13-46/700e225f6027f03032e42985163c5c6360a74906ba6851df5bb748962cb79d0e/FOIE GRAS_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/83 Camille 2025-12-09_13-13-46/700e225f6027f03032e42985163c5c6360a74906ba6851df5bb748962cb79d0e/FOIE GRAS_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/83 Camille 2025-12-09_13-13-46/700e225f6027f03032e42985163c5c6360a74906ba6851df5bb748962cb79d0e/FOIE GRAS_TAT_M6_tracking.json"
+  }
+}

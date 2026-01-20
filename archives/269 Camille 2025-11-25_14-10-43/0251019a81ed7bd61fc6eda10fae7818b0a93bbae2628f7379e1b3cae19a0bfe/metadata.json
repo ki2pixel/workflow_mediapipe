@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/269 Camille/docs/Surnom Nessy.mp4",
+  "video_stem": "Surnom Nessy",
+  "video_hash": "0251019a81ed7bd61fc6eda10fae7818b0a93bbae2628f7379e1b3cae19a0bfe",
+  "created_at": "2025-11-25T14:10:43.291303+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/269 Camille 2025-11-25_14-10-43/0251019a81ed7bd61fc6eda10fae7818b0a93bbae2628f7379e1b3cae19a0bfe/Surnom Nessy_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/269 Camille 2025-11-25_14-10-43/0251019a81ed7bd61fc6eda10fae7818b0a93bbae2628f7379e1b3cae19a0bfe/Surnom Nessy_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/269 Camille 2025-11-25_14-10-43/0251019a81ed7bd61fc6eda10fae7818b0a93bbae2628f7379e1b3cae19a0bfe/Surnom Nessy_tracking.json"
+  }
+}

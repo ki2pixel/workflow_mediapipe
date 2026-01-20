@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/31 Camille/docs/Alix apprend que Benji revoyait son ex pendant leur relation !.mp4",
+  "video_stem": "Alix apprend que Benji revoyait son ex pendant leur relation !",
+  "video_hash": "30f60acbdedc2bc5402283bbefda6ac2edbd8f4a2aea4fe8432a3a664e9d9105",
+  "created_at": "2025-11-04T21:00:15.334540+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2025-11-04_21-00-14/30f60acbdedc2bc5402283bbefda6ac2edbd8f4a2aea4fe8432a3a664e9d9105/Alix apprend que Benji revoyait son ex pendant leur relation !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2025-11-04_21-00-14/30f60acbdedc2bc5402283bbefda6ac2edbd8f4a2aea4fe8432a3a664e9d9105/Alix apprend que Benji revoyait son ex pendant leur relation !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/31 Camille 2025-11-04_21-00-14/30f60acbdedc2bc5402283bbefda6ac2edbd8f4a2aea4fe8432a3a664e9d9105/Alix apprend que Benji revoyait son ex pendant leur relation !_tracking.json"
+  }
+}

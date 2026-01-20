@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/124 Camille/docs/66M - REGLES CHAMBRE A PART.mp4",
+  "video_stem": "66M - REGLES CHAMBRE A PART",
+  "video_hash": "8035c04b75e9fda160d0f90ee0dec35368cfa1d3da343821e9d60fbf40e33ddb",
+  "created_at": "2025-10-11T12:55:32.689809+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2025-10-11_12-55-32/8035c04b75e9fda160d0f90ee0dec35368cfa1d3da343821e9d60fbf40e33ddb/66M - REGLES CHAMBRE A PART_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2025-10-11_12-55-32/8035c04b75e9fda160d0f90ee0dec35368cfa1d3da343821e9d60fbf40e33ddb/66M - REGLES CHAMBRE A PART_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/124 Camille 2025-10-11_12-55-32/8035c04b75e9fda160d0f90ee0dec35368cfa1d3da343821e9d60fbf40e33ddb/66M - REGLES CHAMBRE A PART_tracking.json"
+  }
+}

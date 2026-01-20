@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/103 Camille/docs/M6 - E=M6 - Extrait Emission 5 - Nos astuces naturelles pour chasser les mauvaises odeurs de chez vous.mp4",
+  "video_stem": "M6 - E=M6 - Extrait Emission 5 - Nos astuces naturelles pour chasser les mauvaises odeurs de chez vous",
+  "video_hash": "75802c3a6e391b1d058ba8ddcecb839713f3a6a31125a3c5485a75b166b447a1",
+  "created_at": "2025-10-09T14:23:03.740952+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2025-10-09_14-23-03/75802c3a6e391b1d058ba8ddcecb839713f3a6a31125a3c5485a75b166b447a1/M6 - E=M6 - Extrait Emission 5 - Nos astuces naturelles pour chasser les mauvaises odeurs de chez vous_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2025-10-09_14-23-03/75802c3a6e391b1d058ba8ddcecb839713f3a6a31125a3c5485a75b166b447a1/M6 - E=M6 - Extrait Emission 5 - Nos astuces naturelles pour chasser les mauvaises odeurs de chez vous_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2025-10-09_14-23-03/75802c3a6e391b1d058ba8ddcecb839713f3a6a31125a3c5485a75b166b447a1/M6 - E=M6 - Extrait Emission 5 - Nos astuces naturelles pour chasser les mauvaises odeurs de chez vous_tracking.json"
+  }
+}

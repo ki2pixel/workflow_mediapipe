@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/151 Camille/Benji et Camille sont inséparables !.mp4",
+  "video_stem": "Benji et Camille sont inséparables !",
+  "video_hash": "5f7bb31c0c1abc5b1d6af62bce85dd1c8382d8cf12a4948c331d3e5dde49d36f",
+  "created_at": "2025-10-14T14:35:57.581973+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/5f7bb31c0c1abc5b1d6af62bce85dd1c8382d8cf12a4948c331d3e5dde49d36f/Benji et Camille sont inséparables !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/5f7bb31c0c1abc5b1d6af62bce85dd1c8382d8cf12a4948c331d3e5dde49d36f/Benji et Camille sont inséparables !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/5f7bb31c0c1abc5b1d6af62bce85dd1c8382d8cf12a4948c331d3e5dde49d36f/Benji et Camille sont inséparables !_tracking.json"
+  }
+}

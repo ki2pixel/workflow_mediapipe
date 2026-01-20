@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/289 Camille/docs/EP3_Kayla chute en pleine épreuve ! .mp4",
+  "video_stem": "EP3_Kayla chute en pleine épreuve ! ",
+  "video_hash": "13b3cc6f14f45c9a27bd00641e97d6eef19988be01d404c529c8b23c6da6f27c",
+  "created_at": "2025-12-30T12:54:28.007126+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/13b3cc6f14f45c9a27bd00641e97d6eef19988be01d404c529c8b23c6da6f27c/EP3_Kayla chute en pleine épreuve ! _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/13b3cc6f14f45c9a27bd00641e97d6eef19988be01d404c529c8b23c6da6f27c/EP3_Kayla chute en pleine épreuve ! _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/13b3cc6f14f45c9a27bd00641e97d6eef19988be01d404c529c8b23c6da6f27c/EP3_Kayla chute en pleine épreuve ! _tracking.json"
+  }
+}

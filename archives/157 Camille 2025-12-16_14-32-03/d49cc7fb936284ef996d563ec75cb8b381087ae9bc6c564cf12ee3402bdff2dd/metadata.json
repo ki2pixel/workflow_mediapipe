@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/157 Camille/docs/UJUD - BUDGET DECOS.mp4",
+  "video_stem": "UJUD - BUDGET DECOS",
+  "video_hash": "d49cc7fb936284ef996d563ec75cb8b381087ae9bc6c564cf12ee3402bdff2dd",
+  "created_at": "2025-12-16T14:32:03.384165+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/d49cc7fb936284ef996d563ec75cb8b381087ae9bc6c564cf12ee3402bdff2dd/UJUD - BUDGET DECOS_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/d49cc7fb936284ef996d563ec75cb8b381087ae9bc6c564cf12ee3402bdff2dd/UJUD - BUDGET DECOS_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/d49cc7fb936284ef996d563ec75cb8b381087ae9bc6c564cf12ee3402bdff2dd/UJUD - BUDGET DECOS_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/185 Camille/docs/Prediff 2.mp4",
+  "video_stem": "Prediff 2",
+  "video_hash": "da6838332b0ee4c349969a3924bedb3eca901cbceab6ed67c1f26adfbd0365f0",
+  "created_at": "2025-11-17T14:44:03.035453+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/185 Camille 2025-11-17_14-44-02/da6838332b0ee4c349969a3924bedb3eca901cbceab6ed67c1f26adfbd0365f0/Prediff 2_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/185 Camille 2025-11-17_14-44-02/da6838332b0ee4c349969a3924bedb3eca901cbceab6ed67c1f26adfbd0365f0/Prediff 2_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/185 Camille 2025-11-17_14-44-02/da6838332b0ee4c349969a3924bedb3eca901cbceab6ed67c1f26adfbd0365f0/Prediff 2_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/237 Camille/docs/Extrait post-diff – Thomas est éliminé à la 3e phase du jeu .mp4",
+  "video_stem": "Extrait post-diff – Thomas est éliminé à la 3e phase du jeu ",
+  "video_hash": "cbdd47cee19ecf2e31c8ad9dd2318b0d6e757e77858b66db7c3cc575af356589",
+  "created_at": "2025-10-23T10:59:50.966764+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/cbdd47cee19ecf2e31c8ad9dd2318b0d6e757e77858b66db7c3cc575af356589/Extrait post-diff – Thomas est éliminé à la 3e phase du jeu _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/cbdd47cee19ecf2e31c8ad9dd2318b0d6e757e77858b66db7c3cc575af356589/Extrait post-diff – Thomas est éliminé à la 3e phase du jeu _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/cbdd47cee19ecf2e31c8ad9dd2318b0d6e757e77858b66db7c3cc575af356589/Extrait post-diff – Thomas est éliminé à la 3e phase du jeu _tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/169 Camille/docs/M6 - LRDLF - Extrait Post diff Ep157 - Une candidate chante le jingle de la mini-roue.mp4",
+  "video_stem": "M6 - LRDLF - Extrait Post diff Ep157 - Une candidate chante le jingle de la mini-roue",
+  "video_hash": "157275b75caffc37e2443dadba25a23dff6cfd7d8c9f8d4af66459b3d13019b3",
+  "created_at": "2025-10-16T08:35:06.321839+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/169 Camille 2025-10-16_08-35-06/157275b75caffc37e2443dadba25a23dff6cfd7d8c9f8d4af66459b3d13019b3/M6 - LRDLF - Extrait Post diff Ep157 - Une candidate chante le jingle de la mini-roue_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/169 Camille 2025-10-16_08-35-06/157275b75caffc37e2443dadba25a23dff6cfd7d8c9f8d4af66459b3d13019b3/M6 - LRDLF - Extrait Post diff Ep157 - Une candidate chante le jingle de la mini-roue_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/169 Camille 2025-10-16_08-35-06/157275b75caffc37e2443dadba25a23dff6cfd7d8c9f8d4af66459b3d13019b3/M6 - LRDLF - Extrait Post diff Ep157 - Une candidate chante le jingle de la mini-roue_tracking.json"
+  }
+}

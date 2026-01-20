@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/167 Camille/docs/CLIENT_TAT_M6.mp4",
+  "video_stem": "CLIENT_TAT_M6",
+  "video_hash": "2cddd028879ebcd72f7e9cad6c0550fb05eb30cb4de2dacf6b790b7420053e1a",
+  "created_at": "2025-11-17T09:17:07.582607+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/167 Camille 2025-11-17_09-17-07/2cddd028879ebcd72f7e9cad6c0550fb05eb30cb4de2dacf6b790b7420053e1a/CLIENT_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/167 Camille 2025-11-17_09-17-07/2cddd028879ebcd72f7e9cad6c0550fb05eb30cb4de2dacf6b790b7420053e1a/CLIENT_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/167 Camille 2025-11-17_09-17-07/2cddd028879ebcd72f7e9cad6c0550fb05eb30cb4de2dacf6b790b7420053e1a/CLIENT_TAT_M6_tracking.json"
+  }
+}

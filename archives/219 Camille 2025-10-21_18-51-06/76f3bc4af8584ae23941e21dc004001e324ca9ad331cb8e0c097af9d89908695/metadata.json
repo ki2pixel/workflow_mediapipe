@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/219 Camille/docs/PP - LRDP - Régis Mailhot.mp4",
+  "video_stem": "PP - LRDP - Régis Mailhot",
+  "video_hash": "76f3bc4af8584ae23941e21dc004001e324ca9ad331cb8e0c097af9d89908695",
+  "created_at": "2025-10-21T18:51:06.513660+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/219 Camille 2025-10-21_18-51-06/76f3bc4af8584ae23941e21dc004001e324ca9ad331cb8e0c097af9d89908695/PP - LRDP - Régis Mailhot_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/219 Camille 2025-10-21_18-51-06/76f3bc4af8584ae23941e21dc004001e324ca9ad331cb8e0c097af9d89908695/PP - LRDP - Régis Mailhot_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/219 Camille 2025-10-21_18-51-06/76f3bc4af8584ae23941e21dc004001e324ca9ad331cb8e0c097af9d89908695/PP - LRDP - Régis Mailhot_tracking.json"
+  }
+}

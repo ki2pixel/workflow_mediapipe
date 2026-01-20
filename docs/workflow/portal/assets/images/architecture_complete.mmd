@@ -1,0 +1,149 @@
+graph TB
+    subgraph "Frontend Layer"
+        UI[Interface Utilisateur Web]
+        
+        subgraph "State Management"
+            AS[AppState.js<br/>État Centralisé]
+        end
+        
+        subgraph "Performance Utils"
+            DB[DOMBatcher.js<br/>Optimisation DOM]
+            PO[PerformanceOptimizer.js<br/>Debouncing/Throttling]
+            PM[PollingManager.js<br/>Gestion Polling]
+            EH[ErrorHandler.js<br/>Gestion Erreurs]
+        end
+        
+        subgraph "CSS Architecture"
+            CSS[CSS Modulaire<br/>variables.css<br/>components/*.css]
+        end
+    end
+    
+    subgraph "Flask Application Layer"
+        subgraph "Blueprint Routes"
+            API_BP[api_routes.py<br/>12 endpoints système]
+            WF_BP[workflow_routes.py<br/>18 endpoints workflow]
+        end
+        
+        FLASK[app_new.py<br/>Application Flask Principale]
+    end
+    
+    subgraph "Service Layer (Business Logic)"
+        WS[WorkflowService<br/>Gestion workflow & séquences]
+        MS[MonitoringService<br/>Surveillance système]
+        CS[CacheService<br/>Cache intelligent TTL]
+        PS[PerformanceService<br/>Métriques & profiling]
+        AIRS[AirtableService<br/>API Airtable]
+        CSVS[CSVService<br/>Monitoring téléchargements]
+    end
+    
+    subgraph "Configuration & Security"
+        CONFIG[config/settings.py<br/>Configuration centralisée]
+        SECURITY[config/security.py<br/>Sécurité & tokens]
+    end
+    
+    subgraph "Workflow Processing Layer"
+        subgraph "Python Environments"
+            ENV_MAIN[env/<br/>Étapes 1, 2, 6 + Flask]
+            ENV_TRANS[transnet_env/<br/>Étape 3 - Détection scènes]
+            ENV_AUDIO[audio_env/<br/>Étape 4 - Analyse audio]
+            ENV_TRACK[tracking_env/<br/>Étape 5 - Suivi vidéo]
+        end
+        
+        subgraph "Workflow Scripts"
+            STEP1[step1/<br/>Extraction archives<br/>ZIP/RAR/TAR]
+            STEP2[step2/<br/>Conversion vidéo<br/>25 FPS GPU]
+            STEP3[step3/<br/>Détection scènes<br/>TransNetV2]
+            STEP4[step4/<br/>Analyse audio<br/>Spectrogrammes]
+            STEP5[step5/<br/>Suivi vidéo<br/>MediaPipe CPU/GPU]
+            STEP6[step6/<br/>Finalisation<br/>Archives finales]
+        end
+    end
+    
+    subgraph "Data Storage"
+        PROJECTS[projets_extraits/<br/>Données de travail]
+        CACHE_DIR[Cache système<br/>Fichiers temporaires]
+        OUTPUT[Destination finale<br/>Archives traitées]
+    end
+    
+    subgraph "External Systems"
+        AIRTABLE[Airtable API<br/>Monitoring externe]
+        GPU[GPU NVIDIA<br/>Accélération matérielle]
+        SYSTEM[Ressources Système<br/>CPU, RAM, Disque]
+    end
+    
+    %% Frontend to Flask connections
+    UI --> API_BP
+    UI --> WF_BP
+    AS --> UI
+    DB --> UI
+    PO --> UI
+    PM --> UI
+    EH --> UI
+    CSS --> UI
+    
+    %% Flask to Services connections
+    API_BP --> MS
+    API_BP --> CS
+    API_BP --> PS
+    API_BP --> CSVS
+    WF_BP --> WS
+    WF_BP --> MS
+    FLASK --> CONFIG
+    FLASK --> SECURITY
+    
+    %% Service interconnections
+    WS --> MS
+    WS --> CS
+    WS --> PS
+    CSVS --> AIRS
+    CS --> PS
+    
+    %% Services to Processing
+    WS --> ENV_MAIN
+    WS --> ENV_TRANS
+    WS --> ENV_AUDIO
+    WS --> ENV_TRACK
+    
+    %% Environment to Scripts
+    ENV_MAIN --> STEP1
+    ENV_MAIN --> STEP2
+    ENV_MAIN --> STEP6
+    ENV_TRANS --> STEP3
+    ENV_AUDIO --> STEP4
+    ENV_TRACK --> STEP5
+    
+    %% Scripts to Data
+    STEP1 --> PROJECTS
+    STEP2 --> PROJECTS
+    STEP3 --> PROJECTS
+    STEP4 --> PROJECTS
+    STEP5 --> PROJECTS
+    STEP6 --> OUTPUT
+    
+    %% Cache and Performance
+    CS --> CACHE_DIR
+    PS --> SYSTEM
+    
+    %% External connections
+    AIRS --> AIRTABLE
+    STEP2 --> GPU
+    STEP3 --> GPU
+    STEP5 --> GPU
+    MS --> SYSTEM
+    
+    %% Styling
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef flask fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef config fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef processing fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    classDef data fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef external fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    
+    class UI,AS,DB,PO,PM,EH,CSS frontend
+    class FLASK,API_BP,WF_BP flask
+    class WS,MS,CS,PS,AIRS,CSVS service
+    class CONFIG,SECURITY config
+    class ENV_MAIN,ENV_TRANS,ENV_AUDIO,ENV_TRACK,STEP1,STEP2,STEP3,STEP4,STEP5,STEP6 processing
+    class PROJECTS,CACHE_DIR,OUTPUT data
+    class AIRTABLE,GPU,SYSTEM external

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/39 Camille/docs/postdiff 2 – Ce n’est pas 2 mais 3 cerveaux !.mp4",
+  "video_stem": "postdiff 2 – Ce n’est pas 2 mais 3 cerveaux !",
+  "video_hash": "6f2f86bcb32f149d33747be0dac16c3cccf1044e331f86ab57220e80d104c739",
+  "created_at": "2025-12-03T15:23:29.085548+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/6f2f86bcb32f149d33747be0dac16c3cccf1044e331f86ab57220e80d104c739/postdiff 2 – Ce n’est pas 2 mais 3 cerveaux !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/6f2f86bcb32f149d33747be0dac16c3cccf1044e331f86ab57220e80d104c739/postdiff 2 – Ce n’est pas 2 mais 3 cerveaux !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/6f2f86bcb32f149d33747be0dac16c3cccf1044e331f86ab57220e80d104c739/postdiff 2 – Ce n’est pas 2 mais 3 cerveaux !_tracking.json"
+  }
+}

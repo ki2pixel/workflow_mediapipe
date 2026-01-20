@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/225 Camille/docs/BOUCLE BUG 9-16.mov",
+  "video_stem": "BOUCLE BUG 9-16",
+  "video_hash": "5d60b256e36d68ceb4a2b657a0f9b5eb03036296ffeb23a817aedbec6e6b1a29",
+  "created_at": "2025-10-22T11:20:49.971855+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/5d60b256e36d68ceb4a2b657a0f9b5eb03036296ffeb23a817aedbec6e6b1a29/BOUCLE BUG 9-16_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/5d60b256e36d68ceb4a2b657a0f9b5eb03036296ffeb23a817aedbec6e6b1a29/BOUCLE BUG 9-16_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/5d60b256e36d68ceb4a2b657a0f9b5eb03036296ffeb23a817aedbec6e6b1a29/BOUCLE BUG 9-16_tracking.json"
+  }
+}

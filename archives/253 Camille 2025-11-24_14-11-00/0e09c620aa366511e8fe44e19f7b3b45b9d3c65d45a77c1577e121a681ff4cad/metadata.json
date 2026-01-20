@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/253 Camille/docs/R4086811_LPHDF Shazam.mp4",
+  "video_stem": "R4086811_LPHDF Shazam",
+  "video_hash": "0e09c620aa366511e8fe44e19f7b3b45b9d3c65d45a77c1577e121a681ff4cad",
+  "created_at": "2025-11-24T14:11:00.286028+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/253 Camille 2025-11-24_14-11-00/0e09c620aa366511e8fe44e19f7b3b45b9d3c65d45a77c1577e121a681ff4cad/R4086811_LPHDF Shazam_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/253 Camille 2025-11-24_14-11-00/0e09c620aa366511e8fe44e19f7b3b45b9d3c65d45a77c1577e121a681ff4cad/R4086811_LPHDF Shazam_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/253 Camille 2025-11-24_14-11-00/0e09c620aa366511e8fe44e19f7b3b45b9d3c65d45a77c1577e121a681ff4cad/R4086811_LPHDF Shazam_tracking.json"
+  }
+}

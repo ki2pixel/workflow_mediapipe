@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/125 Camille/docs/EMPLOYEUR.mp4",
+  "video_stem": "EMPLOYEUR",
+  "video_hash": "6a62887afb822ace2f1dac5a5627770da4b56a7eb342f3326ed19297a1406410",
+  "created_at": "2025-10-11T13:40:40.565477+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/125 Camille 2025-10-11_13-40-40/6a62887afb822ace2f1dac5a5627770da4b56a7eb342f3326ed19297a1406410/EMPLOYEUR_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/125 Camille 2025-10-11_13-40-40/6a62887afb822ace2f1dac5a5627770da4b56a7eb342f3326ed19297a1406410/EMPLOYEUR_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/125 Camille 2025-10-11_13-40-40/6a62887afb822ace2f1dac5a5627770da4b56a7eb342f3326ed19297a1406410/EMPLOYEUR_tracking.json"
+  }
+}

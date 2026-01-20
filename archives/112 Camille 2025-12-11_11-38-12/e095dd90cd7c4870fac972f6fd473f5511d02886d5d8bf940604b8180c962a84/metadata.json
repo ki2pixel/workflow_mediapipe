@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/112 Camille/docs/M6 - PANDORE - Il n'arrive pas à mentir devant les autres joueurs.mp4",
+  "video_stem": "M6 - PANDORE - Il n'arrive pas à mentir devant les autres joueurs",
+  "video_hash": "e095dd90cd7c4870fac972f6fd473f5511d02886d5d8bf940604b8180c962a84",
+  "created_at": "2025-12-11T11:38:12.101741+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/112 Camille 2025-12-11_11-38-12/e095dd90cd7c4870fac972f6fd473f5511d02886d5d8bf940604b8180c962a84/M6 - PANDORE - Il n'arrive pas à mentir devant les autres joueurs_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/112 Camille 2025-12-11_11-38-12/e095dd90cd7c4870fac972f6fd473f5511d02886d5d8bf940604b8180c962a84/M6 - PANDORE - Il n'arrive pas à mentir devant les autres joueurs_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/112 Camille 2025-12-11_11-38-12/e095dd90cd7c4870fac972f6fd473f5511d02886d5d8bf940604b8180c962a84/M6 - PANDORE - Il n'arrive pas à mentir devant les autres joueurs_tracking.json"
+  }
+}

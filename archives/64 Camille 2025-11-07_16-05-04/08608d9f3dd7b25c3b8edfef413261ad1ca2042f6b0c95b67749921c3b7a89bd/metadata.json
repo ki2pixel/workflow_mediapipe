@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/64 Camille/docs/RETOUR CHEZ LES PARENTS.mp4",
+  "video_stem": "RETOUR CHEZ LES PARENTS",
+  "video_hash": "08608d9f3dd7b25c3b8edfef413261ad1ca2042f6b0c95b67749921c3b7a89bd",
+  "created_at": "2025-11-07T16:05:04.794695+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/64 Camille 2025-11-07_16-05-04/08608d9f3dd7b25c3b8edfef413261ad1ca2042f6b0c95b67749921c3b7a89bd/RETOUR CHEZ LES PARENTS_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/64 Camille 2025-11-07_16-05-04/08608d9f3dd7b25c3b8edfef413261ad1ca2042f6b0c95b67749921c3b7a89bd/RETOUR CHEZ LES PARENTS_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/64 Camille 2025-11-07_16-05-04/08608d9f3dd7b25c3b8edfef413261ad1ca2042f6b0c95b67749921c3b7a89bd/RETOUR CHEZ LES PARENTS_tracking.json"
+  }
+}

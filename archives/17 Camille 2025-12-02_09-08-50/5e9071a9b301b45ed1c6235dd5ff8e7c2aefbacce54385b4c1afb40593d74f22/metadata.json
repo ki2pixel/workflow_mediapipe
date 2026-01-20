@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/17 Camille/docs/M6 - HALLYDAY PAR DAVID - « J’avais l’impression qu’on me volait presque mes parents » VDEF.mp4",
+  "video_stem": "M6 - HALLYDAY PAR DAVID - « J’avais l’impression qu’on me volait presque mes parents » VDEF",
+  "video_hash": "5e9071a9b301b45ed1c6235dd5ff8e7c2aefbacce54385b4c1afb40593d74f22",
+  "created_at": "2025-12-02T09:08:50.845688+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/17 Camille 2025-12-02_09-08-50/5e9071a9b301b45ed1c6235dd5ff8e7c2aefbacce54385b4c1afb40593d74f22/M6 - HALLYDAY PAR DAVID - « J’avais l’impression qu’on me volait presque mes parents » VDEF_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/17 Camille 2025-12-02_09-08-50/5e9071a9b301b45ed1c6235dd5ff8e7c2aefbacce54385b4c1afb40593d74f22/M6 - HALLYDAY PAR DAVID - « J’avais l’impression qu’on me volait presque mes parents » VDEF_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/17 Camille 2025-12-02_09-08-50/5e9071a9b301b45ed1c6235dd5ff8e7c2aefbacce54385b4c1afb40593d74f22/M6 - HALLYDAY PAR DAVID - « J’avais l’impression qu’on me volait presque mes parents » VDEF_tracking.json"
+  }
+}

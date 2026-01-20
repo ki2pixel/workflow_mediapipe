@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/57 Camille/docs/6ter - les reines - Marie s’énerve contre un automobiliste au comportement dangereux + son voyant moteur s’allume .mp4",
+  "video_stem": "6ter - les reines - Marie s’énerve contre un automobiliste au comportement dangereux + son voyant moteur s’allume ",
+  "video_hash": "9fe4da52aac7cea44591abec17eb63dd20c58a1b41b551a44678ed537360d85a",
+  "created_at": "2026-01-09T09:00:24.912307+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2026-01-09_09-00-24/9fe4da52aac7cea44591abec17eb63dd20c58a1b41b551a44678ed537360d85a/6ter - les reines - Marie s’énerve contre un automobiliste au comportement dangereux + son voyant moteur s’allume _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2026-01-09_09-00-24/9fe4da52aac7cea44591abec17eb63dd20c58a1b41b551a44678ed537360d85a/6ter - les reines - Marie s’énerve contre un automobiliste au comportement dangereux + son voyant moteur s’allume _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2026-01-09_09-00-24/9fe4da52aac7cea44591abec17eb63dd20c58a1b41b551a44678ed537360d85a/6ter - les reines - Marie s’énerve contre un automobiliste au comportement dangereux + son voyant moteur s’allume _tracking.json"
+  }
+}

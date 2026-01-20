@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/198 Camille/docs/EP47_Simon danse collé serré avec Adixia !.mp4",
+  "video_stem": "EP47_Simon danse collé serré avec Adixia !",
+  "video_hash": "fac220ae9b7770ec20a3527ec60aa92847db1051cc9ac48d7b529dec6108fb8f",
+  "created_at": "2025-11-18T19:17:16.116338+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/fac220ae9b7770ec20a3527ec60aa92847db1051cc9ac48d7b529dec6108fb8f/EP47_Simon danse collé serré avec Adixia !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/fac220ae9b7770ec20a3527ec60aa92847db1051cc9ac48d7b529dec6108fb8f/EP47_Simon danse collé serré avec Adixia !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/fac220ae9b7770ec20a3527ec60aa92847db1051cc9ac48d7b529dec6108fb8f/EP47_Simon danse collé serré avec Adixia !_tracking.json"
+  }
+}

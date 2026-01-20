@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/4 Camille/docs/M6 - RDV chez Cyril Lignac - pregen EM2.mp4",
+  "video_stem": "M6 - RDV chez Cyril Lignac - pregen EM2",
+  "video_hash": "8d2e0e92af605b30627240a9f93763b97c1a17ee0d4553a0d036a9ea62cb25bb",
+  "created_at": "2025-12-01T11:24:14.462759+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/4 Camille 2025-12-01_11-24-14/8d2e0e92af605b30627240a9f93763b97c1a17ee0d4553a0d036a9ea62cb25bb/M6 - RDV chez Cyril Lignac - pregen EM2_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/4 Camille 2025-12-01_11-24-14/8d2e0e92af605b30627240a9f93763b97c1a17ee0d4553a0d036a9ea62cb25bb/M6 - RDV chez Cyril Lignac - pregen EM2_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/4 Camille 2025-12-01_11-24-14/8d2e0e92af605b30627240a9f93763b97c1a17ee0d4553a0d036a9ea62cb25bb/M6 - RDV chez Cyril Lignac - pregen EM2_tracking.json"
+  }
+}

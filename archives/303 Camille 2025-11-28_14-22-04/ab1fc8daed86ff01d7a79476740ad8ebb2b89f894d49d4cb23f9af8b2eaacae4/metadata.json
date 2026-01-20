@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/303 Camille/docs/postdiff 1 – Clarysse et Kayla immunisent Colette.mp4",
+  "video_stem": "postdiff 1 – Clarysse et Kayla immunisent Colette",
+  "video_hash": "ab1fc8daed86ff01d7a79476740ad8ebb2b89f894d49d4cb23f9af8b2eaacae4",
+  "created_at": "2025-11-28T14:22:04.847178+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/303 Camille 2025-11-28_14-22-04/ab1fc8daed86ff01d7a79476740ad8ebb2b89f894d49d4cb23f9af8b2eaacae4/postdiff 1 – Clarysse et Kayla immunisent Colette_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/303 Camille 2025-11-28_14-22-04/ab1fc8daed86ff01d7a79476740ad8ebb2b89f894d49d4cb23f9af8b2eaacae4/postdiff 1 – Clarysse et Kayla immunisent Colette_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/303 Camille 2025-11-28_14-22-04/ab1fc8daed86ff01d7a79476740ad8ebb2b89f894d49d4cb23f9af8b2eaacae4/postdiff 1 – Clarysse et Kayla immunisent Colette_tracking.json"
+  }
+}

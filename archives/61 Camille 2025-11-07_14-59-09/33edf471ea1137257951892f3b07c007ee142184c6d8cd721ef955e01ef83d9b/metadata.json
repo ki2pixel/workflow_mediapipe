@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/61 Camille/docs/M6 - LMP - Extrait 1 (EM10 P2) - Il souhaite créer un gâteau trompe-l’œil représentant un fish & chips.mp4",
+  "video_stem": "M6 - LMP - Extrait 1 (EM10 P2) - Il souhaite créer un gâteau trompe-l’œil représentant un fish & chips",
+  "video_hash": "33edf471ea1137257951892f3b07c007ee142184c6d8cd721ef955e01ef83d9b",
+  "created_at": "2025-11-07T14:59:09.798843+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/61 Camille 2025-11-07_14-59-09/33edf471ea1137257951892f3b07c007ee142184c6d8cd721ef955e01ef83d9b/M6 - LMP - Extrait 1 (EM10 P2) - Il souhaite créer un gâteau trompe-l’œil représentant un fish & chips_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/61 Camille 2025-11-07_14-59-09/33edf471ea1137257951892f3b07c007ee142184c6d8cd721ef955e01ef83d9b/M6 - LMP - Extrait 1 (EM10 P2) - Il souhaite créer un gâteau trompe-l’œil représentant un fish & chips_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/61 Camille 2025-11-07_14-59-09/33edf471ea1137257951892f3b07c007ee142184c6d8cd721ef955e01ef83d9b/M6 - LMP - Extrait 1 (EM10 P2) - Il souhaite créer un gâteau trompe-l’œil représentant un fish & chips_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/45 Camille/docs/Il cache une déchetterie derrière son restaurant !.mp4",
+  "video_stem": "Il cache une déchetterie derrière son restaurant !",
+  "video_hash": "09a6b0c700833ec0d54db1befb8f6cda328bc06d4beed7e0164311034c388b33",
+  "created_at": "2026-01-07T22:57:03.021131+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/09a6b0c700833ec0d54db1befb8f6cda328bc06d4beed7e0164311034c388b33/Il cache une déchetterie derrière son restaurant !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/09a6b0c700833ec0d54db1befb8f6cda328bc06d4beed7e0164311034c388b33/Il cache une déchetterie derrière son restaurant !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/09a6b0c700833ec0d54db1befb8f6cda328bc06d4beed7e0164311034c388b33/Il cache une déchetterie derrière son restaurant !_tracking.json"
+  }
+}

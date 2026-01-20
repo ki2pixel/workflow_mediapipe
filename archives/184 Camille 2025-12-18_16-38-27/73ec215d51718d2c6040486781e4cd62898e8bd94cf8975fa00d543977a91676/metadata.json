@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/184 Camille/docs/M6 - Le Roi Soleil - Emmanuel Moire Versailles.mp4",
+  "video_stem": "M6 - Le Roi Soleil - Emmanuel Moire Versailles",
+  "video_hash": "73ec215d51718d2c6040486781e4cd62898e8bd94cf8975fa00d543977a91676",
+  "created_at": "2025-12-18T16:38:27.519059+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/184 Camille 2025-12-18_16-38-27/73ec215d51718d2c6040486781e4cd62898e8bd94cf8975fa00d543977a91676/M6 - Le Roi Soleil - Emmanuel Moire Versailles_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/184 Camille 2025-12-18_16-38-27/73ec215d51718d2c6040486781e4cd62898e8bd94cf8975fa00d543977a91676/M6 - Le Roi Soleil - Emmanuel Moire Versailles_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/184 Camille 2025-12-18_16-38-27/73ec215d51718d2c6040486781e4cd62898e8bd94cf8975fa00d543977a91676/M6 - Le Roi Soleil - Emmanuel Moire Versailles_tracking.json"
+  }
+}

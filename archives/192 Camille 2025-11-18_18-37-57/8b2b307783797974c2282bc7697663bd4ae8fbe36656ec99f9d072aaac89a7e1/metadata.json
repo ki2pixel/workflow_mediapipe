@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/192 Camille/docs/M6 - LRDLF - Il remporte la partie après une banqueroute de sa concurrente.mp4",
+  "video_stem": "M6 - LRDLF - Il remporte la partie après une banqueroute de sa concurrente",
+  "video_hash": "8b2b307783797974c2282bc7697663bd4ae8fbe36656ec99f9d072aaac89a7e1",
+  "created_at": "2025-11-18T18:37:57.560609+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/192 Camille 2025-11-18_18-37-57/8b2b307783797974c2282bc7697663bd4ae8fbe36656ec99f9d072aaac89a7e1/M6 - LRDLF - Il remporte la partie après une banqueroute de sa concurrente_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/192 Camille 2025-11-18_18-37-57/8b2b307783797974c2282bc7697663bd4ae8fbe36656ec99f9d072aaac89a7e1/M6 - LRDLF - Il remporte la partie après une banqueroute de sa concurrente_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/192 Camille 2025-11-18_18-37-57/8b2b307783797974c2282bc7697663bd4ae8fbe36656ec99f9d072aaac89a7e1/M6 - LRDLF - Il remporte la partie après une banqueroute de sa concurrente_tracking.json"
+  }
+}

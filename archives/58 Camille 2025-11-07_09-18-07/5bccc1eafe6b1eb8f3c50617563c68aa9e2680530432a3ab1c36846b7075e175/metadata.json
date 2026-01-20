@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/58 Camille/docs/PREDIFF 1 – Il en veut à sa mère par rapport au suicide de son père .mp4",
+  "video_stem": "PREDIFF 1 – Il en veut à sa mère par rapport au suicide de son père ",
+  "video_hash": "5bccc1eafe6b1eb8f3c50617563c68aa9e2680530432a3ab1c36846b7075e175",
+  "created_at": "2025-11-07T09:18:07.749873+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/58 Camille 2025-11-07_09-18-07/5bccc1eafe6b1eb8f3c50617563c68aa9e2680530432a3ab1c36846b7075e175/PREDIFF 1 – Il en veut à sa mère par rapport au suicide de son père _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/58 Camille 2025-11-07_09-18-07/5bccc1eafe6b1eb8f3c50617563c68aa9e2680530432a3ab1c36846b7075e175/PREDIFF 1 – Il en veut à sa mère par rapport au suicide de son père _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/58 Camille 2025-11-07_09-18-07/5bccc1eafe6b1eb8f3c50617563c68aa9e2680530432a3ab1c36846b7075e175/PREDIFF 1 – Il en veut à sa mère par rapport au suicide de son père _tracking.json"
+  }
+}

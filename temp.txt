@@ -1,0 +1,16 @@
+
+Log Principal (5. Analyse du tracking)
+--- Lancement de: 5. Analyse du tracking ---
+Préparation de l'étape de tracking : recherche des vidéos à traiter...
+1 vidéo(s) ajoutée(s) au lot de traitement.
+Le script gestionnaire va maintenant prendre le relais.
+
+Commande: /mnt/venv_ext4/tracking_env/bin/python /home/kidpixel/workflow_mediapipe/workflow_scripts/step5/run_tracking_manager.py --videos_json_path /tmp/tracking_videos_ufp89drd.json
+Dans: /home/kidpixel/workflow_mediapipe/projets_extraits
+
+2025-12-22 15:22:46,910 - [MANAGER] - [EnvSnapshot] {'STEP5_ENABLE_GPU': '1', 'STEP5_GPU_ENGINES': 'insightface', 'STEP5_TRACKING_ENGINE': 'insightface', 'TRACKING_DISABLE_GPU': '1', 'STEP5_GPU_FALLBACK_AUTO': '1'}
+2025-12-22 15:22:46,910 - [MANAGER] - CPU-only mode (GPU disabled or not supported for this engine)
+2025-12-22 15:22:46,911 - [MANAGER] - InsightFace engine is GPU-only, but GPU mode is disabled or not authorized. Set STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES.
+
+--- 5. Analyse du tracking a échoué (code: 1) ---
+

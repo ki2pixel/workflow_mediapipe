@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/289 Camille/docs/EP3_Chritsopher prend un énorme râteau !.mp4",
+  "video_stem": "EP3_Chritsopher prend un énorme râteau !",
+  "video_hash": "02af761199e054eb311b62449b35e351ee320efd6195c29f32b76061839fa9da",
+  "created_at": "2025-12-30T12:54:28.408421+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/02af761199e054eb311b62449b35e351ee320efd6195c29f32b76061839fa9da/EP3_Chritsopher prend un énorme râteau !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/02af761199e054eb311b62449b35e351ee320efd6195c29f32b76061839fa9da/EP3_Chritsopher prend un énorme râteau !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/02af761199e054eb311b62449b35e351ee320efd6195c29f32b76061839fa9da/EP3_Chritsopher prend un énorme râteau !_tracking.json"
+  }
+}

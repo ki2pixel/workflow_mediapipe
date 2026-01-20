@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/98 Camille/docs/prédiff – Stéphanie élimina-t-elle Nadège .mp4",
+  "video_stem": "prédiff – Stéphanie élimina-t-elle Nadège ",
+  "video_hash": "76c70997a274e7dacec04117beec3e725fc63997deda55b2b40eab4842a4fe03",
+  "created_at": "2026-01-13T14:11:27.279697+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/98 Camille 2026-01-13_14-11-27/76c70997a274e7dacec04117beec3e725fc63997deda55b2b40eab4842a4fe03/prédiff – Stéphanie élimina-t-elle Nadège _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/98 Camille 2026-01-13_14-11-27/76c70997a274e7dacec04117beec3e725fc63997deda55b2b40eab4842a4fe03/prédiff – Stéphanie élimina-t-elle Nadège _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/98 Camille 2026-01-13_14-11-27/76c70997a274e7dacec04117beec3e725fc63997deda55b2b40eab4842a4fe03/prédiff – Stéphanie élimina-t-elle Nadège _tracking.json"
+  }
+}

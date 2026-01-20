@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/184 Camille/docs/CLEAN TRAVAUX DANS LA MAISON.mp4",
+  "video_stem": "CLEAN TRAVAUX DANS LA MAISON",
+  "video_hash": "e359c87eee29b5fd8331ca1ebcb2154ba8e64e1854d05a527a52c5500a5036e9",
+  "created_at": "2025-12-18T16:38:27.564320+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/184 Camille 2025-12-18_16-38-27/e359c87eee29b5fd8331ca1ebcb2154ba8e64e1854d05a527a52c5500a5036e9/CLEAN TRAVAUX DANS LA MAISON_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/184 Camille 2025-12-18_16-38-27/e359c87eee29b5fd8331ca1ebcb2154ba8e64e1854d05a527a52c5500a5036e9/CLEAN TRAVAUX DANS LA MAISON_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/184 Camille 2025-12-18_16-38-27/e359c87eee29b5fd8331ca1ebcb2154ba8e64e1854d05a527a52c5500a5036e9/CLEAN TRAVAUX DANS LA MAISON_tracking.json"
+  }
+}

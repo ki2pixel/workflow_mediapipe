@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/35 Camille/docs/M6 - LMBF - Chiara et Bruno sont impressionnés par cette pâtisserie trompe-l’œil d’olive.mp4",
+  "video_stem": "M6 - LMBF - Chiara et Bruno sont impressionnés par cette pâtisserie trompe-l’œil d’olive",
+  "video_hash": "dda569370af7f820c030677453a63c5a9bc1c131682751db7a89a0cb43b7e3ea",
+  "created_at": "2026-01-07T09:13:12.760339+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2026-01-07_09-13-12/dda569370af7f820c030677453a63c5a9bc1c131682751db7a89a0cb43b7e3ea/M6 - LMBF - Chiara et Bruno sont impressionnés par cette pâtisserie trompe-l’œil d’olive_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2026-01-07_09-13-12/dda569370af7f820c030677453a63c5a9bc1c131682751db7a89a0cb43b7e3ea/M6 - LMBF - Chiara et Bruno sont impressionnés par cette pâtisserie trompe-l’œil d’olive_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2026-01-07_09-13-12/dda569370af7f820c030677453a63c5a9bc1c131682751db7a89a0cb43b7e3ea/M6 - LMBF - Chiara et Bruno sont impressionnés par cette pâtisserie trompe-l’œil d’olive_tracking.json"
+  }
+}

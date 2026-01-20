@@ -1,0 +1,309 @@
+{
+  "metadata": {
+    "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/269 Camille/docs/3.mov",
+    "total_frames": 75,
+    "fps": 25.0
+  },
+  "frames": [
+    {
+      "frame": 1,
+      "tracked_objects": []
+    },
+    {
+      "frame": 2,
+      "tracked_objects": []
+    },
+    {
+      "frame": 3,
+      "tracked_objects": []
+    },
+    {
+      "frame": 4,
+      "tracked_objects": []
+    },
+    {
+      "frame": 5,
+      "tracked_objects": []
+    },
+    {
+      "frame": 6,
+      "tracked_objects": []
+    },
+    {
+      "frame": 7,
+      "tracked_objects": []
+    },
+    {
+      "frame": 8,
+      "tracked_objects": []
+    },
+    {
+      "frame": 9,
+      "tracked_objects": []
+    },
+    {
+      "frame": 10,
+      "tracked_objects": []
+    },
+    {
+      "frame": 11,
+      "tracked_objects": []
+    },
+    {
+      "frame": 12,
+      "tracked_objects": []
+    },
+    {
+      "frame": 13,
+      "tracked_objects": []
+    },
+    {
+      "frame": 14,
+      "tracked_objects": []
+    },
+    {
+      "frame": 15,
+      "tracked_objects": []
+    },
+    {
+      "frame": 16,
+      "tracked_objects": []
+    },
+    {
+      "frame": 17,
+      "tracked_objects": []
+    },
+    {
+      "frame": 18,
+      "tracked_objects": []
+    },
+    {
+      "frame": 19,
+      "tracked_objects": []
+    },
+    {
+      "frame": 20,
+      "tracked_objects": []
+    },
+    {
+      "frame": 21,
+      "tracked_objects": []
+    },
+    {
+      "frame": 22,
+      "tracked_objects": []
+    },
+    {
+      "frame": 23,
+      "tracked_objects": []
+    },
+    {
+      "frame": 24,
+      "tracked_objects": []
+    },
+    {
+      "frame": 25,
+      "tracked_objects": []
+    },
+    {
+      "frame": 26,
+      "tracked_objects": []
+    },
+    {
+      "frame": 27,
+      "tracked_objects": []
+    },
+    {
+      "frame": 28,
+      "tracked_objects": []
+    },
+    {
+      "frame": 29,
+      "tracked_objects": []
+    },
+    {
+      "frame": 30,
+      "tracked_objects": []
+    },
+    {
+      "frame": 31,
+      "tracked_objects": []
+    },
+    {
+      "frame": 32,
+      "tracked_objects": []
+    },
+    {
+      "frame": 33,
+      "tracked_objects": []
+    },
+    {
+      "frame": 34,
+      "tracked_objects": []
+    },
+    {
+      "frame": 35,
+      "tracked_objects": []
+    },
+    {
+      "frame": 36,
+      "tracked_objects": []
+    },
+    {
+      "frame": 37,
+      "tracked_objects": []
+    },
+    {
+      "frame": 38,
+      "tracked_objects": []
+    },
+    {
+      "frame": 39,
+      "tracked_objects": []
+    },
+    {
+      "frame": 40,
+      "tracked_objects": []
+    },
+    {
+      "frame": 41,
+      "tracked_objects": []
+    },
+    {
+      "frame": 42,
+      "tracked_objects": []
+    },
+    {
+      "frame": 43,
+      "tracked_objects": []
+    },
+    {
+      "frame": 44,
+      "tracked_objects": []
+    },
+    {
+      "frame": 45,
+      "tracked_objects": []
+    },
+    {
+      "frame": 46,
+      "tracked_objects": []
+    },
+    {
+      "frame": 47,
+      "tracked_objects": []
+    },
+    {
+      "frame": 48,
+      "tracked_objects": []
+    },
+    {
+      "frame": 49,
+      "tracked_objects": []
+    },
+    {
+      "frame": 50,
+      "tracked_objects": []
+    },
+    {
+      "frame": 51,
+      "tracked_objects": []
+    },
+    {
+      "frame": 52,
+      "tracked_objects": []
+    },
+    {
+      "frame": 53,
+      "tracked_objects": []
+    },
+    {
+      "frame": 54,
+      "tracked_objects": []
+    },
+    {
+      "frame": 55,
+      "tracked_objects": []
+    },
+    {
+      "frame": 56,
+      "tracked_objects": []
+    },
+    {
+      "frame": 57,
+      "tracked_objects": []
+    },
+    {
+      "frame": 58,
+      "tracked_objects": []
+    },
+    {
+      "frame": 59,
+      "tracked_objects": []
+    },
+    {
+      "frame": 60,
+      "tracked_objects": []
+    },
+    {
+      "frame": 61,
+      "tracked_objects": []
+    },
+    {
+      "frame": 62,
+      "tracked_objects": []
+    },
+    {
+      "frame": 63,
+      "tracked_objects": []
+    },
+    {
+      "frame": 64,
+      "tracked_objects": []
+    },
+    {
+      "frame": 65,
+      "tracked_objects": []
+    },
+    {
+      "frame": 66,
+      "tracked_objects": []
+    },
+    {
+      "frame": 67,
+      "tracked_objects": []
+    },
+    {
+      "frame": 68,
+      "tracked_objects": []
+    },
+    {
+      "frame": 69,
+      "tracked_objects": []
+    },
+    {
+      "frame": 70,
+      "tracked_objects": []
+    },
+    {
+      "frame": 71,
+      "tracked_objects": []
+    },
+    {
+      "frame": 72,
+      "tracked_objects": []
+    },
+    {
+      "frame": 73,
+      "tracked_objects": []
+    },
+    {
+      "frame": 74,
+      "tracked_objects": []
+    },
+    {
+      "frame": 75,
+      "tracked_objects": []
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/151 Camille/Adixia et Paga tournent définitivement la page sur leur histoire.mp4",
+  "video_stem": "Adixia et Paga tournent définitivement la page sur leur histoire",
+  "video_hash": "25d68afaff206447ace21ef4e5ee37894c4e34cd95e19f26fd4b315131773d61",
+  "created_at": "2025-10-14T14:35:57.306271+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/25d68afaff206447ace21ef4e5ee37894c4e34cd95e19f26fd4b315131773d61/Adixia et Paga tournent définitivement la page sur leur histoire_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/25d68afaff206447ace21ef4e5ee37894c4e34cd95e19f26fd4b315131773d61/Adixia et Paga tournent définitivement la page sur leur histoire_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/151 Camille 2025-10-14_14-35-57/25d68afaff206447ace21ef4e5ee37894c4e34cd95e19f26fd4b315131773d61/Adixia et Paga tournent définitivement la page sur leur histoire_tracking.json"
+  }
+}

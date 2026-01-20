@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorateur de Workflow Interactif</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            text-align: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #00d4ff, #5b86e5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .toggle-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .toggle-btn.active {
+            background: linear-gradient(45deg, #00d4ff, #5b86e5);
+            border-color: transparent;
+        }
+
+        .controls {
+            position: fixed;
+            top: 120px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .canvas-container {
+            position: fixed;
+            top: 120px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        .diagram-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            background: radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 75% 75%, rgba(0, 212, 255, 0.1) 0%, transparent 50%);
+        }
+
+        .diagram-canvas.grabbing {
+            cursor: grabbing;
+        }
+
+        .node {
+            position: absolute;
+            min-width: 150px;
+            max-width: 180px;
+            padding: 0.9rem;
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(15px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            user-select: none;
+            z-index: 20;
+        }
+
+        .node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .node-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .node-icon {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+
+        .node-desc {
+            font-size: 0.7rem;
+            opacity: 0.9;
+            line-height: 1.3;
+        }
+
+        .connection {
+            position: absolute;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .connection-line {
+            stroke: rgba(0, 212, 255, 0.6);
+            stroke-width: 2;
+            fill: none;
+            filter: drop-shadow(0 0 3px rgba(0, 212, 255, 0.3));
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .connection-arrow {
+            fill: rgba(0, 212, 255, 0.8);
+        }
+
+        /* Node types styling */
+        .frontend { background: rgba(225, 245, 254, 0.15); }
+        .frontend .node-icon { background: #e1f5fe; color: #01579b; }
+
+        .flask { background: rgba(255, 243, 224, 0.15); }
+        .flask .node-icon { background: #fff3e0; color: #e65100; }
+
+        .service { background: rgba(243, 229, 245, 0.15); }
+        .service .node-icon { background: #f3e5f5; color: #4a148c; }
+
+        .config { background: rgba(232, 245, 232, 0.15); }
+        .config .node-icon { background: #e8f5e8; color: #1b5e20; }
+
+        .processing { background: rgba(255, 248, 225, 0.15); }
+        .processing .node-icon { background: #fff8e1; color: #f57f17; }
+
+        .data { background: rgba(252, 228, 236, 0.15); }
+        .data .node-icon { background: #fce4ec; color: #880e4f; }
+
+        .external { background: rgba(241, 248, 233, 0.15); }
+        .external .node-icon { background: #f1f8e9; color: #33691e; }
+
+        .workflow-step { background: rgba(0, 212, 255, 0.15); }
+        .workflow-step .node-icon { background: #00d4ff; color: #0d47a1; }
+
+        .monitoring { background: rgba(156, 39, 176, 0.15); }
+        .monitoring .node-icon { background: #9c27b0; color: #ffffff; }
+
+        .error {
+            background: rgba(244, 67, 54, 0.15);
+            min-width: 100px !important;
+            max-width: 120px !important;
+            padding: 0.6rem !important;
+        }
+        .error .node-icon { background: #f44336; color: #ffffff; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal h2 {
+            color: #00d4ff;
+            margin-bottom: 1rem;
+        }
+
+        .modal p {
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        /* Legend */
+        .legend {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.8rem;
+            z-index: 100;
+            max-width: 200px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.3rem 0;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* Animations */
+        @keyframes nodeAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .node {
+            animation: nodeAppear 0.5s ease forwards;
+        }
+
+        @keyframes connectionDraw {
+            from {
+                stroke-dasharray: 1000;
+                stroke-dashoffset: 1000;
+            }
+            to {
+                stroke-dasharray: 1000;
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .connection-line {
+            animation: connectionDraw 1s ease forwards;
+        }
+
+        /* Visual Grouping Containers */
+        .layer-container {
+            position: absolute;
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            pointer-events: none;
+            z-index: 25;
+            opacity: 1;
+            display: block;
+            visibility: visible;
+        }
+
+        .layer-label {
+            position: absolute;
+            top: -20px;
+            left: 30px;
+            background: rgba(0, 0, 0, 0.95);
+            color: #00d4ff;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            border: 2px solid rgba(0, 212, 255, 0.6);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            pointer-events: auto;
+            opacity: 1;
+            display: block;
+            visibility: visible;
+        }
+
+        .frontend-layer {
+            background: linear-gradient(135deg, rgba(225, 245, 254, 0.05), rgba(225, 245, 254, 0.02));
+        }
+
+        .backend-layer {
+            background: linear-gradient(135deg, rgba(255, 243, 224, 0.05), rgba(255, 243, 224, 0.02));
+        }
+
+        .services-layer {
+            background: linear-gradient(135deg, rgba(243, 229, 245, 0.05), rgba(243, 229, 245, 0.02));
+        }
+
+        .processing-layer {
+            background: linear-gradient(135deg, rgba(255, 248, 225, 0.05), rgba(255, 248, 225, 0.02));
+        }
+
+        .data-layer {
+            background: linear-gradient(135deg, rgba(252, 228, 236, 0.05), rgba(252, 228, 236, 0.02));
+        }
+
+        .external-layer {
+            background: linear-gradient(135deg, rgba(241, 248, 233, 0.05), rgba(241, 248, 233, 0.02));
+        }
+
+        .workflow-layer {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(0, 212, 255, 0.03));
+            border: 2px solid rgba(0, 212, 255, 0.2) !important;
+            z-index: 30 !important;
+            opacity: 1 !important;
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+        }
+
+        .monitoring-layer {
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.05), rgba(156, 39, 176, 0.02));
+        }
+
+        .error-layer {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.05), rgba(244, 67, 54, 0.02));
+        }
+
+        .config-layer {
+            background: linear-gradient(135deg, rgba(232, 245, 232, 0.05), rgba(232, 245, 232, 0.02));
+        }
+
+        /* Specific styling for workflow layers to ensure visibility */
+        .layer-container.workflow-layer {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 212, 255, 0.04)) !important;
+            border: 2px solid rgba(0, 212, 255, 0.3) !important;
+            z-index: 35 !important;
+            opacity: 1 !important;
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+        }
+
+        /* Ensure Completion layer is always visible */
+        .layer-container.workflow-layer:has(.layer-label:contains("Completion")),
+        .layer-container.workflow-layer[data-label="Completion"] {
+            background: linear-gradient(135deg, rgba(0, 255, 127, 0.1), rgba(0, 255, 127, 0.04)) !important;
+            border: 2px solid rgba(0, 255, 127, 0.4) !important;
+            z-index: 40 !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.4rem;
+            }
+
+            .toggle-btn {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.8rem;
+            }
+
+            .controls {
+                right: 10px;
+                top: 100px;
+            }
+
+            .control-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .node {
+                min-width: 130px;
+                max-width: 150px;
+                padding: 0.7rem;
+            }
+
+            .error {
+                min-width: 80px !important;
+                max-width: 100px !important;
+                padding: 0.5rem !important;
+            }
+
+            .node-title {
+                font-size: 0.8rem;
+            }
+
+            .node-desc {
+                font-size: 0.65rem;
+            }
+
+            .layer-container {
+                display: none; /* Hide layer containers on mobile for cleaner view */
+            }
+
+            .legend {
+                bottom: 10px;
+                left: 10px;
+                max-width: 150px;
+                font-size: 0.7rem;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .layer-label {
+                font-size: 0.6rem;
+                padding: 3px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Explorateur de Workflow</h1>
+        <!-- Note d'information FromSmash: affichage discret sous le titre -->
+        <p style="margin-top: 6px; font-size: 0.9rem; opacity: 0.85;">
+            Note: Les liens FromSmash s'ouvrent dans un nouvel onglet via une modale dédiée (pas de téléchargement automatique).
+        </p>
+        <div class="view-toggle">
+            <button class="toggle-btn active" onclick="switchView('architecture')">
+                🏗️ Architecture
+            </button>
+            <button class="toggle-btn" onclick="switchView('workflow')">
+                ⚡ Flux d'Exécution
+            </button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" onclick="zoomIn()" title="Zoom In">+</button>
+        <button class="control-btn" onclick="zoomOut()" title="Zoom Out">-</button>
+        <button class="control-btn" onclick="resetView()" title="Reset View">⌂</button>
+        <button class="control-btn" onclick="toggleLegend()" title="Toggle Legend">ℹ</button>
+    </div>
+
+    <div class="canvas-container">
+        <div id="canvas" class="diagram-canvas"></div>
+    </div>
+
+    <div id="legend" class="legend">
+        <h3 style="margin-bottom: 0.5rem; color: #00d4ff;">Légende</h3>
+        <div class="legend-item">
+            <div class="legend-color" style="background: rgba(225, 245, 254, 0.5);"></div>
+            <span>Frontend</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: rgba(255, 243, 224, 0.5);"></div>
+            <span>Flask</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: rgba(243, 229, 245, 0.5);"></div>
+            <span>Services</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: rgba(255, 248, 225, 0.5);"></div>
+            <span>Processing</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: rgba(252, 228, 236, 0.5);"></div>
+            <span>Data</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: rgba(241, 248, 233, 0.5);"></div>
+            <span>External</span>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentView = 'architecture';
+        let scale = 1;
+        let panX = 0;
+        let panY = 0;
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let nodes = [];
+        let connections = [];
+
+        const canvas = document.getElementById('canvas');
+
+        // Architecture data structure - Improved spacing and visual hierarchy
+        const architectureData = {
+            nodes: [
+                // Frontend Layer (Top) - Improved spacing with y: 80, 200, 320
+                { id: 'ui', title: 'Interface Utilisateur Web', desc: 'Interface utilisateur principale', type: 'frontend', x: 400, y: 80, icon: '🖥️' },
+                { id: 'appstate', title: 'AppState.js', desc: 'État centralisé', type: 'frontend', x: 80, y: 200, icon: '🔄' },
+                { id: 'dombatcher', title: 'DOMBatcher.js', desc: 'Optimisation DOM', type: 'frontend', x: 280, y: 200, icon: '⚡' },
+                { id: 'perfoptimizer', title: 'PerformanceOptimizer.js', desc: 'Debouncing/Throttling', type: 'frontend', x: 480, y: 200, icon: '🚀' },
+                { id: 'polling', title: 'PollingManager.js', desc: 'Gestion polling', type: 'frontend', x: 680, y: 200, icon: '🔁' },
+                { id: 'errorhandler', title: 'ErrorHandler.js', desc: 'Gestion erreurs', type: 'frontend', x: 880, y: 200, icon: '🛡️' },
+                { id: 'css_arch', title: 'CSS Modulaire', desc: 'variables.css, components/*.css', type: 'frontend', x: 400, y: 320, icon: '🎨' },
+
+                // Flask Application Layer - Improved spacing with y: 480, 600
+                { id: 'flask', title: 'app_new.py', desc: 'Application Flask Principale', type: 'flask', x: 300, y: 480, icon: '🌶️' },
+                { id: 'api_routes', title: 'api_routes.py', desc: '12 endpoints système', type: 'flask', x: 120, y: 600, icon: '🔌' },
+                { id: 'workflow_routes', title: 'workflow_routes.py', desc: '18 endpoints workflow', type: 'flask', x: 480, y: 600, icon: '🛣️' },
+
+                // Configuration & Security Layer - Improved spacing with y: 480, 600
+                { id: 'config', title: 'config/settings.py', desc: 'Configuration centralisée', type: 'config', x: 1000, y: 480, icon: '⚙️' },
+                { id: 'security', title: 'config/security.py', desc: 'Sécurité & tokens', type: 'config', x: 1000, y: 600, icon: '🔒' },
+
+                // Service Layer - Improved spacing with y: 760, 880
+                { id: 'workflow_service', title: 'WorkflowService', desc: 'Gestion workflow & séquences', type: 'service', x: 80, y: 760, icon: '⚙️' },
+                { id: 'monitoring_service', title: 'MonitoringService', desc: 'Surveillance système', type: 'service', x: 320, y: 760, icon: '📊' },
+                { id: 'cache_service', title: 'CacheService', desc: 'Cache intelligent TTL', type: 'service', x: 560, y: 760, icon: '💾' },
+                { id: 'perf_service', title: 'PerformanceService', desc: 'Métriques & profiling', type: 'service', x: 800, y: 760, icon: '📈' },
+                { id: 'webhook_service', title: 'WebhookService', desc: 'Source Webhook unique', type: 'service', x: 320, y: 880, icon: '🌐' },
+                { id: 'csv_service', title: 'CSVService', desc: 'Monitoring téléchargements (Webhook)', type: 'service', x: 560, y: 880, icon: '📊' },
+
+                // Workflow Processing Layer - Python Environments - Improved spacing at y: 1040
+                { id: 'env_main', title: 'env/', desc: 'Étapes 1, 2, 6 + Flask', type: 'processing', x: 80, y: 1040, icon: '🐍' },
+                { id: 'env_trans', title: 'transnet_env/', desc: 'Étape 3 - Détection scènes', type: 'processing', x: 320, y: 1040, icon: '🎬' },
+                { id: 'env_audio', title: 'audio_env/', desc: 'Étape 4 - Analyse audio', type: 'processing', x: 560, y: 1040, icon: '🎵' },
+                { id: 'env_track', title: 'tracking_env/', desc: 'Étape 5 - Suivi vidéo', type: 'processing', x: 800, y: 1040, icon: '👁️' },
+
+                // Workflow Scripts - Improved spacing at y: 1160
+                { id: 'step1', title: 'step1/', desc: 'Extraction archives ZIP/RAR/TAR', type: 'processing', x: 80, y: 1160, icon: '📦' },
+                { id: 'step2', title: 'step2/', desc: 'Conversion vidéo 25 FPS GPU', type: 'processing', x: 240, y: 1160, icon: '🎬' },
+                { id: 'step3', title: 'step3/', desc: 'Détection scènes TransNetV2', type: 'processing', x: 400, y: 1160, icon: '🎯' },
+                { id: 'step4', title: 'step4/', desc: 'Analyse audio Spectrogrammes', type: 'processing', x: 560, y: 1160, icon: '🎵' },
+                { id: 'step5', title: 'step5/', desc: 'Suivi vidéo MediaPipe CPU/GPU', type: 'processing', x: 720, y: 1160, icon: '👁️' },
+                { id: 'step6', title: 'step6/', desc: 'Finalisation Archives finales', type: 'processing', x: 880, y: 1160, icon: '✨' },
+
+                // Data Storage Layer - Improved spacing at y: 1280
+                { id: 'projects', title: 'projets_extraits/', desc: 'Données de travail', type: 'data', x: 120, y: 1280, icon: '📁' },
+                { id: 'cache_dir', title: 'Cache système', desc: 'Fichiers temporaires', type: 'data', x: 400, y: 1280, icon: '🗃️' },
+                { id: 'output', title: 'Destination finale', desc: 'Archives traitées', type: 'data', x: 680, y: 1280, icon: '📦' },
+
+                // External Systems Layer - Better positioned at x: 1300
+                { id: 'webhook_endpoint', title: 'Webhook JSON', desc: 'Source téléchargements Dropbox-only', type: 'external', x: 1300, y: 200, icon: '🌐' },
+                { id: 'gpu', title: 'GPU NVIDIA', desc: 'Accélération matérielle', type: 'external', x: 1300, y: 600, icon: '🚀' },
+                { id: 'system', title: 'Ressources Système', desc: 'CPU, RAM, Disque', type: 'external', x: 1300, y: 1040, icon: '💻' }
+            ],
+            connections: [
+                // Frontend to UI connections (all frontend components connect to UI)
+                { from: 'appstate', to: 'ui' },
+                { from: 'dombatcher', to: 'ui' },
+                { from: 'perfoptimizer', to: 'ui' },
+                { from: 'polling', to: 'ui' },
+                { from: 'errorhandler', to: 'ui' },
+                { from: 'css_arch', to: 'ui' },
+
+                // UI to Flask connections
+                { from: 'ui', to: 'api_routes' },
+                { from: 'ui', to: 'workflow_routes' },
+
+                // Flask to Services connections
+                { from: 'api_routes', to: 'monitoring_service' },
+                { from: 'api_routes', to: 'cache_service' },
+                { from: 'api_routes', to: 'perf_service' },
+                { from: 'api_routes', to: 'csv_service' },
+                { from: 'workflow_routes', to: 'workflow_service' },
+                { from: 'workflow_routes', to: 'monitoring_service' },
+                { from: 'flask', to: 'config' },
+                { from: 'flask', to: 'security' },
+
+                // Service interconnections
+                { from: 'workflow_service', to: 'monitoring_service' },
+                { from: 'workflow_service', to: 'cache_service' },
+                { from: 'workflow_service', to: 'perf_service' },
+                { from: 'csv_service', to: 'webhook_service' },
+                { from: 'cache_service', to: 'perf_service' },
+
+                // Services to Processing Environments
+                { from: 'workflow_service', to: 'env_main' },
+                { from: 'workflow_service', to: 'env_trans' },
+                { from: 'workflow_service', to: 'env_audio' },
+                { from: 'workflow_service', to: 'env_track' },
+
+                // Environment to Scripts connections
+                { from: 'env_main', to: 'step1' },
+                { from: 'env_main', to: 'step2' },
+                { from: 'env_main', to: 'step6' },
+                { from: 'env_trans', to: 'step3' },
+                { from: 'env_audio', to: 'step4' },
+                { from: 'env_track', to: 'step5' },
+
+                // Scripts to Data connections
+                { from: 'step1', to: 'projects' },
+                { from: 'step2', to: 'projects' },
+                { from: 'step3', to: 'projects' },
+                { from: 'step4', to: 'projects' },
+                { from: 'step5', to: 'projects' },
+                { from: 'step6', to: 'output' },
+
+                // Cache and Performance connections
+                { from: 'cache_service', to: 'cache_dir' },
+                { from: 'perf_service', to: 'system' },
+
+                // External connections
+                { from: 'webhook_service', to: 'webhook_endpoint' },
+                { from: 'step2', to: 'gpu' },
+                { from: 'step3', to: 'gpu' },
+                { from: 'step5', to: 'gpu' },
+                { from: 'monitoring_service', to: 'system' }
+            ]
+        };
+
+        // Workflow execution data structure - Improved spacing and visual hierarchy
+        const workflowData = {
+            nodes: [
+                // Initialization Layer (Top) - Improved spacing at y: 80, 200
+                { id: 'start', title: 'Démarrage Workflow', desc: 'Point d\'entrée', type: 'workflow-step', x: 400, y: 80, icon: '🚀' },
+                { id: 'init_check', title: 'Vérification Prérequis', desc: 'Validation initiale', type: 'workflow-step', x: 400, y: 200, icon: '✅' },
+                { id: 'error_init', title: 'Erreur Initialisation', desc: 'Échec prérequis', type: 'error', x: 650, y: 200, icon: '❌' },
+
+                // Main Workflow Steps - Improved spacing with y: 380 (start), 500 (success), 620 (error)
+                { id: 'step1_start', title: 'STEP1: Extraction Archives', desc: 'Extraction ZIP/RAR/TAR (env/)', type: 'workflow-step', x: 80, y: 380, icon: '📦' },
+                { id: 'step1_success', title: '✓ Archives Extraites', desc: 'Extraction réussie', type: 'workflow-step', x: 80, y: 500, icon: '✅' },
+                { id: 'step1_error', title: '✗ Erreur Extraction', desc: 'Échec extraction', type: 'error', x: 80, y: 620, icon: '❌' },
+
+                { id: 'step2_start', title: 'STEP2: Conversion Vidéo', desc: 'Conversion 25 FPS (env/)', type: 'workflow-step', x: 280, y: 380, icon: '🎬' },
+                { id: 'step2_success', title: '✓ Vidéos 25 FPS', desc: 'Conversion réussie', type: 'workflow-step', x: 280, y: 500, icon: '✅' },
+                { id: 'step2_error', title: '✗ Erreur Conversion', desc: 'Échec conversion', type: 'error', x: 280, y: 620, icon: '❌' },
+
+                { id: 'step3_start', title: 'STEP3: Détection Scènes', desc: 'TransNetV2 (transnet_env/)', type: 'workflow-step', x: 480, y: 380, icon: '🎯' },
+                { id: 'step3_success', title: '✓ Scènes Détectées', desc: 'Détection réussie', type: 'workflow-step', x: 480, y: 500, icon: '✅' },
+                { id: 'step3_error', title: '✗ Erreur Détection', desc: 'Échec détection', type: 'error', x: 480, y: 620, icon: '❌' },
+
+                { id: 'step4_start', title: 'STEP4: Analyse Audio', desc: 'Spectrogrammes (audio_env/)', type: 'workflow-step', x: 680, y: 380, icon: '🎵' },
+                { id: 'step4_success', title: '✓ Audio Analysé', desc: 'Analyse réussie', type: 'workflow-step', x: 680, y: 500, icon: '✅' },
+                { id: 'step4_error', title: '✗ Erreur Audio', desc: 'Échec analyse', type: 'error', x: 680, y: 620, icon: '❌' },
+
+                { id: 'step5_start', title: 'STEP5: Suivi Vidéo', desc: 'MediaPipe (tracking_env/)', type: 'workflow-step', x: 880, y: 380, icon: '👁️' },
+                { id: 'step5_success', title: '✓ Tracking Terminé', desc: 'Suivi réussi', type: 'workflow-step', x: 880, y: 500, icon: '✅' },
+                { id: 'step5_error', title: '✗ Erreur Tracking', desc: 'Échec suivi', type: 'error', x: 880, y: 620, icon: '❌' },
+
+                { id: 'step6_start', title: 'STEP6: Finalisation', desc: 'Organisation finale (env/)', type: 'workflow-step', x: 1080, y: 380, icon: '✨' },
+                { id: 'step6_success', title: '✓ Workflow Terminé', desc: 'Finalisation réussie', type: 'workflow-step', x: 1080, y: 500, icon: '✅' },
+                { id: 'step6_error', title: '✗ Erreur Finalisation', desc: 'Échec finalisation', type: 'error', x: 1080, y: 620, icon: '❌' },
+
+                // Completion - Better positioned
+                { id: 'workflow_complete', title: '🎉 Workflow Complet', desc: 'Données Prêtes', type: 'workflow-step', x: 1280, y: 440, icon: '🎉' },
+
+                // Error Handling Layer - Improved spacing at y: 760, 880
+                { id: 'error_handler', title: 'ErrorHandler', desc: 'Recovery automatique', type: 'error', x: 680, y: 760, icon: '🛡️' },
+                { id: 'retry_logic', title: 'Retry Logic', desc: 'Logique de retry', type: 'error', x: 680, y: 880, icon: '🔄' },
+                { id: 'final_error', title: 'Erreur Finale', desc: 'Notification utilisateur', type: 'error', x: 880, y: 880, icon: '🚨' },
+
+                // Monitoring Layer - Improved spacing at y: 1000, 1120
+                { id: 'frontend_mon', title: 'Interface Web', desc: 'Surveillance UI', type: 'monitoring', x: 80, y: 1000, icon: '🖥️' },
+                { id: 'polling_mon', title: 'PollingManager', desc: 'Surveillance continue', type: 'monitoring', x: 280, y: 1000, icon: '🔁' },
+                { id: 'api_status', title: 'API Status', desc: 'Temps réel', type: 'monitoring', x: 480, y: 1000, icon: '📡' },
+                { id: 'appstate_mon', title: 'AppState', desc: 'État centralisé', type: 'monitoring', x: 680, y: 1000, icon: '🔄' },
+                { id: 'cache_mon', title: 'CacheService', desc: 'TTL intelligent', type: 'monitoring', x: 80, y: 1120, icon: '💾' },
+                { id: 'perf_mon', title: 'PerformanceService', desc: 'Métriques temps réel', type: 'monitoring', x: 280, y: 1120, icon: '📈' },
+                { id: 'monitoring_service', title: 'MonitoringService', desc: 'Ressources système', type: 'monitoring', x: 480, y: 1120, icon: '📊' },
+
+                // External Services Layer - Improved spacing
+                { id: 'webhook_ext', title: 'Webhook JSON', desc: 'Source téléchargements Dropbox-only', type: 'external', x: 680, y: 1120, icon: '🌐' },
+                { id: 'gpu_accel', title: 'Accélération GPU', desc: 'NVIDIA CUDA', type: 'external', x: 1280, y: 280, icon: '🚀' },
+                { id: 'system_res', title: 'Ressources Système', desc: 'CPU/RAM/Disque', type: 'external', x: 1280, y: 1120, icon: '💻' }
+            ],
+            connections: [
+                // Main workflow flow (horizontal with success/error branches)
+                { from: 'start', to: 'init_check' },
+                { from: 'init_check', to: 'step1_start' },
+                { from: 'init_check', to: 'error_init' },
+
+                // Step 1 flow
+                { from: 'step1_start', to: 'step1_success' },
+                { from: 'step1_start', to: 'step1_error' },
+                { from: 'step1_success', to: 'step2_start' },
+
+                // Step 2 flow
+                { from: 'step2_start', to: 'step2_success' },
+                { from: 'step2_start', to: 'step2_error' },
+                { from: 'step2_success', to: 'step3_start' },
+
+                // Step 3 flow
+                { from: 'step3_start', to: 'step3_success' },
+                { from: 'step3_start', to: 'step3_error' },
+                { from: 'step3_success', to: 'step4_start' },
+
+                // Step 4 flow
+                { from: 'step4_start', to: 'step4_success' },
+                { from: 'step4_start', to: 'step4_error' },
+                { from: 'step4_success', to: 'step5_start' },
+
+                // Step 5 flow
+                { from: 'step5_start', to: 'step5_success' },
+                { from: 'step5_start', to: 'step5_error' },
+                { from: 'step5_success', to: 'step6_start' },
+
+                // Step 6 flow
+                { from: 'step6_start', to: 'step6_success' },
+                { from: 'step6_start', to: 'step6_error' },
+                { from: 'step6_success', to: 'workflow_complete' },
+
+                // GPU acceleration connections
+                { from: 'gpu_accel', to: 'step2_start' },
+                { from: 'gpu_accel', to: 'step3_start' },
+                { from: 'gpu_accel', to: 'step5_start' },
+
+                // Error handling connections
+                { from: 'step1_error', to: 'error_handler' },
+                { from: 'step2_error', to: 'error_handler' },
+                { from: 'step3_error', to: 'error_handler' },
+                { from: 'step4_error', to: 'error_handler' },
+                { from: 'step5_error', to: 'error_handler' },
+                { from: 'step6_error', to: 'error_handler' },
+                { from: 'error_init', to: 'error_handler' },
+                { from: 'error_handler', to: 'retry_logic' },
+                { from: 'retry_logic', to: 'final_error' },
+                { from: 'retry_logic', to: 'step1_start' },
+
+                // Monitoring flow
+                { from: 'frontend_mon', to: 'polling_mon' },
+                { from: 'polling_mon', to: 'api_status' },
+                { from: 'api_status', to: 'appstate_mon' },
+                { from: 'cache_mon', to: 'perf_mon' },
+                { from: 'perf_mon', to: 'monitoring_service' },
+                { from: 'perf_mon', to: 'webhook_ext' },
+
+                // Vertical connections from workflow to monitoring
+                { from: 'step1_start', to: 'frontend_mon' },
+                { from: 'step2_start', to: 'polling_mon' },
+                { from: 'step4_start', to: 'perf_mon' },
+
+                // External system connections
+                { from: 'monitoring_service', to: 'system_res' }
+            ]
+        };
+
+        function initCanvas() {
+            canvas.innerHTML = '';
+            nodes = [];
+            connections = [];
+            
+            const data = currentView === 'architecture' ? architectureData : workflowData;
+            
+            // Create SVG for connections
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.style.position = 'absolute';
+            svg.style.top = '0';
+            svg.style.left = '0';
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+            svg.style.pointerEvents = 'none';
+            svg.style.zIndex = '15';
+            canvas.appendChild(svg);
+            
+            // Create nodes
+            data.nodes.forEach((nodeData, index) => {
+                const node = createNode(nodeData);
+                canvas.appendChild(node);
+                nodes.push({ element: node, data: nodeData });
+                
+                // Stagger animation delay
+                node.style.animationDelay = `${index * 0.1}s`;
+            });
+            
+            // Create connections
+            setTimeout(() => {
+                data.connections.forEach((conn, index) => {
+                    const connection = createConnection(conn, data.nodes);
+                    if (connection) {
+                        svg.appendChild(connection);
+                        connections.push(connection);
+                        // Stagger connection animation
+                        connection.style.animationDelay = `${index * 0.05}s`;
+                    }
+                });
+            }, 500);
+        }
+
+        function createNode(nodeData) {
+            const node = document.createElement('div');
+            node.className = `node ${nodeData.type}`;
+            node.style.left = `${nodeData.x}px`;
+            node.style.top = `${nodeData.y}px`;
+            
+            node.innerHTML = `
+                <div class="node-title">
+                    <div class="node-icon">${nodeData.icon}</div>
+                    ${nodeData.title}
+                </div>
+                <div class="node-desc">${nodeData.desc}</div>
+            `;
+            
+            node.addEventListener('click', () => showModal(nodeData.id, nodeData));
+            
+            return node;
+        }
+
+        function createConnection(conn, nodes) {
+            const fromNode = nodes.find(n => n.id === conn.from);
+            const toNode = nodes.find(n => n.id === conn.to);
+            
+            if (!fromNode || !toNode) return null;
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('class', 'connection-line');
+            line.setAttribute('x1', fromNode.x + nodeWidth/2);
+            line.setAttribute('y1', fromNode.y + nodeHeight/2);
+            line.setAttribute('x2', toNode.x + nodeWidth/2);
+            line.setAttribute('y2', toNode.y + nodeHeight/2);
+            
+            return line;
+        }
+
+        function switchView(viewName) {
+            currentView = viewName;
+            
+            // Update button states
+            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Reinitialize canvas
+            initCanvas();
+            resetView();
+        }
+
+        function zoomIn() {
+            const oldScale = scale;
+            scale = Math.min(scale * 1.2, 3);
+
+            // Adjust pan position to zoom towards center
+            const scaleRatio = scale / oldScale;
+            panX *= scaleRatio;
+            panY *= scaleRatio;
+
+            updateTransform();
+        }
+
+        function zoomOut() {
+            const oldScale = scale;
+            scale = Math.max(scale / 1.2, 0.2); // Allow more zoom out
+
+            // Adjust pan position to zoom from center
+            const scaleRatio = scale / oldScale;
+            panX *= scaleRatio;
+            panY *= scaleRatio;
+
+            updateTransform();
+        }
+
+        function updateTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        }
+
+        function resetView() {
+            scale = 1;
+            panX = 0;
+            panY = 0;
+            updateTransform();
+        }
+
+        function toggleLegend() {
+            const legend = document.getElementById('legend');
+            legend.style.display = legend.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showModal(nodeId, nodeData) {
+            const modal = document.getElementById('modal');
+            const modalBody = document.getElementById('modal-body');
+
+            // Generate detailed content based on node type and data
+            const content = generateModalContent(nodeData);
+            modalBody.innerHTML = content;
+
+            modal.classList.add('active');
+
+            // Close modal when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.remove('active');
+        }
+
+        function generateModalContent(nodeData) {
+            const detailedInfo = getDetailedNodeInfo(nodeData);
+
+            return `
+                <h2>${nodeData.icon} ${nodeData.title}</h2>
+                <p><strong>Type:</strong> ${nodeData.type}</p>
+                <p><strong>Description:</strong> ${nodeData.desc}</p>
+                ${detailedInfo.details ? `<div><h3>Détails Techniques</h3>${detailedInfo.details}</div>` : ''}
+                ${detailedInfo.features ? `<div><h3>Fonctionnalités</h3><ul>${detailedInfo.features.map(f => `<li>${f}</li>`).join('')}</ul></div>` : ''}
+                ${detailedInfo.dependencies ? `<div><h3>Dépendances</h3><ul>${detailedInfo.dependencies.map(d => `<li>${d}</li>`).join('')}</ul></div>` : ''}
+                ${detailedInfo.metrics ? `<div><h3>Métriques</h3><ul>${detailedInfo.metrics.map(m => `<li>${m}</li>`).join('')}</ul></div>` : ''}
+            `;
+        }
+
+        function getDetailedNodeInfo(nodeData) {
+            const nodeDetails = {
+                // Frontend nodes
+                'ui': {
+                    details: 'Interface utilisateur principale construite avec HTML5, CSS3 et JavaScript moderne.',
+                    features: ['Interface responsive', 'Animations fluides', 'Gestion d\'état temps réel', 'Polling automatique'],
+                    dependencies: ['AppState.js', 'DOMBatcher.js', 'PollingManager.js', 'ErrorHandler.js']
+                },
+                'appstate': {
+                    details: 'Gestionnaire d\'état centralisé utilisant le pattern Observer pour la synchronisation.',
+                    features: ['État centralisé', 'Notifications automatiques', 'Persistance locale', 'Rollback automatique'],
+                    dependencies: ['LocalStorage API', 'Event System']
+                },
+                'dombatcher': {
+                    details: 'Optimiseur de performance DOM utilisant le batching pour minimiser les reflows.',
+                    features: ['Batching intelligent', 'Optimisation reflow', 'Queue de modifications', 'Performance monitoring'],
+                    dependencies: ['RequestAnimationFrame', 'MutationObserver']
+                },
+                'perfoptimizer': {
+                    details: 'Optimiseur de performance avec debouncing et throttling pour les événements utilisateur.',
+                    features: ['Debouncing intelligent', 'Throttling adaptatif', 'Optimisation événements', 'Performance monitoring'],
+                    dependencies: ['RequestAnimationFrame', 'Performance API']
+                },
+                'polling': {
+                    details: 'Gestionnaire de polling intelligent avec backoff exponentiel et détection de changements.',
+                    features: ['Polling adaptatif', 'Backoff exponentiel', 'Détection changements', 'Gestion erreurs'],
+                    dependencies: ['Fetch API', 'WebSocket (fallback)']
+                },
+                'errorhandler': {
+                    details: 'Système de gestion d\'erreurs avec recovery automatique et logging centralisé.',
+                    features: ['Recovery automatique', 'Logging centralisé', 'Notifications utilisateur', 'Retry intelligent'],
+                    dependencies: ['Console API', 'Notification API']
+                },
+                'css_arch': {
+                    details: 'Architecture CSS modulaire avec variables centralisées et composants réutilisables.',
+                    features: ['Variables CSS centralisées', 'Composants modulaires', 'Thèmes adaptatifs', 'Optimisation performance'],
+                    dependencies: ['CSS Custom Properties', 'CSS Modules']
+                },
+
+                // Flask nodes
+                'flask': {
+                    details: 'Application Flask principale avec architecture modulaire et gestion des sessions.',
+                    features: ['Architecture modulaire', 'Gestion sessions', 'Middleware custom', 'Hot reload'],
+                    dependencies: ['Python 3.8+', 'Flask 2.0+', 'Werkzeug', 'Jinja2']
+                },
+                'api_routes': {
+                    details: '12 endpoints système pour monitoring, cache, et gestion des performances.',
+                    features: ['12 endpoints système', 'Validation automatique', 'Rate limiting', 'Documentation auto'],
+                    dependencies: ['Flask-RESTful', 'Marshmallow', 'Flask-Limiter']
+                },
+                'workflow_routes': {
+                    details: '18 endpoints dédiés à la gestion complète du workflow vidéo.',
+                    features: ['18 endpoints workflow', 'Validation fichiers', 'Progress tracking', 'Error handling'],
+                    dependencies: ['Flask-Upload', 'Celery', 'Redis']
+                },
+
+                // Configuration & Security nodes
+                'config': {
+                    details: 'Configuration centralisée du système avec gestion des environnements.',
+                    features: ['Configuration centralisée', 'Gestion environnements', 'Validation config', 'Hot reload'],
+                    dependencies: ['Python configparser', 'Environment variables']
+                },
+                'security': {
+                    details: 'Système de sécurité avec tokens et authentification.',
+                    features: ['Gestion tokens', 'Authentification', 'Autorisation', 'Chiffrement'],
+                    dependencies: ['JWT', 'bcrypt', 'cryptography']
+                },
+
+                // Service nodes
+                'workflow_service': {
+                    details: 'Service principal orchestrant l\'exécution des 6 étapes du workflow vidéo.',
+                    features: ['Orchestration workflow', 'Gestion états', 'Recovery automatique', 'Monitoring temps réel'],
+                    dependencies: ['Celery', 'Redis', 'PostgreSQL']
+                },
+                'monitoring_service': {
+                    details: 'Service de surveillance système avec métriques temps réel et alertes.',
+                    features: ['Métriques temps réel', 'Alertes automatiques', 'Dashboard intégré', 'Historique'],
+                    dependencies: ['Prometheus', 'Grafana', 'InfluxDB']
+                },
+                'cache_service': {
+                    details: 'Service de cache intelligent avec TTL adaptatif et invalidation automatique.',
+                    features: ['TTL adaptatif', 'Invalidation auto', 'Compression', 'Statistiques'],
+                    dependencies: ['Redis', 'Memcached', 'LRU Cache']
+                },
+                'perf_service': {
+                    details: 'Service de métriques de performance avec analyse prédictive.',
+                    features: ['Métriques détaillées', 'Analyse prédictive', 'Optimisations auto', 'Rapports'],
+                    dependencies: ['psutil', 'numpy', 'pandas']
+                },
+                'webhook_service': {
+                    details: 'Service récupérant les liens depuis le Webhook JSON unique (cache + retries).',
+                    features: ['Source unique', 'Cache TTL', 'Retry backoff', 'Normalisation des entrées'],
+                    dependencies: ['requests', 'cachetools']
+                },
+                'csv_service': {
+                    details: 'Service de monitoring des téléchargements basé sur le Webhook (Dropbox-only).',
+                    features: ['Monitoring auto', 'Historique structuré', 'Politique Dropbox-only', 'Validation URLs'],
+                    dependencies: ['WorkflowState', 'WebhookService']
+                },
+
+                // Processing environments
+                'env_main': {
+                    details: 'Environnement principal Python pour les étapes 1, 2, 6 et l\'application Flask.',
+                    features: ['Python 3.8+', 'Gestion mémoire', 'Multiprocessing', 'Error recovery'],
+                    dependencies: ['FFmpeg', 'OpenCV', 'NumPy', 'Pillow']
+                },
+                'env_trans': {
+                    details: 'Environnement spécialisé TransNetV2 pour la détection automatique de scènes.',
+                    features: ['TransNetV2 optimisé', 'GPU acceleration', 'Batch processing', 'Cache intelligent'],
+                    dependencies: ['TensorFlow', 'CUDA', 'cuDNN', 'TransNetV2']
+                },
+                'env_audio': {
+                    details: 'Environnement d\'analyse audio avec traitement spectral avancé.',
+                    features: ['Analyse spectrale', 'Feature extraction', 'Noise reduction', 'Format support'],
+                    dependencies: ['librosa', 'scipy', 'soundfile', 'resampy']
+                },
+                'env_track': {
+                    details: 'Environnement MediaPipe pour le suivi vidéo et détection d\'objets.',
+                    features: ['MediaPipe optimisé', 'Tracking temps réel', 'Multi-object', 'GPU acceleration'],
+                    dependencies: ['MediaPipe', 'OpenCV', 'TensorFlow Lite', 'CUDA']
+                },
+
+                // Workflow steps
+                'start': {
+                    details: 'Point d\'entrée du workflow avec validation des prérequis système.',
+                    features: ['Validation système', 'Check dépendances', 'Init environnements', 'Logging setup'],
+                    metrics: ['Temps initialisation', 'Ressources disponibles', 'Status environnements']
+                },
+                'step1': {
+                    details: 'Extraction d\'archives avec support multi-format et validation d\'intégrité.',
+                    features: ['Support ZIP/RAR/TAR', 'Validation intégrité', 'Progress tracking', 'Error recovery'],
+                    metrics: ['Taille extraite', 'Temps extraction', 'Fichiers traités', 'Erreurs détectées']
+                },
+                'step2': {
+                    details: 'Conversion vidéo optimisée 25 FPS avec préservation de qualité.',
+                    features: ['Conversion 25 FPS', 'Préservation qualité', 'GPU acceleration', 'Batch processing'],
+                    metrics: ['FPS source/cible', 'Qualité vidéo', 'Temps conversion', 'Utilisation GPU']
+                },
+                'step3': {
+                    details: 'Détection de scènes avec TransNetV2 et post-traitement intelligent.',
+                    features: ['TransNetV2 detection', 'Post-processing', 'Seuil adaptatif', 'Validation manuelle'],
+                    metrics: ['Scènes détectées', 'Précision', 'Temps traitement', 'Confiance moyenne']
+                },
+                'step4': {
+                    details: 'Analyse audio spectrale avec extraction de caractéristiques avancées.',
+                    features: ['Analyse spectrale', 'Feature extraction', 'Synchronisation A/V', 'Noise analysis'],
+                    metrics: ['Fréquences analysées', 'Features extraites', 'Qualité audio', 'Sync A/V']
+                },
+                'step5': {
+                    details: 'Suivi vidéo MediaPipe avec détection multi-objets et tracking persistant.',
+                    features: ['Multi-object tracking', 'Persistence tracking', 'Occlusion handling', 'Real-time processing'],
+                    metrics: ['Objets trackés', 'Précision tracking', 'Pertes tracking', 'FPS traitement']
+                },
+                'step6': {
+                    details: 'Finalisation avec organisation des données et génération de métadonnées.',
+                    features: ['Organisation finale', 'Métadonnées', 'Validation qualité', 'Archive génération'],
+                    metrics: ['Fichiers organisés', 'Métadonnées générées', 'Taille finale', 'Temps total']
+                },
+
+                // Workflow execution nodes
+                'step1_start': {
+                    details: 'Démarrage de l\'extraction d\'archives avec validation des formats supportés.',
+                    features: ['Support ZIP/RAR/TAR', 'Validation format', 'Sanitisation paths', 'Progress tracking'],
+                    metrics: ['Archives détectées', 'Formats supportés', 'Taille totale', 'Temps estimation']
+                },
+                'step1_success': {
+                    details: 'Extraction réussie avec organisation dans projets_extraits/.',
+                    features: ['Extraction complète', 'Organisation fichiers', 'Validation intégrité', 'Nettoyage'],
+                    metrics: ['Fichiers extraits', 'Taille extraite', 'Temps extraction', 'Intégrité validée']
+                },
+                'step1_error': {
+                    details: 'Erreur lors de l\'extraction avec diagnostic détaillé.',
+                    features: ['Diagnostic erreur', 'Logs détaillés', 'Recovery suggestions', 'Cleanup partiel'],
+                    metrics: ['Type erreur', 'Fichiers partiels', 'Espace utilisé', 'Actions recovery']
+                },
+                'step2_start': {
+                    details: 'Démarrage de la conversion vidéo avec analyse FPS.',
+                    features: ['Scan vidéos', 'Analyse FPS', 'Détection format', 'Planification conversion'],
+                    metrics: ['Vidéos détectées', 'FPS moyens', 'Formats détectés', 'Temps estimation']
+                },
+                'step2_success': {
+                    details: 'Conversion réussie vers 25 FPS avec validation.',
+                    features: ['Conversion 25 FPS', 'Validation qualité', 'Optimisation GPU', 'Intégrité vérifiée'],
+                    metrics: ['Vidéos converties', 'Gain compression', 'Temps conversion', 'Utilisation GPU']
+                },
+                'step2_error': {
+                    details: 'Erreur de conversion avec diagnostic GPU/CPU.',
+                    features: ['Diagnostic conversion', 'Logs FFmpeg', 'Fallback CPU', 'Recovery options'],
+                    metrics: ['Erreurs GPU', 'Fallback utilisés', 'Vidéos partielles', 'Ressources utilisées']
+                },
+
+                // Error handling nodes
+                'error_handler': {
+                    details: 'Gestionnaire d\'erreurs centralisé avec recovery automatique.',
+                    features: ['Recovery automatique', 'Logging centralisé', 'Notifications', 'Retry intelligent'],
+                    dependencies: ['Logging system', 'Notification API', 'Retry logic']
+                },
+                'retry_logic': {
+                    details: 'Logique de retry avec backoff exponentiel.',
+                    features: ['Backoff exponentiel', 'Limite tentatives', 'Conditions retry', 'Escalation'],
+                    dependencies: ['Timer system', 'Condition evaluator']
+                },
+                'final_error': {
+                    details: 'Erreur finale avec notification utilisateur.',
+                    features: ['Notification utilisateur', 'Rapport erreur', 'Actions manuelles', 'Support contact'],
+                    dependencies: ['Notification system', 'Report generator']
+                },
+
+                // Monitoring nodes
+                'api_status': {
+                    details: 'Surveillance des endpoints API en temps réel.',
+                    features: ['Status temps réel', 'Health checks', 'Response times', 'Error rates'],
+                    metrics: ['Uptime', 'Response time', 'Error rate', 'Throughput']
+                },
+                'appstate_mon': {
+                    details: 'Monitoring de l\'état centralisé de l\'application.',
+                    features: ['État centralisé', 'Change tracking', 'State validation', 'Rollback capability'],
+                    metrics: ['State changes', 'Validation errors', 'Rollbacks', 'Sync status']
+                }
+            };
+
+            return nodeDetails[nodeData.id] || {
+                details: `Composant ${nodeData.type} du système de traitement vidéo.`,
+                features: ['Fonctionnalité de base', 'Intégration système'],
+                dependencies: ['Dépendances standard']
+            };
+        }
+
+        // Pan and drag functionality
+        function setupCanvasEvents() {
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', endDrag);
+            canvas.addEventListener('mouseleave', endDrag);
+
+            // Touch events for mobile
+            canvas.addEventListener('touchstart', handleTouch);
+            canvas.addEventListener('touchmove', handleTouch);
+            canvas.addEventListener('touchend', endDrag);
+
+            // Prevent context menu
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            // Mouse wheel zoom
+            canvas.addEventListener('wheel', handleWheel, { passive: false });
+
+            // Window resize handler to update pan limits
+            window.addEventListener('resize', () => {
+                // Force recalculation of pan limits on next drag operation
+                // No need to do anything here as drag() function recalculates dynamically
+            });
+
+            // Ensure proper cursor state
+            canvas.addEventListener('mouseenter', () => {
+                if (!isDragging) {
+                    canvas.style.cursor = 'grab';
+                }
+            });
+        }
+
+        function handleMouseMove(e) {
+            // Handle dragging
+            if (isDragging) {
+                drag(e);
+            } else {
+                // Ensure cursor remains grab when over canvas area
+                if (e.target === canvas || (!e.target.classList.contains('node') && !e.target.closest('.node'))) {
+                    canvas.style.cursor = 'grab';
+                }
+            }
+        }
+
+        function startDrag(e) {
+            // Allow dragging on canvas or any non-interactive element
+            if (e.target === canvas || e.target.classList.contains('diagram-canvas') ||
+                (!e.target.classList.contains('node') && !e.target.closest('.node'))) {
+                isDragging = true;
+                canvas.classList.add('grabbing');
+                dragStart.x = e.clientX - panX;
+                dragStart.y = e.clientY - panY;
+                e.preventDefault(); // Prevent text selection during drag
+            }
+        }
+
+        function drag(e) {
+            const newPanX = e.clientX - dragStart.x;
+            const newPanY = e.clientY - dragStart.y;
+
+            // Get canvas-container dimensions and position for accurate pan boundaries
+            const canvasContainer = document.querySelector('.canvas-container');
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+
+            // Get viewport dimensions for reference
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            // Estimate diagram content size based on current view
+            const diagramWidth = currentView === 'architecture' ? 1600 : 1500;
+            const diagramHeight = currentView === 'architecture' ? 1400 : 1300;
+
+            // Calculate scaled content dimensions based on current scale
+            const scaledDiagramWidth = diagramWidth * scale;
+            const scaledDiagramHeight = diagramHeight * scale;
+
+            // Dynamic pan limits calculation using canvas-container as reference
+            let maxPanX, maxPanY, minPanX, minPanY;
+
+            if (scale >= 1.0) {
+                // When zoomed in, allow panning to see all content within container bounds
+                maxPanX = Math.max(0, (scaledDiagramWidth - containerWidth) / 2 + containerWidth * 0.1);
+                maxPanY = Math.max(0, (scaledDiagramHeight - containerHeight) / 2 + containerHeight * 0.1);
+                minPanX = -maxPanX;
+                minPanY = -maxPanY;
+            } else {
+                // When zoomed out, provide generous panning area based on container size
+                const zoomOutFactor = (1.0 - scale) * 2; // Increases as zoom decreases
+                const basePaddingX = containerWidth * 0.4; // 40% of container width
+                const basePaddingY = containerHeight * 0.4; // 40% of container height
+                const dynamicPaddingX = basePaddingX * (1 + zoomOutFactor);
+                const dynamicPaddingY = basePaddingY * (1 + zoomOutFactor);
+
+                // Calculate content offset from container center
+                const contentOffsetX = (scaledDiagramWidth - containerWidth) / 2;
+                const contentOffsetY = (scaledDiagramHeight - containerHeight) / 2;
+
+                maxPanX = Math.max(dynamicPaddingX, contentOffsetX + dynamicPaddingX);
+                maxPanY = Math.max(dynamicPaddingY, contentOffsetY + dynamicPaddingY);
+                minPanX = -maxPanX;
+                minPanY = -maxPanY;
+            }
+
+            // Apply the calculated limits
+            panX = Math.max(minPanX, Math.min(maxPanX, newPanX));
+            panY = Math.max(minPanY, Math.min(maxPanY, newPanY));
+
+            updateTransform();
+        }
+
+        function endDrag() {
+            if (isDragging) {
+                isDragging = false;
+                canvas.classList.remove('grabbing');
+                // Ensure cursor returns to grab state
+                canvas.style.cursor = 'grab';
+            }
+        }
+
+        function handleTouch(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            if (touch) {
+                const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' :
+                                                 e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvas.dispatchEvent(mouseEvent);
+            }
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Calculate zoom
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const oldScale = scale;
+            scale = Math.max(0.2, Math.min(3, scale * zoomFactor));
+
+            // Zoom towards mouse position
+            const scaleChange = scale / oldScale;
+            panX = mouseX - (mouseX - panX) * scaleChange;
+            panY = mouseY - (mouseY - panY) * scaleChange;
+
+            updateTransform();
+        }
+
+        function createLayerContainers() {
+            const data = currentView === 'architecture' ? architectureData : workflowData;
+
+            if (currentView === 'architecture') {
+                // Architecture view layer containers - Properly sized to contain all nodes
+                const layers = [
+                    {
+                        class: 'frontend-layer',
+                        label: 'Frontend Layer',
+                        bounds: { x: 40, y: 40, width: 1000, height: 360 }
+                    },
+                    {
+                        class: 'backend-layer',
+                        label: 'Flask Application Layer',
+                        bounds: { x: 80, y: 420, width: 580, height: 260 }
+                    },
+                    {
+                        class: 'config-layer',
+                        label: 'Configuration & Security',
+                        bounds: { x: 940, y: 420, width: 200, height: 260 }
+                    },
+                    {
+                        class: 'services-layer',
+                        label: 'Service Layer',
+                        bounds: { x: 40, y: 700, width: 900, height: 260 }
+                    },
+                    {
+                        class: 'processing-layer',
+                        label: 'Processing Layer',
+                        bounds: { x: 40, y: 980, width: 1000, height: 280 }
+                    },
+                    {
+                        class: 'data-layer',
+                        label: 'Data Storage',
+                        bounds: { x: 80, y: 1280, width: 640, height: 140 }
+                    },
+                    {
+                        class: 'external-layer',
+                        label: 'External Systems',
+                        bounds: { x: 1240, y: 140, width: 200, height: 1100 }
+                    }
+                ];
+
+                layers.forEach(layer => {
+                    const container = document.createElement('div');
+                    container.className = `layer-container ${layer.class}`;
+                    container.setAttribute('data-label', layer.label);
+                    container.style.left = `${layer.bounds.x}px`;
+                    container.style.top = `${layer.bounds.y}px`;
+                    container.style.width = `${layer.bounds.width}px`;
+                    container.style.height = `${layer.bounds.height}px`;
+
+                    const label = document.createElement('div');
+                    label.className = 'layer-label';
+                    label.textContent = layer.label;
+                    label.style.zIndex = '200';
+                    container.appendChild(label);
+
+                    canvas.appendChild(container);
+                });
+            } else {
+                // Workflow view layer containers - Properly sized to contain all nodes
+                const layers = [
+                    {
+                        class: 'workflow-layer',
+                        label: 'Initialization',
+                        bounds: { x: 340, y: 40, width: 380, height: 220 }
+                    },
+                    {
+                        class: 'workflow-layer',
+                        label: 'Main Workflow Steps',
+                        bounds: { x: 40, y: 320, width: 1300, height: 380 }
+                    },
+                    {
+                        class: 'workflow-layer',
+                        label: 'Completion',
+                        bounds: { x: 1220, y: 380, width: 200, height: 140 }
+                    },
+                    {
+                        class: 'error-layer',
+                        label: 'Error Handling',
+                        bounds: { x: 620, y: 720, width: 320, height: 240 }
+                    },
+                    {
+                        class: 'monitoring-layer',
+                        label: 'Monitoring Layer',
+                        bounds: { x: 40, y: 980, width: 900, height: 260 }
+                    },
+                    {
+                        class: 'external-layer',
+                        label: 'External Services',
+                        bounds: { x: 620, y: 1100, width: 320, height: 140 }
+                    },
+                    {
+                        class: 'external-layer',
+                        label: 'GPU & System Resources',
+                        bounds: { x: 1220, y: 220, width: 200, height: 1000 }
+                    }
+                ];
+
+                layers.forEach(layer => {
+                    const container = document.createElement('div');
+                    container.className = `layer-container ${layer.class}`;
+                    container.setAttribute('data-label', layer.label);
+                    container.style.left = `${layer.bounds.x}px`;
+                    container.style.top = `${layer.bounds.y}px`;
+                    container.style.width = `${layer.bounds.width}px`;
+                    container.style.height = `${layer.bounds.height}px`;
+
+                    // Force visibility for workflow layers
+                    if (layer.class === 'workflow-layer') {
+                        container.style.zIndex = '35';
+                        container.style.opacity = '1';
+                        container.style.display = 'block';
+                        container.style.visibility = 'visible';
+                        container.style.position = 'absolute';
+                    }
+
+                    const label = document.createElement('div');
+                    label.className = 'layer-label';
+                    label.textContent = layer.label;
+                    label.style.zIndex = '200';
+                    container.appendChild(label);
+
+                    canvas.appendChild(container);
+                });
+            }
+        }
+
+        function initCanvas() {
+            canvas.innerHTML = '';
+            nodes = [];
+            connections = [];
+
+            const data = currentView === 'architecture' ? architectureData : workflowData;
+
+            // Create layer containers first
+            createLayerContainers();
+
+            // Create SVG for connections with arrow markers
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.style.position = 'absolute';
+            svg.style.top = '0';
+            svg.style.left = '0';
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+            svg.style.pointerEvents = 'none';
+            svg.style.zIndex = '15';
+
+            // Add arrow marker definition
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', 'arrowhead');
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '7');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '3.5');
+            marker.setAttribute('orient', 'auto');
+
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+            polygon.setAttribute('fill', 'rgba(0, 212, 255, 0.8)');
+
+            marker.appendChild(polygon);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+            canvas.appendChild(svg);
+
+            // Create nodes
+            data.nodes.forEach((nodeData, index) => {
+                const node = createNode(nodeData);
+                canvas.appendChild(node);
+                nodes.push({ element: node, data: nodeData });
+
+                // Stagger animation delay
+                node.style.animationDelay = `${index * 0.1}s`;
+            });
+
+            // Create connections with improved routing
+            setTimeout(() => {
+                data.connections.forEach((conn, index) => {
+                    const connection = createConnection(conn, data.nodes);
+                    if (connection) {
+                        svg.appendChild(connection);
+                        connections.push(connection);
+                        // Stagger connection animation
+                        connection.style.animationDelay = `${index * 0.05}s`;
+                    }
+                });
+            }, 500);
+        }
+
+        function createNode(nodeData) {
+            const node = document.createElement('div');
+            node.className = `node ${nodeData.type}`;
+            node.style.left = `${nodeData.x}px`;
+            node.style.top = `${nodeData.y}px`;
+
+            node.innerHTML = `
+                <div class="node-title">
+                    <div class="node-icon">${nodeData.icon}</div>
+                    ${nodeData.title}
+                </div>
+                <div class="node-desc">${nodeData.desc}</div>
+            `;
+
+            node.addEventListener('click', () => showModal(nodeData.id, nodeData));
+
+            return node;
+        }
+
+        function createConnection(conn, nodes) {
+            const fromNode = nodes.find(n => n.id === conn.from);
+            const toNode = nodes.find(n => n.id === conn.to);
+
+            if (!fromNode || !toNode) return null;
+
+            // Calculate optimal connection points based on node positions
+            const nodeWidth = 165;
+            const nodeHeight = 70;
+
+            let fromX, fromY, toX, toY;
+
+            // Determine connection points based on relative positions
+            const dx = toNode.x - fromNode.x;
+            const dy = toNode.y - fromNode.y;
+
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal connection
+                if (dx > 0) {
+                    // Left to right
+                    fromX = fromNode.x + nodeWidth;
+                    fromY = fromNode.y + nodeHeight / 2;
+                    toX = toNode.x;
+                    toY = toNode.y + nodeHeight / 2;
+                } else {
+                    // Right to left
+                    fromX = fromNode.x;
+                    fromY = fromNode.y + nodeHeight / 2;
+                    toX = toNode.x + nodeWidth;
+                    toY = toNode.y + nodeHeight / 2;
+                }
+            } else {
+                // Vertical connection
+                if (dy > 0) {
+                    // Top to bottom
+                    fromX = fromNode.x + nodeWidth / 2;
+                    fromY = fromNode.y + nodeHeight;
+                    toX = toNode.x + nodeWidth / 2;
+                    toY = toNode.y;
+                } else {
+                    // Bottom to top
+                    fromX = fromNode.x + nodeWidth / 2;
+                    fromY = fromNode.y;
+                    toX = toNode.x + nodeWidth / 2;
+                    toY = toNode.y + nodeHeight;
+                }
+            }
+
+            // Create curved path for better visual appeal
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('class', 'connection-line');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+
+            // Calculate control points for smooth curves
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            let pathData;
+
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal curve with vertical offset
+                const controlOffset = Math.min(Math.abs(dx) * 0.4, 150);
+                const midX1 = fromX + (dx > 0 ? controlOffset : -controlOffset);
+                const midX2 = toX - (dx > 0 ? controlOffset : -controlOffset);
+                pathData = `M ${fromX} ${fromY} C ${midX1} ${fromY}, ${midX2} ${toY}, ${toX} ${toY}`;
+            } else {
+                // Vertical curve with horizontal offset
+                const controlOffset = Math.min(Math.abs(dy) * 0.4, 100);
+                const midY1 = fromY + (dy > 0 ? controlOffset : -controlOffset);
+                const midY2 = toY - (dy > 0 ? controlOffset : -controlOffset);
+                pathData = `M ${fromX} ${fromY} C ${fromX} ${midY1}, ${toX} ${midY2}, ${toX} ${toY}`;
+            }
+
+            path.setAttribute('d', pathData);
+
+            return path;
+        }
+
+        function switchView(viewName) {
+            currentView = viewName;
+
+            // Update button states
+            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update legend for current view
+            updateLegend();
+
+            // Reinitialize canvas
+            initCanvas();
+            resetView();
+        }
+
+        function updateLegend() {
+            const legend = document.getElementById('legend');
+            const legendItems = currentView === 'architecture' ?
+                [
+                    { color: 'rgba(225, 245, 254, 0.5)', label: 'Frontend' },
+                    { color: 'rgba(255, 243, 224, 0.5)', label: 'Flask' },
+                    { color: 'rgba(243, 229, 245, 0.5)', label: 'Services' },
+                    { color: 'rgba(255, 248, 225, 0.5)', label: 'Processing' },
+                    { color: 'rgba(252, 228, 236, 0.5)', label: 'Data' },
+                    { color: 'rgba(241, 248, 233, 0.5)', label: 'External' }
+                ] : [
+                    { color: 'rgba(0, 212, 255, 0.5)', label: 'Workflow Steps' },
+                    { color: 'rgba(156, 39, 176, 0.5)', label: 'Monitoring' },
+                    { color: 'rgba(244, 67, 54, 0.5)', label: 'Error Handling' },
+                    { color: 'rgba(241, 248, 233, 0.5)', label: 'External' }
+                ];
+
+            legend.innerHTML = `
+                <h3 style="margin-bottom: 0.5rem; color: #00d4ff;">Légende - ${currentView === 'architecture' ? 'Architecture' : 'Workflow'}</h3>
+                ${legendItems.map(item => `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${item.color};"></div>
+                        <span>${item.label}</span>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            setupCanvasEvents();
+            updateLegend();
+            initCanvas();
+
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeModal();
+                } else if (e.key === '+' || e.key === '=') {
+                    zoomIn();
+                } else if (e.key === '-') {
+                    zoomOut();
+                } else if (e.key === '0') {
+                    resetView();
+                } else if (e.key === 'l' || e.key === 'L') {
+                    toggleLegend();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

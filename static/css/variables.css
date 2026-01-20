@@ -1,0 +1,32 @@
+:root {
+    --bg-dark: #1e1e2f;
+    --bg-card: #2c2c3e;
+    --bg-secondary: #2c2c3e; /* Secondary background for widgets */
+    --bg-tertiary: #3a3a4e; /* Tertiary background for disabled elements */
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --text-muted: #707080; /* Muted text for disabled states */
+    --accent-primary: #7986cb;
+    --accent-secondary: #ff8a65;
+    --border-color: #39394d;
+    --green: #66bb6a;
+    --red: #ef5350;
+    --yellow: #ffee58;
+    --blue: #42a5f5;
+    --log-bg: #161625;
+    --log-text: #c0c0d0;
+    --text-bright: #f0f0f0;
+    --bg-hover: rgba(121, 134, 203, 0.1);
+    --border-bright: #4a4a5e;
+    --touch-target-min: 44px;
+    --button-compact-padding: 12px;
+    --topbar-height: 68px;
+    --orange: #ffb74d; /* For custom sequence button */
+    --status-running: #4dabf7;
+    --status-success: #4caf50;
+    --status-error: #e53935;
+    --status-warning: #ff9800;
+    --status-idle: #9e9e9e;
+    --border-color-translucent: #39394d88; /* var(--border-color) avec opacité */
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; /* System font stack */
+}

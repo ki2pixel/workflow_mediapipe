@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/263 Camille/docs/Adixia et Simon se projettent ensemble !.mp4",
+  "video_stem": "Adixia et Simon se projettent ensemble !",
+  "video_hash": "fe00b3b6db2e60517105033c8b4fc6a46ae5351c585d24fa035f2a010990afcb",
+  "created_at": "2025-11-25T10:37:15.971773+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/fe00b3b6db2e60517105033c8b4fc6a46ae5351c585d24fa035f2a010990afcb/Adixia et Simon se projettent ensemble !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/fe00b3b6db2e60517105033c8b4fc6a46ae5351c585d24fa035f2a010990afcb/Adixia et Simon se projettent ensemble !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/fe00b3b6db2e60517105033c8b4fc6a46ae5351c585d24fa035f2a010990afcb/Adixia et Simon se projettent ensemble !_tracking.json"
+  }
+}

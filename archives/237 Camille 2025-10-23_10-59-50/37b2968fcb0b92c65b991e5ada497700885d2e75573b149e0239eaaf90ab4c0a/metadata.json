@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/237 Camille/docs/Extrait M6+ - Jérémy pas sincère avec Robin  .mp4",
+  "video_stem": "Extrait M6+ - Jérémy pas sincère avec Robin  ",
+  "video_hash": "37b2968fcb0b92c65b991e5ada497700885d2e75573b149e0239eaaf90ab4c0a",
+  "created_at": "2025-10-23T10:59:51.057107+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/37b2968fcb0b92c65b991e5ada497700885d2e75573b149e0239eaaf90ab4c0a/Extrait M6+ - Jérémy pas sincère avec Robin  _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/37b2968fcb0b92c65b991e5ada497700885d2e75573b149e0239eaaf90ab4c0a/Extrait M6+ - Jérémy pas sincère avec Robin  _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/37b2968fcb0b92c65b991e5ada497700885d2e75573b149e0239eaaf90ab4c0a/Extrait M6+ - Jérémy pas sincère avec Robin  _tracking.json"
+  }
+}

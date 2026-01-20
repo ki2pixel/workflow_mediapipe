@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flux d'Exécution d'un Workflow Complet - Workflow MediaPipe v4.0</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="../assets/styles.css">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --accent-color: #0ea5e9;
+            --background-color: #ffffff;
+            --surface-color: #f8fafc;
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+            
+            /* Dark theme variables */
+            --dark-background: #0f172a;
+            --dark-surface: #1e293b;
+            --dark-text: #f1f5f9;
+            --dark-text-muted: #94a3b8;
+            --dark-border: #334155;
+        }
+
+        [data-theme="dark"] {
+            --background-color: var(--dark-background);
+            --surface-color: var(--dark-surface);
+            --text-color: var(--dark-text);
+            --text-muted: var(--dark-text-muted);
+            --border-color: var(--dark-border);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem;
+            cursor: pointer;
+            color: var(--text-color);
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--border-color);
+        }
+
+        .back-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .back-button:hover {
+            background: var(--accent-color);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: var(--header-height);
+            padding: 2rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+
+        .page-description {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 3rem;
+            line-height: 1.7;
+        }
+
+        /* Diagram styles removed - diagrams now handled on main page only */
+
+        /* Workflow Steps */
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .workflow-step {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .step-number {
+            position: absolute;
+            top: -10px;
+            left: 1rem;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.875rem;
+        }
+
+        .workflow-step h3 {
+            color: var(--primary-color);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .step-environment {
+            background: var(--accent-color);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .workflow-step ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .workflow-step li {
+            padding: 0.25rem 0;
+            color: var(--text-color);
+            position: relative;
+            padding-left: 1rem;
+        }
+
+        .workflow-step li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        /* Process Flow */
+        .process-flow {
+            background: linear-gradient(135deg, var(--surface-color) 0%, var(--background-color) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .process-flow h2 {
+            color: var(--primary-color);
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .flow-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .flow-section {
+            background-color: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .flow-section h4 {
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .flow-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .flow-section li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .flow-section li:last-child {
+            border-bottom: none;
+        }
+
+        .flow-section li strong {
+            color: var(--primary-color);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .page-title {
+                font-size: 2rem;
+            }
+            
+            .workflow-steps {
+                grid-template-columns: 1fr;
+            }
+            
+            .flow-sections {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Dark theme link fixes */
+        [data-theme="dark"] a {
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] a:hover {
+            color: var(--primary-color) !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1>Flux d'Exécution d'un Workflow Complet</h1>
+        <div class="header-controls">
+            <a href="../index.html" class="back-button">← Retour à la Documentation</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Basculer le thème">
+                🌙
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb">
+            <a href="../index.html">Documentation</a>
+            <span>›</span>
+            <span>Architecture</span>
+            <span>›</span>
+            <span>Flux d'Exécution d'un Workflow Complet</span>
+        </nav>
+
+        <!-- Page Title -->
+        <h1 class="page-title">Flux d'Exécution d'un Workflow Complet</h1>
+        <p class="page-description">
+            Diagramme détaillé du flux d'exécution complet d'un workflow MediaPipe v4.0, 
+            montrant le processus étape par étape, les points de décision, la gestion d'erreurs, 
+            et l'intégration du monitoring en temps réel.
+        </p>
+
+        <!-- Workflow execution documentation continues below -->
+
+        <!-- Workflow Steps -->
+        <div class="workflow-steps">
+            <div class="workflow-step">
+                <div class="step-number">1</div>
+                <h3>Extraction d'Archives</h3>
+                <div class="step-environment">env/</div>
+                <ul>
+                    <li>Validation des archives ZIP/RAR/TAR</li>
+                    <li>Extraction sécurisée avec sanitisation des chemins</li>
+                    <li>Organisation dans projets_extraits/</li>
+                    <li>Vérification d'intégrité</li>
+                </ul>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-number">2</div>
+                <h3>Conversion Vidéo</h3>
+                <div class="step-environment">env/</div>
+                <ul>
+                    <li>Scan des vidéos et analyse FPS</li>
+                    <li>Conversion GPU avec FFmpeg NVENC</li>
+                    <li>Normalisation à 25 FPS</li>
+                    <li>Validation de l'intégrité</li>
+                </ul>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-number">3</div>
+                <h3>Détection de Scènes</h3>
+                <div class="step-environment">transnet_env/</div>
+                <ul>
+                    <li>Chargement du modèle TransNetV2</li>
+                    <li>Analyse vidéo pour détection des transitions</li>
+                    <li>Export CSV avec timecodes et frames</li>
+                    <li>Optimisation GPU</li>
+                </ul>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-number">4</div>
+                <h3>Analyse Audio</h3>
+                <div class="step-environment">audio_env/</div>
+                <ul>
+                    <li>Extraction audio avec FFmpeg</li>
+                    <li>Analyse spectrale et spectrogrammes</li>
+                    <li>Extraction de features (MFCC, Chroma)</li>
+                    <li>Export JSON des métadonnées audio</li>
+                </ul>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-number">5</div>
+                <h3>Suivi Vidéo</h3>
+                <div class="step-environment">tracking_env/</div>
+                <ul>
+                    <li>Sélection mode CPU (15 workers) ou GPU (1 worker)</li>
+                    <li>Détection faciale avec MediaPipe</li>
+                    <li>Tracking d'objets et coordonnées</li>
+                    <li>Export JSON des données de tracking</li>
+                </ul>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-number">5.bis</div>
+                <h3>Réduction JSON</h3>
+                <div class="step-environment">env/</div>
+                <ul>
+                    <li>Optimisation des fichiers JSON</li>
+                    <li>Réduction des données vidéo et audio</li>
+                    <li>Traitement par lot des projets</li>
+                    <li>Amélioration des performances</li>
+                </ul>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-number">6</div>
+                <h3>Finalisation</h3>
+                <div class="step-environment">env/</div>
+                <ul>
+                    <li>Validation d'intégrité complète</li>
+                    <li>Organisation de la structure finale</li>
+                    <li>Copie vers destination finale</li>
+                    <li>Nettoyage des fichiers temporaires</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Process Flow -->
+        <div class="process-flow">
+            <h2>Composants du Flux d'Exécution</h2>
+            <div class="flow-sections">
+                <div class="flow-section">
+                    <h4>🔄 Monitoring & État</h4>
+                    <ul>
+                        <li><strong>Interface Web</strong> - Surveillance en temps réel</li>
+                        <li><strong>PollingManager</strong> - Surveillance continue</li>
+                        <li><strong>AppState</strong> - État centralisé</li>
+                        <li><strong>MonitoringService</strong> - Ressources système</li>
+                    </ul>
+                </div>
+
+                <div class="flow-section">
+                    <h4>⚠️ Gestion d'Erreurs</h4>
+                    <ul>
+                        <li><strong>ErrorHandler</strong> - Recovery automatique</li>
+                        <li><strong>Retry Logic</strong> - Logique de nouvelle tentative</li>
+                        <li><strong>Exponential Backoff</strong> - Délai progressif</li>
+                        <li><strong>Notification Utilisateur</strong> - Erreurs finales</li>
+                    </ul>
+                </div>
+
+                <div class="flow-section">
+                    <h4>🌍 Intégrations Externes</h4>
+                    <ul>
+                        <li><strong>GPU NVIDIA CUDA</strong> - Accélération matérielle</li>
+                        <li><strong>AirtableService</strong> - API externe</li>
+                        <li><strong>CSVService</strong> - Monitoring automatique</li>
+                        <li><strong>Ressources Système</strong> - CPU/RAM/Disque</li>
+                    </ul>
+                </div>
+
+                <div class="flow-section">
+                    <h4>🎯 Points de Décision</h4>
+                    <ul>
+                        <li><strong>Vérification Prérequis</strong> - Validation initiale</li>
+                        <li><strong>Mode CPU/GPU</strong> - Sélection optimale</li>
+                        <li><strong>Validation Étapes</strong> - Contrôles de succès</li>
+                        <li><strong>Retry Possible</strong> - Décision de nouvelle tentative</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Enhanced functionality -->
+    <script src="../assets/app.js"></script>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+
+            const button = document.querySelector('.theme-toggle');
+            button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+
+            const button = document.querySelector('.theme-toggle');
+            button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+            setTimeout(() => {
+                if (window.enhancedApp && window.enhancedApp.diagramLightbox) {
+                    window.enhancedApp.diagramLightbox.setupClickableDiagrams();
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

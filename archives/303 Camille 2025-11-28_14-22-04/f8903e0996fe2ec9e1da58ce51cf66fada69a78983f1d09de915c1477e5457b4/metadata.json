@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/303 Camille/docs/postdiff 1 – La doyenne fait un cadeau exceptionnel aux immunisés !.mp4",
+  "video_stem": "postdiff 1 – La doyenne fait un cadeau exceptionnel aux immunisés !",
+  "video_hash": "f8903e0996fe2ec9e1da58ce51cf66fada69a78983f1d09de915c1477e5457b4",
+  "created_at": "2025-11-28T14:22:05.187771+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/303 Camille 2025-11-28_14-22-04/f8903e0996fe2ec9e1da58ce51cf66fada69a78983f1d09de915c1477e5457b4/postdiff 1 – La doyenne fait un cadeau exceptionnel aux immunisés !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/303 Camille 2025-11-28_14-22-04/f8903e0996fe2ec9e1da58ce51cf66fada69a78983f1d09de915c1477e5457b4/postdiff 1 – La doyenne fait un cadeau exceptionnel aux immunisés !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/303 Camille 2025-11-28_14-22-04/f8903e0996fe2ec9e1da58ce51cf66fada69a78983f1d09de915c1477e5457b4/postdiff 1 – La doyenne fait un cadeau exceptionnel aux immunisés !_tracking.json"
+  }
+}

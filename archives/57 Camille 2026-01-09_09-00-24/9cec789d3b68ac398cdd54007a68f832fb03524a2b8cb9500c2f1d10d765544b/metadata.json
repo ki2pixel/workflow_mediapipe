@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/57 Camille/docs/6ter - les reines - Clémence doit conduire dans un fort brouillard .mp4",
+  "video_stem": "6ter - les reines - Clémence doit conduire dans un fort brouillard ",
+  "video_hash": "9cec789d3b68ac398cdd54007a68f832fb03524a2b8cb9500c2f1d10d765544b",
+  "created_at": "2026-01-09T09:00:24.930373+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2026-01-09_09-00-24/9cec789d3b68ac398cdd54007a68f832fb03524a2b8cb9500c2f1d10d765544b/6ter - les reines - Clémence doit conduire dans un fort brouillard _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2026-01-09_09-00-24/9cec789d3b68ac398cdd54007a68f832fb03524a2b8cb9500c2f1d10d765544b/6ter - les reines - Clémence doit conduire dans un fort brouillard _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/57 Camille 2026-01-09_09-00-24/9cec789d3b68ac398cdd54007a68f832fb03524a2b8cb9500c2f1d10d765544b/6ter - les reines - Clémence doit conduire dans un fort brouillard _tracking.json"
+  }
+}

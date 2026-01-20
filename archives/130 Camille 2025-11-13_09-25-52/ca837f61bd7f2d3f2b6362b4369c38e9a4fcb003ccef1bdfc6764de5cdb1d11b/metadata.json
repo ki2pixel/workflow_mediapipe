@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/130 Camille/docs/6TER_En famille_un kervelec ne pleure jamaismp4.mp4",
+  "video_stem": "6TER_En famille_un kervelec ne pleure jamaismp4",
+  "video_hash": "ca837f61bd7f2d3f2b6362b4369c38e9a4fcb003ccef1bdfc6764de5cdb1d11b",
+  "created_at": "2025-11-13T09:25:52.279475+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/130 Camille 2025-11-13_09-25-52/ca837f61bd7f2d3f2b6362b4369c38e9a4fcb003ccef1bdfc6764de5cdb1d11b/6TER_En famille_un kervelec ne pleure jamaismp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/130 Camille 2025-11-13_09-25-52/ca837f61bd7f2d3f2b6362b4369c38e9a4fcb003ccef1bdfc6764de5cdb1d11b/6TER_En famille_un kervelec ne pleure jamaismp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/130 Camille 2025-11-13_09-25-52/ca837f61bd7f2d3f2b6362b4369c38e9a4fcb003ccef1bdfc6764de5cdb1d11b/6TER_En famille_un kervelec ne pleure jamaismp4_tracking.json"
+  }
+}

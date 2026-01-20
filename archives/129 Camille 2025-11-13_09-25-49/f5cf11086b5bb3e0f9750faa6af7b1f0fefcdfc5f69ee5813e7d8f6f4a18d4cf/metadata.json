@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/129 Camille/docs/6TER_En famille_Mauvaise définitionmp4.mp4",
+  "video_stem": "6TER_En famille_Mauvaise définitionmp4",
+  "video_hash": "f5cf11086b5bb3e0f9750faa6af7b1f0fefcdfc5f69ee5813e7d8f6f4a18d4cf",
+  "created_at": "2025-11-13T09:25:49.899579+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/f5cf11086b5bb3e0f9750faa6af7b1f0fefcdfc5f69ee5813e7d8f6f4a18d4cf/6TER_En famille_Mauvaise définitionmp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/f5cf11086b5bb3e0f9750faa6af7b1f0fefcdfc5f69ee5813e7d8f6f4a18d4cf/6TER_En famille_Mauvaise définitionmp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/f5cf11086b5bb3e0f9750faa6af7b1f0fefcdfc5f69ee5813e7d8f6f4a18d4cf/6TER_En famille_Mauvaise définitionmp4_tracking.json"
+  }
+}

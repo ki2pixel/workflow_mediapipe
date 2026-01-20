@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/29 Camille/docs/post-diff 2 – Simon fait grimper la cagnotte de 5 000€ avant la grande finale.mp4",
+  "video_stem": "post-diff 2 – Simon fait grimper la cagnotte de 5 000€ avant la grande finale",
+  "video_hash": "80b88e23af0b357a3f7ae4a099444cd365afcb9b5606bdc09ba74394a00af239",
+  "created_at": "2025-11-04T15:56:45.472648+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/29 Camille 2025-11-04_15-56-45/80b88e23af0b357a3f7ae4a099444cd365afcb9b5606bdc09ba74394a00af239/post-diff 2 – Simon fait grimper la cagnotte de 5 000€ avant la grande finale_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/29 Camille 2025-11-04_15-56-45/80b88e23af0b357a3f7ae4a099444cd365afcb9b5606bdc09ba74394a00af239/post-diff 2 – Simon fait grimper la cagnotte de 5 000€ avant la grande finale_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/29 Camille 2025-11-04_15-56-45/80b88e23af0b357a3f7ae4a099444cd365afcb9b5606bdc09ba74394a00af239/post-diff 2 – Simon fait grimper la cagnotte de 5 000€ avant la grande finale_tracking.json"
+  }
+}

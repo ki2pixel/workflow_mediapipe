@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/157 Camille/docs/M6 - LMP - Extrait 4 (EM11 P2)  Sa banane en trompe-l’œil provoque un fou rire chez le jury.mp4",
+  "video_stem": "M6 - LMP - Extrait 4 (EM11 P2)  Sa banane en trompe-l’œil provoque un fou rire chez le jury",
+  "video_hash": "08f61a37fd9376194c53aaf7bbe4e6617a83d45591aee77823dbfe6c9fb4520b",
+  "created_at": "2025-11-14T13:57:35.903149+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-11-14_13-57-35/08f61a37fd9376194c53aaf7bbe4e6617a83d45591aee77823dbfe6c9fb4520b/M6 - LMP - Extrait 4 (EM11 P2)  Sa banane en trompe-l’œil provoque un fou rire chez le jury_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-11-14_13-57-35/08f61a37fd9376194c53aaf7bbe4e6617a83d45591aee77823dbfe6c9fb4520b/M6 - LMP - Extrait 4 (EM11 P2)  Sa banane en trompe-l’œil provoque un fou rire chez le jury_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-11-14_13-57-35/08f61a37fd9376194c53aaf7bbe4e6617a83d45591aee77823dbfe6c9fb4520b/M6 - LMP - Extrait 4 (EM11 P2)  Sa banane en trompe-l’œil provoque un fou rire chez le jury_tracking.json"
+  }
+}

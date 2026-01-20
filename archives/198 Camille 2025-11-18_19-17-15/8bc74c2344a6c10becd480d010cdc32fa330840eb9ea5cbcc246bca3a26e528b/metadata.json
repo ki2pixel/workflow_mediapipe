@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/198 Camille/docs/EP46_Niko devient fou sur cette épreuve de logique ! .mp4",
+  "video_stem": "EP46_Niko devient fou sur cette épreuve de logique ! ",
+  "video_hash": "8bc74c2344a6c10becd480d010cdc32fa330840eb9ea5cbcc246bca3a26e528b",
+  "created_at": "2025-11-18T19:17:16.002220+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/8bc74c2344a6c10becd480d010cdc32fa330840eb9ea5cbcc246bca3a26e528b/EP46_Niko devient fou sur cette épreuve de logique ! _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/8bc74c2344a6c10becd480d010cdc32fa330840eb9ea5cbcc246bca3a26e528b/EP46_Niko devient fou sur cette épreuve de logique ! _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/8bc74c2344a6c10becd480d010cdc32fa330840eb9ea5cbcc246bca3a26e528b/EP46_Niko devient fou sur cette épreuve de logique ! _tracking.json"
+  }
+}

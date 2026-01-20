@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/4 Camille/docs/CHAUFFEUR ROUTIER_TAT_M6.mp4",
+  "video_stem": "CHAUFFEUR ROUTIER_TAT_M6",
+  "video_hash": "78e1db847acd9035a658d91b9887815c051dcd656934d1726bd409133f3c18ec",
+  "created_at": "2025-12-01T11:24:14.526566+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/4 Camille 2025-12-01_11-24-14/78e1db847acd9035a658d91b9887815c051dcd656934d1726bd409133f3c18ec/CHAUFFEUR ROUTIER_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/4 Camille 2025-12-01_11-24-14/78e1db847acd9035a658d91b9887815c051dcd656934d1726bd409133f3c18ec/CHAUFFEUR ROUTIER_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/4 Camille 2025-12-01_11-24-14/78e1db847acd9035a658d91b9887815c051dcd656934d1726bd409133f3c18ec/CHAUFFEUR ROUTIER_TAT_M6_tracking.json"
+  }
+}

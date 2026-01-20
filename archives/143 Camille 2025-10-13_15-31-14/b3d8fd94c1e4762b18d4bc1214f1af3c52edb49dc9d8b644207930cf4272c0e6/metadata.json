@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/143 Camille/docs/TEVA_Nos meilleures années_Quand tu en as marre de commander toujours la même chosemp4.mp4",
+  "video_stem": "TEVA_Nos meilleures années_Quand tu en as marre de commander toujours la même chosemp4",
+  "video_hash": "b3d8fd94c1e4762b18d4bc1214f1af3c52edb49dc9d8b644207930cf4272c0e6",
+  "created_at": "2025-10-13T15:31:14.114549+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/143 Camille 2025-10-13_15-31-14/b3d8fd94c1e4762b18d4bc1214f1af3c52edb49dc9d8b644207930cf4272c0e6/TEVA_Nos meilleures années_Quand tu en as marre de commander toujours la même chosemp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/143 Camille 2025-10-13_15-31-14/b3d8fd94c1e4762b18d4bc1214f1af3c52edb49dc9d8b644207930cf4272c0e6/TEVA_Nos meilleures années_Quand tu en as marre de commander toujours la même chosemp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/143 Camille 2025-10-13_15-31-14/b3d8fd94c1e4762b18d4bc1214f1af3c52edb49dc9d8b644207930cf4272c0e6/TEVA_Nos meilleures années_Quand tu en as marre de commander toujours la même chosemp4_tracking.json"
+  }
+}

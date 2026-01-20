@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/102 Camille/docs/M6 - Pékin Express - Extrait 4 (EM2 P1)  Il se fait épiler l’intérieur du nez et des oreilles par son hôte.mp4",
+  "video_stem": "M6 - Pékin Express - Extrait 4 (EM2 P1)  Il se fait épiler l’intérieur du nez et des oreilles par son hôte",
+  "video_hash": "00b7e4aef6d5f13a6ef452813ab6a1ec7e73437157758fc6663ba5eef9a00550",
+  "created_at": "2025-11-10T20:00:12.459825+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/102 Camille 2025-11-10_20-00-12/00b7e4aef6d5f13a6ef452813ab6a1ec7e73437157758fc6663ba5eef9a00550/M6 - Pékin Express - Extrait 4 (EM2 P1)  Il se fait épiler l’intérieur du nez et des oreilles par son hôte_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/102 Camille 2025-11-10_20-00-12/00b7e4aef6d5f13a6ef452813ab6a1ec7e73437157758fc6663ba5eef9a00550/M6 - Pékin Express - Extrait 4 (EM2 P1)  Il se fait épiler l’intérieur du nez et des oreilles par son hôte_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/102 Camille 2025-11-10_20-00-12/00b7e4aef6d5f13a6ef452813ab6a1ec7e73437157758fc6663ba5eef9a00550/M6 - Pékin Express - Extrait 4 (EM2 P1)  Il se fait épiler l’intérieur du nez et des oreilles par son hôte_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/263 Camille/docs/Personne n'arrive à mettre Greg et Maeva en couple !.mp4",
+  "video_stem": "Personne n'arrive à mettre Greg et Maeva en couple !",
+  "video_hash": "7f9e1bee967167686ae954abf99255ba825b3cc03ad401c8739425854b9d7742",
+  "created_at": "2025-11-25T10:37:16.464875+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/7f9e1bee967167686ae954abf99255ba825b3cc03ad401c8739425854b9d7742/Personne n'arrive à mettre Greg et Maeva en couple !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/7f9e1bee967167686ae954abf99255ba825b3cc03ad401c8739425854b9d7742/Personne n'arrive à mettre Greg et Maeva en couple !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/7f9e1bee967167686ae954abf99255ba825b3cc03ad401c8739425854b9d7742/Personne n'arrive à mettre Greg et Maeva en couple !_tracking.json"
+  }
+}

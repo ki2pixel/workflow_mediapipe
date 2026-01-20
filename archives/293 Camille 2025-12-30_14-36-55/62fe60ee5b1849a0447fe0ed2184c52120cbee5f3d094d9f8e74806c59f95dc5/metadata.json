@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/293 Camille/docs/Buffy avoue être la tueuse à sa mère.mp4",
+  "video_stem": "Buffy avoue être la tueuse à sa mère",
+  "video_hash": "62fe60ee5b1849a0447fe0ed2184c52120cbee5f3d094d9f8e74806c59f95dc5",
+  "created_at": "2025-12-30T14:36:55.456428+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/293 Camille 2025-12-30_14-36-55/62fe60ee5b1849a0447fe0ed2184c52120cbee5f3d094d9f8e74806c59f95dc5/Buffy avoue être la tueuse à sa mère_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/293 Camille 2025-12-30_14-36-55/62fe60ee5b1849a0447fe0ed2184c52120cbee5f3d094d9f8e74806c59f95dc5/Buffy avoue être la tueuse à sa mère_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/293 Camille 2025-12-30_14-36-55/62fe60ee5b1849a0447fe0ed2184c52120cbee5f3d094d9f8e74806c59f95dc5/Buffy avoue être la tueuse à sa mère_tracking.json"
+  }
+}

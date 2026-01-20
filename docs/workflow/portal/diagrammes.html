@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrammes d'Architecture - Workflow MediaPipe v4.0</title>
+    <style>
+        /* --- Styles Généraux et Thème --- */
+        :root {
+            --bg-color: #f4f7f9;
+            --text-color: #2c3e50;
+            --card-bg: #ffffff;
+            --header-bg: #ffffff;
+            --primary-color: #3498db;
+            --primary-hover: #2980b9;
+            --border-color: #e0e0e0;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --node-hover-stroke: #f39c12;
+            --node-selected-stroke: #e74c3c;
+            --node-connected-stroke: #2ecc71;
+        }
+
+        html.dark-mode {
+            --bg-color: #1a1a2e;
+            --text-color: #e0e0e0;
+            --card-bg: #16213e;
+            --header-bg: #1e2a47;
+            --primary-color: #0f3460;
+            --primary-hover: #1f487e;
+            --border-color: #3a4a6b;
+            --shadow: 0 4px 15px rgba(0,0,0,0.3);
+            --node-hover-stroke: #f1c40f;
+            --node-selected-stroke: #e74c3c;
+            --node-connected-stroke: #2ecc71;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.3s, color 0.3s;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* --- En-tête et Contrôles --- */
+        header {
+            width: 100%;
+            background-color: var(--header-bg);
+            box-shadow: var(--shadow);
+            padding: 15px 30px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5em;
+            color: var(--text-color);
+        }
+        
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* --- Interrupteur de Diagramme --- */
+        .diagram-switcher {
+            display: flex;
+            background-color: var(--bg-color);
+            border-radius: 20px;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .diagram-switcher label {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 18px;
+            transition: background-color 0.3s, color 0.3s;
+            font-weight: 500;
+        }
+
+        .diagram-switcher input[type="radio"] {
+            display: none;
+        }
+
+        .diagram-switcher input[type="radio"]:checked + label {
+            background-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 2px 5px rgba(52, 152, 219, 0.4);
+        }
+
+        /* --- Bouton Thème Sombre --- */
+        #theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        #theme-toggle:hover {
+            background-color: var(--bg-color);
+            transform: rotate(15deg);
+        }
+
+        /* --- Conteneur principal du Diagramme --- */
+        main {
+            flex-grow: 1;
+            width: calc(100% - 40px);
+            margin: 20px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .diagram-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 1;
+            transition: opacity 0.4s ease-in-out;
+        }
+        
+        .diagram-container.hidden {
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .diagram-container svg {
+            max-width: 100%;
+            max-height: 100%;
+            cursor: grab;
+        }
+        .diagram-container svg:active {
+            cursor: grabbing;
+        }
+        
+        /* --- Styles d'interaction sur les nœuds SVG --- */
+        .node.hovered > rect, .node.hovered > polygon, .node.hovered > circle {
+            stroke-width: 4px !important;
+            stroke: var(--node-hover-stroke) !important;
+        }
+        .node.selected > rect, .node.selected > polygon, .node.selected > circle {
+            stroke-width: 5px !important;
+            stroke: var(--node-selected-stroke) !important;
+            filter: drop-shadow(0 0 5px var(--node-selected-stroke));
+        }
+        .edgePath.connected path {
+            stroke: var(--node-connected-stroke) !important;
+            stroke-width: 2.5px !important;
+        }
+
+        /* --- Tooltip --- */
+        #tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Diagrammes d'Architecture</h1>
+        <!-- Note d'information FromSmash: affichage discret sous le titre -->
+        <p style="margin: 6px 0 0 0; font-size: 0.9em; opacity: 0.8;">
+            Note: Les liens FromSmash s'ouvrent dans un nouvel onglet via une modale dédiée (pas de téléchargement automatique).
+        </p>
+        <div class="controls">
+            <div class="diagram-switcher">
+                <input type="radio" id="view-workflow" name="diagram-view" value="workflow" checked>
+                <label for="view-workflow">🔄 Flux d'Exécution</label>
+
+                <input type="radio" id="view-architecture" name="diagram-view" value="architecture">
+                <label for="view-architecture">🏗️ Architecture Système</label>
+            </div>
+            <button id="theme-toggle" title="Changer de thème">🌙</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="workflow-container" class="diagram-container">
+            <pre class="mermaid">
+                %% ----- CODE WORKFLOW STABLE ET FONCTIONNEL -----
+                graph LR
+                    START(Démarrage) --> INIT_CHECK{Prérequis}
+
+                    subgraph "STEP 1: Extraction"
+                        STEP1_START(Extraction Archives) --> STEP1_VALIDATE(Validation) --> STEP1_EXTRACT(Extraction Sécurisée) --> STEP1_ORGANIZE(Organisation) --> STEP1_COMPLETE{Réussie?}
+                        STEP1_COMPLETE -- ✓ --> STEP1_SUCCESS(✓ Extraites)
+                        STEP1_COMPLETE -- ✗ --> STEP1_ERROR(✗ Erreur)
+                    end
+
+                    subgraph "STEP 2: Conversion"
+                        STEP2_START(Conversion Vidéo) --> STEP2_SCAN(Scan FPS) --> STEP2_FILTER{FPS≠25?}
+                        STEP2_FILTER -- Oui --> STEP2_CONVERT(Conversion GPU) --> STEP2_VALIDATE(Validation)
+                        STEP2_FILTER -- Non --> STEP2_SKIP(Pas de Conv.)
+                        STEP2_VALIDATE & STEP2_SKIP --> STEP2_COMPLETE{Réussie?}
+                        STEP2_COMPLETE -- ✓ --> STEP2_SUCCESS(✓ 25 FPS)
+                        STEP2_COMPLETE -- ✗ --> STEP2_ERROR(✗ Erreur)
+                    end
+
+                    subgraph "STEP 3: Détection"
+                        STEP3_START(Détection Scènes) --> STEP3_LOAD(Load TransNetV2) --> STEP3_PROCESS(Analyse Vidéo) --> STEP3_EXPORT(Export CSV) --> STEP3_COMPLETE{Réussie?}
+                        STEP3_COMPLETE -- ✓ --> STEP3_SUCCESS(✓ Scènes)
+                        STEP3_COMPLETE -- ✗ --> STEP3_ERROR(✗ Erreur)
+                    end
+
+                    subgraph "STEP 4: Audio"
+                        STEP4_START(Analyse Audio) --> STEP4_EXTRACT(Extraction) --> STEP4_ANALYZE(Analyse Spectrale) --> STEP4_FEATURES(Features) --> STEP4_JSON(Export JSON) --> STEP4_COMPLETE{Réussie?}
+                        STEP4_COMPLETE -- ✓ --> STEP4_SUCCESS(✓ Audio)
+                        STEP4_COMPLETE -- ✗ --> STEP4_ERROR(✗ Erreur)
+                    end
+
+                    subgraph "STEP 5: Tracking"
+                        STEP5_START(Suivi Vidéo) --> STEP5_MODE{Mode}
+                        STEP5_MODE -- CPU --> STEP5_CPU(Multi-proc)
+                        STEP5_MODE -- GPU --> STEP5_GPU(Séquentiel)
+                        STEP5_CPU & STEP5_GPU --> STEP5_MEDIAPIPE(MediaPipe) --> STEP5_TRACK(Tracking) --> STEP5_JSON_OUT(Export JSON) --> STEP5_COMPLETE{Réussi?}
+                        STEP5_COMPLETE -- ✓ --> STEP5_SUCCESS(✓ Tracking)
+                        STEP5_COMPLETE -- ✗ --> STEP5_ERROR(✗ Erreur)
+                    end
+
+                    subgraph "STEP 6: Finalisation"
+                        STEP6_START(Finalisation) --> STEP6_VALIDATE(Validation) --> STEP6_ORGANIZE(Organisation) --> STEP6_COPY(Copie Finale) --> STEP6_VERIFY(Vérification) --> STEP6_CLEANUP(Nettoyage) --> STEP6_COMPLETE{Réussie?}
+                        STEP6_COMPLETE -- ✓ --> STEP6_SUCCESS(✓ Terminé)
+                        STEP6_COMPLETE -- ✗ --> STEP6_ERROR(✗ Erreur)
+                    end
+
+                    WORKFLOW_COMPLETE(🎉<br/>Workflow<br/>Complet)
+
+                    %% ---- CONNEXIONS PRINCIPALES ----
+                    INIT_CHECK -- ✓ OK --> STEP1_START
+                    STEP1_SUCCESS --> STEP2_START
+                    STEP2_SUCCESS --> STEP3_START
+                    STEP3_SUCCESS --> STEP4_START
+                    STEP4_SUCCESS --> STEP5_START
+                    STEP5_SUCCESS --> STEP6_START
+                    STEP6_SUCCESS --> WORKFLOW_COMPLETE
+
+                    %% ---- SYSTÈMES TRANSVERSES ----
+                    subgraph "Systèmes de Support"
+                        subgraph "Gestion des Erreurs"
+                            ERROR_HANDLER(ErrorHandler) --> RETRY_LOGIC{Retry?}
+                            RETRY_LOGIC -- Non --> FINAL_ERROR(Erreur Finale)
+                            RETRY_LOGIC -- Oui --> BACKOFF(Backoff)
+                        end
+                        subgraph "Ressources & Monitoring"
+                           GPU_ACCEL(Accél. GPU)
+                           MONITORING(Monitoring)
+                        end
+                    end
+
+                    %% ---- CONNEXIONS TRANSVERSES ----
+                    INIT_CHECK -- ✗ Erreur --> ERROR_HANDLER
+                    STEP1_ERROR & STEP2_ERROR & STEP3_ERROR & STEP4_ERROR & STEP5_ERROR & STEP6_ERROR --> ERROR_HANDLER
+                    GPU_ACCEL --> STEP2_CONVERT & STEP3_PROCESS & STEP5_GPU
+                    BACKOFF --> START
+
+                    %% ---- CLASSES ----
+                    classDef default stroke-width:2px,font-size:12px;
+                    class START,STEP1_START,STEP2_START,STEP3_START,STEP4_START,STEP5_START,STEP6_START,STEP1_VALIDATE,STEP1_EXTRACT,STEP1_ORGANIZE,STEP2_SCAN,STEP2_CONVERT,STEP2_VALIDATE,STEP2_SKIP,STEP3_LOAD,STEP3_PROCESS,STEP3_EXPORT,STEP4_EXTRACT,STEP4_ANALYZE,STEP4_FEATURES,STEP4_JSON,STEP5_CPU,STEP5_GPU,STEP5_MEDIAPIPE,STEP5_TRACK,STEP5_JSON_OUT,STEP6_VALIDATE,STEP6_ORGANIZE,STEP6_COPY,STEP6_VERIFY,STEP6_CLEANUP,BACKOFF stepNode
+                    class STEP1_SUCCESS,STEP2_SUCCESS,STEP3_SUCCESS,STEP4_SUCCESS,STEP5_SUCCESS,STEP6_SUCCESS successNode
+                    class STEP1_ERROR,STEP2_ERROR,STEP3_ERROR,STEP4_ERROR,STEP5_ERROR,STEP6_ERROR,FINAL_ERROR errorNode
+                    class INIT_CHECK,STEP1_COMPLETE,STEP2_COMPLETE,STEP2_FILTER,STEP3_COMPLETE,STEP4_COMPLETE,STEP5_COMPLETE,STEP5_MODE,STEP6_COMPLETE,RETRY_LOGIC decisionNode
+                    class MONITORING,ERROR_HANDLER monitoringNode
+                    class GPU_ACCEL externalNode
+                    class WORKFLOW_COMPLETE finalNode
+            </pre>
+        </div>
+        <div id="architecture-container" class="diagram-container hidden">
+            <pre class="mermaid">
+                %% Le diagramme d'architecture reste inchangé
+                graph TB
+                    subgraph "Frontend Layer"
+                        UI(Interface Utilisateur Web)
+                        subgraph "State Management"
+                            AS(AppState.js<br/>État Centralisé)
+                        end
+                        subgraph "Performance Utils"
+                            DB(DOMBatcher.js<br/>Optimisation DOM)
+                            PO(PerformanceOptimizer.js<br/>Debouncing/Throttling)
+                            PM(PollingManager.js<br/>Gestion Polling)
+                            EH(ErrorHandler.js<br/>Gestion Erreurs)
+                        end
+                        subgraph "CSS Architecture"
+                            CSS(CSS Modulaire<br/>variables.css<br/>components/*.css)
+                        end
+                    end
+
+                    subgraph "Flask Application Layer"
+                        subgraph "Blueprint Routes"
+                            API_BP(api_routes.py<br/>12 endpoints système)
+                            WF_BP(workflow_routes.py<br/>18 endpoints workflow)
+                        end
+                        FLASK(app_new.py<br/>Application Flask Principale)
+                    end
+
+                    subgraph "Service Layer (Business Logic)"
+                        WS(WorkflowService<br/>Gestion workflow & séquences)
+                        MS(MonitoringService<br/>Surveillance système)
+                        CS(CacheService<br/>Cache intelligent TTL)
+                        PS(PerformanceService<br/>Métriques & profiling)
+                        AIRS(AirtableService<br/>API Airtable)
+                        CSVS(CSVService<br/>Monitoring téléchargements)
+                    end
+
+                    subgraph "Configuration & Security"
+                        CONFIG(config/settings.py<br/>Configuration centralisée)
+                        SECURITY(config/security.py<br/>Sécurité & tokens)
+                    end
+
+                    subgraph "Workflow Processing Layer"
+                        subgraph "Python Environments"
+                            ENV_MAIN(env/<br/>Étapes 1, 2, 6 + Flask)
+                            ENV_TRANS(transnet_env/<br/>Étape 3 - Détection scènes)
+                            ENV_AUDIO(audio_env/<br/>Étape 4 - Analyse audio)
+                            ENV_TRACK(tracking_env/<br/>Étape 5 - Suivi vidéo)
+                        end
+                        subgraph "Workflow Scripts"
+                            STEP1(step1/<br/>Extraction archives<br/>ZIP/RAR/TAR)
+                            STEP2(step2/<br/>Conversion vidéo<br/>25 FPS GPU)
+                            STEP3(step3/<br/>Détection scènes<br/>TransNetV2)
+                            STEP4(step4/<br/>Analyse audio<br/>Spectrogrammes)
+                            STEP5(step5/<br/>Suivi vidéo<br/>MediaPipe CPU/GPU)
+                            STEP6(step6/<br/>Finalisation<br/>Archives finales)
+                        end
+                    end
+
+                    subgraph "Data Storage"
+                        PROJECTS(projets_extraits/<br/>Données de travail)
+                        CACHE_DIR(Cache système<br/>Fichiers temporaires)
+                        OUTPUT(Destination finale<br/>Archives traitées)
+                    end
+
+                    subgraph "External Systems"
+                        AIRTABLE(Airtable API<br/>Monitoring externe)
+                        GPU(GPU NVIDIA<br/>Accélération matérielle)
+                        SYSTEM(Ressources Système<br/>CPU, RAM, Disque)
+                    end
+
+                    UI --> API_BP & WF_BP; AS & DB & PO & PM & EH & CSS --> UI; API_BP --> MS & CS & PS & CSVS; WF_BP --> WS & MS; FLASK --> CONFIG & SECURITY; WS --> MS & CS & PS; CSVS --> AIRS; CS --> PS; WS --> ENV_MAIN & ENV_TRANS & ENV_AUDIO & ENV_TRACK; ENV_MAIN --> STEP1 & STEP2 & STEP6; ENV_TRANS --> STEP3; ENV_AUDIO --> STEP4; ENV_TRACK --> STEP5; STEP1 & STEP2 & STEP3 & STEP4 & STEP5 --> PROJECTS; STEP6 --> OUTPUT; CS --> CACHE_DIR; PS & MS --> SYSTEM; AIRS --> AIRTABLE; STEP2 & STEP3 & STEP5 --> GPU
+
+                    class UI,AS,DB,PO,PM,EH,CSS frontend; class FLASK,API_BP,WF_BP flask; class WS,MS,CS,PS,AIRS,CSVS service; class CONFIG,SECURITY config; class ENV_MAIN,ENV_TRANS,ENV_AUDIO,ENV_TRACK,STEP1,STEP2,STEP3,STEP4,STEP5,STEP6 processing; class PROJECTS,CACHE_DIR,OUTPUT data; class AIRTABLE,GPU,SYSTEM external
+            </pre>
+        </div>
+        <div id="tooltip"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4/dist/panzoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const jsConfetti = new JSConfetti();
+
+            const themePalettes = {
+                light: {
+                    background: '#ffffff', primaryColor: '#e3f2fd', primaryBorderColor: '#1976d2', textColor: '#121212', lineColor: '#666',
+                    stepNode: { fill: '#e3f2fd', stroke: '#1976d2' }, successNode: { fill: '#e8f5e9', stroke: '#388e3c' },
+                    errorNode: { fill: '#ffebee', stroke: '#d32f2f' }, decisionNode: { fill: '#fff3e0', stroke: '#f57c00' },
+                    monitoringNode: { fill: '#f3e5f5', stroke: '#7b1fa2' }, externalNode: { fill: '#f1f8e9', stroke: '#689f38' },
+                    finalNode: { fill: '#e0f2f1', stroke: '#00695c' }, frontend: { fill: '#e1f5fe', stroke: '#01579b' },
+                    flask: { fill: '#fff3e0', stroke: '#e65100' }, service: { fill: '#f3e5f5', stroke: '#4a148c' },
+                    config: { fill: '#e8f5e8', stroke: '#1b5e20' }, processing: { fill: '#fff8e1', stroke: '#f57f17' },
+                    data: { fill: '#fce4ec', stroke: '#880e4f' }, external: { fill: '#f1f8e9', stroke: '#33691e' }
+                },
+                dark: {
+                    background: '#16213e', primaryColor: '#0f3460', primaryBorderColor: '#53a7e8', textColor: '#e0e0e0', lineColor: '#aaa',
+                    stepNode: { fill: '#0f3460', stroke: '#53a7e8' }, successNode: { fill: '#1c3b1d', stroke: '#6fbf73' },
+                    errorNode: { fill: '#4d1c1c', stroke: '#f57373' }, decisionNode: { fill: '#4d3a20', stroke: '#ffb74d' },
+                    monitoringNode: { fill: '#3b204d', stroke: '#ce93d8' }, externalNode: { fill: '#334c20', stroke: '#aed581' },
+                    finalNode: { fill: '#003d33', stroke: '#4db6ac' }, frontend: { fill: '#00263b', stroke: '#4fc3f7' },
+                    flask: { fill: '#4e2a00', stroke: '#ffb74d' }, service: { fill: '#2a084c', stroke: '#ba68c8' },
+                    config: { fill: '#103e13', stroke: '#81c784' }, processing: { fill: '#523f07', stroke: '#fff176' },
+                    data: { fill: '#5c0930', stroke: '#f06292' }, external: { fill: '#1f360e', stroke: '#aed581' }
+                }
+            };
+
+            function getMermaidConfig() {
+                const isDarkMode = document.documentElement.classList.contains('dark-mode');
+                const themeName = isDarkMode ? 'dark' : 'light';
+                const palette = themePalettes[themeName];
+                const classDefs = Object.keys(palette).filter(key => typeof palette[key] === 'object').map(key => `classDef ${key} fill:${palette[key].fill},stroke:${palette[key].stroke},stroke-width:2px`).join('\n');
+                return { startOnLoad: false, securityLevel: 'loose', theme: isDarkMode ? 'dark' : 'base', themeVariables: { background: palette.background, primaryColor: palette.primaryColor, primaryBorderColor: palette.primaryBorderColor, lineColor: palette.lineColor, textColor: palette.textColor, }, class: { 'classDefs': classDefs } };
+            }
+
+            const themeToggle = document.getElementById('theme-toggle');
+            const tooltip = document.getElementById('tooltip');
+            const diagramContainers = { workflow: document.getElementById('workflow-container'), architecture: document.getElementById('architecture-container') };
+            const switcherRadios = document.querySelectorAll('input[name="diagram-view"]');
+            const panzoomInstances = {};
+            let currentView = 'workflow';
+
+            const renderAndInitDiagram = async (name) => {
+                const container = diagramContainers[name];
+                const pre = container.querySelector('.mermaid');
+                if (!container.dataset.mermaidCode) { container.dataset.mermaidCode = pre.innerText; }
+                const mermaidCode = container.dataset.mermaidCode;
+                mermaid.initialize(getMermaidConfig());
+                try {
+                    const { svg } = await mermaid.render(`graph-${name}-${Date.now()}`, mermaidCode);
+                    container.innerHTML = svg;
+                    const svgElement = container.querySelector('svg');
+                    panzoomInstances[name] = Panzoom(svgElement, {
+                        maxScale: 10,
+                        minScale: 0.2,
+                        canvas: true
+                    });
+                    svgElement.parentElement.addEventListener('wheel', (event) => { panzoomInstances[name].zoomWithWheel(event); });
+                    setupNodeInteractions(container);
+                } catch (error) {
+                    container.innerHTML = `<p style="color:red; text-align:center;">Erreur de rendu du diagramme :<br>${error.message}</p>`;
+                    console.error('Erreur Mermaid:', error);
+                }
+            };
+
+            themeToggle.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark-mode');
+                themeToggle.textContent = document.documentElement.classList.contains('dark-mode') ? '☀️' : '🌙';
+                renderAndInitDiagram(currentView);
+            });
+
+            // ----- FONCTION D'INTERACTION CORRIGÉE ET ROBUSTE -----
+            function setupNodeInteractions(container) {
+                const nodes = container.querySelectorAll('.node');
+                const edges = container.querySelectorAll('.edgePath');
+
+                // 1. Créer une carte pour trouver rapidement un noeud à partir de son ID simple.
+                const nodeMap = new Map();
+                nodes.forEach(node => {
+                    // L'ID complet du SVG est la clé, et l'élément DOM lui-même est la valeur.
+                    // Nous allons extraire l'ID simple de manière plus fiable plus tard.
+                    nodeMap.set(node.id, node);
+                });
+
+                nodes.forEach(node => {
+                    const nodeLabel = node.querySelector('.nodeLabel').textContent.replace(/<br\s*\/?>/g, ' - ');
+
+                    // --- Événements de survol (inchangés et fonctionnels) ---
+                    node.addEventListener('mouseenter', () => {
+                        node.classList.add('hovered');
+                        tooltip.textContent = nodeLabel;
+                        tooltip.style.opacity = '1';
+                    });
+                    node.addEventListener('mousemove', (e) => {
+                        tooltip.style.left = `${e.pageX + 15}px`;
+                        tooltip.style.top = `${e.pageY + 15}px`;
+                    });
+                    node.addEventListener('mouseleave', () => {
+                        node.classList.remove('hovered');
+                        tooltip.style.opacity = '0';
+                    });
+
+                    // --- Événement de clic (logique corrigée) ---
+                    node.addEventListener('click', (e) => {
+                        const clickedNode = e.currentTarget;
+                        if (clickedNode.id.includes('WORKFLOW_COMPLETE')) {
+                             jsConfetti.addConfetti({ emojis: ['🎉', '🚀', '✅', '✨'] });
+                        }
+
+                        const isSelected = clickedNode.classList.contains('selected');
+
+                        // Réinitialiser tout
+                        nodes.forEach(n => n.classList.remove('selected'));
+                        edges.forEach(edge => edge.classList.remove('connected'));
+
+                        if (!isSelected) {
+                            clickedNode.classList.add('selected');
+
+                            // Mettre en évidence les connexions de manière fiable
+                            edges.forEach(edge => {
+                                const fromSimpleId = edge.getAttribute('data-from');
+                                const toSimpleId = edge.getAttribute('data-to');
+
+                                // C'est la nouvelle logique : on vérifie si l'ID complet du noeud cliqué
+                                // se termine par l'ID simple de la flèche (précédé d'un tiret).
+                                // C'est robuste aux préfixes générés par Mermaid.
+                                const isConnected = clickedNode.id.endsWith('-' + fromSimpleId) ||
+                                                    clickedNode.id.endsWith('-' + toSimpleId);
+
+                                if (isConnected) {
+                                    edge.classList.add('connected');
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+
+            switcherRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentView = e.target.value;
+                    Object.keys(diagramContainers).forEach(key => { diagramContainers[key].classList.toggle('hidden', key !== currentView); });
+                    renderAndInitDiagram(currentView);
+                    // Update URL fragment when switching diagrams
+                    window.history.replaceState(null, null, `#${currentView}`);
+                });
+            });
+
+            // Handle URL fragment navigation on page load
+            function handleFragmentNavigation() {
+                const fragment = window.location.hash.substring(1); // Remove the '#'
+                if (fragment && (fragment === 'architecture' || fragment === 'workflow')) {
+                    currentView = fragment;
+                    // Update radio button selection
+                    const targetRadio = document.getElementById(`view-${fragment}`);
+                    if (targetRadio) {
+                        targetRadio.checked = true;
+                        // Trigger the change event to switch diagrams
+                        targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                        return;
+                    }
+                }
+                // Default to workflow if no valid fragment
+                document.getElementById('view-workflow').dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            // Listen for hash changes (back/forward navigation)
+            window.addEventListener('hashchange', handleFragmentNavigation);
+
+            // Initialize with fragment navigation
+            handleFragmentNavigation();
+        });
+    </script>
+</body>
+</html>

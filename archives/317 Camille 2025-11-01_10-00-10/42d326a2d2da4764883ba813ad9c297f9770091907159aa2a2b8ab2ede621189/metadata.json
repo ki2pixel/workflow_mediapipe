@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/317 Camille/docs/EXAMINATEUR CORROMPU_TAT_M6.mp4",
+  "video_stem": "EXAMINATEUR CORROMPU_TAT_M6",
+  "video_hash": "42d326a2d2da4764883ba813ad9c297f9770091907159aa2a2b8ab2ede621189",
+  "created_at": "2025-10-31T22:00:10.243513+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/317 Camille 2025-10-31_22-00-10/42d326a2d2da4764883ba813ad9c297f9770091907159aa2a2b8ab2ede621189/EXAMINATEUR CORROMPU_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/317 Camille 2025-10-31_22-00-10/42d326a2d2da4764883ba813ad9c297f9770091907159aa2a2b8ab2ede621189/EXAMINATEUR CORROMPU_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/317 Camille 2025-10-31_22-00-10/42d326a2d2da4764883ba813ad9c297f9770091907159aa2a2b8ab2ede621189/EXAMINATEUR CORROMPU_TAT_M6_tracking.json"
+  }
+}

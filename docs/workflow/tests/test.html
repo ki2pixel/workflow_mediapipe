@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test du Portail de Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        
+        .test-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #f8fafc;
+        }
+        
+        .test-result {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            font-weight: 500;
+        }
+        
+        .test-pass {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        
+        .test-fail {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        
+        .test-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+        
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+        }
+        
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        
+        .file-list {
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-ok {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-missing {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-error {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test du Portail de Documentation Workflow MediaPipe</h1>
+    
+    <p>Cette page permet de vérifier que tous les composants du portail de documentation sont correctement configurés et fonctionnels.</p>
+    
+    <div class="test-section">
+        <h2>📁 Vérification des Fichiers</h2>
+        <p>Vérification de la présence de tous les fichiers requis :</p>
+        <button onclick="checkFiles()">Vérifier les Fichiers</button>
+        <div id="file-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📚 Test des Documents Markdown</h2>
+        <p>Vérification que tous les documents Markdown peuvent être chargés :</p>
+        <button onclick="testMarkdownFiles()">Tester les Documents</button>
+        <div id="markdown-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔧 Test des Fonctionnalités JavaScript</h2>
+        <p>Vérification des bibliothèques et fonctionnalités JavaScript :</p>
+        <button onclick="testJavaScriptFeatures()">Tester JavaScript</button>
+        <div id="js-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎨 Test des Styles CSS</h2>
+        <p>Vérification du chargement des styles :</p>
+        <button onclick="testCSS()">Tester CSS</button>
+        <div id="css-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🌐 Test de Connectivité CDN</h2>
+        <p>Vérification de l'accès aux bibliothèques externes :</p>
+        <button onclick="testCDN()">Tester CDN</button>
+        <div id="cdn-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🚀 Lancement du Portail</h2>
+        <p>Si tous les tests passent, vous pouvez lancer le portail :</p>
+        <button onclick="window.open('index.html', '_blank')">Ouvrir le Portail</button>
+    </div>
+
+    <script>
+        const requiredFiles = [
+            'architecture.html',
+            'assets/styles.css',
+            'assets/app.js',
+            'assets/config.js',
+            'README.md',
+            'ARCHITECTURE_COMPLETE_FR.md',
+            'GUIDE_DEMARRAGE_RAPIDE.md',
+            'REFERENCE_RAPIDE_DEVELOPPEURS.md',
+            'STEP1_EXTRACTION.md',
+            'STEP2_CONVERSION.md',
+            'STEP3_DETECTION_SCENES.md',
+            'STEP4_ANALYSE_AUDIO.md',
+            'STEP5_SUIVI_VIDEO.md',
+            'STEP6_REDUCTION_JSON.md',
+            'STEP7_FINALISATION.md'
+        ];
+
+        const markdownFiles = [
+            'ARCHITECTURE_COMPLETE_FR.md',
+            'GUIDE_DEMARRAGE_RAPIDE.md',
+            'REFERENCE_RAPIDE_DEVELOPPEURS.md',
+            'STEP1_EXTRACTION.md',
+            'STEP2_CONVERSION.md',
+            'STEP3_DETECTION_SCENES.md',
+            'STEP4_ANALYSE_AUDIO.md',
+            'STEP5_SUIVI_VIDEO.md',
+            'STEP6_REDUCTION_JSON.md',
+            'STEP7_FINALISATION.md'
+        ];
+
+        const cdnUrls = [
+            'https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js',
+            'https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js',
+            'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js',
+            'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js',
+            'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css'
+        ];
+
+        async function checkFiles() {
+            const resultsDiv = document.getElementById('file-results');
+            resultsDiv.innerHTML = '<div class="file-list"></div>';
+            const fileList = resultsDiv.querySelector('.file-list');
+            
+            let allFilesOk = true;
+            
+            for (const file of requiredFiles) {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                try {
+                    const response = await fetch(file, { method: 'HEAD' });
+                    const status = response.ok ? 'ok' : 'missing';
+                    const statusText = response.ok ? 'OK' : 'Manquant';
+                    const statusClass = response.ok ? 'status-ok' : 'status-missing';
+                    
+                    if (!response.ok) allFilesOk = false;
+                    
+                    fileItem.innerHTML = `
+                        <span>${file}</span>
+                        <span class="file-status ${statusClass}">${statusText}</span>
+                    `;
+                } catch (error) {
+                    allFilesOk = false;
+                    fileItem.innerHTML = `
+                        <span>${file}</span>
+                        <span class="file-status status-error">Erreur</span>
+                    `;
+                }
+                
+                fileList.appendChild(fileItem);
+            }
+            
+            const summary = document.createElement('div');
+            summary.className = allFilesOk ? 'test-pass' : 'test-fail';
+            summary.textContent = allFilesOk ? 
+                '✅ Tous les fichiers sont présents' : 
+                '❌ Certains fichiers sont manquants';
+            resultsDiv.appendChild(summary);
+        }
+
+        async function testMarkdownFiles() {
+            const resultsDiv = document.getElementById('markdown-results');
+            resultsDiv.innerHTML = '<div class="file-list"></div>';
+            const fileList = resultsDiv.querySelector('.file-list');
+            
+            let allMarkdownOk = true;
+            
+            for (const file of markdownFiles) {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                try {
+                    const response = await fetch(file);
+                    if (response.ok) {
+                        const content = await response.text();
+                        const hasContent = content.trim().length > 0;
+                        const status = hasContent ? 'ok' : 'error';
+                        const statusText = hasContent ? 'OK' : 'Vide';
+                        const statusClass = hasContent ? 'status-ok' : 'status-error';
+                        
+                        if (!hasContent) allMarkdownOk = false;
+                        
+                        fileItem.innerHTML = `
+                            <span>${file} (${Math.round(content.length / 1024)}KB)</span>
+                            <span class="file-status ${statusClass}">${statusText}</span>
+                        `;
+                    } else {
+                        allMarkdownOk = false;
+                        fileItem.innerHTML = `
+                            <span>${file}</span>
+                            <span class="file-status status-missing">Manquant</span>
+                        `;
+                    }
+                } catch (error) {
+                    allMarkdownOk = false;
+                    fileItem.innerHTML = `
+                        <span>${file}</span>
+                        <span class="file-status status-error">Erreur</span>
+                    `;
+                }
+                
+                fileList.appendChild(fileItem);
+            }
+            
+            const summary = document.createElement('div');
+            summary.className = allMarkdownOk ? 'test-pass' : 'test-fail';
+            summary.textContent = allMarkdownOk ? 
+                '✅ Tous les documents Markdown sont valides' : 
+                '❌ Problèmes détectés dans les documents Markdown';
+            resultsDiv.appendChild(summary);
+        }
+
+        function testJavaScriptFeatures() {
+            const resultsDiv = document.getElementById('js-results');
+            resultsDiv.innerHTML = '';
+            
+            const tests = [
+                {
+                    name: 'Local Storage',
+                    test: () => {
+                        localStorage.setItem('test', 'value');
+                        const result = localStorage.getItem('test') === 'value';
+                        localStorage.removeItem('test');
+                        return result;
+                    }
+                },
+                {
+                    name: 'Fetch API',
+                    test: () => typeof fetch === 'function'
+                },
+                {
+                    name: 'Intersection Observer',
+                    test: () => typeof IntersectionObserver === 'function'
+                },
+                {
+                    name: 'Clipboard API',
+                    test: () => navigator.clipboard && typeof navigator.clipboard.writeText === 'function'
+                },
+                {
+                    name: 'CSS Custom Properties',
+                    test: () => CSS && CSS.supports && CSS.supports('color', 'var(--test)')
+                }
+            ];
+            
+            let allTestsPass = true;
+            
+            tests.forEach(test => {
+                try {
+                    const passed = test.test();
+                    const result = document.createElement('div');
+                    result.className = passed ? 'test-pass' : 'test-fail';
+                    result.textContent = `${passed ? '✅' : '❌'} ${test.name}`;
+                    resultsDiv.appendChild(result);
+                    
+                    if (!passed) allTestsPass = false;
+                } catch (error) {
+                    const result = document.createElement('div');
+                    result.className = 'test-fail';
+                    result.textContent = `❌ ${test.name} (Erreur: ${error.message})`;
+                    resultsDiv.appendChild(result);
+                    allTestsPass = false;
+                }
+            });
+            
+            const summary = document.createElement('div');
+            summary.className = allTestsPass ? 'test-pass' : 'test-warning';
+            summary.textContent = allTestsPass ? 
+                '✅ Toutes les fonctionnalités JavaScript sont supportées' : 
+                '⚠️ Certaines fonctionnalités peuvent ne pas fonctionner optimalement';
+            resultsDiv.appendChild(summary);
+        }
+
+        async function testCSS() {
+            const resultsDiv = document.getElementById('css-results');
+            resultsDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('assets/styles.css');
+                if (response.ok) {
+                    const cssContent = await response.text();
+                    const hasContent = cssContent.trim().length > 0;
+                    
+                    const result = document.createElement('div');
+                    result.className = hasContent ? 'test-pass' : 'test-fail';
+                    result.textContent = hasContent ? 
+                        `✅ Fichier CSS chargé (${Math.round(cssContent.length / 1024)}KB)` : 
+                        '❌ Fichier CSS vide';
+                    resultsDiv.appendChild(result);
+                } else {
+                    const result = document.createElement('div');
+                    result.className = 'test-fail';
+                    result.textContent = '❌ Impossible de charger le fichier CSS';
+                    resultsDiv.appendChild(result);
+                }
+            } catch (error) {
+                const result = document.createElement('div');
+                result.className = 'test-fail';
+                result.textContent = `❌ Erreur lors du chargement CSS: ${error.message}`;
+                resultsDiv.appendChild(result);
+            }
+        }
+
+        async function testCDN() {
+            const resultsDiv = document.getElementById('cdn-results');
+            resultsDiv.innerHTML = '<div class="file-list"></div>';
+            const fileList = resultsDiv.querySelector('.file-list');
+            
+            let allCdnOk = true;
+            
+            for (const url of cdnUrls) {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                try {
+                    const response = await fetch(url, { method: 'HEAD' });
+                    const status = response.ok ? 'ok' : 'error';
+                    const statusText = response.ok ? 'OK' : 'Erreur';
+                    const statusClass = response.ok ? 'status-ok' : 'status-error';
+                    
+                    if (!response.ok) allCdnOk = false;
+                    
+                    const urlParts = url.split('/');
+                    const fileName = urlParts[urlParts.length - 1];
+                    
+                    fileItem.innerHTML = `
+                        <span>${fileName}</span>
+                        <span class="file-status ${statusClass}">${statusText}</span>
+                    `;
+                } catch (error) {
+                    allCdnOk = false;
+                    const urlParts = url.split('/');
+                    const fileName = urlParts[urlParts.length - 1];
+                    
+                    fileItem.innerHTML = `
+                        <span>${fileName}</span>
+                        <span class="file-status status-error">Inaccessible</span>
+                    `;
+                }
+                
+                fileList.appendChild(fileItem);
+            }
+            
+            const summary = document.createElement('div');
+            summary.className = allCdnOk ? 'test-pass' : 'test-warning';
+            summary.textContent = allCdnOk ? 
+                '✅ Toutes les bibliothèques CDN sont accessibles' : 
+                '⚠️ Certaines bibliothèques CDN ne sont pas accessibles (fonctionnement hors ligne limité)';
+            resultsDiv.appendChild(summary);
+        }
+
+        // Auto-run basic tests on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page de test chargée. Utilisez les boutons pour exécuter les tests.');
+        });
+    </script>
+</body>
+</html>

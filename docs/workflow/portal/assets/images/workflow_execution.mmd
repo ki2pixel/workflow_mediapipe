@@ -1,0 +1,131 @@
+graph TD
+    START[Démarrage Workflow] --> INIT_CHECK{Vérification<br/>Prérequis}
+    INIT_CHECK -->|✓ OK| STEP1_START[STEP1: Extraction Archives]
+    INIT_CHECK -->|✗ Erreur| ERROR_INIT[Erreur Initialisation]
+    
+    subgraph "STEP1: Extraction (env/)"
+        STEP1_START --> STEP1_VALIDATE[Validation Archives<br/>ZIP/RAR/TAR]
+        STEP1_VALIDATE --> STEP1_EXTRACT[Extraction Sécurisée<br/>Sanitisation Paths]
+        STEP1_EXTRACT --> STEP1_ORGANIZE[Organisation<br/>projets_extraits/]
+        STEP1_ORGANIZE --> STEP1_COMPLETE{Extraction<br/>Réussie?}
+        STEP1_COMPLETE -->|✓| STEP1_SUCCESS[✓ Archives Extraites]
+        STEP1_COMPLETE -->|✗| STEP1_ERROR[✗ Erreur Extraction]
+    end
+    
+    STEP1_SUCCESS --> STEP2_START[STEP2: Conversion Vidéo]
+    
+    subgraph "STEP2: Conversion (env/)"
+        STEP2_START --> STEP2_SCAN[Scan Vidéos<br/>Analyse FPS]
+        STEP2_SCAN --> STEP2_FILTER{FPS ≠ 25.0?}
+        STEP2_FILTER -->|Oui| STEP2_CONVERT[Conversion GPU<br/>FFmpeg NVENC]
+        STEP2_FILTER -->|Non| STEP2_SKIP[Pas de Conversion]
+        STEP2_CONVERT --> STEP2_VALIDATE[Validation<br/>Intégrité]
+        STEP2_SKIP --> STEP2_COMPLETE
+        STEP2_VALIDATE --> STEP2_COMPLETE{Conversion<br/>Réussie?}
+        STEP2_COMPLETE -->|✓| STEP2_SUCCESS[✓ Vidéos 25 FPS]
+        STEP2_COMPLETE -->|✗| STEP2_ERROR[✗ Erreur Conversion]
+    end
+    
+    STEP2_SUCCESS --> STEP3_START[STEP3: Détection Scènes]
+    
+    subgraph "STEP3: Détection (transnet_env/)"
+        STEP3_START --> STEP3_LOAD[Chargement<br/>TransNetV2]
+        STEP3_LOAD --> STEP3_PROCESS[Analyse Vidéo<br/>Détection Transitions]
+        STEP3_PROCESS --> STEP3_EXPORT[Export CSV<br/>Timecodes + Frames]
+        STEP3_EXPORT --> STEP3_COMPLETE{Détection<br/>Réussie?}
+        STEP3_COMPLETE -->|✓| STEP3_SUCCESS[✓ Scènes Détectées]
+        STEP3_COMPLETE -->|✗| STEP3_ERROR[✗ Erreur Détection]
+    end
+    
+    STEP3_SUCCESS --> STEP4_START[STEP4: Analyse Audio]
+    
+    subgraph "STEP4: Audio (audio_env/)"
+        STEP4_START --> STEP4_EXTRACT[Extraction Audio<br/>FFmpeg]
+        STEP4_EXTRACT --> STEP4_ANALYZE[Analyse Spectrale<br/>Spectrogrammes]
+        STEP4_ANALYZE --> STEP4_FEATURES[Extraction Features<br/>MFCC, Chroma]
+        STEP4_FEATURES --> STEP4_JSON[Export JSON<br/>Métadonnées Audio]
+        STEP4_JSON --> STEP4_COMPLETE{Analyse<br/>Réussie?}
+        STEP4_COMPLETE -->|✓| STEP4_SUCCESS[✓ Audio Analysé]
+        STEP4_COMPLETE -->|✗| STEP4_ERROR[✗ Erreur Audio]
+    end
+    
+    STEP4_SUCCESS --> STEP5_START[STEP5: Suivi Vidéo]
+    
+    subgraph "STEP5: Tracking (tracking_env/)"
+        STEP5_START --> STEP5_MODE{Mode<br/>Traitement}
+        STEP5_MODE -->|CPU| STEP5_CPU[Multiprocessing<br/>15 Workers]
+        STEP5_MODE -->|GPU| STEP5_GPU[GPU Séquentiel<br/>1 Worker]
+        STEP5_CPU --> STEP5_MEDIAPIPE[MediaPipe<br/>Détection Faciale]
+        STEP5_GPU --> STEP5_MEDIAPIPE
+        STEP5_MEDIAPIPE --> STEP5_TRACK[Tracking Objets<br/>Coordonnées]
+        STEP5_TRACK --> STEP5_JSON_OUT[Export JSON<br/>Données Tracking]
+        STEP5_JSON_OUT --> STEP5_COMPLETE{Tracking<br/>Réussi?}
+        STEP5_COMPLETE -->|✓| STEP5_SUCCESS[✓ Tracking Terminé]
+        STEP5_COMPLETE -->|✗| STEP5_ERROR[✗ Erreur Tracking]
+    end
+    
+    STEP5_SUCCESS --> STEP6_START[STEP6: Finalisation]
+    
+    subgraph "STEP6: Finalisation (env/)"
+        STEP6_START --> STEP6_VALIDATE[Validation<br/>Intégrité Complète]
+        STEP6_VALIDATE --> STEP6_ORGANIZE[Organisation<br/>Structure Finale]
+        STEP6_ORGANIZE --> STEP6_COPY[Copie Destination<br/>Archives Finales]
+        STEP6_COPY --> STEP6_VERIFY[Vérification<br/>Intégrité Copie]
+        STEP6_VERIFY --> STEP6_CLEANUP[Nettoyage<br/>Fichiers Temporaires]
+        STEP6_CLEANUP --> STEP6_COMPLETE{Finalisation<br/>Réussie?}
+        STEP6_COMPLETE -->|✓| STEP6_SUCCESS[✓ Workflow Terminé]
+        STEP6_COMPLETE -->|✗| STEP6_ERROR[✗ Erreur Finalisation]
+    end
+    
+    subgraph "Monitoring & État"
+        FRONTEND[Interface Web] --> POLLING[PollingManager<br/>Surveillance Continue]
+        POLLING --> API_STATUS[API Status<br/>Temps Réel]
+        API_STATUS --> APPSTATE[AppState<br/>État Centralisé]
+        APPSTATE --> UI_UPDATE[Mise à Jour UI<br/>DOMBatcher]
+        
+        CACHE_SYS[CacheService<br/>TTL Intelligent] --> PERF_TRACK[PerformanceService<br/>Métriques]
+        PERF_TRACK --> MONITORING[MonitoringService<br/>Ressources Système]
+    end
+    
+    subgraph "Gestion d'Erreurs"
+        STEP1_ERROR --> ERROR_HANDLER[ErrorHandler<br/>Recovery Automatique]
+        STEP2_ERROR --> ERROR_HANDLER
+        STEP3_ERROR --> ERROR_HANDLER
+        STEP4_ERROR --> ERROR_HANDLER
+        STEP5_ERROR --> ERROR_HANDLER
+        STEP6_ERROR --> ERROR_HANDLER
+        ERROR_INIT --> ERROR_HANDLER
+        
+        ERROR_HANDLER --> RETRY_LOGIC{Retry<br/>Possible?}
+        RETRY_LOGIC -->|Oui| BACKOFF[Exponential<br/>Backoff]
+        RETRY_LOGIC -->|Non| FINAL_ERROR[Erreur Finale<br/>Notification Utilisateur]
+        BACKOFF --> STEP1_START
+    end
+    
+    subgraph "Intégrations Externes"
+        CSV_MONITOR[CSVService<br/>Monitoring Auto] --> AIRTABLE_API[AirtableService<br/>API Externe]
+        GPU_ACCEL[Accélération GPU<br/>NVIDIA CUDA] --> STEP2_CONVERT
+        GPU_ACCEL --> STEP3_PROCESS
+        GPU_ACCEL --> STEP5_GPU
+        
+        SYSTEM_RES[Ressources Système<br/>CPU/RAM/Disque] --> MONITORING
+    end
+    
+    STEP6_SUCCESS --> WORKFLOW_COMPLETE[🎉 Workflow Complet<br/>Données Prêtes]
+    
+    %% Styling
+    classDef stepNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef successNode fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef errorNode fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef decisionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef monitoringNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef externalNode fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef finalNode fill:#e0f2f1,stroke:#00695c,stroke-width:3px
+    
+    class STEP1_START,STEP2_START,STEP3_START,STEP4_START,STEP5_START,STEP6_START stepNode
+    class STEP1_SUCCESS,STEP2_SUCCESS,STEP3_SUCCESS,STEP4_SUCCESS,STEP5_SUCCESS,STEP6_SUCCESS successNode
+    class STEP1_ERROR,STEP2_ERROR,STEP3_ERROR,STEP4_ERROR,STEP5_ERROR,STEP6_ERROR,ERROR_INIT,FINAL_ERROR errorNode
+    class INIT_CHECK,STEP1_COMPLETE,STEP2_COMPLETE,STEP2_FILTER,STEP3_COMPLETE,STEP4_COMPLETE,STEP5_COMPLETE,STEP5_MODE,STEP6_COMPLETE,RETRY_LOGIC decisionNode
+    class FRONTEND,POLLING,API_STATUS,APPSTATE,UI_UPDATE,CACHE_SYS,PERF_TRACK,MONITORING,ERROR_HANDLER monitoringNode
+    class CSV_MONITOR,AIRTABLE_API,GPU_ACCEL,SYSTEM_RES externalNode
+    class WORKFLOW_COMPLETE finalNode

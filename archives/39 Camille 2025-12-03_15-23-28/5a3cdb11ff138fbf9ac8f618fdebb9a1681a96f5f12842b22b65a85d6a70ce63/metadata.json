@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/39 Camille/docs/postdiff 1 - JP requitte le campus.mp4",
+  "video_stem": "postdiff 1 - JP requitte le campus",
+  "video_hash": "5a3cdb11ff138fbf9ac8f618fdebb9a1681a96f5f12842b22b65a85d6a70ce63",
+  "created_at": "2025-12-03T15:23:29.183714+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/5a3cdb11ff138fbf9ac8f618fdebb9a1681a96f5f12842b22b65a85d6a70ce63/postdiff 1 - JP requitte le campus_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/5a3cdb11ff138fbf9ac8f618fdebb9a1681a96f5f12842b22b65a85d6a70ce63/postdiff 1 - JP requitte le campus_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/5a3cdb11ff138fbf9ac8f618fdebb9a1681a96f5f12842b22b65a85d6a70ce63/postdiff 1 - JP requitte le campus_tracking.json"
+  }
+}

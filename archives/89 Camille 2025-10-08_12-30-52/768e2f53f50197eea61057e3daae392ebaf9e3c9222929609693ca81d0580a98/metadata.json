@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/89 Camille/docs/Les jaunes gagnent des nuggets après cette victoire !.mp4",
+  "video_stem": "Les jaunes gagnent des nuggets après cette victoire !",
+  "video_hash": "768e2f53f50197eea61057e3daae392ebaf9e3c9222929609693ca81d0580a98",
+  "created_at": "2025-10-08T12:30:53.181434+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/768e2f53f50197eea61057e3daae392ebaf9e3c9222929609693ca81d0580a98/Les jaunes gagnent des nuggets après cette victoire !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/768e2f53f50197eea61057e3daae392ebaf9e3c9222929609693ca81d0580a98/Les jaunes gagnent des nuggets après cette victoire !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/768e2f53f50197eea61057e3daae392ebaf9e3c9222929609693ca81d0580a98/Les jaunes gagnent des nuggets après cette victoire !_tracking.json"
+  }
+}

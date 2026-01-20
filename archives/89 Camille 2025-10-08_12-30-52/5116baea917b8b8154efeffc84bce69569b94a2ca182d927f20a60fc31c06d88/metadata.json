@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/89 Camille/docs/Paga demande une dernière chance à Giuseppa !.mp4",
+  "video_stem": "Paga demande une dernière chance à Giuseppa !",
+  "video_hash": "5116baea917b8b8154efeffc84bce69569b94a2ca182d927f20a60fc31c06d88",
+  "created_at": "2025-10-08T12:30:52.698084+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/5116baea917b8b8154efeffc84bce69569b94a2ca182d927f20a60fc31c06d88/Paga demande une dernière chance à Giuseppa !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/5116baea917b8b8154efeffc84bce69569b94a2ca182d927f20a60fc31c06d88/Paga demande une dernière chance à Giuseppa !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/89 Camille 2025-10-08_12-30-52/5116baea917b8b8154efeffc84bce69569b94a2ca182d927f20a60fc31c06d88/Paga demande une dernière chance à Giuseppa !_tracking.json"
+  }
+}

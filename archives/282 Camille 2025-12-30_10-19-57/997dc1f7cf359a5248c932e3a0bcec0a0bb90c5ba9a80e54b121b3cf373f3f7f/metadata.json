@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/282 Camille/docs/PP - Bohemian Rapsody - Scène culte.mp4",
+  "video_stem": "PP - Bohemian Rapsody - Scène culte",
+  "video_hash": "997dc1f7cf359a5248c932e3a0bcec0a0bb90c5ba9a80e54b121b3cf373f3f7f",
+  "created_at": "2025-12-30T10:19:57.529233+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/282 Camille 2025-12-30_10-19-57/997dc1f7cf359a5248c932e3a0bcec0a0bb90c5ba9a80e54b121b3cf373f3f7f/PP - Bohemian Rapsody - Scène culte_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/282 Camille 2025-12-30_10-19-57/997dc1f7cf359a5248c932e3a0bcec0a0bb90c5ba9a80e54b121b3cf373f3f7f/PP - Bohemian Rapsody - Scène culte_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/282 Camille 2025-12-30_10-19-57/997dc1f7cf359a5248c932e3a0bcec0a0bb90c5ba9a80e54b121b3cf373f3f7f/PP - Bohemian Rapsody - Scène culte_tracking.json"
+  }
+}

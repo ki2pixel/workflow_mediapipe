@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/65 Camille/docs/JOUETS CONTREFACON_TAT_M6.mp4",
+  "video_stem": "JOUETS CONTREFACON_TAT_M6",
+  "video_hash": "014a909785050ee4434f9ebfd019cefea7fd390071e89623b4112f70468e9f4b",
+  "created_at": "2025-12-06T14:24:41.493743+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/65 Camille 2025-12-06_14-24-41/014a909785050ee4434f9ebfd019cefea7fd390071e89623b4112f70468e9f4b/JOUETS CONTREFACON_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/65 Camille 2025-12-06_14-24-41/014a909785050ee4434f9ebfd019cefea7fd390071e89623b4112f70468e9f4b/JOUETS CONTREFACON_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/65 Camille 2025-12-06_14-24-41/014a909785050ee4434f9ebfd019cefea7fd390071e89623b4112f70468e9f4b/JOUETS CONTREFACON_TAT_M6_tracking.json"
+  }
+}

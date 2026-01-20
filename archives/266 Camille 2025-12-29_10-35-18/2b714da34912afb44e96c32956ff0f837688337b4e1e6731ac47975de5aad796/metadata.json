@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/266 Camille/docs/6ter - Donovan magicien - Donovan bluffe José Garcia avec une bouteille de champagne .mp4",
+  "video_stem": "6ter - Donovan magicien - Donovan bluffe José Garcia avec une bouteille de champagne ",
+  "video_hash": "2b714da34912afb44e96c32956ff0f837688337b4e1e6731ac47975de5aad796",
+  "created_at": "2025-12-29T10:35:18.494147+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/266 Camille 2025-12-29_10-35-18/2b714da34912afb44e96c32956ff0f837688337b4e1e6731ac47975de5aad796/6ter - Donovan magicien - Donovan bluffe José Garcia avec une bouteille de champagne _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/266 Camille 2025-12-29_10-35-18/2b714da34912afb44e96c32956ff0f837688337b4e1e6731ac47975de5aad796/6ter - Donovan magicien - Donovan bluffe José Garcia avec une bouteille de champagne _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/266 Camille 2025-12-29_10-35-18/2b714da34912afb44e96c32956ff0f837688337b4e1e6731ac47975de5aad796/6ter - Donovan magicien - Donovan bluffe José Garcia avec une bouteille de champagne _tracking.json"
+  }
+}

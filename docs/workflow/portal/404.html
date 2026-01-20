@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page non trouvée - Documentation Workflow MediaPipe</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --background-color: #ffffff;
+            --surface-color: #f8fafc;
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+        }
+
+        .error-code {
+            font-size: 8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            line-height: 1;
+        }
+
+        .error-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-color);
+        }
+
+        .error-description {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: var(--surface-color);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        .suggestions {
+            margin-top: 3rem;
+            padding: 2rem;
+            background-color: var(--surface-color);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .suggestions h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .suggestions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .suggestions li {
+            margin-bottom: 0.5rem;
+        }
+
+        .suggestions a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .suggestions a:hover {
+            text-decoration: underline;
+        }
+
+        .icon {
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 6rem;
+            }
+
+            .error-title {
+                font-size: 1.5rem;
+            }
+
+            .error-description {
+                font-size: 1rem;
+            }
+
+            .error-actions {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+
+            .suggestions {
+                margin-top: 2rem;
+                padding: 1.5rem;
+            }
+        }
+
+        /* Dark theme support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #0f172a;
+                --surface-color: #1e293b;
+                --text-color: #f1f5f9;
+                --text-muted: #94a3b8;
+                --border-color: #334155;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-code">404</div>
+        <h1 class="error-title">Page non trouvée</h1>
+        <p class="error-description">
+            Désolé, la page que vous recherchez n'existe pas ou a été déplacée.
+        </p>
+        
+        <div class="error-actions">
+            <a href="index.html" class="btn btn-primary">
+                <span class="icon">🏠</span>
+                Retour à l'accueil
+            </a>
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                <span class="icon">←</span>
+                Page précédente
+            </a>
+        </div>
+
+        <div class="suggestions">
+            <h3>📚 Pages populaires</h3>
+            <ul>
+                <li><a href="index.html">🏠 Accueil de la documentation</a></li>
+                <li><a href="index.html#ARCHITECTURE_COMPLETE_FR">🏗️ Architecture complète du système</a></li>
+                <li><a href="index.html#GUIDE_DEMARRAGE_RAPIDE">🚀 Guide de démarrage rapide</a></li>
+                <li><a href="index.html#REFERENCE_RAPIDE_DEVELOPPEURS">👨‍💻 Référence développeurs</a></li>
+                <li><a href="index.html#STEP1_EXTRACTION">📦 Étape 1: Extraction d'archives</a></li>
+                <li><a href="index.html#STEP2_CONVERSION">🎬 Étape 2: Conversion vidéo</a></li>
+                <li><a href="index.html#STEP3_DETECTION_SCENES">🎯 Étape 3: Détection de scènes</a></li>
+                <li><a href="index.html#STEP4_ANALYSE_AUDIO">🎵 Étape 4: Analyse audio</a></li>
+                <li><a href="index.html#STEP5_SUIVI_VIDEO">👁️ Étape 5: Suivi vidéo</a></li>
+                <li><a href="index.html#STEP6_REDUCTION_JSON">🧩 Étape 6: Réduction JSON</a></li>
+<li><a href="index.html#STEP7_FINALISATION">✅ Étape 7: Finalisation</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const path = window.location.pathname;
+            const filename = path.split('/').pop();
+            
+            const knownDocs = [
+                'ARCHITECTURE_COMPLETE_FR',
+                'GUIDE_DEMARRAGE_RAPIDE',
+                'REFERENCE_RAPIDE_DEVELOPPEURS',
+                'STEP1_EXTRACTION',
+                'STEP2_CONVERSION',
+                'STEP3_DETECTION_SCENES',
+                'STEP4_ANALYSE_AUDIO',
+                'STEP5_SUIVI_VIDEO',
+                'STEP6_REDUCTION_JSON','STEP7_FINALISATION'
+            ];
+            
+            const docName = filename.replace(/\.(html|md)$/, '');
+            if (knownDocs.includes(docName)) {
+                window.location.href = `index.html#${docName}`;
+            }
+        });
+
+        document.querySelectorAll('a[href^="architecture.html#"]').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const hash = this.getAttribute('href').split('#')[1];
+                window.location.href = `index.html#${hash}`;
+            });
+        });
+    </script>
+</body>
+</html>

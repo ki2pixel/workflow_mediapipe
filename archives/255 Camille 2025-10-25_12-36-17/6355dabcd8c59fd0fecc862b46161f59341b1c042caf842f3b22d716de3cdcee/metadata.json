@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/255 Camille/docs/GRAND MERE.mp4",
+  "video_stem": "GRAND MERE",
+  "video_hash": "6355dabcd8c59fd0fecc862b46161f59341b1c042caf842f3b22d716de3cdcee",
+  "created_at": "2025-10-25T12:36:17.824259+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/255 Camille 2025-10-25_12-36-17/6355dabcd8c59fd0fecc862b46161f59341b1c042caf842f3b22d716de3cdcee/GRAND MERE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/255 Camille 2025-10-25_12-36-17/6355dabcd8c59fd0fecc862b46161f59341b1c042caf842f3b22d716de3cdcee/GRAND MERE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/255 Camille 2025-10-25_12-36-17/6355dabcd8c59fd0fecc862b46161f59341b1c042caf842f3b22d716de3cdcee/GRAND MERE_tracking.json"
+  }
+}

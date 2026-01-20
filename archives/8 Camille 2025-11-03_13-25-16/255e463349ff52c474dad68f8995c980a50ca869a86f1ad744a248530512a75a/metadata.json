@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/8 Camille/docs/LIVRAISON.mp4",
+  "video_stem": "LIVRAISON",
+  "video_hash": "255e463349ff52c474dad68f8995c980a50ca869a86f1ad744a248530512a75a",
+  "created_at": "2025-11-03T13:25:16.874948+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/8 Camille 2025-11-03_13-25-16/255e463349ff52c474dad68f8995c980a50ca869a86f1ad744a248530512a75a/LIVRAISON_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/8 Camille 2025-11-03_13-25-16/255e463349ff52c474dad68f8995c980a50ca869a86f1ad744a248530512a75a/LIVRAISON_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/8 Camille 2025-11-03_13-25-16/255e463349ff52c474dad68f8995c980a50ca869a86f1ad744a248530512a75a/LIVRAISON_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/108 Camille/docs/Le ton monte entre Loanne et Martika à la 1ère cérémonie.mp4",
+  "video_stem": "Le ton monte entre Loanne et Martika à la 1ère cérémonie",
+  "video_hash": "c19c065ada3a14e4b61bc87b8186ac70b27e9761b8f7a045e70993c92b46c284",
+  "created_at": "2025-11-12T10:28:55.686715+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/108 Camille 2025-11-12_10-28-55/c19c065ada3a14e4b61bc87b8186ac70b27e9761b8f7a045e70993c92b46c284/Le ton monte entre Loanne et Martika à la 1ère cérémonie_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/108 Camille 2025-11-12_10-28-55/c19c065ada3a14e4b61bc87b8186ac70b27e9761b8f7a045e70993c92b46c284/Le ton monte entre Loanne et Martika à la 1ère cérémonie_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/108 Camille 2025-11-12_10-28-55/c19c065ada3a14e4b61bc87b8186ac70b27e9761b8f7a045e70993c92b46c284/Le ton monte entre Loanne et Martika à la 1ère cérémonie_tracking.json"
+  }
+}

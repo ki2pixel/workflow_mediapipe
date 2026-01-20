@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/61 Camille/docs/UJUD - GAUTHIER.mp4",
+  "video_stem": "UJUD - GAUTHIER",
+  "video_hash": "de93809c77d94b2729f26189a56effea0bb6033035fb082e53860aa0b529b343",
+  "created_at": "2025-11-07T14:59:09.833722+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/61 Camille 2025-11-07_14-59-09/de93809c77d94b2729f26189a56effea0bb6033035fb082e53860aa0b529b343/UJUD - GAUTHIER_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/61 Camille 2025-11-07_14-59-09/de93809c77d94b2729f26189a56effea0bb6033035fb082e53860aa0b529b343/UJUD - GAUTHIER_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/61 Camille 2025-11-07_14-59-09/de93809c77d94b2729f26189a56effea0bb6033035fb082e53860aa0b529b343/UJUD - GAUTHIER_tracking.json"
+  }
+}

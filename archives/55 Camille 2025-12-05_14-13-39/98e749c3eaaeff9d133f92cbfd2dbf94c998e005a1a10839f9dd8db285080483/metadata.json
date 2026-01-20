@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/55 Camille/docs/M6 - LMP - Extrait 5 (EM14 P2)  Mercotte fait ses adieux au Meilleur Pâtissier.mp4",
+  "video_stem": "M6 - LMP - Extrait 5 (EM14 P2)  Mercotte fait ses adieux au Meilleur Pâtissier",
+  "video_hash": "98e749c3eaaeff9d133f92cbfd2dbf94c998e005a1a10839f9dd8db285080483",
+  "created_at": "2025-12-05T14:13:39.192592+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/55 Camille 2025-12-05_14-13-39/98e749c3eaaeff9d133f92cbfd2dbf94c998e005a1a10839f9dd8db285080483/M6 - LMP - Extrait 5 (EM14 P2)  Mercotte fait ses adieux au Meilleur Pâtissier_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/55 Camille 2025-12-05_14-13-39/98e749c3eaaeff9d133f92cbfd2dbf94c998e005a1a10839f9dd8db285080483/M6 - LMP - Extrait 5 (EM14 P2)  Mercotte fait ses adieux au Meilleur Pâtissier_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/55 Camille 2025-12-05_14-13-39/98e749c3eaaeff9d133f92cbfd2dbf94c998e005a1a10839f9dd8db285080483/M6 - LMP - Extrait 5 (EM14 P2)  Mercotte fait ses adieux au Meilleur Pâtissier_tracking.json"
+  }
+}

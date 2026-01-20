@@ -1,0 +1,790 @@
+/* Additional styles for enhanced functionality */
+
+/* Search functionality */
+.search-container {
+    position: relative;
+    margin: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.search-result-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.search-result-item:hover {
+    background-color: var(--border-color);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-title {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.search-result-excerpt {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.search-highlight {
+    background-color: #fef08a;
+    color: #92400e;
+    padding: 0.125rem 0.25rem;
+    border-radius: 3px;
+}
+
+[data-theme="dark"] .search-highlight {
+    background-color: #451a03;
+    color: #fbbf24;
+}
+
+/* Table of Contents - Fixed Right Sidebar */
+.toc-container {
+    position: fixed;
+    top: var(--header-height);
+    right: 0;
+    width: 280px;
+    height: calc(100vh - var(--header-height));
+    background-color: var(--surface-color);
+    border-left: 1px solid var(--border-color);
+    padding: 1.5rem;
+    overflow-y: auto;
+    z-index: 800;
+    transition: transform 0.3s ease;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.toc-container.hidden {
+    transform: translateX(100%);
+}
+
+/* Adjust main content when TOC is visible */
+.main-content.with-toc {
+    margin-right: 280px;
+}
+
+[data-theme="dark"] .toc-container {
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.toc-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.toc-item {
+    margin-bottom: 0.25rem;
+}
+
+/* TOC Button Styling - Replaces link styling */
+.toc-button {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    line-height: 1.4;
+    margin-bottom: 0.25rem;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.toc-button:hover {
+    background-color: var(--border-color);
+    color: var(--primary-color);
+}
+
+.toc-button.active {
+    background-color: var(--primary-color);
+    color: white !important;
+}
+
+/* Legacy toc-link support for any remaining links */
+.toc-link {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    line-height: 1.4;
+    margin-bottom: 0.25rem;
+}
+
+.toc-link:hover {
+    background-color: var(--border-color);
+    color: var(--primary-color);
+}
+
+.toc-link.active {
+    background-color: var(--primary-color);
+    color: white !important;
+}
+
+/* Dark theme specific TOC styling - Button-based approach */
+/* TOC Buttons in dark theme */
+html[data-theme="dark"] .toc-button,
+[data-theme="dark"] .toc-button {
+    color: #ffffff !important;
+    background: none !important;
+    border: none !important;
+}
+
+html[data-theme="dark"] .toc-button:hover,
+[data-theme="dark"] .toc-button:hover {
+    background-color: var(--dark-border) !important;
+    color: var(--primary-color) !important;
+}
+
+html[data-theme="dark"] .toc-button.active,
+[data-theme="dark"] .toc-button.active {
+    background-color: var(--primary-color) !important;
+    color: #ffffff !important;
+}
+
+/* Legacy TOC Links in dark theme - Maximum specificity force white text */
+html[data-theme="dark"] body .toc-container .toc-link,
+html[data-theme="dark"] .toc-container .toc-link,
+[data-theme="dark"] .toc-container .toc-link,
+[data-theme="dark"] .toc-link {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+html[data-theme="dark"] body .toc-container .toc-link:hover,
+html[data-theme="dark"] .toc-container .toc-link:hover,
+[data-theme="dark"] .toc-container .toc-link:hover,
+[data-theme="dark"] .toc-link:hover {
+    background-color: var(--dark-border) !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+html[data-theme="dark"] body .toc-container .toc-link.active,
+html[data-theme="dark"] .toc-container .toc-link.active,
+[data-theme="dark"] .toc-container .toc-link.active,
+[data-theme="dark"] .toc-link.active {
+    background-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+/* Override any inherited link styles in dark theme */
+html[data-theme="dark"] body .toc-container a,
+html[data-theme="dark"] .toc-container a,
+[data-theme="dark"] .toc-container a {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+html[data-theme="dark"] body .toc-container a:visited,
+html[data-theme="dark"] .toc-container a:visited,
+[data-theme="dark"] .toc-container a:visited {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+html[data-theme="dark"] body .toc-container a:link,
+html[data-theme="dark"] .toc-container a:link,
+[data-theme="dark"] .toc-container a:link {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+/* TOC title styling */
+html[data-theme="dark"] body .toc-container .toc-title,
+html[data-theme="dark"] .toc-container .toc-title,
+[data-theme="dark"] .toc-container .toc-title,
+[data-theme="dark"] .toc-title {
+    color: #94a3b8 !important;
+}
+
+/* Force white color for all TOC text elements with maximum specificity */
+html[data-theme="dark"] body .toc-container,
+html[data-theme="dark"] body .toc-container *:not(.toc-title),
+html[data-theme="dark"] .toc-container,
+html[data-theme="dark"] .toc-container *:not(.toc-title),
+[data-theme="dark"] .toc-container,
+[data-theme="dark"] .toc-container *:not(.toc-title) {
+    color: #ffffff !important;
+}
+
+/* Hover state with primary color for legacy links */
+html[data-theme="dark"] body .toc-container .toc-link:hover,
+html[data-theme="dark"] .toc-container .toc-link:hover,
+[data-theme="dark"] .toc-container .toc-link:hover {
+    color: var(--primary-color) !important;
+}
+
+/* TOC Button level styling */
+.toc-item.level-2 .toc-button {
+    padding-left: 1rem;
+}
+
+.toc-item.level-3 .toc-button {
+    padding-left: 1.5rem;
+    font-size: 0.8125rem;
+}
+
+.toc-item.level-4 .toc-button {
+    padding-left: 2rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+/* Legacy TOC Link level styling */
+.toc-item.level-2 .toc-link {
+    padding-left: 1rem;
+}
+
+.toc-item.level-3 .toc-link {
+    padding-left: 1.5rem;
+    font-size: 0.8125rem;
+}
+
+.toc-item.level-4 .toc-link {
+    padding-left: 2rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+/* Enhanced markdown content */
+.markdown-content {
+    position: relative;
+    transition: margin-right 0.3s ease;
+}
+
+/* Remove the old with-toc class styling as it's now handled by main-content */
+
+/* Copy code button */
+.code-block-container {
+    position: relative;
+}
+
+.copy-code-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.code-block-container:hover .copy-code-btn {
+    opacity: 1;
+}
+
+.copy-code-btn:hover {
+    background-color: var(--border-color);
+    color: var(--text-color);
+}
+
+.copy-code-btn.copied {
+    background-color: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+/* Anchor links */
+.anchor-link {
+    opacity: 0;
+    margin-left: 0.5rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-weight: normal;
+    transition: opacity 0.2s ease;
+}
+
+.markdown-content h1:hover .anchor-link,
+.markdown-content h2:hover .anchor-link,
+.markdown-content h3:hover .anchor-link,
+.markdown-content h4:hover .anchor-link {
+    opacity: 1;
+}
+
+.anchor-link:hover {
+    color: var(--primary-color);
+}
+
+/* Progress indicator */
+.reading-progress {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    width: 0%;
+    height: 3px;
+    background-color: var(--primary-color);
+    z-index: 1001;
+    transition: width 0.1s ease;
+}
+
+/* Enhanced responsive design */
+@media (max-width: 1200px) {
+    .toc-container {
+        transform: translateX(100%);
+    }
+
+    .main-content.with-toc {
+        margin-right: 0;
+    }
+
+    /* TOC toggle button for smaller screens */
+    .toc-toggle {
+        display: block;
+        position: fixed;
+        top: calc(var(--header-height) + 1rem);
+        right: 1rem;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        cursor: pointer;
+        z-index: 900;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+    }
+
+    .toc-toggle:hover {
+        background-color: var(--accent-color);
+        transform: scale(1.05);
+    }
+
+    .toc-container.visible {
+        transform: translateX(0);
+    }
+}
+
+@media (min-width: 1201px) {
+    .toc-toggle {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .search-container {
+        margin: 0.5rem;
+    }
+
+    .feature-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .welcome-section {
+        padding: 2rem 0;
+    }
+
+    .welcome-section h1 {
+        font-size: 2rem;
+    }
+
+    .document-content {
+        padding: 0;
+    }
+
+    /* Mobile adjustments removed - using direct navigation */
+
+    .diagram-content .mermaid {
+        min-width: 95%;
+        min-height: 80%;
+    }
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Focus styles for accessibility */
+.nav-link:focus,
+.theme-toggle:focus,
+.search-input:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Loading animation */
+.loading {
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Enhanced error styles */
+.error {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 1.5rem;
+    color: #dc2626;
+    margin: 2rem 0;
+}
+
+[data-theme="dark"] .error {
+    background-color: #450a0a;
+    border-color: #7f1d1d;
+    color: #fca5a5;
+}
+
+.error h3 {
+    margin-bottom: 0.5rem;
+    color: inherit;
+}
+
+/* Back to top button */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 48px;
+    height: 48px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.back-to-top:hover {
+    background-color: var(--accent-color);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.back-to-top.visible {
+    display: flex;
+}
+
+/* Lightbox styles removed - using direct navigation */
+
+
+
+/* Interactive Diagram Styles */
+.interactive-indicator {
+    position: absolute !important;
+    top: 10px !important;
+    right: 10px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Interactive diagram iframe styling in lightbox */
+.diagram-content iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 8px;
+    background-color: transparent;
+    min-height: 80vh;
+}
+
+/* Enhanced hover effects for interactive diagrams */
+.interactive-diagram-clickable {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.interactive-diagram-clickable:hover {
+    transform: scale(1.02);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+}
+
+.interactive-diagram-clickable:hover .interactive-indicator {
+    animation-duration: 1s;
+}
+
+
+
+
+
+/* Clickable diagram styling */
+.mermaid-clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 2px solid transparent;
+}
+
+.mermaid-clickable:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Static diagram image styling */
+.diagram-image,
+.clickable-diagram-image {
+    max-width: 100%;
+    height: auto;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    display: block;
+    margin: 1rem auto;
+}
+
+.diagram-image:hover,
+.clickable-diagram-image:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Container for diagram images */
+.diagram-container {
+    text-align: center;
+    margin: 2rem 0;
+    padding: 1rem;
+    background-color: var(--surface-color);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.diagram-container h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.diagram-container p {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    font-style: italic;
+}
+
+/* Improved Mermaid diagram contrast */
+.mermaid svg {
+    background-color: var(--background-color);
+    border-radius: 6px;
+}
+
+[data-theme="dark"] .mermaid svg {
+    background-color: var(--dark-surface);
+}
+
+/* Enhanced Mermaid diagram contrast for both themes */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node ellipse,
+.mermaid .node polygon {
+    stroke-width: 2px !important;
+}
+
+/* Light theme Mermaid styling */
+[data-theme="light"] .mermaid .node rect,
+[data-theme="light"] .mermaid .node circle,
+[data-theme="light"] .mermaid .node ellipse,
+[data-theme="light"] .mermaid .node polygon {
+    fill: #ffffff !important;
+    stroke: var(--primary-color) !important;
+}
+
+[data-theme="light"] .mermaid .nodeLabel,
+[data-theme="light"] .mermaid .node text,
+[data-theme="light"] .mermaid text {
+    fill: #1e293b !important;
+    color: #1e293b !important;
+    font-weight: 600 !important;
+}
+
+/* Dark theme Mermaid styling with high contrast */
+[data-theme="dark"] .mermaid .node rect,
+[data-theme="dark"] .mermaid .node circle,
+[data-theme="dark"] .mermaid .node ellipse,
+[data-theme="dark"] .mermaid .node polygon {
+    fill: #1e293b !important;
+    stroke: #60a5fa !important;
+    stroke-width: 2px !important;
+}
+
+[data-theme="dark"] .mermaid .nodeLabel,
+[data-theme="dark"] .mermaid .node text,
+[data-theme="dark"] .mermaid text {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+[data-theme="dark"] .mermaid .edgeLabel {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    border: 1px solid #60a5fa !important;
+    border-radius: 4px !important;
+    padding: 2px 6px !important;
+}
+
+/* Specific fixes for subgraph titles and labels */
+[data-theme="dark"] .mermaid .cluster rect {
+    fill: #334155 !important;
+    stroke: #60a5fa !important;
+    stroke-width: 2px !important;
+}
+
+[data-theme="dark"] .mermaid .cluster text {
+    fill: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+}
+
+/* Arrow and line styling */
+[data-theme="dark"] .mermaid .edgePath path {
+    stroke: #94a3b8 !important;
+    stroke-width: 2px !important;
+}
+
+[data-theme="dark"] .mermaid .arrowheadPath {
+    fill: #94a3b8 !important;
+    stroke: #94a3b8 !important;
+}
+
+/* Enhanced print styles */
+@media print {
+    .header,
+    .sidebar,
+    .back-to-top,
+    .copy-code-btn,
+    .search-container {
+        display: none !important;
+    }
+    
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .markdown-content {
+        max-width: none !important;
+        margin-right: 0 !important;
+    }
+    
+    .toc-container {
+        display: none !important;
+    }
+    
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3 {
+        break-after: avoid;
+    }
+    
+    .markdown-content pre,
+    .markdown-content blockquote {
+        break-inside: avoid;
+    }
+    
+    .feature-card {
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+}

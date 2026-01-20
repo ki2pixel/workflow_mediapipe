@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/46 Camille/docs/EM3_Cassandra pleure en découvrant qu'il y a des arnacœurs dans la maison !.mp4",
+  "video_stem": "EM3_Cassandra pleure en découvrant qu'il y a des arnacœurs dans la maison !",
+  "video_hash": "9801e7ce5852b2a6a1194c405063e50936c51234209ff74ee95ebd6326724ed9",
+  "created_at": "2025-12-04T14:30:57.450750+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/46 Camille 2025-12-04_14-30-57/9801e7ce5852b2a6a1194c405063e50936c51234209ff74ee95ebd6326724ed9/EM3_Cassandra pleure en découvrant qu'il y a des arnacœurs dans la maison !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/46 Camille 2025-12-04_14-30-57/9801e7ce5852b2a6a1194c405063e50936c51234209ff74ee95ebd6326724ed9/EM3_Cassandra pleure en découvrant qu'il y a des arnacœurs dans la maison !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/46 Camille 2025-12-04_14-30-57/9801e7ce5852b2a6a1194c405063e50936c51234209ff74ee95ebd6326724ed9/EM3_Cassandra pleure en découvrant qu'il y a des arnacœurs dans la maison !_tracking.json"
+  }
+}

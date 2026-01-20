@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/49 Camille/docs/6TER_Mr Bean_Comment se laver les dents dans sa voiture-.mp4",
+  "video_stem": "6TER_Mr Bean_Comment se laver les dents dans sa voiture-",
+  "video_hash": "83020fb66c6a74bff6ce56c007c1a183c6d93caeee40e455227bc90d6571b9ca",
+  "created_at": "2025-10-06T08:53:53.038477+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/83020fb66c6a74bff6ce56c007c1a183c6d93caeee40e455227bc90d6571b9ca/6TER_Mr Bean_Comment se laver les dents dans sa voiture-_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/83020fb66c6a74bff6ce56c007c1a183c6d93caeee40e455227bc90d6571b9ca/6TER_Mr Bean_Comment se laver les dents dans sa voiture-_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/83020fb66c6a74bff6ce56c007c1a183c6d93caeee40e455227bc90d6571b9ca/6TER_Mr Bean_Comment se laver les dents dans sa voiture-_tracking.json"
+  }
+}

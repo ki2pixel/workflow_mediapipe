@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/273 Camille/docs/Gulli - Marsupilamis - Jade se fait coacher.mp4",
+  "video_stem": "Gulli - Marsupilamis - Jade se fait coacher",
+  "video_hash": "8fa3e0b58027634a0672d78f0f5a7f07e14ce1bba3188da504a1d564373a87c4",
+  "created_at": "2025-10-28T10:24:42.233851+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/8fa3e0b58027634a0672d78f0f5a7f07e14ce1bba3188da504a1d564373a87c4/Gulli - Marsupilamis - Jade se fait coacher_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/8fa3e0b58027634a0672d78f0f5a7f07e14ce1bba3188da504a1d564373a87c4/Gulli - Marsupilamis - Jade se fait coacher_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/8fa3e0b58027634a0672d78f0f5a7f07e14ce1bba3188da504a1d564373a87c4/Gulli - Marsupilamis - Jade se fait coacher_tracking.json"
+  }
+}

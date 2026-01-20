@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/45 Camille/docs/Une escalope aux champignons... sans champignons !.mp4",
+  "video_stem": "Une escalope aux champignons... sans champignons !",
+  "video_hash": "e307404bbfb073411c1b0016d61c58a43ce70e25131015ce840dba355c7e587f",
+  "created_at": "2026-01-07T22:57:02.940247+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/e307404bbfb073411c1b0016d61c58a43ce70e25131015ce840dba355c7e587f/Une escalope aux champignons... sans champignons !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/e307404bbfb073411c1b0016d61c58a43ce70e25131015ce840dba355c7e587f/Une escalope aux champignons... sans champignons !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/45 Camille 2026-01-07_22-57-02/e307404bbfb073411c1b0016d61c58a43ce70e25131015ce840dba355c7e587f/Une escalope aux champignons... sans champignons !_tracking.json"
+  }
+}

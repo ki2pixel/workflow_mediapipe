@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/246 Camille/docs/6ter - Norbert commis d'office - Ils comparent son plat à du dégueuli .mp4",
+  "video_stem": "6ter - Norbert commis d'office - Ils comparent son plat à du dégueuli ",
+  "video_hash": "fc153557989e567a0478ed1bf5f029e166e4d95183b94258632dbeead3be8441",
+  "created_at": "2025-10-24T09:32:02.221238+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/246 Camille 2025-10-24_09-32-02/fc153557989e567a0478ed1bf5f029e166e4d95183b94258632dbeead3be8441/6ter - Norbert commis d'office - Ils comparent son plat à du dégueuli _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/246 Camille 2025-10-24_09-32-02/fc153557989e567a0478ed1bf5f029e166e4d95183b94258632dbeead3be8441/6ter - Norbert commis d'office - Ils comparent son plat à du dégueuli _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/246 Camille 2025-10-24_09-32-02/fc153557989e567a0478ed1bf5f029e166e4d95183b94258632dbeead3be8441/6ter - Norbert commis d'office - Ils comparent son plat à du dégueuli _tracking.json"
+  }
+}

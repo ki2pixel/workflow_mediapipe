@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/286 Camille/docs/TEVA_Copycat_Elle n'arrive pas à sauver son collèguemp4.mp4",
+  "video_stem": "TEVA_Copycat_Elle n'arrive pas à sauver son collèguemp4",
+  "video_hash": "7424f92013741c7c71f7a9447bf3fed66d057bcbc9c6cc9b34c6cf9e9958fc21",
+  "created_at": "2025-10-29T10:50:56.695687+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/7424f92013741c7c71f7a9447bf3fed66d057bcbc9c6cc9b34c6cf9e9958fc21/TEVA_Copycat_Elle n'arrive pas à sauver son collèguemp4_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/7424f92013741c7c71f7a9447bf3fed66d057bcbc9c6cc9b34c6cf9e9958fc21/TEVA_Copycat_Elle n'arrive pas à sauver son collèguemp4_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/286 Camille 2025-10-29_10-50-56/7424f92013741c7c71f7a9447bf3fed66d057bcbc9c6cc9b34c6cf9e9958fc21/TEVA_Copycat_Elle n'arrive pas à sauver son collèguemp4_tracking.json"
+  }
+}

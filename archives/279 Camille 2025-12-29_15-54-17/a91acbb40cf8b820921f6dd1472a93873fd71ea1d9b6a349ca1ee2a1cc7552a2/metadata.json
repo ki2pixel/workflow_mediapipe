@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/279 Camille/docs/E=M6 - Peau homme vs femme.mp4",
+  "video_stem": "E=M6 - Peau homme vs femme",
+  "video_hash": "a91acbb40cf8b820921f6dd1472a93873fd71ea1d9b6a349ca1ee2a1cc7552a2",
+  "created_at": "2025-12-29T15:54:18.016231+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/279 Camille 2025-12-29_15-54-17/a91acbb40cf8b820921f6dd1472a93873fd71ea1d9b6a349ca1ee2a1cc7552a2/E=M6 - Peau homme vs femme_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/279 Camille 2025-12-29_15-54-17/a91acbb40cf8b820921f6dd1472a93873fd71ea1d9b6a349ca1ee2a1cc7552a2/E=M6 - Peau homme vs femme_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/279 Camille 2025-12-29_15-54-17/a91acbb40cf8b820921f6dd1472a93873fd71ea1d9b6a349ca1ee2a1cc7552a2/E=M6 - Peau homme vs femme_tracking.json"
+  }
+}

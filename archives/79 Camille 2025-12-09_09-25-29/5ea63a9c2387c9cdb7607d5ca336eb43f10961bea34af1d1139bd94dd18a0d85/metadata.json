@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/79 Camille/docs/PP - Le retour de Don Camillo - Fernandel et Gino Cervi.mp4",
+  "video_stem": "PP - Le retour de Don Camillo - Fernandel et Gino Cervi",
+  "video_hash": "5ea63a9c2387c9cdb7607d5ca336eb43f10961bea34af1d1139bd94dd18a0d85",
+  "created_at": "2025-12-09T09:25:29.226666+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/79 Camille 2025-12-09_09-25-29/5ea63a9c2387c9cdb7607d5ca336eb43f10961bea34af1d1139bd94dd18a0d85/PP - Le retour de Don Camillo - Fernandel et Gino Cervi_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/79 Camille 2025-12-09_09-25-29/5ea63a9c2387c9cdb7607d5ca336eb43f10961bea34af1d1139bd94dd18a0d85/PP - Le retour de Don Camillo - Fernandel et Gino Cervi_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/79 Camille 2025-12-09_09-25-29/5ea63a9c2387c9cdb7607d5ca336eb43f10961bea34af1d1139bd94dd18a0d85/PP - Le retour de Don Camillo - Fernandel et Gino Cervi_tracking.json"
+  }
+}

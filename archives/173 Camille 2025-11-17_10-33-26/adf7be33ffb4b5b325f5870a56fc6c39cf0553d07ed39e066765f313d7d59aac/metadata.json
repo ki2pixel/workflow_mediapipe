@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/173 Camille/docs/TEVA_Piquantes_La trend tiktok sur sa chanson  « les gens n’ont pas compris la chanson » .mp4",
+  "video_stem": "TEVA_Piquantes_La trend tiktok sur sa chanson  « les gens n’ont pas compris la chanson » ",
+  "video_hash": "adf7be33ffb4b5b325f5870a56fc6c39cf0553d07ed39e066765f313d7d59aac",
+  "created_at": "2025-11-17T10:33:26.422825+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/173 Camille 2025-11-17_10-33-26/adf7be33ffb4b5b325f5870a56fc6c39cf0553d07ed39e066765f313d7d59aac/TEVA_Piquantes_La trend tiktok sur sa chanson  « les gens n’ont pas compris la chanson » _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/173 Camille 2025-11-17_10-33-26/adf7be33ffb4b5b325f5870a56fc6c39cf0553d07ed39e066765f313d7d59aac/TEVA_Piquantes_La trend tiktok sur sa chanson  « les gens n’ont pas compris la chanson » _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/173 Camille 2025-11-17_10-33-26/adf7be33ffb4b5b325f5870a56fc6c39cf0553d07ed39e066765f313d7d59aac/TEVA_Piquantes_La trend tiktok sur sa chanson  « les gens n’ont pas compris la chanson » _tracking.json"
+  }
+}

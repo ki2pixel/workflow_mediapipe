@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/225 Camille/docs/Laurent apprend la danse de la pluie aux aventuriers !.mp4",
+  "video_stem": "Laurent apprend la danse de la pluie aux aventuriers !",
+  "video_hash": "55098421ec8f586ec8a5a2edeacff4b5c28dae260f561cab6a81f6db3d0ba440",
+  "created_at": "2025-10-22T11:20:49.533693+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/55098421ec8f586ec8a5a2edeacff4b5c28dae260f561cab6a81f6db3d0ba440/Laurent apprend la danse de la pluie aux aventuriers !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/55098421ec8f586ec8a5a2edeacff4b5c28dae260f561cab6a81f6db3d0ba440/Laurent apprend la danse de la pluie aux aventuriers !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/55098421ec8f586ec8a5a2edeacff4b5c28dae260f561cab6a81f6db3d0ba440/Laurent apprend la danse de la pluie aux aventuriers !_tracking.json"
+  }
+}

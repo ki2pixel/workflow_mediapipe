@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/118 Camille/docs/R4088211_LPHDF Conseils un jo.mp4",
+  "video_stem": "R4088211_LPHDF Conseils un jo",
+  "video_hash": "0a1a99b11d0e82eac5f9d1985f635a14b1478b8abd0014697e922dfd65d0cbfb",
+  "created_at": "2025-12-12T23:44:30.863170+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/118 Camille 2025-12-12_23-44-30/0a1a99b11d0e82eac5f9d1985f635a14b1478b8abd0014697e922dfd65d0cbfb/R4088211_LPHDF Conseils un jo_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/118 Camille 2025-12-12_23-44-30/0a1a99b11d0e82eac5f9d1985f635a14b1478b8abd0014697e922dfd65d0cbfb/R4088211_LPHDF Conseils un jo_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/118 Camille 2025-12-12_23-44-30/0a1a99b11d0e82eac5f9d1985f635a14b1478b8abd0014697e922dfd65d0cbfb/R4088211_LPHDF Conseils un jo_tracking.json"
+  }
+}

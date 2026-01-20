@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/273 Camille/docs/Gulli - Marsupilamis - Jade affronte Max.mp4",
+  "video_stem": "Gulli - Marsupilamis - Jade affronte Max",
+  "video_hash": "bc10af4973fa585a6539e39c4540bb8e3ae3c4b872c8ec3540a5a08794f36f91",
+  "created_at": "2025-10-28T10:24:42.206736+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/bc10af4973fa585a6539e39c4540bb8e3ae3c4b872c8ec3540a5a08794f36f91/Gulli - Marsupilamis - Jade affronte Max_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/bc10af4973fa585a6539e39c4540bb8e3ae3c4b872c8ec3540a5a08794f36f91/Gulli - Marsupilamis - Jade affronte Max_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/bc10af4973fa585a6539e39c4540bb8e3ae3c4b872c8ec3540a5a08794f36f91/Gulli - Marsupilamis - Jade affronte Max_tracking.json"
+  }
+}

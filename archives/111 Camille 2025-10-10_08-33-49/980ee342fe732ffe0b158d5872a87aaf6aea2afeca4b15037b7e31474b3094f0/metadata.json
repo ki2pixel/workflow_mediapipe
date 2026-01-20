@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/111 Camille/docs/M6 - LMP - Il souhaite allier le kouign-amann et la tropézienne en un seul gâteau.mp4",
+  "video_stem": "M6 - LMP - Il souhaite allier le kouign-amann et la tropézienne en un seul gâteau",
+  "video_hash": "980ee342fe732ffe0b158d5872a87aaf6aea2afeca4b15037b7e31474b3094f0",
+  "created_at": "2025-10-10T08:33:49.856141+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/111 Camille 2025-10-10_08-33-49/980ee342fe732ffe0b158d5872a87aaf6aea2afeca4b15037b7e31474b3094f0/M6 - LMP - Il souhaite allier le kouign-amann et la tropézienne en un seul gâteau_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/111 Camille 2025-10-10_08-33-49/980ee342fe732ffe0b158d5872a87aaf6aea2afeca4b15037b7e31474b3094f0/M6 - LMP - Il souhaite allier le kouign-amann et la tropézienne en un seul gâteau_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/111 Camille 2025-10-10_08-33-49/980ee342fe732ffe0b158d5872a87aaf6aea2afeca4b15037b7e31474b3094f0/M6 - LMP - Il souhaite allier le kouign-amann et la tropézienne en un seul gâteau_tracking.json"
+  }
+}

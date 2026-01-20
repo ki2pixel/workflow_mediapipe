@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/67 Camille/docs/BOMBE.mp4",
+  "video_stem": "BOMBE",
+  "video_hash": "6269acd7280d0630b8f030728a66660859d48d9503cbfe1d2dacb55254404172",
+  "created_at": "2025-11-07T18:44:33.894825+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/6269acd7280d0630b8f030728a66660859d48d9503cbfe1d2dacb55254404172/BOMBE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/6269acd7280d0630b8f030728a66660859d48d9503cbfe1d2dacb55254404172/BOMBE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/67 Camille 2025-11-07_18-44-33/6269acd7280d0630b8f030728a66660859d48d9503cbfe1d2dacb55254404172/BOMBE_tracking.json"
+  }
+}

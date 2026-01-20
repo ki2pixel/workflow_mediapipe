@@ -1,0 +1,385 @@
+# Journal des Décisions
+
+Ce document enregistre les décisions architecturales et techniques importantes prises au cours du projet.
+
+> **Politique de conservation**  
+> - Ce fichier conserve intégralement les décisions des ~90 derniers jours ou celles toujours actives dans le code.  
+> - Les décisions antérieures sont synthétisées ci-dessous et disponibles en détail dans `memory-bank/archives/decisionLog_legacy.md`.
+
+## Historique synthétique (avant 2025-10-08)
+
+Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
+
+## 2026-01-20 01:12:00+01:00: Maintenance Tests Backend — Application complète Guide de Maintenance (Phases 1-3)
+- **Décision** : Appliquer l'intégralité du Guide de Maintenance Tests Backend créé suite à l'audit du 2026-01-20 pour corriger les problèmes identifiés et stabiliser la suite de tests backend.
+- **Raison** : L'audit avait révélé des tests obsolètes post-refactoring, des dépendances manquantes dans les environnements spécialisés, et des imports incorrects. La correction de ces problèmes était nécessaire pour assurer la fiabilité des tests et la maintenabilité future du codebase.
+- **Implémentation Phase 1 (Corrections Critiques)** :
+  - **Migration `_get_app_state` → `get_workflow_state`** : Remplacement systématique dans `tests/unit/test_workflow_service.py` et `tests/integration/test_workflow_routes.py` avec ajout de helpers `patched_workflow_state`, `patched_commands_config`, `patched_app_new`.
+  - **Suppression méthodes obsolètes CSVService** : Retrait des tests `convert_expanded_onedrive_url` et `fetch_csv_data` dans `tests/unit/test_csv_service_refactored.py`.
+  - **Correction imports application** : Migration de `app_new import app` vers `app_new import create_app` dans `tests/integration/test_lemonfox_api_endpoint.py`.
+  - **Implémentation locale méthodes manquantes** : Ajout de `parse_progress_from_log_line` local dans `tests/integration/test_workflow_integration.py`.
+- **Implémentation Phase 2 (Isolation Environnement)** :
+  - **Scripts spécialisés** : Création de `run_step3_tests.sh`, `run_step5_tests.sh`, et `run_main_tests.sh` pour exécuter les tests dans les environnements appropriés.
+  - **Configuration pytest** : Mise à jour de `pytest.ini` pour exclure les tests nécessitant des environnements spécialisés du run principal.
+- **Implémentation Phase 3 (Refactoring Tests)** :
+  - **Fixtures standardisées** : Ajout de `mock_workflow_state`, `mock_app`, `transnet_env_info`, et `tracking_env_info` dans `conftest.py`.
+  - **Scripts d'automatisation** : Création de `diagnose_tests.sh`, `fix_backend_tests.sh`, et `validate_tests.sh` pour la maintenance future.
+- **Validation** : Phase 1 : 67/67 tests passés. Phase 2 : 281 tests principaux passés (35 échecs hors environnement). Phase 3 : Patterns standardisés et automatisation en place.
+- **Impact** : Stabilisation complète de la suite de tests backend, isolation par environnement pour éviter les erreurs de dépendances, et mise en place d'outils d'automatisation pour la maintenance future. Le projet dispose maintenant d'une base de tests fiable et maintenable.
+
+## 2026-01-18 21:00:00+01:00: Suppression Feature "Étape 5 · Options avancées"
+- **Décision** : Supprimer complètement la fonctionnalité de configuration dynamique des chunks STEP5 (chunk min/max) de l'interface utilisateur et du backend pour simplifier l'architecture et réduire la surface de maintenance.
+- **Raison** : La feature n'était plus utilisée activement, ajoutait une complexité inutile (API, service, propagation env vars), et le chunking adaptatif fonctionne parfaitement avec ses valeurs par défaut. Sa suppression simplifie le code sans impact fonctionnel.
+- **Implémentation** : 
+  - **Frontend** : Suppression de la section Settings "Étape 5 · Options avancées" (`templates/index_new.html`), fonction `initializeStep5AdvancedControls()` et appel (`static/main.js`), API `setStep5ChunkBoundsAPI` (`static/apiService.js`), styles CSS associés (`static/css/components/controls.css`).
+  - **Backend** : Suppression de la route `/api/step5/chunk_bounds` (`routes/api_routes.py`), méthode `set_step5_chunk_bounds()` (`services/workflow_service.py`), propagation des variables `TRACKING_CHUNK_MIN/MAX` (`app_new.py`, `workflow_scripts/step5/run_tracking_manager.py`).
+  - **Documentation** : Nettoyage des références dans `docs/workflow/pipeline/STEP5_SUIVI_VIDEO.md`, `docs/workflow/core/ARCHITECTURE_COMPLETE_FR.md`, `docs/workflow/technical/API_INSTRUMENTATION.md`, `docs/workflow/technical/TESTING_STRATEGY.md`, `docs/workflow/core/REFERENCE_RAPIDE_DEVELOPPEURS.md`, `docs/workflow/admin/UPDATE_DOCUMENTATION_SUMMARY.md`.
+- **Validation** : Tests frontend OK (`npm run test:frontend`), passe globale de vérification terminée (0 artefact restant dans le code actif), architecture simplifiée, chunking adaptatif préservé.
+- **Impact** : Réduction significative de la dette technique et de la surface d'entretien, tout en préservant les fonctionnalités essentielles de STEP5.
+
+## 2026-01-18 20:29:00+01:00: Retrait des features Supervision (Diagnostics/Statistiques) et Téléversement
+- **Décision** : Supprimer complètement les fonctionnalités frontend “Supervision” (boutons Diagnostics + Statistiques) et “Actions rapides · Téléversement” devenues obsolètes pour limiter la surface d’entretien. `templates/index_new.html` ne référence plus ces sections, `static/main.js` et `static/domElements.js` ont perdu leurs imports/handlers correspondants, et Chart.js n’est plus chargé.
+- **Raison** : Ces modules n’étaient plus utilisés ni maintenus côté backend; les conserver entretenait une dette UI et du code mort (imports JS, raccourcis clavier, modales, CSS dédiées).
+- **Impacts** : Interface allégée (topbar + settings), suppression de l’intégration Chart.js, suppression des raccourcis clavier S/D/U et des exports Smart Upload. Aucun impact backend direct à ce stade.
+- **Validation** : Changements UI uniquement; tests non exécutés, inspection visuelle recommandée.
+
+## 2026-01-18 02:27:00+01:00: Audit UX/UI Unifié — Sprint 2 (Moyen Terme)
+- **Décision** : Implémenter les quatre actions “Moyen Terme (Sprint 2)” : (1) restructurer le panneau Settings en sections thématiques avec composants réutilisables (`settings-section`, `settings-block`, `advanced-controls`), (2) ajouter des badges d’état visuels sur chaque step afin de refléter instantanément le statut WorkflowState, (3) harmoniser les gabarits de modales/overlays (popupManager + CSS) avec transitions cohérentes et focus trap existant, (4) généraliser des transitions fluides + labellisation ARIA du toggle Settings pour améliorer l’accessibilité.
+- **Raison** : Offrir une expérience utilisateur plus lisible en moyenne charge (navigation rapide dans Settings, perception immédiate des statuts d’étapes, cohérence des modales) et préparer le terrain pour les Sprints suivants (usages avancés AppState/PollingManager).
+- **Impacts** : Fichiers affectés principaux : `templates/index_new.html` (structure Settings + badges), `static/css/components/{controls,steps}.css` (sections, transitions, badges), `static/uiUpdater.js` (mapping statuts/badges + synchronisation `data-status`), `static/main.js` (aria-label dynamique du toggle), `static/popupManager.js` (gabarits uniformes). Aucun impact backend. Tests automatisés non exécutés (UI-only); revue visuelle recommandée.
+- **Validation** : Inspection manuelle (prévue) ; aucune régression fonctionnelle connue.
+
+## 2026-01-18 02:10:00+01:00: Audit UX/UI Unifié — Sprint 1 (Court Terme)
+- **Décision** : Appliquer les quatre actions “Court Terme (Sprint 1)” définies dans `docs/workflow/audits/audit-ux-ui-unifie-2026-01-18.md` : (1) séparer et styliser les groupes d’actions primaires/secondaires dans la topbar, (2) repositionner le widget de monitoring système en bas-gauche avec translation conditionnelle lorsque les logs sont actifs, (3) introduire une palette d’états unifiée via `.status-badge` et variables `--status-*`, (4) harmoniser les styles `:disabled` dans tout le frontend.
+- **Raison** : Réduire la surcharge cognitive sur la barre de contrôle, améliorer la visibilité du monitoring temps réel, clarifier les retours d’état et assurer une expérience homogène pour les éléments désactivés.
+- **Impacts** : Modifications coordonnées de `templates/index_new.html`, `static/css/components/{controls,steps,widgets}.css`, `static/css/{variables,base}.css`, `static/{apiService,uiUpdater}.js`. L’interface reflète désormais explicitement la hiérarchie des actions, le widget est accessible sans masquer le contenu, et les badges d’état/états disabled sont cohérents sur toutes les steps.
+- **Validation** : Tests automatisés non exécutés (changements purement UI) ; inspection visuelle recommandée lors du prochain run.
+
+## 2026-01-18 00:09:03+01:00: Audit Frontend — Finalisation actions 🟠 (Performance & Qualité)
+- **Décision** : Finaliser les 3 actions importantes restantes de l’audit `docs/workflow/archives/audit-frontend-2026-01-17.md` : (1) Optimiser `parseAndStyleLogContent()` avec `_COMPILED_LOG_PATTERNS` dans `static/uiUpdater.js`, (2) Échapper systématiquement les variables interpolées dans `static/popupManager.js` via `DOMUpdateUtils.escapeHtml()`, (3) Ajouter un support global `prefers-reduced-motion` dans `static/css/base.css`.
+- **Raison** : Améliorer la performance sur logs volumineux, renforcer la sécurité XSS sur les popups, et respecter l’accessibilité WCAG pour les utilisateurs sensibles au mouvement.
+- **Impacts** : Frontend plus performant (regex pré-compilées), sécurisé (plus de `innerHTML` non échappé), et accessible (réduction des animations). Aucune régression fonctionnelle.
+- **Validation** : `npm run test:frontend` exécuté avec succès (exit code 0).
+
+## 2026-01-17 23:56:00+01:00: Audit Frontend — Correctifs critiques (XSS, A11y, tests)
+- **Décision** : Appliquer les 3 actions critiques immédiates de l’audit `docs/workflow/archives/audit-frontend-2026-01-17.md` : (1) Corriger XSS P0 dans `static/apiService.js` (remplacer `innerHTML +=` par DOM safe), (2) Implémenter focus trap + restauration focus systématique sur toutes les modales (`static/statsViewer.js`, `static/reportViewer.js`, correction import `static/main.js`), (3) Ajouter les tests critiques manquants (`tests/frontend/test_dom_batcher_performance.mjs`, `tests/frontend/test_focus_trap.mjs`) et mettre à jour `package.json`.
+- **Raison** : Sécuriser le frontend contre les injections XSS, garantir l’accessibilité WCAG (focus trap/Tab/Escape/restauration), et couvrir les tests manquants pour éviter les régressions sur DOMBatcher et les modales.
+- **Impacts** : Frontend sécurisé (plus de `innerHTML` dangereux), accessible (focus géré sur toutes les modales), et testé (`npm run test:frontend` OK). Aucune régression fonctionnelle.
+- **Validation** : `npm run test:frontend` exécuté avec succès (exit code 0).
+
+## 2026-01-17 23:56:00+01:00: Synthèse des décisions majeures 2025 (Standardisation & Optimisations)
+- **Décision** : Consolider et synthétiser les trois grandes décisions architecturales de 2025 : (1) Standardisation architecture & monitoring avec adoption de WorkflowState, WorkflowCommandsConfig, suppression des intégrations Airtable/MySQL et bascule Webhook-only, (2) Refonte UI/UX & outils internes avec passage au mode compact unique, widgets unifiés, diagnostics système, Smart Upload sécurisé et durcissement Step7, (3) Optimisations pipeline STEP3/4/5 avec tracking full CPU, tuning TransNetV2/PyTorch audio, rapports HTML-only et service ResultsArchiver.
+- **Raison** : Faciliter la consultation rapide des décisions stratégiques de 2025 tout en allégeant ce fichier principal. Les détails chronologiques complets sont préservés dans archives/decisionLog_legacy.md.
+- **Impacts** : Ces décisions ont éliminé les anciens globaux (PROCESS_INFO, etc.), sécurisé l'état applicatif, modernisé l'interface utilisateur et optimisé les performances du pipeline. L'architecture est désormais unifiée et maintenable.
+- **Validation** : Implémentations validées tout au long de 2025 ; entrées détaillées archivées pour traçabilité complète.
+
+## 2026-01-13 11:36:00+01:00: Audit Remediation — correction warning Pytest sur docstring finalize_and_copy.py
+- **Décision** : Corriger l'échappement invalide `\\-` dans la docstring de `workflow_scripts/step7/finalize_and_copy.py` (probablement dans un exemple ou description regex) pour éviter le DeprecationWarning Pytest.
+- **Raison** : Supprimer les warnings inutiles dans la sortie de tests pour une meilleure lisibilité et conformité Python moderne.
+- **Impacts** : Pas de changement fonctionnel, seulement correction de syntaxe docstring.
+
+## 2026-01-13 11:30:00+01:00: Audit Remediation — durcissement validation URL + testabilité frontend
+- **Décision** : Rejeter explicitement les schémas non-HTTP(S) (`ftp://`, `file://`) dans `CSVService._check_csv_for_downloads()` avant toute logique Dropbox-only.
+- **Raison** : Réduire la surface d’abus (sources locales / protocoles non supportés) et aligner le monitoring sur une allowlist stricte.
+- **Impacts** : Les liens webhook non-HTTP(S) sont ignorés (pas d’auto-download, pas d’écriture d’historique). Frontend : export de `parseAndStyleLogContent` pour permettre un test Node de non-régression XSS.
+
+## 2026-01-10 12:28:00+01:00: Refactoring webhook download logic to remove manual_open virtual entries and enforce Dropbox-only auto-download policy
+- **Décision** : Refactorer la logique de _check_csv_for_downloads() pour supprimer les entrées virtuelles "manual_open" pour les URLs non éligibles (FromSmash, SwissTransfer, externes), gardant uniquement l'auto-download pour les URLs Dropbox/proxy R2, et ignorant les autres liens sans créer d'entrées UI ou historique.
+- **Contexte** : La fonctionnalité obsolète de création d'entrées virtuelles "manual_open" pour les liens non-Dropbox causait des notifications UI inappropriées et une complexité inutile. La politique doit être strictement "Dropbox-only" pour l'auto-download.
+- **Implémentation** :
+  - **Backend** (`services/csv_service.py`) : Suppression de la branche de création d'entrées virtuelles "manual_open", logique simplifiée à ne créer des téléchargements que pour URLs Dropbox/proxy R2 éligibles, suppression de l'import uuid.
+  - **Frontend** (`static/csvWorkflowPrompt.js`) : Mise à jour de `showCSVWorkflowPrompt()` pour ignorer les liens non-Dropbox, ajout d'un check défensif `isManualOpen` dans `isDropboxLikeDownload()` pour éviter toute classification erronée.
+  - **Tests** (`tests/integration/test_csv_dry_run.py`) : Ajout de `test_csv_non_eligible_links_are_ignored` pour valider l'absence d'entrées WorkflowState, historique et workers pour les liens non éligibles.
+  - **Documentation** : Mise à jour de tous les fichiers docs/workflow/ pour supprimer les références au mode manuel, documenter la politique "Dropbox-only", et confirmer que les liens non éligibles sont ignorés.
+- **Validation** : Tests unitaires et d'intégration passants, comportement vérifié (auto-download Dropbox uniquement, ignorance des autres liens), documentation alignée.
+- **Impact** : Simplification radicale de la logique de monitoring, élimination des notifications UI pour les liens non-Dropbox, renforcement de la sécurité et de la maintenabilité, architecture plus cohérente avec la source unique Webhook.
+
+## 2026-01-09 13:38:00+01:00: Correction logique monitoring CSV — écriture historique seulement pour téléchargements réels, réessais pour échecs, correction popup frontend pour liens manuels
+- **Décision** : Ajuster la logique de monitoring CSV pour que l'historique ne soit écrit que lors de téléchargements réels ou simulés (DRY_RUN), permettant les réessais pour les échecs, et corriger le frontend pour traiter les liens manuels comme non-Dropbox.
+- **Contexte** : Le système ajoutait des URLs à `download_history.json` même pour les entrées virtuelles "manual_open", causant des skips incorrects et des popups "Téléchargement Terminé !" pour des liens manuels Dropbox/R2.
+- **Implémentation** :
+  - **Backend** (`services/csv_service.py`) :
+    - `_check_csv_for_downloads()` n'ajoute plus à l'historique pour les entrées "manual_open". Histoire mise à jour seulement en DRY_RUN ou après succès réel (via `execute_csv_download_worker`).
+    - Ajout de `_is_url_already_tracked()` pour vérifier `WorkflowState` et permettre réessais pour statuts 'failed', 'cancelled', 'unknown_error'.
+    - Ajout de dédup dans la même passe de monitoring pour éviter multiples workers.
+  - **Frontend** (`static/csvWorkflowPrompt.js`) :
+    - `isDropboxLikeDownload()` retourne `false` si `manual_open === true`.
+    - Ajout `isDropboxByTypeOrUrl` pour différencier, permettant des messages spécifiques pour liens manuels Dropbox.
+    - Ajustement des messages et boutons pour liens manuels Dropbox (affichage "Dropbox" au lieu "Lien Externe").
+  - **Tests** : Mise à jour `tests/integration/test_double_encoded_urls.py` et `test_csv_dry_run.py` pour refléter la nouvelle logique, ajout `original_filename` pour déclencher auto-download, isolation hermétique des modules.
+- **Validation** : Tests unitaires passants, régression évitée pour liens manuels, popups correctes ("Nouveau lien disponible !" vs "Téléchargement Terminé !").
+- **Impact** : Élimination des skips incorrects pour paires R2/Dropbox, réessais possibles pour échecs, expérience utilisateur améliorée avec popups appropriées, architecture plus robuste.
+
+## 2026-01-09 01:10:00+01:00: Correction popup Dropbox proxy (R2 URLs)
+- **Décision** : Corriger la classification incorrecte des URLs Dropbox proxy (`workers.dev/dropbox/...`) qui étaient traitées comme "liens externes" au lieu de téléchargements Dropbox automatiques.
+- **Contexte** : Les URLs R2 Dropbox servant de proxy pour les fichiers Dropbox étaient mal interprétées par le frontend, affichant une popup "Ouvrir manuellement" au lieu du workflow "Téléchargement Terminé". Le problème venait d'une détection incomplète dans le frontend et de métadonnées manquantes du backend.
+- **Implémentation** :
+  - **Backend** (`app_new.py`) : Ajout de `url` et `url_type: 'dropbox'` dans `download_info` de la fonction `execute_csv_download_worker()` pour marquer explicitement le type de téléchargement.
+  - **Frontend** (`static/csvWorkflowPrompt.js`) : 
+    - Ajout de la fonction `isDropboxProxyUrl()` pour détecter les URLs avec hostname contenant 'workers.dev' ou 'worker' et pathname contenant '/dropbox/'.
+    - Ajout de `isDropboxLikeDownload()` pour combiner la détection via `url_type==='dropbox'`, `isDropboxUrl()` et `isDropboxProxyUrl()`.
+    - Remplacement de toutes les vérifications `isDropboxUrl()` par `isDropboxLikeDownload()`.
+  - **Cache-busting** (`routes/workflow_routes.py`) : Ajout de `_STATIC_CACHE_BUSTER` timestamp généré au chargement du module et passé au template `index_new.html` pour forcer le rechargement des assets JS après redémarrage.
+- **Validation** : Après redémarrage du serveur et hard refresh (Ctrl+F5), les URLs R2 Dropbox affichent correctement la popup "Téléchargement Terminé" et non plus la popup "Lien Externe".
+- **Impact** : Amélioration de l'expérience utilisateur avec classification correcte des téléchargements Dropbox proxy, élimination des confusions sur le mode manuel, et garantie que le frontend charge toujours le JavaScript à jour via cache-busting.
+
+## 2025-12-27 14:30:00+01:00: Restriction GPU STEP5 à InsightFace uniquement
+- **Décision** : Restreindre l'utilisation du GPU au seul moteur InsightFace pour STEP5, forçant tous les autres moteurs (MediaPipe, OpenSeeFace, OpenCV, EOS) à fonctionner en mode CPU même si `STEP5_ENABLE_GPU=1`.
+- **Contexte** : Après des tests approfondis, seul InsightFace offre une stabilité et des performances satisfaisantes en mode GPU. Les autres moteurs présentent des problèmes de stabilité, de consommation mémoire excessive ou des gains de performance insuffisants pour justifier la complexité de leur support GPU.
+- **Implémentation** :
+  - Modification de `run_tracking_manager.py` pour forcer `args.disable_gpu = True` pour tous les moteurs sauf InsightFace
+  - Mise à jour de la documentation (`STEP5_GPU_USAGE.md`, `STEP5_SUIVI_VIDEO.md`) pour refléter cette restriction
+  - Ajout de tests unitaires complets pour valider le comportement
+- **Validation** : Tests unitaires passants avec succès, vérifiant que seul InsightFace peut utiliser le GPU et que les autres moteurs sont bien forcés en CPU.
+- **Impact** : Simplification de la maintenance, réduction des risques de problèmes liés au GPU, et clarification pour les utilisateurs sur les capacités GPU du système.
+
+## 2025-12-23 10:31:00+01:00: STEP5 — Parallélisation du fallback object detector en mode InsightFace GPU
+- **Décision** : Quand `STEP5_ENABLE_OBJECT_DETECTION=1` en mode InsightFace GPU, respecter `TRACKING_CPU_WORKERS` pour accélérer le fallback CPU (object detection) sans casser la séquentialité GPU de la détection visage.
+- **Contexte** : Le fallback object detector (MediaPipe Tasks) devenait un goulot CPU en mode GPU car `TRACKING_CPU_WORKERS` était historiquement forcé à `1` pour les workers GPU. Une première tentative multi-thread en `RunningMode.VIDEO` générait des warnings `Input timestamp must be monotonically increasing`.
+- **Implémentation** :
+  - `run_tracking_manager.py` : propagation de `TRACKING_CPU_WORKERS` vers les workers GPU via `--mp_num_workers_internal` quand le fallback est activé.
+  - `process_video_worker.py` (mode `face_engine`) : exécution du fallback via threads (1 instance `ObjectDetector` par thread), et bascule du detector en `RunningMode.IMAGE` + `detect()` pour supprimer la contrainte de timestamps monotones.
+- **Validation** : logs `logs/step5/insightface/manager_tracking_20251223_102425.log` et `worker_GPU_...19349.log` montrent `Object detection fallback workers ...: 15` et absence des warnings, avec amélioration de performance.
+
+## 2025-12-22 14:40:00+01:00: Réintroduction d’InsightFace GPU-only
+- **Décision** : Réactiver InsightFace comme moteur STEP5 officiel, en imposant le mode GPU-only via un environnement dédié `insightface_env`. Le gestionnaire injecte désormais automatiquement les bibliothèques CUDA (`nvidia/*/lib` + `/usr/local/cuda-*/targets/.../lib`) avant de lancer le worker, garantissant que `onnxruntime` charge `CUDAExecutionProvider`. Les variables `.env` documentées couvrent la VRAM (`STEP5_GPU_MAX_VRAM_MB`), le profilage (`STEP5_GPU_PROFILING`) et les paramètres InsightFace (modèle, det_size, throttling).
+
+## 2025-12-22 12:40:00+01:00: STEP5 — Lazy import MediaPipe et subprocess pour TensorFlow GPU checks
+- **Décision** : Implémenter lazy import de MediaPipe via `importlib` dans `process_video_worker.py` pour éviter les conflits NumPy/TensorFlow (`_ARRAY_API` errors) lors du chargement des workers OpenCV. Utiliser subprocess pour les vérifications TensorFlow GPU dans `STEP5_TF_GPU_ENV_PYTHON` au lieu d'un import direct dans `tracking_env`.
+- **Contexte** : L'activation GPU pour STEP5 causait des erreurs TensorFlow (`_ARRAY_API not found`, `MessageFactory object has no attribute 'GetPrototype'`) en raison d'incompatibilités NumPy entre `tracking_env` (NumPy 2.2.6) et TensorFlow 2.15.0 (requis NumPy 1.x). MediaPipe importe TensorFlow au niveau module, causant des erreurs même pour les moteurs OpenCV.
+- **Implémentation** :
+  - **Lazy import** : Fonction `_ensure_mediapipe_loaded(required=False)` dans `process_video_worker.py` pour différer l'import jusqu'à utilisation réelle du moteur MediaPipe. `required=True` pour les workers MediaPipe, `required=False` pour fallback object detector.
+  - **Subprocess TensorFlow** : `Config.check_gpu_availability()` utilise `subprocess.run([STEP5_TF_GPU_ENV_PYTHON, "-c", "import tensorflow as tf; ..."])` au lieu d'un import direct, isolant TensorFlow dans son venv dédié.
+  - **Logging providers ONNX** : Ajout de logs détaillés des providers actifs dans `onnx_facemesh_detector.py` (`FaceMesh ONNX providers active: [...]`) pour validation automatisée.
+- **Impact** :
+  - ✅ Élimine les erreurs TensorFlow lors de l'activation GPU pour moteurs OpenCV.
+  - ✅ Permet l'utilisation de `STEP5_TF_GPU_ENV_PYTHON` sans pollution de `tracking_env`.
+  - ✅ Tests GPU passent : `pytest tests/unit/test_step5_gpu_logs.py` valide présence de `use_gpu=True` + `CUDAExecutionProvider` dans logs.
+  - ⚠️ Lazy import ajoute ~200ms de latence au premier import MediaPipe dans un worker.
+- **Trade-off** : Complexité accrue (lazy loading + subprocess) vs stabilité (pas de conflits TensorFlow). Justifié pour préserver la séparation des venvs et éviter les re-installations TensorFlow dans `tracking_env`.
+- **Statut** : ✅ Implémenté et testé. Permet l'activation GPU pour OpenCV YuNet + PyFeat sans erreurs TensorFlow.
+
+## 2025-12-22 01:45:00+01:00: STEP5 — Support GPU optionnel (v4.2)
+- **Décision** : Ajouter un support GPU **optionnel et expérimental** pour les moteurs MediaPipe Face Landmarker et OpenSeeFace, tout en conservant le mode CPU-only comme défaut (v4.1).
+- **Contexte** : Analyse de faisabilité approfondie (`docs/workflow/STEP5_GPU_FEASIBILITY.md`) a révélé que MediaPipe et OpenSeeFace peuvent bénéficier d'une accélération GPU sur GTX 1650 (4 Go VRAM), avec des gains estimés de 40-80% FPS pour le traitement de 1-2 vidéos prioritaires. Le mode CPU-only reste optimal pour le batch processing massif (15 workers parallèles).
+- **Implémentation** :
+  - **Configuration** : Nouvelles variables `.env` (`STEP5_ENABLE_GPU`, `STEP5_GPU_ENGINES`, `STEP5_GPU_MAX_VRAM_MB`, `STEP5_GPU_PROFILING`, `STEP5_GPU_FALLBACK_AUTO`)
+  - **Validation hardware** : `Config.check_gpu_availability()` dans `config/settings.py` vérifie VRAM, CUDA, ONNX providers et TensorFlow GPU
+  - **Routage conditionnel** : `run_tracking_manager.py` active GPU uniquement si `STEP5_ENABLE_GPU=1` + moteur compatible + validation hardware réussie
+  - **OpenSeeFace GPU** : Ajout paramètre `use_gpu` à `OpenSeeFaceEngine`, utilise `CUDAExecutionProvider` pour sessions ONNX (détection + landmarks)
+  - **MediaPipe GPU** : Support `BaseOptions.Delegate.GPU` dans workers multiprocessing, nécessite TensorFlow Lite GPU delegate
+  - **Factory** : `create_face_engine(engine_name, use_gpu=False)` propage flag GPU aux moteurs compatibles
+  - **1 worker séquentiel strict** : Architecture existante de `resource_worker_loop` garantit déjà qu'un seul worker GPU traite 1 vidéo à la fois (pas de parallélisation GPU)
+- **Dépendances** :
+  - **OpenSeeFace GPU** : Nécessite `onnxruntime-gpu==1.23.2` (CUDA provider)
+  - **MediaPipe GPU** : Nécessite `tensorflow==2.15.0` (GPU delegate, ~2 Go)
+  - Scripts d'installation : `scripts/install_onnxruntime_gpu.sh`, `scripts/install_tensorflow_gpu.sh`
+  - Script de validation : `scripts/validate_gpu_prerequisites.sh`
+- **Tests** : Suite complète `tests/unit/test_step5_gpu_support.py` couvrant validation hardware, initialisation moteurs, factory functions
+- **Documentation** :
+  - Guide utilisateur détaillé : `docs/workflow/STEP5_GPU_USAGE.md` (installation, configuration, monitoring, troubleshooting)
+  - Rapport de faisabilité complet : `docs/workflow/STEP5_GPU_FEASIBILITY.md` (analyse moteurs, benchmarks, risques)
+  - Mise à jour : `docs/workflow/STEP5_SUIVI_VIDEO.md` (mention mode GPU expérimental v4.2)
+- **Contraintes et Limitations** :
+  - **1 worker GPU séquentiel uniquement** : GTX 1650 4 Go VRAM insuffisante pour parallélisation GPU
+  - **Contention VRAM avec STEP2** : Risque d'OOM si conversion vidéo (NVENC) active simultanément
+  - **Pas de Tensor Cores** : GTX 1650 (Turing) ne supporte pas FP16 matériel → gains ~40-60% vs ~80-100% sur RTX
+  - **Moteurs non compatibles** : OpenCV YuNet/PyFeat et EOS restent CPU-only (ONNX pas utilisé pour YuNet/PyFeat dans tracking, EOS = fitting C++ analytique)
+- **Impact** :
+  - ✅ Gains FPS 40-80% pour traitement de 1-2 vidéos prioritaires (MediaPipe GPU ~35-45 FPS vs 25-30 CPU, OpenSeeFace GPU ~28-35 FPS vs 18-22 CPU)
+  - ✅ Latence réduite pour workflows interactifs et preview temps réel
+  - ✅ Fallback automatique vers CPU si GPU indisponible ou VRAM insuffisante (`STEP5_GPU_FALLBACK_AUTO=1`)
+  - ⚠️ Installation lourde pour MediaPipe GPU (~2 Go TensorFlow)
+  - ⚠️ CPU-only reste optimal pour batch processing 10+ vidéos (parallélisation massive impossible sur GPU 4 Go)
+- **Trade-offs** :
+  - ➕ Flexibilité accrue : utilisateurs peuvent choisir GPU pour cas d'usage spécifiques
+  - ➕ Pas de régression : mode CPU-only conservé par défaut, stabilité v4.1 préservée
+  - ➕ Architecture extensible : infrastructure GPU réutilisable pour futurs moteurs (YuNet/PyFeat GPU dans rapport de faisabilité)
+  - ➖ Complexité accrue : 2 stacks GPU distincts (TFLite + ONNX CUDA) à maintenir
+  - ➖ Tests GPU difficiles en CI/CD sans matériel dédié
+  - ➖ Maintenance de 2 chemins d'exécution (CPU vs GPU) dans workers
+- **Statut** : ✅ Implémentation complète (code, tests, documentation). Mode GPU désactivé par défaut (`STEP5_ENABLE_GPU=0`), activation manuelle requise via `.env`.
+
+## 2025-12-21 13:25:00+01:00: STEP5 — Suppression complète du moteur Maxine
+- **Décision** : Supprimer complètement le moteur NVIDIA Maxine de STEP5 en raison de l'incompatibilité système avec la configuration matérielle actuelle (GTX 1650 sans Tensor Cores).
+- **Contexte** : Le moteur Maxine nécessite des GPU RTX avec Tensor Cores pour fonctionner en mode natif. Le fallback CPU était fonctionnel mais ajoutait une complexité inutile au codebase. La décision a été prise de simplifier l'architecture en se concentrant sur les moteurs compatibles (MediaPipe, OpenSeeFace, EOS, OpenCV).
+- **Implémentation** :
+  - Suppression de la classe `MaxineFaceEngine` dans `workflow_scripts/step5/face_engines.py` (lignes 1307-1492)
+  - Retrait de toutes les références Maxine dans `run_tracking_manager.py` (variables `MAXINE_ENV_PYTHON`, logique de routing)
+  - Suppression du script bridge `workflow_scripts/step5/maxine_bridge.py`
+  - Suppression du script d'installation `scripts/setup_maxine_env.sh`
+  - Nettoyage complet du fichier `.env` : suppression des variables `STEP5_MAXINE_*`, `MAXINE_*` et des commentaires associés
+  - Suppression du fichier `requirements-maxine.txt`
+  - Mise à jour de la documentation :
+    - Suppression des fichiers `docs/workflow/MAXINE_CPU_FALLBACK.md` et `docs/workflow/MAXINE_INTEGRATION.md`
+    - Suppression de `docs/workflow/Guide SDK Maxine AR Ubuntu GTX.md`
+    - Mise à jour de `REFERENCE_RAPIDE_DEVELOPPEURS.md` pour retirer Maxine des moteurs supportés
+    - Nettoyage de `STEP5_SUIVI_VIDEO.md`, `ARCHITECTURE_COMPLETE_FR.md`, `GUIDE_DEMARRAGE_RAPIDE.md`, `README.md`
+    - Nettoyage de `Alternatives GPU pour Tracking Facial Blendshapes.md`
+  - Suppression des tests unitaires `tests/unit/test_maxine_engine.py`
+- **Impact** : Le moteur par défaut reste `mediapipe_landmarker`. Les utilisateurs doivent migrer vers MediaPipe, OpenSeeFace, EOS ou les moteurs OpenCV.
+- **Trade-offs** :
+  - ➕ Simplification significative de l'architecture et réduction de la surface de bugs
+  - ➕ Suppression des dépendances SDK propriétaires NVIDIA
+  - ➕ Amélioration de la maintenabilité du code
+  - ➖ Perte des capacités de détection haute précision via SDK Maxine (53 blendshapes)
+  - ➖ Migration requise pour les utilisateurs utilisant Maxine
+- **Statut** : ✅ Suppression complète effectuée. Tous les fichiers, références et documentation Maxine ont été retirés du projet.
+
+## 2025-12-21 13:10:00+01:00: STEP5 — Suppression complète du moteur InsightFace
+- **Décision** : Supprimer complètement le moteur InsightFace de STEP5 en raison de problèmes de performance et de stabilité.
+- **Contexte** : Le moteur InsightFace causait des instabilités et des performances dégradées. La décision a été prise de simplifier l'architecture en se concentrant sur les moteurs plus stables (MediaPipe, OpenSeeFace, EOS, Maxine).
+- **Implémentation** :
+  - Suppression de la classe `InsightFaceEngine` dans `workflow_scripts/step5/face_engines.py`
+  - Retrait de toutes les références InsightFace dans `run_tracking_manager.py` et `process_video_worker_multiprocessing.py`
+  - Nettoyage des variables d'environnement `STEP5_INSIGHTFACE_*` du fichier `.env`
+  - Suppression de l'environnement virtuel `insightface_env/` et de `insightface_env_requirements.txt`
+  - Retrait du guide d'installation `docs/workflow/Guide Installation InsightFace Engine.md`
+  - Mise à jour de la documentation pour supprimer les références InsightFace
+- **Impact** : Le moteur par défaut est maintenant `mediapipe_landmarker`. Les utilisateurs doivent migrer vers MediaPipe ou d'autres moteurs supportés.
+- **Trade-offs** :
+  - ➕ Simplification de l'architecture et réduction de la surface de bugs
+  - ➕ Amélioration de la stabilité globale du système
+  - ➖ Perte des capacités de détection robuste de RetinaFace
+  - ➖ Migration requise pour les utilisateurs utilisant InsightFace
+
+## 2025-12-20 13:22:00+01:00: Centralisation des chemins d'environnements virtuels
+- **Décision** : Introduire `VENV_BASE_DIR` comme variable d'environnement unique pour définir la racine de tous les virtualenvs (env, tracking_env, audio_env, transnet_env, eos_env).
+- **Implémentation** :
+  - `.env` documente `VENV_BASE_DIR` (fallback vers le dossier projet).
+  - `config.settings` expose `Config.get_venv_path/get_venv_python` et `WorkflowCommandsConfig` s'appuie exclusivement dessus.
+  - `start_workflow.sh` lit/exporte `VENV_BASE_DIR` (priorité env→`.env`→fallback) avant de lancer `app_new.py`, garantissant la cohérence hors repo.
+- **Impacts** : Tous les scripts utilisent désormais des chemins dérivés de `VENV_BASE_DIR`, permettant de déplacer les virtualenvs (ex. `/mnt/cache/venv/workflow_mediapipe`) sans rebuild et en conservant la compatibilité historique.
+
+## 2025-12-20: Réduction taille exports JSON STEP5
+- **Décision** : Introduire STEP5_EXPORT_VERBOSE_FIELDS pour contrôler l'export des données volumineuses (landmarks, eos) dans STEP5, réduisant la taille JSON de 74-95% tout en préservant la compatibilité STEP6.
+
+## 2025-12-20: Ajustement niveaux de log pour warnings non-critiques
+- **Décision** : Convertir les warnings "Failed to read frame" (fin vidéo) et "Audio schema missing" en DEBUG pour réduire le bruit dans les logs, tout en gardant les warnings réels.
+
+## 2025-12-19 22:31:00+01:00: STEP5 — Compatibilité complète moteur `eos` (downscaling, profiling, throttle)
+- **Décision** : Étendre `EosFaceEngine` pour appliquer les mêmes optimisations que les autres moteurs STEP5 (downscale, profilage, throttling).
+- **Implémentation** :
+  - Ajout `STEP5_EOS_MAX_WIDTH` (downscale + rescale coordonnées) et propagation aux workers multiprocessing.
+  - Support `STEP5_ENABLE_PROFILING` avec logs `[PROFILING]` assets / YuNet / FaceMesh / fit `eos` toutes les 20 frames.
+  - Fallback automatique sur `STEP5_BLENDSHAPES_THROTTLE_N` quand `STEP5_EOS_FIT_EVERY_N` est absent.
+- **Résultats** : Smoke test validé (`downscale=0.33`, 32.84 FPS) avec export JSON complet (`landmarks` 68x3, `eos.shape_coeffs`, `eos.expression_coeffs`). `.env` et `config/settings` documentent les nouvelles options.
+
+## 2025-12-19 19:xx:xx+01:00: STEP5 — Ajout moteur `eos` (3DMM) + exécution workers via `eos_env`
+- **Décision** : Ajouter un nouveau moteur `eos` utilisable via `STEP5_TRACKING_ENGINE=eos`, exécuté dans un environnement virtuel dédié `eos_env`, sans modifier `tracking_env`.
+- **Implémentation** :
+  - `run_tracking_manager.py` route l’interpréteur Python **des workers** vers `eos_env/bin/python` quand le moteur est `eos` (override possible via `STEP5_EOS_ENV_PYTHON`).
+  - `workflow_scripts/step5/face_engines.py` ajoute `EosFaceEngine` (YuNet + FaceMesh ONNX → conversion 478→68 → fit `eos`), et exporte `eos: {shape_coeffs, expression_coeffs}`.
+  - `process_video_worker_multiprocessing.py` propage les variables `STEP5_EOS_*` aux processus `ProcessPoolExecutor`.
+  - `utils/tracking_optimizations.py` exporte maintenant systématiquement `centroid_y` et `bbox_ymin/bbox_ymax/bbox_width/bbox_height`, et exporte `landmarks` / `eos` si fournis par un moteur facial.
+- **Raison** : Isolation des dépendances `eos-py` dans un env dédié, tout en conservant l’architecture STEP5 existante et la compatibilité multiprocessing.
+- **Trade-off** : `eos_env` doit embarquer les dépendances requises par les scripts worker STEP5 (imports au module), même si le moteur `eos` n’utilise pas directement MediaPipe Tasks.
+
+## 2025-12-19 15:36:20 - STEP5 — Robustesse lecture OpenCV (frame finale)
+- **Décision** : `process_frame_chunk()` ré-ouvre/seek sur frame_idx, tente frame_idx-1 puis CAP_PROP_POS_MSEC, et insère un placeholder vide au lieu de break en cas d'échec.
+- **Impact** : Supprime les erreurs sur les frames manquantes (ex: frame 4554) tout en conservant l'export dense.
+
+## 2025-12-19 15:36:20 - STEP5 — Log OpenSeeFace config
+- **Décision** : Ajout d'un log explicite côté worker multiprocessing listant `STEP5_OPENSEEFACE_MODEL_ID` et paramètres clés (models_dir, paths, detect_every_n, thresholds, max_faces, jawopen_scale, max_width) pour tracer les runs OpenSeeFace.
+
+## 2025-12-19 13:34:00+01:00: STEP5 — OpenSeeFace: profiling + max width dédié + throttle de benchmark
+- **Décision** : Rendre le moteur `openseeface` observable et “benchmarkable” via les variables existantes, tout en évitant la confusion de nommage liée à `STEP5_YUNET_MAX_WIDTH`.
+- **Implémentation** :
+  - **Profiling OpenSeeFace** : prise en charge de `STEP5_ENABLE_PROFILING` dans `workflow_scripts/step5/face_engines.py` (timings resize/detect/landmarks/post) + logs `[PROFILING]` toutes les 20 frames.
+  - **Variable dédiée** : ajout de `STEP5_OPENSEEFACE_MAX_WIDTH`. Le moteur OpenSeeFace l’utilise en priorité et **fallback** sur `STEP5_YUNET_MAX_WIDTH`.
+  - **Throttle compat** : si `STEP5_OPENSEEFACE_DETECT_EVERY_N` n’est pas défini, OpenSeeFace utilise `STEP5_BLENDSHAPES_THROTTLE_N` comme intervalle de détection.
+- **Trade-off** : le “throttle” OpenSeeFace saute des frames en réutilisant la dernière détection — utile pour mesurer la charge CPU mais peut lisser des variations rapides.
+
+## 2025-12-19 11:12:00+01:00: STEP5 — YuNet downscaling configurable + rescale coordonnées (JSON en résolution originale)
+- **Décision** : Accélérer drastiquement YuNet en faisant la détection sur une version downscalée de la frame, tout en renvoyant les `bbox`/`centroid` en coordonnées de la vidéo originale.
+- **Implémentation** :
+  - Nouveau paramètre `STEP5_YUNET_MAX_WIDTH` (défaut: `640`) pour borner la largeur de l’image d’entrée YuNet.
+  - `OpenCVYuNetFaceEngine.detect()` redimensionne la frame si nécessaire, exécute la détection, puis rescales les coordonnées.
+  - `cv2.setNumThreads(1)` côté YuNet pour limiter la contention CPU quand le tracking est déjà parallélisé.
+- **Résultats (vidéo 1080p test)** : Perf fortement dépendante de `STEP5_YUNET_MAX_WIDTH` (ex: 640 ≈ 69 FPS ; 1280 ≈ 27 FPS).
+
+## 2025-12-19 11:10:00+01:00: STEP5 — Profiling: propagation `.env` en multiprocessing + seuil compatible chunks
+- **Décision** : Garantir que les variables `.env` (ex. `STEP5_ENABLE_PROFILING`, `STEP5_BLENDSHAPES_THROTTLE_N`) sont visibles dans les workers multiprocessing.
+- **Implémentation** :
+  - Chargement du `.env` dans les scripts/modules exécutés par les workers.
+  - Logging `[PROFILING]` toutes les `20` frames (au lieu de `100`) pour compatibilité avec la taille de chunk.
+- **Impacts** : Les logs `[PROFILING]` apparaissent systématiquement et permettent d’isoler le goulot (YuNet vs FaceMesh vs py-feat).
+
+## 2025-12-19 02:01:00+01:00: STEP5 — Filtrage d’export des blendshapes (profil `mouth`)
+- **Décision** : Ajouter un filtrage configurable à l’export JSON des blendshapes (`STEP5_BLENDSHAPES_PROFILE`) pour limiter les clés exportées (ex. focus bouche).
+- **Contexte** : Besoin de corréler parole ↔ mouvements de bouche. L’export complet (52 clés) alourdit le JSON.
+- **Profils** : `full` (défaut), `mouth` (jaw*/mouth* + option `tongueOut`), `none`, `mediapipe`, `custom`.
+
+## 2025-12-19 01:45:00+01:00: STEP5 — Fix compatibilité FaceMesh ONNX (468→478) pour blendshapes py-feat
+- **Décision** : Dans `ONNXFaceMeshDetector`, compléter (padding) la sortie FaceMesh ONNX de 468 points vers 478 points pour satisfaire les consumers existants (py-feat) qui attendent `len(landmarks) >= 478`.
+- **Contexte** : Le modèle `face_landmark.onnx` expose 468 points. L’extracteur refusait de calculer sur <478 points.
+- **Impacts** : Les `blendshapes` sont désormais présentes sur toutes les détections de visages.
+
+## 2025-12-18 20:45:00+01:00: STEP5 — Registry de modèles de détection d'objets avec sélection configurable
+- **Décision** : Remplacer le hardcode du modèle `EfficientDet-Lite2-32.tflite` par un système de registry permettant la sélection configurable de modèles.
+- **Implémentation** :
+  - **Registry centralisé** : `workflow_scripts/step5/object_detector_registry.py` (6 modèles : efficientdet, ssd_mobilenet, yolo11n, nanodet_plus).
+  - **Configuration** : `STEP5_OBJECT_DETECTOR_MODEL=efficientdet_lite2` (défaut).
+- **Impacts** : Flexibilité de changement de modèle sans modification code (config uniquement).
+
+## 2025-12-18 19:30:00+01:00: Activation du multiprocessing pour tous les moteurs de tracking
+- **Décision** : Permettre l'utilisation du multiprocessing pour tous les moteurs de tracking (MediaPipe et OpenCV) en supprimant les contraintes de single-worker.
+- **Raison** : Améliorer les performances en exploitant tous les cœurs CPU disponibles.
+
+## 2025-12-18 15:36:00+01:00: STEP5 — Warmup OpenCV avant seek (fix troncature export multiprocessing)
+- **Décision** : Dans le worker multiprocessing STEP5, effectuer un warmup du décodeur (`cap.read()`) avant `cap.set(CAP_PROP_POS_FRAMES, start_frame)`.
+- **Raison** : Sur certains MP4, OpenCV échoue silencieusement à se positionner sur une frame tant qu'un premier `read()` n'a pas été effectué.
+- **Impacts** : Export JSON STEP5 redevenu dense et complet.
+
+## 2025-12-17 20:19:00+01:00: STEP4 — Lemonfox: hyperparamètres via config + smoothing de `is_speech_present`
+- **Décision** : Ajouter des paramètres Lemonfox “tunable” via `.env`/`config.settings` et appliquer automatiquement.
+- **Implémentation** :
+  - Valeurs par défaut: `LEMONFOX_TIMESTAMP_GRANULARITIES` (défaut: `word`), etc.
+  - Post-traitement: `LEMONFOX_SPEECH_GAP_FILL_SEC` et `LEMONFOX_SPEECH_MIN_ON_SEC`.
+- **Impacts** : Meilleure robustesse de la timeline `is_speech_present`.
+
+## 2025-12-17 19:54:00+01:00: STEP4 — Activation automatique du preset Pyannote `config/optimal_tv_config.json`
+- **Décision** : Charger automatiquement `config/optimal_tv_config.json` et l'appliquer via `pipeline.instantiate(...)`.
+- **Détails** : Fusion avec l’override existant de `batch_size`.
+- **Raison** : Centraliser un preset de tuning “TV” sans modifier la logique métier.
+
+## 2025-12-17 19:12:00+01:00: STEP4 — Wrapper Lemonfox: import du service sans dépendances Flask (audio_env)
+- **Décision** : Importer `LemonfoxAudioService` via `importlib` depuis le fichier au lieu de passer par le package `services`.
+- **Raison** : Éviter l'import de `flask_caching` non présent dans `audio_env`.
+
+## 2025-12-15 20:05:22+01:00: STEP4 — Cohérence GPU/CPU (désactivation AMP via profil gpu_fp32)
+- **Décision** : Introduire le profil recommandé `AUDIO_PROFILE=gpu_fp32` (GPU FP32 sans AMP).
+- **Raison** : AMP (FP16) causait des faux négatifs massifs sur `is_speech_present` (écarts de ~6% vs ~86% de parole).
+
+## 2025-12-13 19:56:00+01:00: Migration architecture vers Webhook uniquement — Suppression complète des intégrations Airtable, MySQL et CSV fallback
+- **Décision** : Simplifier radicalement l'architecture de monitoring des téléchargements en ne conservant que Webhook comme unique source.
+- **Contexte** : Les intégrations MySQL, Airtable et CSV ajoutaient une complexité excessive.
+- **Impacts** : Architecture simplifiée (4 sources → 1), configuration réduite, ~1350 lignes de code supprimées/déplacées.
+
+## 2025-12-12 21:46:00+01:00: Alignement architecture — config steps, état CSV, instrumentation et durcissement XSS progress
+- **Décision** : Rendre effectifs les standards documentés : `WorkflowCommandsConfig` et `WorkflowState` comme sources uniques de vérité.
+- **Implémentation** :
+  - Backend: instanciation centralisée, migration de l'état CSV.
+  - Frontend: remplacement de `innerHTML` par `textContent` pour `progress_text`.
+- **Raison** : Éviter les divergences config/état et supprimer une surface XSS.
+
+## 2025-11-18 16:32:00+01:00: Stabilisation STEP4 GPU sur machine CUDA 11.x
+- **Décision** : Maintenir l'exécution GPU pour STEP4 malgré un driver CUDA 11.4 en alignant l'environnement (Python 3.10 + torch==1.12.1+cu113).
+- **Implémentation** : Gestion de mémoire `max_split_size_mb:32`, fallback CPU par fichier en cas d'OOM, introduction de `AUDIO_PARTIAL_SUCCESS_OK=1`.
+
+## 2025-11-18 13:35:00+01:00: Plan de migration WorkflowState (4 étapes)
+- **Décision** : Adopter un plan en 4 étapes pour achever la migration vers un état centralisé.
+- **Plan** : Initialisation, Migration des accès `PROCESS_INFO`, Migration des séquences, Nettoyage des variables historiques.
+
+## 2025-11-18 13:32:00+01:00: Migration vers WorkflowState — principale terminée, finalisation `WorkflowService` en cours
+- **Décision** : Finaliser `services/workflow_service.py` pour éliminer les dernières références aux variables globales historiques (`PROCESS_INFO`, etc.).
+
+## 2025-11-18 13:30:00+01:00: Refactoring de maintenabilité — Phases 1, 2 et 3a
+- **Décision** : Consolider l'architecture en introduisant `WorkflowState`, `WorkflowCommandsConfig` et `DownloadService`.
+- **Impact** : Réduction de la complexité des fonctions critiques (ex: worker CSV -63% de lignes).
+
+## 2025-11-02 00:38:00+01:00: Comptage rapports mensuels — alignement affichage et analyse
+- **Décision** : Harmoniser le comptage des vidéos entre le HTML généré et l'analyse d'un rapport uploadé.
+- **Implémentation** : Déduplication des noms scindés, parsing focalisé sur la section « Répartition des Durées ».
+
+ > Les décisions antérieures au 8 octobre 2025 sont détaillées dans `memory-bank/archives/decisionLog_legacy.md`.

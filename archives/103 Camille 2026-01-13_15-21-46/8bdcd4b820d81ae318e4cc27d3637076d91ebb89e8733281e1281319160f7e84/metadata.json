@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/103 Camille/docs/Vivi est dégoûtée de voir Paga se rapprocher d'Océane !.mp4",
+  "video_stem": "Vivi est dégoûtée de voir Paga se rapprocher d'Océane !",
+  "video_hash": "8bdcd4b820d81ae318e4cc27d3637076d91ebb89e8733281e1281319160f7e84",
+  "created_at": "2026-01-13T15:21:46.317822+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2026-01-13_15-21-46/8bdcd4b820d81ae318e4cc27d3637076d91ebb89e8733281e1281319160f7e84/Vivi est dégoûtée de voir Paga se rapprocher d'Océane !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2026-01-13_15-21-46/8bdcd4b820d81ae318e4cc27d3637076d91ebb89e8733281e1281319160f7e84/Vivi est dégoûtée de voir Paga se rapprocher d'Océane !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2026-01-13_15-21-46/8bdcd4b820d81ae318e4cc27d3637076d91ebb89e8733281e1281319160f7e84/Vivi est dégoûtée de voir Paga se rapprocher d'Océane !_tracking.json"
+  }
+}

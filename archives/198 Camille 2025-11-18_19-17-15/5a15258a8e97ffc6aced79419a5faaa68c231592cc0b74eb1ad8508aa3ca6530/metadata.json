@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/198 Camille/docs/EP47_La soirée années 80 des fratés part en vrille ! .mp4",
+  "video_stem": "EP47_La soirée années 80 des fratés part en vrille ! ",
+  "video_hash": "5a15258a8e97ffc6aced79419a5faaa68c231592cc0b74eb1ad8508aa3ca6530",
+  "created_at": "2025-11-18T19:17:15.913134+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/5a15258a8e97ffc6aced79419a5faaa68c231592cc0b74eb1ad8508aa3ca6530/EP47_La soirée années 80 des fratés part en vrille ! _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/5a15258a8e97ffc6aced79419a5faaa68c231592cc0b74eb1ad8508aa3ca6530/EP47_La soirée années 80 des fratés part en vrille ! _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/198 Camille 2025-11-18_19-17-15/5a15258a8e97ffc6aced79419a5faaa68c231592cc0b74eb1ad8508aa3ca6530/EP47_La soirée années 80 des fratés part en vrille ! _tracking.json"
+  }
+}

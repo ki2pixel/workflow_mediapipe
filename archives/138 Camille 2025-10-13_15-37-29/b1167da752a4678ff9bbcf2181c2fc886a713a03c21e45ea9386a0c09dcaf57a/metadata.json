@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/138 Camille/docs/M6 - LMCR -  Il révèle avoir été conçu... dans ce restaurant !_TAT_M6.mp4",
+  "video_stem": "M6 - LMCR -  Il révèle avoir été conçu... dans ce restaurant !_TAT_M6",
+  "video_hash": "b1167da752a4678ff9bbcf2181c2fc886a713a03c21e45ea9386a0c09dcaf57a",
+  "created_at": "2025-10-13T15:37:29.769286+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/138 Camille 2025-10-13_15-37-29/b1167da752a4678ff9bbcf2181c2fc886a713a03c21e45ea9386a0c09dcaf57a/M6 - LMCR -  Il révèle avoir été conçu... dans ce restaurant !_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/138 Camille 2025-10-13_15-37-29/b1167da752a4678ff9bbcf2181c2fc886a713a03c21e45ea9386a0c09dcaf57a/M6 - LMCR -  Il révèle avoir été conçu... dans ce restaurant !_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/138 Camille 2025-10-13_15-37-29/b1167da752a4678ff9bbcf2181c2fc886a713a03c21e45ea9386a0c09dcaf57a/M6 - LMCR -  Il révèle avoir été conçu... dans ce restaurant !_TAT_M6_tracking.json"
+  }
+}

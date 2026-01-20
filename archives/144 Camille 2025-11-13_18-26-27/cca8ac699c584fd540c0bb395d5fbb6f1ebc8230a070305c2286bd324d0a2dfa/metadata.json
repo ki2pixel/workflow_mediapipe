@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/144 Camille/docs/6TER_La petite maison_Caroline apprend une mauvaise nouvelle au sujet de la santé de sa fille, Mary.mp4",
+  "video_stem": "6TER_La petite maison_Caroline apprend une mauvaise nouvelle au sujet de la santé de sa fille, Mary",
+  "video_hash": "cca8ac699c584fd540c0bb395d5fbb6f1ebc8230a070305c2286bd324d0a2dfa",
+  "created_at": "2025-11-13T18:26:27.173731+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/144 Camille 2025-11-13_18-26-27/cca8ac699c584fd540c0bb395d5fbb6f1ebc8230a070305c2286bd324d0a2dfa/6TER_La petite maison_Caroline apprend une mauvaise nouvelle au sujet de la santé de sa fille, Mary_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/144 Camille 2025-11-13_18-26-27/cca8ac699c584fd540c0bb395d5fbb6f1ebc8230a070305c2286bd324d0a2dfa/6TER_La petite maison_Caroline apprend une mauvaise nouvelle au sujet de la santé de sa fille, Mary_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/144 Camille 2025-11-13_18-26-27/cca8ac699c584fd540c0bb395d5fbb6f1ebc8230a070305c2286bd324d0a2dfa/6TER_La petite maison_Caroline apprend une mauvaise nouvelle au sujet de la santé de sa fille, Mary_tracking.json"
+  }
+}

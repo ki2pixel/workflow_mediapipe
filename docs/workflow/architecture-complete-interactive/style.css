@@ -1,0 +1,676 @@
+:root {
+  /* JointJS Palette - Architecture Colors */
+  --jj-color1: #ed2637;  /* Primary Red */
+  --jj-color2: #131e29;  /* Dark Blue */
+  --jj-color3: #dde6ed;  /* Light Gray */
+  --jj-color4: #f6f740;  /* Yellow */
+  --jj-color5: #0075f2;  /* Blue */
+  --jj-color6: #1a2938;  /* Dark Gray */
+  --jj-color7: #cad8e3;  /* Medium Gray */
+  
+  /* Architecture Layer Colors */
+  --frontend-color: #01579b;      /* Deep Blue */
+  --frontend-fill: #e1f5fe;       /* Light Blue */
+  --flask-color: #e65100;         /* Deep Orange */
+  --flask-fill: #fff3e0;          /* Light Orange */
+  --service-color: #4a148c;       /* Deep Purple */
+  --service-fill: #f3e5f5;        /* Light Purple */
+  --config-color: #1b5e20;        /* Deep Green */
+  --config-fill: #e8f5e8;         /* Light Green */
+  --processing-color: #f57f17;    /* Deep Amber */
+  --processing-fill: #fff8e1;     /* Light Amber */
+  --data-color: #880e4f;          /* Deep Pink */
+  --data-fill: #fce4ec;           /* Light Pink */
+  --external-color: #33691e;      /* Deep Light Green */
+  --external-fill: #f1f8e9;       /* Very Light Green */
+
+  /* Dark Theme (Default) */
+  --frontend-stroke-color: var(--frontend-color);
+  --frontend-fill-color: var(--jj-color2);
+  --frontend-text-color: var(--frontend-color);
+  --flask-stroke-color: var(--flask-color);
+  --flask-fill-color: var(--jj-color2);
+  --flask-text-color: var(--flask-color);
+  --service-stroke-color: var(--service-color);
+  --service-fill-color: var(--jj-color2);
+  --service-text-color: var(--service-color);
+  --config-stroke-color: var(--config-color);
+  --config-fill-color: var(--jj-color2);
+  --config-text-color: var(--config-color);
+  --processing-stroke-color: var(--processing-color);
+  --processing-fill-color: var(--jj-color2);
+  --processing-text-color: var(--processing-color);
+  --data-stroke-color: var(--data-color);
+  --data-fill-color: var(--jj-color2);
+  --data-text-color: var(--data-color);
+  --external-stroke-color: var(--external-color);
+  --external-fill-color: var(--jj-color2);
+  --external-text-color: var(--external-color);
+  --flow-stroke-color: var(--jj-color1);
+  --flow-label-stroke-color: var(--jj-color2);
+  --flow-label-fill-color: var(--jj-color1);
+  --flow-label-text-color: var(--jj-color3);
+  --flow-selection-color: var(--jj-color6);
+  --frame-color: var(--jj-color4);
+  --background-color: var(--jj-color2);
+  --switch-color: var(--jj-color3);
+  --switch-background-color: var(--jj-color1);
+  --logo-color: var(--jj-color3);
+  --panel-background: rgba(19, 30, 41, 0.95);
+  --panel-border: var(--jj-color1);
+  --button-background: var(--jj-color1);
+  --button-text: var(--jj-color3);
+}
+
+/* Light Theme */
+.light-theme {
+  --frontend-stroke-color: var(--frontend-color);
+  --frontend-fill-color: var(--frontend-fill);
+  --frontend-text-color: var(--frontend-color);
+  --flask-stroke-color: var(--flask-color);
+  --flask-fill-color: var(--flask-fill);
+  --flask-text-color: var(--flask-color);
+  --service-stroke-color: var(--service-color);
+  --service-fill-color: var(--service-fill);
+  --service-text-color: var(--service-color);
+  --config-stroke-color: var(--config-color);
+  --config-fill-color: var(--config-fill);
+  --config-text-color: var(--config-color);
+  --processing-stroke-color: var(--processing-color);
+  --processing-fill-color: var(--processing-fill);
+  --processing-text-color: var(--processing-color);
+  --data-stroke-color: var(--data-color);
+  --data-fill-color: var(--data-fill);
+  --data-text-color: var(--data-color);
+  --external-stroke-color: var(--external-color);
+  --external-fill-color: var(--external-fill);
+  --external-text-color: var(--external-color);
+  --flow-stroke-color: var(--jj-color1);
+  --flow-label-stroke-color: var(--jj-color3);
+  --flow-label-fill-color: var(--jj-color1);
+  --flow-label-text-color: var(--jj-color3);
+  --flow-selection-color: var(--jj-color7);
+  --frame-color: var(--jj-color5);
+  --background-color: var(--jj-color3);
+  --switch-color: var(--jj-color3);
+  --switch-background-color: var(--jj-color2);
+  --logo-color: var(--jj-color2);
+  --panel-background: rgba(221, 230, 237, 0.95);
+  --panel-border: var(--jj-color2);
+  --button-background: var(--jj-color2);
+  --button-text: var(--jj-color3);
+}
+
+/* Font */
+@font-face {
+  font-family: "PPFraktionSans";
+  font-style: normal;
+  font-weight: 300;
+  src: url("https://assets.codepen.io/7589991/PPFraktionSans-Regular.woff") format("woff");
+}
+@font-face {
+  font-family: "PPFraktionSans";
+  font-style: italic;
+  font-weight: 300;
+  src: url("https://assets.codepen.io/7589991/PPFraktionSans-RegularItalic.woff") format("woff");
+}
+@font-face {
+  font-family: "PPFraktionSans";
+  font-style: normal;
+  font-weight: 600;
+  src: url("https://assets.codepen.io/7589991/PPFraktionSans-Bold.woff") format("woff");
+}
+
+/* Base Styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "PPFraktionSans", sans-serif;
+  background: var(--background-color);
+  overflow: hidden;
+}
+
+/* Canvas */
+#canvas {
+  position: absolute;
+  inset: 0 0 0 0;
+}
+
+/* Architecture Layer Node Styles */
+.jj-frontend-body {
+  fill: var(--frontend-fill-color);
+  stroke: var(--frontend-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-frontend-text {
+  fill: var(--frontend-text-color);
+  font-weight: 500;
+}
+
+.jj-flask-body {
+  fill: var(--flask-fill-color);
+  stroke: var(--flask-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-flask-text {
+  fill: var(--flask-text-color);
+  font-weight: 500;
+}
+
+.jj-service-body {
+  fill: var(--service-fill-color);
+  stroke: var(--service-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-service-text {
+  fill: var(--service-text-color);
+  font-weight: 500;
+}
+
+.jj-config-body {
+  fill: var(--config-fill-color);
+  stroke: var(--config-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-config-text {
+  fill: var(--config-text-color);
+  font-weight: 500;
+}
+
+.jj-processing-body {
+  fill: var(--processing-fill-color);
+  stroke: var(--processing-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-processing-text {
+  fill: var(--processing-text-color);
+  font-weight: 500;
+}
+
+.jj-data-body {
+  fill: var(--data-fill-color);
+  stroke: var(--data-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-data-text {
+  fill: var(--data-text-color);
+  font-weight: 500;
+}
+
+.jj-external-body {
+  fill: var(--external-fill-color);
+  stroke: var(--external-stroke-color);
+  stroke-width: 2px;
+}
+
+.jj-external-text {
+  fill: var(--external-text-color);
+  font-weight: 500;
+}
+
+/* Enhanced Flow Styles for Better Visual Separation */
+.jj-flow-line {
+  stroke: var(--flow-stroke-color);
+  stroke-width: 2.5px;              /* Slightly thicker for better visibility */
+  stroke-linecap: round;            /* Rounded line caps for smoother appearance */
+  stroke-linejoin: round;           /* Rounded joins for smoother corners */
+}
+
+.jj-flow-outline {
+  stroke: var(--background-color);
+  stroke-width: 12px;               /* Increased from 6px to 12px for better separation */
+  stroke-linecap: round;            /* Rounded caps for outline */
+  stroke-linejoin: round;           /* Rounded joins for outline */
+  opacity: 0.9;                     /* Slight transparency for better blending */
+}
+
+.jj-flow-label-body {
+  stroke: var(--flow-label-stroke-color);
+  fill: var(--flow-label-fill-color);
+  stroke-width: 1px;
+}
+
+.jj-flow-label-text {
+  fill: var(--flow-label-text-color);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.jj-flow-arrowhead {
+  stroke: var(--flow-stroke-color);
+  fill: var(--flow-stroke-color);
+}
+
+.jj-frame {
+  fill: var(--frame-color);
+  opacity: 0.8;
+}
+
+.jj-flow-tools circle {
+  stroke: var(--frame-color);
+  fill: var(--background-color);
+  stroke-width: 2;
+}
+
+.jj-flow-tools rect {
+  stroke: var(--frame-color);
+}
+
+.jj-flow-selection {
+  stroke: var(--flow-selection-color);
+  stroke-width: 8px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: none;
+  opacity: 0.6;
+}
+
+/* Enhanced Node Layering for Better Connection Visibility */
+.jj-frontend-body,
+.jj-flask-body,
+.jj-service-body,
+.jj-config-body,
+.jj-processing-body,
+.jj-data-body,
+.jj-external-body {
+  /* Add subtle shadow to create depth and separation from connections */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  /* Remove CSS z-index - let JointJS handle layering through SVG element order */
+}
+
+/* Connection Layer Management - Remove CSS z-index conflicts */
+.jj-flow-outline {
+  /* Let JointJS handle proper SVG layering */
+}
+
+.jj-flow-line {
+  /* Let JointJS handle proper SVG layering */
+}
+
+/* Enhanced Arrow Heads for Better Visibility */
+.jj-flow-arrowhead {
+  stroke: var(--flow-stroke-color);
+  fill: var(--flow-stroke-color);
+  stroke-width: 1px;
+  /* Add subtle shadow to arrow heads */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Theme Switch */
+.theme-switch {
+  width: 70px;
+  height: 30px;
+  background: var(--switch-background-color);
+  border-radius: 50px;
+  position: absolute;
+  display: inline-block;
+  right: 16px;
+  top: 16px;
+  cursor: pointer;
+  z-index: 1000;
+}
+
+.theme-switch .switch {
+  width: 24px;
+  height: 24px;
+  background: var(--switch-color);
+  border-radius: 100%;
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  transition: 0.5s all ease;
+}
+
+.theme-switch .light-icon {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+}
+
+.theme-switch .dark-icon {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+}
+
+.light-theme .theme-switch .switch {
+  transform: translateX(37px);
+}
+
+/* Panel Toggle Buttons */
+.panel-toggles {
+  position: absolute;
+  top: 60px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1001;
+}
+
+.toggle-btn {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--panel-border);
+  border-radius: 50%;
+  background: var(--panel-background);
+  color: var(--frontend-text-color);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-btn:hover {
+  transform: scale(1.1);
+  background: var(--button-background);
+  color: var(--button-text);
+}
+
+.toggle-btn.active {
+  background: var(--button-background);
+  color: var(--button-text);
+  transform: scale(1.05);
+}
+
+/* Control Panels */
+.controls-panel {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  background: var(--panel-background);
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 300px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transform: translateX(100%);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.controls-panel.visible {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.info-panel {
+  position: absolute;
+  bottom: 60px;
+  left: 16px;
+  background: var(--panel-background);
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 350px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transform: translateX(-100%);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.info-panel.visible {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Panel Headers */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panel-header h3,
+.panel-header h4 {
+  margin: 0;
+  color: var(--frontend-text-color);
+  font-size: 16px;
+}
+
+.panel-header h4 {
+  font-size: 14px;
+}
+
+.close-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--jj-color1);
+  color: var(--button-text);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  background: #c62828;
+  transform: scale(1.1);
+}
+
+.control-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.control-buttons button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: var(--button-background);
+  color: var(--button-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-buttons button:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+.status {
+  font-size: 12px;
+  color: var(--frontend-text-color);
+  font-style: italic;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid var(--frontend-color);
+}
+
+.info-panel ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--frontend-text-color);
+  font-size: 12px;
+}
+
+.info-panel li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.info-panel ul ul {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.info-panel kbd {
+  background: var(--jj-color6);
+  color: var(--jj-color3);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 10px;
+  border: 1px solid var(--jj-color7);
+}
+
+/* Color Indicators for Architecture Layers */
+.color-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.color-indicator.frontend {
+  background: var(--frontend-fill-color);
+  border-color: var(--frontend-stroke-color);
+}
+
+.color-indicator.flask {
+  background: var(--flask-fill-color);
+  border-color: var(--flask-stroke-color);
+}
+
+.color-indicator.service {
+  background: var(--service-fill-color);
+  border-color: var(--service-stroke-color);
+}
+
+.color-indicator.config {
+  background: var(--config-fill-color);
+  border-color: var(--config-stroke-color);
+}
+
+.color-indicator.processing {
+  background: var(--processing-fill-color);
+  border-color: var(--processing-stroke-color);
+}
+
+.color-indicator.data {
+  background: var(--data-fill-color);
+  border-color: var(--data-stroke-color);
+}
+
+.color-indicator.external {
+  background: var(--external-fill-color);
+  border-color: var(--external-stroke-color);
+}
+
+/* Logo */
+.logo-link {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+}
+
+#logo {
+  fill: var(--logo-color);
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+#logo:hover {
+  opacity: 1;
+}
+
+/* Zoom and Pan Controls */
+.zoom-pan-controls {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.zoom-pan-controls h4 {
+  margin: 0 0 10px 0;
+  color: var(--frontend-text-color);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.zoom-pan-controls .button-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.zoom-pan-controls .control-btn {
+  padding: 8px 12px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 60px;
+}
+
+.zoom-pan-controls .control-btn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.zoom-pan-controls .control-btn:active {
+  transform: translateY(0);
+}
+
+.zoom-pan-controls #zoom-in:hover {
+  background: #28a745;
+}
+
+.zoom-pan-controls #zoom-out:hover {
+  background: #dc3545;
+}
+
+.zoom-pan-controls #zoom-reset:hover {
+  background: #007bff;
+}
+
+.zoom-pan-controls #pan-toggle {
+  background: #6c757d;
+}
+
+.zoom-pan-controls .pan-instructions {
+  color: var(--frontend-text-color);
+  opacity: 0.8;
+  font-size: 11px;
+  line-height: 1.3;
+  margin-top: 8px;
+}
+
+/* Pan mode cursor styles */
+.pan-mode-active {
+  cursor: grab !important;
+}
+
+.pan-mode-active:active {
+  cursor: grabbing !important;
+}

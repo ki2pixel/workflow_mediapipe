@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/26 Camille/docs/Extrait pré-diff – Quel joueur va quitter le jeu  .mp4",
+  "video_stem": "Extrait pré-diff – Quel joueur va quitter le jeu  ",
+  "video_hash": "0bd1d53c51c6d75439cba9c3d9641a2a8384f50b6f16911f49b03bce541c05e9",
+  "created_at": "2025-11-04T11:32:50.173120+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/0bd1d53c51c6d75439cba9c3d9641a2a8384f50b6f16911f49b03bce541c05e9/Extrait pré-diff – Quel joueur va quitter le jeu  _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/0bd1d53c51c6d75439cba9c3d9641a2a8384f50b6f16911f49b03bce541c05e9/Extrait pré-diff – Quel joueur va quitter le jeu  _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/26 Camille 2025-11-04_11-32-50/0bd1d53c51c6d75439cba9c3d9641a2a8384f50b6f16911f49b03bce541c05e9/Extrait pré-diff – Quel joueur va quitter le jeu  _tracking.json"
+  }
+}

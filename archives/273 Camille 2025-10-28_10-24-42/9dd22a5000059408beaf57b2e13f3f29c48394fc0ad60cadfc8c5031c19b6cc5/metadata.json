@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/273 Camille/docs/2025-10-27 CERVEAU 2 - EM01 RS_TAT_W9.mp4",
+  "video_stem": "2025-10-27 CERVEAU 2 - EM01 RS_TAT_W9",
+  "video_hash": "9dd22a5000059408beaf57b2e13f3f29c48394fc0ad60cadfc8c5031c19b6cc5",
+  "created_at": "2025-10-28T10:24:42.299270+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/9dd22a5000059408beaf57b2e13f3f29c48394fc0ad60cadfc8c5031c19b6cc5/2025-10-27 CERVEAU 2 - EM01 RS_TAT_W9_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/9dd22a5000059408beaf57b2e13f3f29c48394fc0ad60cadfc8c5031c19b6cc5/2025-10-27 CERVEAU 2 - EM01 RS_TAT_W9_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/273 Camille 2025-10-28_10-24-42/9dd22a5000059408beaf57b2e13f3f29c48394fc0ad60cadfc8c5031c19b6cc5/2025-10-27 CERVEAU 2 - EM01 RS_TAT_W9_tracking.json"
+  }
+}

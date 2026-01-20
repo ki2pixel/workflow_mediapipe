@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/129 Camille/docs/6TER_En famille_le combat des chefs.mp4",
+  "video_stem": "6TER_En famille_le combat des chefs",
+  "video_hash": "70d4c86c3275cba464d44a9db8458053916e1068b053e7958dfd8bd6f1648c30",
+  "created_at": "2025-11-13T09:25:49.966356+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/70d4c86c3275cba464d44a9db8458053916e1068b053e7958dfd8bd6f1648c30/6TER_En famille_le combat des chefs_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/70d4c86c3275cba464d44a9db8458053916e1068b053e7958dfd8bd6f1648c30/6TER_En famille_le combat des chefs_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/129 Camille 2025-11-13_09-25-49/70d4c86c3275cba464d44a9db8458053916e1068b053e7958dfd8bd6f1648c30/6TER_En famille_le combat des chefs_tracking.json"
+  }
+}

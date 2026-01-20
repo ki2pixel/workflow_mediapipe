@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/199 Camille/docs/M6 - LMBF - Extrait 3 (EM3 - E3006611)  Chiara et Bruno sont surpris de découvrir cette boulangerie au milieu d’une étable.mp4",
+  "video_stem": "M6 - LMBF - Extrait 3 (EM3 - E3006611)  Chiara et Bruno sont surpris de découvrir cette boulangerie au milieu d’une étable",
+  "video_hash": "b53d0f54254d12f79a47552197f6e4ca5a54906a9f1d2321097420dabe2712bc",
+  "created_at": "2025-12-19T15:34:52.380804+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/b53d0f54254d12f79a47552197f6e4ca5a54906a9f1d2321097420dabe2712bc/M6 - LMBF - Extrait 3 (EM3 - E3006611)  Chiara et Bruno sont surpris de découvrir cette boulangerie au milieu d’une étable_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/b53d0f54254d12f79a47552197f6e4ca5a54906a9f1d2321097420dabe2712bc/M6 - LMBF - Extrait 3 (EM3 - E3006611)  Chiara et Bruno sont surpris de découvrir cette boulangerie au milieu d’une étable_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/199 Camille 2025-12-19_15-34-52/b53d0f54254d12f79a47552197f6e4ca5a54906a9f1d2321097420dabe2712bc/M6 - LMBF - Extrait 3 (EM3 - E3006611)  Chiara et Bruno sont surpris de découvrir cette boulangerie au milieu d’une étable_tracking.json"
+  }
+}

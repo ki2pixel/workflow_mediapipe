@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/259 Camille/docs/6TER_Véto&co_On a enlevé plus d’1m d’intestin à cette chienne.mp4",
+  "video_stem": "6TER_Véto&co_On a enlevé plus d’1m d’intestin à cette chienne",
+  "video_hash": "ed5c660c15fa2646f48a5510eda056bdbe2ad7a39f73fc4899d986f3d8eadcd3",
+  "created_at": "2025-10-27T10:05:33.165969+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/ed5c660c15fa2646f48a5510eda056bdbe2ad7a39f73fc4899d986f3d8eadcd3/6TER_Véto&co_On a enlevé plus d’1m d’intestin à cette chienne_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/ed5c660c15fa2646f48a5510eda056bdbe2ad7a39f73fc4899d986f3d8eadcd3/6TER_Véto&co_On a enlevé plus d’1m d’intestin à cette chienne_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/259 Camille 2025-10-27_10-05-33/ed5c660c15fa2646f48a5510eda056bdbe2ad7a39f73fc4899d986f3d8eadcd3/6TER_Véto&co_On a enlevé plus d’1m d’intestin à cette chienne_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/119 Camille/docs/6TER_Véto&Co_Pourquoi il ne faut pas interrompre des petites bagarres entre chats.mp4",
+  "video_stem": "6TER_Véto&Co_Pourquoi il ne faut pas interrompre des petites bagarres entre chats",
+  "video_hash": "20f2d84be4468b09f681b85077c138d0f3eb598d88fa9a197328f5274ec9dcb8",
+  "created_at": "2025-10-10T13:35:54.684922+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/20f2d84be4468b09f681b85077c138d0f3eb598d88fa9a197328f5274ec9dcb8/6TER_Véto&Co_Pourquoi il ne faut pas interrompre des petites bagarres entre chats_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/20f2d84be4468b09f681b85077c138d0f3eb598d88fa9a197328f5274ec9dcb8/6TER_Véto&Co_Pourquoi il ne faut pas interrompre des petites bagarres entre chats_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/20f2d84be4468b09f681b85077c138d0f3eb598d88fa9a197328f5274ec9dcb8/6TER_Véto&Co_Pourquoi il ne faut pas interrompre des petites bagarres entre chats_tracking.json"
+  }
+}

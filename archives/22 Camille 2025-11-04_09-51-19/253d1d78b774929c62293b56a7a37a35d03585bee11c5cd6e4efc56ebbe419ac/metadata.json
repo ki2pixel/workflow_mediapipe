@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/22 Camille/docs/Teva - Piquantes - « Je ne pensais pas qu’on pouvait frapper une femme enceinte ».mp4",
+  "video_stem": "Teva - Piquantes - « Je ne pensais pas qu’on pouvait frapper une femme enceinte »",
+  "video_hash": "253d1d78b774929c62293b56a7a37a35d03585bee11c5cd6e4efc56ebbe419ac",
+  "created_at": "2025-11-04T09:51:19.755681+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/22 Camille 2025-11-04_09-51-19/253d1d78b774929c62293b56a7a37a35d03585bee11c5cd6e4efc56ebbe419ac/Teva - Piquantes - « Je ne pensais pas qu’on pouvait frapper une femme enceinte »_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/22 Camille 2025-11-04_09-51-19/253d1d78b774929c62293b56a7a37a35d03585bee11c5cd6e4efc56ebbe419ac/Teva - Piquantes - « Je ne pensais pas qu’on pouvait frapper une femme enceinte »_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/22 Camille 2025-11-04_09-51-19/253d1d78b774929c62293b56a7a37a35d03585bee11c5cd6e4efc56ebbe419ac/Teva - Piquantes - « Je ne pensais pas qu’on pouvait frapper une femme enceinte »_tracking.json"
+  }
+}

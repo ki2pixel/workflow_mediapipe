@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/117 Camille/docs/UJUD - MALAISE CLOCHE.mp4",
+  "video_stem": "UJUD - MALAISE CLOCHE",
+  "video_hash": "188e824a9d8e4018d3a3810dc0efe965de6e8b6f1a675bd37427ddde984d1f6e",
+  "created_at": "2025-11-12T14:39:43.992872+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/117 Camille 2025-11-12_14-39-43/188e824a9d8e4018d3a3810dc0efe965de6e8b6f1a675bd37427ddde984d1f6e/UJUD - MALAISE CLOCHE_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/117 Camille 2025-11-12_14-39-43/188e824a9d8e4018d3a3810dc0efe965de6e8b6f1a675bd37427ddde984d1f6e/UJUD - MALAISE CLOCHE_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/117 Camille 2025-11-12_14-39-43/188e824a9d8e4018d3a3810dc0efe965de6e8b6f1a675bd37427ddde984d1f6e/UJUD - MALAISE CLOCHE_tracking.json"
+  }
+}

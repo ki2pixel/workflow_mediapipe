@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/157 Camille/docs/UJUD - PASSIONNE DECOS.mp4",
+  "video_stem": "UJUD - PASSIONNE DECOS",
+  "video_hash": "73b398e7d0e73ec49ff6601543a8313101d990b2ea5c61e56e9f9df9715deb7e",
+  "created_at": "2025-12-16T14:32:03.330851+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/73b398e7d0e73ec49ff6601543a8313101d990b2ea5c61e56e9f9df9715deb7e/UJUD - PASSIONNE DECOS_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/73b398e7d0e73ec49ff6601543a8313101d990b2ea5c61e56e9f9df9715deb7e/UJUD - PASSIONNE DECOS_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/73b398e7d0e73ec49ff6601543a8313101d990b2ea5c61e56e9f9df9715deb7e/UJUD - PASSIONNE DECOS_tracking.json"
+  }
+}

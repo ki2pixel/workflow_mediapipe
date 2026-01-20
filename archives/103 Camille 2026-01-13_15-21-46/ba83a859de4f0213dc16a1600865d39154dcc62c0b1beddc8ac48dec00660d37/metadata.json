@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/103 Camille/docs/Maissane embrassent Nico après s'être rapprochée de Greg !.mp4",
+  "video_stem": "Maissane embrassent Nico après s'être rapprochée de Greg !",
+  "video_hash": "ba83a859de4f0213dc16a1600865d39154dcc62c0b1beddc8ac48dec00660d37",
+  "created_at": "2026-01-13T15:21:46.236592+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2026-01-13_15-21-46/ba83a859de4f0213dc16a1600865d39154dcc62c0b1beddc8ac48dec00660d37/Maissane embrassent Nico après s'être rapprochée de Greg !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2026-01-13_15-21-46/ba83a859de4f0213dc16a1600865d39154dcc62c0b1beddc8ac48dec00660d37/Maissane embrassent Nico après s'être rapprochée de Greg !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/103 Camille 2026-01-13_15-21-46/ba83a859de4f0213dc16a1600865d39154dcc62c0b1beddc8ac48dec00660d37/Maissane embrassent Nico après s'être rapprochée de Greg !_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/305 Camille/docs/M6 - LMP - Extrait 2 (EM13 P1)  Sa poche à douille explose à seulement 3 minutes de la fin de l’épreuve.mp4",
+  "video_stem": "M6 - LMP - Extrait 2 (EM13 P1)  Sa poche à douille explose à seulement 3 minutes de la fin de l’épreuve",
+  "video_hash": "3944d888fb2376955d7d9a79f1eb36f3ac21c017785eca3f82727c1e85337466",
+  "created_at": "2025-11-28T15:50:50.725646+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/305 Camille 2025-11-28_15-50-50/3944d888fb2376955d7d9a79f1eb36f3ac21c017785eca3f82727c1e85337466/M6 - LMP - Extrait 2 (EM13 P1)  Sa poche à douille explose à seulement 3 minutes de la fin de l’épreuve_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/305 Camille 2025-11-28_15-50-50/3944d888fb2376955d7d9a79f1eb36f3ac21c017785eca3f82727c1e85337466/M6 - LMP - Extrait 2 (EM13 P1)  Sa poche à douille explose à seulement 3 minutes de la fin de l’épreuve_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/305 Camille 2025-11-28_15-50-50/3944d888fb2376955d7d9a79f1eb36f3ac21c017785eca3f82727c1e85337466/M6 - LMP - Extrait 2 (EM13 P1)  Sa poche à douille explose à seulement 3 minutes de la fin de l’épreuve_tracking.json"
+  }
+}

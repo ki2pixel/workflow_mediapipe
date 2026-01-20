@@ -1,0 +1,8 @@
+{
+  "segmentation": {
+    "min_duration_off": 0.15
+  },
+  "clustering": {
+    "min_cluster_size": 3
+  }
+}

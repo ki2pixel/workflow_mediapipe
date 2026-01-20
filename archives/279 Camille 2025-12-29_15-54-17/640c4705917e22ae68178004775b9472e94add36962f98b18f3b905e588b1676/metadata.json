@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/279 Camille/docs/E=M6 - Pourquoi manger les huîtres vivantes.mp4",
+  "video_stem": "E=M6 - Pourquoi manger les huîtres vivantes",
+  "video_hash": "640c4705917e22ae68178004775b9472e94add36962f98b18f3b905e588b1676",
+  "created_at": "2025-12-29T15:54:17.991659+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/279 Camille 2025-12-29_15-54-17/640c4705917e22ae68178004775b9472e94add36962f98b18f3b905e588b1676/E=M6 - Pourquoi manger les huîtres vivantes_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/279 Camille 2025-12-29_15-54-17/640c4705917e22ae68178004775b9472e94add36962f98b18f3b905e588b1676/E=M6 - Pourquoi manger les huîtres vivantes_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/279 Camille 2025-12-29_15-54-17/640c4705917e22ae68178004775b9472e94add36962f98b18f3b905e588b1676/E=M6 - Pourquoi manger les huîtres vivantes_tracking.json"
+  }
+}

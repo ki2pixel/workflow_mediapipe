@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/14 Camille/docs/M6 - E=M6 - PRÉVENIR ET SOIGNER LE MAL DE GORGE  HALTE AUX IDÉES REÇUES.mp4",
+  "video_stem": "M6 - E=M6 - PRÉVENIR ET SOIGNER LE MAL DE GORGE  HALTE AUX IDÉES REÇUES",
+  "video_hash": "5e7d328fd092742c1ff2ad53e1b798b68a9e6381102b779c3e252f13472b7e82",
+  "created_at": "2025-11-03T15:54:22.659593+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/14 Camille 2025-11-03_15-54-22/5e7d328fd092742c1ff2ad53e1b798b68a9e6381102b779c3e252f13472b7e82/M6 - E=M6 - PRÉVENIR ET SOIGNER LE MAL DE GORGE  HALTE AUX IDÉES REÇUES_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/14 Camille 2025-11-03_15-54-22/5e7d328fd092742c1ff2ad53e1b798b68a9e6381102b779c3e252f13472b7e82/M6 - E=M6 - PRÉVENIR ET SOIGNER LE MAL DE GORGE  HALTE AUX IDÉES REÇUES_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/14 Camille 2025-11-03_15-54-22/5e7d328fd092742c1ff2ad53e1b798b68a9e6381102b779c3e252f13472b7e82/M6 - E=M6 - PRÉVENIR ET SOIGNER LE MAL DE GORGE  HALTE AUX IDÉES REÇUES_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/289 Camille/docs/EP3_Niko rate complètement son épreuve !.mp4",
+  "video_stem": "EP3_Niko rate complètement son épreuve !",
+  "video_hash": "cb751de35409f83c8c20bf3022825c84ed3aa75ffc30252d610eb7dbcac8cf6e",
+  "created_at": "2025-12-30T12:54:28.254475+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/cb751de35409f83c8c20bf3022825c84ed3aa75ffc30252d610eb7dbcac8cf6e/EP3_Niko rate complètement son épreuve !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/cb751de35409f83c8c20bf3022825c84ed3aa75ffc30252d610eb7dbcac8cf6e/EP3_Niko rate complètement son épreuve !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/289 Camille 2025-12-30_12-54-28/cb751de35409f83c8c20bf3022825c84ed3aa75ffc30252d610eb7dbcac8cf6e/EP3_Niko rate complètement son épreuve !_tracking.json"
+  }
+}

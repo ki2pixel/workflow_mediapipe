@@ -1,0 +1,4797 @@
+{
+  "frames_analysis": [
+    {
+      "frame": 1,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 1045,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [
+            "SPEAKER_01"
+          ],
+          "bbox_width": 328,
+          "bbox_height": 383
+        }
+      ]
+    },
+    {
+      "frame": 2,
+      "tracked_objects": [
+        {
+          "id": "obj_1",
+          "centroid_x": 1081,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [
+            "SPEAKER_01"
+          ],
+          "bbox_width": 408,
+          "bbox_height": 525
+        }
+      ]
+    },
+    {
+      "frame": 3,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 143,
+          "source": "object_detector",
+          "label": "cup",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_3",
+          "centroid_x": 166,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1272,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 4,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 147,
+          "source": "object_detector",
+          "label": "cup",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_3",
+          "centroid_x": 170,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_5",
+          "centroid_x": 1038,
+          "source": "object_detector",
+          "label": "potted plant",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1286,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 5,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 156,
+          "source": "object_detector",
+          "label": "cup",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_3",
+          "centroid_x": 179,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1294,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 6,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 161,
+          "source": "object_detector",
+          "label": "cup",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1295,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 7,
+      "tracked_objects": [
+        {
+          "id": "obj_4",
+          "centroid_x": 175,
+          "source": "object_detector",
+          "label": "cup",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_3",
+          "centroid_x": 202,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_6",
+          "centroid_x": 318,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1299,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 8,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 213,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_6",
+          "centroid_x": 324,
+          "source": "object_detector",
+          "label": "spoon",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1298,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 9,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 225,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1311,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 10,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 246,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1301,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 11,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 260,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1308,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 12,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 277,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1310,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 13,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 298,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1338,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 14,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 314,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1320,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 15,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 331,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1333,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 16,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 348,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1346,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 17,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 357,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1346,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 18,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 372,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1344,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 19,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 390,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1321,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 20,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1315,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 21,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 422,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1300,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 22,
+      "tracked_objects": [
+        {
+          "id": "obj_3",
+          "centroid_x": 440,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1300,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 23,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1329,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 24,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1326,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 25,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1326,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 26,
+      "tracked_objects": [
+        {
+          "id": "obj_7",
+          "centroid_x": 1081,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [
+            "SPEAKER_01"
+          ],
+          "bbox_width": 350,
+          "bbox_height": 393
+        }
+      ]
+    },
+    {
+      "frame": 27,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1360,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 28,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1341,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 29,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1348,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 30,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1368,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 31,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1333,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 32,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1342,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 33,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1341,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 34,
+      "tracked_objects": [
+        {
+          "id": "obj_2",
+          "centroid_x": 1339,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 35,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 247,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 992,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1360,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 36,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 251,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1000,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1366,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 37,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1006,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1371,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 38,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 269,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1052,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 1280,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 39,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 273,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_11",
+          "centroid_x": 938,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1057,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 40,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 289,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1076,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1418,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 41,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 297,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_11",
+          "centroid_x": 1005,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1100,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 42,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 303,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_11",
+          "centroid_x": 1075,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1130,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 43,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 312,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1143,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_10",
+          "centroid_x": 1206,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 44,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 332,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1164,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1451,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 45,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 330,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1164,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1443,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 46,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 327,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1168,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1453,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 47,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 329,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1159,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1456,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 48,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 332,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1170,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1463,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 49,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 322,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1154,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1455,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 50,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 322,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1151,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1446,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 51,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 328,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1148,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1441,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 52,
+      "tracked_objects": [
+        {
+          "id": "obj_9",
+          "centroid_x": 318,
+          "source": "object_detector",
+          "label": "bowl",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1141,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_12",
+          "centroid_x": 1332,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 53,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1133,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1440,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 54,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1120,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1451,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 55,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1111,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1459,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 56,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1097,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1444,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 57,
+      "tracked_objects": [
+        {
+          "id": "obj_14",
+          "centroid_x": 1005,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_8",
+          "centroid_x": 1084,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1430,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 58,
+      "tracked_objects": [
+        {
+          "id": "obj_14",
+          "centroid_x": 1007,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1440,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 59,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1049,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_12",
+          "centroid_x": 1303,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 60,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1039,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_2",
+          "centroid_x": 1427,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 61,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1028,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_12",
+          "centroid_x": 1294,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_15",
+          "centroid_x": 1431,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 62,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1016,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1426,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_15",
+          "centroid_x": 1440,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 63,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1026,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1436,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 64,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1041,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1438,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 65,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1032,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1441,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 66,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 1438,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 67,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 1434,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 68,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1011,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1441,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 69,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1015,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1443,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 70,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 1445,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 71,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 1443,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 72,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 1446,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 73,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1010,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_16",
+          "centroid_x": 1085,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1447,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 74,
+      "tracked_objects": [
+        {
+          "id": "obj_16",
+          "centroid_x": 1086,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1446,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 75,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 999,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_16",
+          "centroid_x": 1090,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1445,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 76,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 987,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1451,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 77,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 991,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1453,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 78,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1010,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_16",
+          "centroid_x": 1112,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1462,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 79,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1023,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1460,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 80,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1037,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1459,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 81,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1043,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1460,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 82,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1049,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1465,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 83,
+      "tracked_objects": [
+        {
+          "id": "obj_13",
+          "centroid_x": 1466,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 84,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1055,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1460,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 85,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1055,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_16",
+          "centroid_x": 1125,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1453,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 86,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1054,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_16",
+          "centroid_x": 1129,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1454,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 87,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1053,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1458,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 88,
+      "tracked_objects": [
+        {
+          "id": "obj_8",
+          "centroid_x": 1049,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_13",
+          "centroid_x": 1450,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 89,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 1239,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 895,
+          "bbox_height": 837
+        }
+      ]
+    },
+    {
+      "frame": 90,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 1233,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 910,
+          "bbox_height": 832
+        }
+      ]
+    },
+    {
+      "frame": 91,
+      "tracked_objects": [
+        {
+          "id": "obj_17",
+          "centroid_x": 1212,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 918,
+          "bbox_height": 854
+        }
+      ]
+    },
+    {
+      "frame": 92,
+      "tracked_objects": [
+        {
+          "id": "obj_19",
+          "centroid_x": 422,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_18",
+          "centroid_x": 957,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 93,
+      "tracked_objects": [
+        {
+          "id": "obj_19",
+          "centroid_x": 408,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_18",
+          "centroid_x": 956,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 94,
+      "tracked_objects": [
+        {
+          "id": "obj_19",
+          "centroid_x": 397,
+          "source": "object_detector",
+          "label": "tie",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_18",
+          "centroid_x": 957,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 95,
+      "tracked_objects": [
+        {
+          "id": "obj_20",
+          "centroid_x": 1053,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 914,
+          "bbox_height": 844
+        }
+      ]
+    },
+    {
+      "frame": 96,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 962,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 97,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 958,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 98,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 957,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 99,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 100,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 101,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 102,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 103,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 1004,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 104,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 995,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 105,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 923,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 106,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 919,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 107,
+      "tracked_objects": [
+        {
+          "id": "obj_18",
+          "centroid_x": 912,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 108,
+      "tracked_objects": [
+        {
+          "id": "obj_21",
+          "centroid_x": 1027,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 109,
+      "tracked_objects": []
+    },
+    {
+      "frame": 110,
+      "tracked_objects": []
+    },
+    {
+      "frame": 111,
+      "tracked_objects": [
+        {
+          "id": "obj_21",
+          "centroid_x": 1055,
+          "source": "object_detector",
+          "label": "bird",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 112,
+      "tracked_objects": []
+    },
+    {
+      "frame": 113,
+      "tracked_objects": []
+    },
+    {
+      "frame": 114,
+      "tracked_objects": []
+    },
+    {
+      "frame": 115,
+      "tracked_objects": []
+    },
+    {
+      "frame": 116,
+      "tracked_objects": [
+        {
+          "id": "obj_23",
+          "centroid_x": 1099,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1568,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 117,
+      "tracked_objects": [
+        {
+          "id": "obj_23",
+          "centroid_x": 1108,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1573,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 118,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1017,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1589,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 119,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1001,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1592,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 120,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1022,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1607,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 121,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1075,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1588,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 122,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1083,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1608,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 123,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1069,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_22",
+          "centroid_x": 1612,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 124,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1029,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 125,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1022,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 126,
+      "tracked_objects": [
+        {
+          "id": "obj_24",
+          "centroid_x": 1001,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_25",
+          "centroid_x": 1080,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 127,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 976,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 128,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_27",
+          "centroid_x": 1729,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 129,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 970,
+          "source": "object_detector",
+          "label": "dining table",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_27",
+          "centroid_x": 1719,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 130,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 966,
+          "source": "object_detector",
+          "label": "dining table",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_27",
+          "centroid_x": 1711,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 131,
+      "tracked_objects": [
+        {
+          "id": "obj_29",
+          "centroid_x": 956,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 132,
+      "tracked_objects": []
+    },
+    {
+      "frame": 133,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 957,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 134,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 955,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 135,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 136,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 958,
+          "source": "object_detector",
+          "label": "dining table",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 137,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_30",
+          "centroid_x": 1583,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 138,
+      "tracked_objects": [
+        {
+          "id": "obj_26",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 139,
+      "tracked_objects": []
+    },
+    {
+      "frame": 140,
+      "tracked_objects": []
+    },
+    {
+      "frame": 141,
+      "tracked_objects": [
+        {
+          "id": "obj_31",
+          "centroid_x": 594,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 142,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 738,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 143,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 144,
+      "tracked_objects": []
+    },
+    {
+      "frame": 145,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 993,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 146,
+      "tracked_objects": []
+    },
+    {
+      "frame": 147,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 918,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 148,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 842,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 149,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 786,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 150,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 857,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 151,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 801,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 152,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 691,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 153,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 742,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 154,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 813,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 155,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 898,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 156,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 941,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 157,
+      "tracked_objects": []
+    },
+    {
+      "frame": 158,
+      "tracked_objects": [
+        {
+          "id": "obj_28",
+          "centroid_x": 990,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 159,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 803,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 160,
+      "tracked_objects": []
+    },
+    {
+      "frame": 161,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 724,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 162,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 757,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 163,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 769,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 164,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 781,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 165,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 782,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1395,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 166,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 800,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1410,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 167,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 801,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1404,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 168,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 796,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1393,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 169,
+      "tracked_objects": [
+        {
+          "id": "obj_32",
+          "centroid_x": 789,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1392,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 170,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 752,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1351,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 171,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 763,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1388,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 172,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1340,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 173,
+      "tracked_objects": [
+        {
+          "id": "obj_33",
+          "centroid_x": 758,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1351,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 174,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1049,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 586,
+          "bbox_height": 540
+        }
+      ]
+    },
+    {
+      "frame": 175,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1060,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 580,
+          "bbox_height": 539
+        }
+      ]
+    },
+    {
+      "frame": 176,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1066,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 567,
+          "bbox_height": 541
+        }
+      ]
+    },
+    {
+      "frame": 177,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1073,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 575,
+          "bbox_height": 544
+        }
+      ]
+    },
+    {
+      "frame": 178,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1075,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 572,
+          "bbox_height": 544
+        }
+      ]
+    },
+    {
+      "frame": 179,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1355,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 180,
+      "tracked_objects": [
+        {
+          "id": "obj_36",
+          "centroid_x": 928,
+          "source": "object_detector",
+          "label": "sink",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1359,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 181,
+      "tracked_objects": [
+        {
+          "id": "obj_36",
+          "centroid_x": 927,
+          "source": "object_detector",
+          "label": "sink",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_34",
+          "centroid_x": 1359,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 182,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1076,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 575,
+          "bbox_height": 528
+        }
+      ]
+    },
+    {
+      "frame": 183,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1079,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 584,
+          "bbox_height": 529
+        }
+      ]
+    },
+    {
+      "frame": 184,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1360,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 185,
+      "tracked_objects": [
+        {
+          "id": "obj_35",
+          "centroid_x": 1079,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 580,
+          "bbox_height": 522
+        }
+      ]
+    },
+    {
+      "frame": 186,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1361,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 187,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1360,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 188,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1357,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 189,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1350,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 190,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1350,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 191,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1342,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 192,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1339,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 193,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1339,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 194,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1358,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 195,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1063,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 586,
+          "bbox_height": 525
+        }
+      ]
+    },
+    {
+      "frame": 196,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1069,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 584,
+          "bbox_height": 528
+        }
+      ]
+    },
+    {
+      "frame": 197,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1071,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 592,
+          "bbox_height": 530
+        }
+      ]
+    },
+    {
+      "frame": 198,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1347,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 199,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1348,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 200,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1346,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 201,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1339,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 202,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1077,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 593,
+          "bbox_height": 547
+        }
+      ]
+    },
+    {
+      "frame": 203,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1081,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 587,
+          "bbox_height": 545
+        }
+      ]
+    },
+    {
+      "frame": 204,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1080,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 588,
+          "bbox_height": 544
+        }
+      ]
+    },
+    {
+      "frame": 205,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1075,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 594,
+          "bbox_height": 553
+        }
+      ]
+    },
+    {
+      "frame": 206,
+      "tracked_objects": [
+        {
+          "id": "obj_34",
+          "centroid_x": 1351,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 207,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1043,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 601,
+          "bbox_height": 555
+        }
+      ]
+    },
+    {
+      "frame": 208,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1029,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 609,
+          "bbox_height": 558
+        }
+      ]
+    },
+    {
+      "frame": 209,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 1008,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 617,
+          "bbox_height": 561
+        }
+      ]
+    },
+    {
+      "frame": 210,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 991,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 605,
+          "bbox_height": 548
+        }
+      ]
+    },
+    {
+      "frame": 211,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 986,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 593,
+          "bbox_height": 543
+        }
+      ]
+    },
+    {
+      "frame": 212,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 975,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 614,
+          "bbox_height": 554
+        }
+      ]
+    },
+    {
+      "frame": 213,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 974,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 603,
+          "bbox_height": 553
+        }
+      ]
+    },
+    {
+      "frame": 214,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 970,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 612,
+          "bbox_height": 564
+        }
+      ]
+    },
+    {
+      "frame": 215,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 976,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 602,
+          "bbox_height": 556
+        }
+      ]
+    },
+    {
+      "frame": 216,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 978,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 602,
+          "bbox_height": 560
+        }
+      ]
+    },
+    {
+      "frame": 217,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 982,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 609,
+          "bbox_height": 566
+        }
+      ]
+    },
+    {
+      "frame": 218,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 981,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 604,
+          "bbox_height": 564
+        }
+      ]
+    },
+    {
+      "frame": 219,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 975,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 599,
+          "bbox_height": 566
+        }
+      ]
+    },
+    {
+      "frame": 220,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 969,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [],
+          "bbox_width": 593,
+          "bbox_height": 558
+        }
+      ]
+    },
+    {
+      "frame": 221,
+      "tracked_objects": [
+        {
+          "id": "obj_38",
+          "centroid_x": 994,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 222,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 1153,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_39",
+          "centroid_x": 1200,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 223,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 1130,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_39",
+          "centroid_x": 1204,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 224,
+      "tracked_objects": [
+        {
+          "id": "obj_40",
+          "centroid_x": 1145,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 225,
+      "tracked_objects": [
+        {
+          "id": "obj_37",
+          "centroid_x": 991,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 226,
+      "tracked_objects": [
+        {
+          "id": "obj_43",
+          "centroid_x": 583,
+          "source": "object_detector",
+          "label": "knife",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_41",
+          "centroid_x": 967,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": []
+        },
+        {
+          "id": "obj_42",
+          "centroid_x": 1250,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": []
+        }
+      ]
+    },
+    {
+      "frame": 227,
+      "tracked_objects": [
+        {
+          "id": "obj_41",
+          "centroid_x": 976,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1335,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 228,
+      "tracked_objects": [
+        {
+          "id": "obj_41",
+          "centroid_x": 1017,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1350,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 229,
+      "tracked_objects": [
+        {
+          "id": "obj_45",
+          "centroid_x": 932,
+          "source": "face_landmarker",
+          "label": "face",
+          "active_speakers": [
+            "SPEAKER_01"
+          ],
+          "bbox_width": 598,
+          "bbox_height": 574
+        }
+      ]
+    },
+    {
+      "frame": 230,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 437,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_46",
+          "centroid_x": 1125,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1388,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 231,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 448,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_46",
+          "centroid_x": 1163,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1412,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 232,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 483,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_46",
+          "centroid_x": 1188,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1421,
+          "source": "object_detector",
+          "label": "donut",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 233,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 472,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_46",
+          "centroid_x": 1197,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_44",
+          "centroid_x": 1437,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 234,
+      "tracked_objects": [
+        {
+          "id": "obj_47",
+          "centroid_x": 498,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_46",
+          "centroid_x": 1214,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 235,
+      "tracked_objects": [
+        {
+          "id": "obj_48",
+          "centroid_x": 603,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        },
+        {
+          "id": "obj_49",
+          "centroid_x": 1264,
+          "source": "object_detector",
+          "label": "person",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 236,
+      "tracked_objects": [
+        {
+          "id": "obj_50",
+          "centroid_x": 862,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 237,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 945,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 238,
+      "tracked_objects": [
+        {
+          "id": "obj_50",
+          "centroid_x": 832,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 239,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 959,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 240,
+      "tracked_objects": [
+        {
+          "id": "obj_52",
+          "centroid_x": 915,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 241,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 242,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 243,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 966,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 244,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 970,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 245,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 968,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 246,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 966,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 247,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 966,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 248,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 249,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 962,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 250,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 962,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 251,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 252,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 962,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 253,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 960,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 254,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 255,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 962,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 256,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 257,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 258,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 259,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 260,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 261,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 262,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 263,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 264,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 265,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 963,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 266,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 267,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 961,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 268,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 962,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 269,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 964,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 270,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 965,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 271,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 970,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 272,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 970,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 273,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 971,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 274,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 969,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 275,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 968,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 276,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 970,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 277,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 972,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 278,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 971,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 279,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 971,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 280,
+      "tracked_objects": [
+        {
+          "id": "obj_51",
+          "centroid_x": 972,
+          "source": "object_detector",
+          "label": "cake",
+          "active_speakers": [
+            "SPEAKER_01"
+          ]
+        }
+      ]
+    }
+  ]
+}

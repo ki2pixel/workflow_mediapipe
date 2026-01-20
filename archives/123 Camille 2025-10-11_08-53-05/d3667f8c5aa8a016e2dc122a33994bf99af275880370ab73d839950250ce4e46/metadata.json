@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/123 Camille/docs/Gulli - Battlebots - La fumée empêche de voir le combat.mp4",
+  "video_stem": "Gulli - Battlebots - La fumée empêche de voir le combat",
+  "video_hash": "d3667f8c5aa8a016e2dc122a33994bf99af275880370ab73d839950250ce4e46",
+  "created_at": "2025-10-11T08:53:05.387976+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/123 Camille 2025-10-11_08-53-05/d3667f8c5aa8a016e2dc122a33994bf99af275880370ab73d839950250ce4e46/Gulli - Battlebots - La fumée empêche de voir le combat_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/123 Camille 2025-10-11_08-53-05/d3667f8c5aa8a016e2dc122a33994bf99af275880370ab73d839950250ce4e46/Gulli - Battlebots - La fumée empêche de voir le combat_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/123 Camille 2025-10-11_08-53-05/d3667f8c5aa8a016e2dc122a33994bf99af275880370ab73d839950250ce4e46/Gulli - Battlebots - La fumée empêche de voir le combat_tracking.json"
+  }
+}

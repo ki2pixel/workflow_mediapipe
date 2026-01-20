@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/153 Camille/docs/Maeva et Alix dansent avec des mecs en boit de nuit !.mp4",
+  "video_stem": "Maeva et Alix dansent avec des mecs en boit de nuit !",
+  "video_hash": "ef97a340575504ced15817aa51762738069d161dcb6593bc1a8a56c9346fc73e",
+  "created_at": "2025-12-16T14:26:02.234391+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-12-16_14-26-01/ef97a340575504ced15817aa51762738069d161dcb6593bc1a8a56c9346fc73e/Maeva et Alix dansent avec des mecs en boit de nuit !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-12-16_14-26-01/ef97a340575504ced15817aa51762738069d161dcb6593bc1a8a56c9346fc73e/Maeva et Alix dansent avec des mecs en boit de nuit !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2025-12-16_14-26-01/ef97a340575504ced15817aa51762738069d161dcb6593bc1a8a56c9346fc73e/Maeva et Alix dansent avec des mecs en boit de nuit !_tracking.json"
+  }
+}

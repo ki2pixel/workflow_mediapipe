@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/174 Camille/docs/TEVA_Piquantes_Ses peurs + sa thérapie .mp4",
+  "video_stem": "TEVA_Piquantes_Ses peurs + sa thérapie ",
+  "video_hash": "14608ae558346bd70d21d3688fcea39def11e528058434efdd532daaf01ddbf7",
+  "created_at": "2025-11-17T10:33:25.791789+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/174 Camille 2025-11-17_10-33-25/14608ae558346bd70d21d3688fcea39def11e528058434efdd532daaf01ddbf7/TEVA_Piquantes_Ses peurs + sa thérapie _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/174 Camille 2025-11-17_10-33-25/14608ae558346bd70d21d3688fcea39def11e528058434efdd532daaf01ddbf7/TEVA_Piquantes_Ses peurs + sa thérapie _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/174 Camille 2025-11-17_10-33-25/14608ae558346bd70d21d3688fcea39def11e528058434efdd532daaf01ddbf7/TEVA_Piquantes_Ses peurs + sa thérapie _tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/263 Camille/docs/Une des deux exs de Benji va devoir quitter l'aventure !.mp4",
+  "video_stem": "Une des deux exs de Benji va devoir quitter l'aventure !",
+  "video_hash": "694943450d431b63aa4c6ffbbae3af32a601d1a870f7f2a564487d247b541bcc",
+  "created_at": "2025-11-25T10:37:16.380858+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/694943450d431b63aa4c6ffbbae3af32a601d1a870f7f2a564487d247b541bcc/Une des deux exs de Benji va devoir quitter l'aventure !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/694943450d431b63aa4c6ffbbae3af32a601d1a870f7f2a564487d247b541bcc/Une des deux exs de Benji va devoir quitter l'aventure !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/263 Camille 2025-11-25_10-37-15/694943450d431b63aa4c6ffbbae3af32a601d1a870f7f2a564487d247b541bcc/Une des deux exs de Benji va devoir quitter l'aventure !_tracking.json"
+  }
+}

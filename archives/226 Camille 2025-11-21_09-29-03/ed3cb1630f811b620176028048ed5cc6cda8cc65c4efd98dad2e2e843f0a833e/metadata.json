@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/226 Camille/docs/TEVA_Piquantes_Elle se confie sur le harcèlement qu’elle a subit 1.mp4",
+  "video_stem": "TEVA_Piquantes_Elle se confie sur le harcèlement qu’elle a subit 1",
+  "video_hash": "ed3cb1630f811b620176028048ed5cc6cda8cc65c4efd98dad2e2e843f0a833e",
+  "created_at": "2025-11-21T09:29:03.814368+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/ed3cb1630f811b620176028048ed5cc6cda8cc65c4efd98dad2e2e843f0a833e/TEVA_Piquantes_Elle se confie sur le harcèlement qu’elle a subit 1_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/ed3cb1630f811b620176028048ed5cc6cda8cc65c4efd98dad2e2e843f0a833e/TEVA_Piquantes_Elle se confie sur le harcèlement qu’elle a subit 1_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/226 Camille 2025-11-21_09-29-03/ed3cb1630f811b620176028048ed5cc6cda8cc65c4efd98dad2e2e843f0a833e/TEVA_Piquantes_Elle se confie sur le harcèlement qu’elle a subit 1_tracking.json"
+  }
+}

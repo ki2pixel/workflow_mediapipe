@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/49 Camille/docs/6TER_Mr Bean_Quand tu n’arrives pas à te lever.mp4",
+  "video_stem": "6TER_Mr Bean_Quand tu n’arrives pas à te lever",
+  "video_hash": "a9cd44d69467c0636d0ac45a5de8b852f8db03b209fac240984010e1d415a20f",
+  "created_at": "2025-10-06T08:53:52.869991+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/a9cd44d69467c0636d0ac45a5de8b852f8db03b209fac240984010e1d415a20f/6TER_Mr Bean_Quand tu n’arrives pas à te lever_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/a9cd44d69467c0636d0ac45a5de8b852f8db03b209fac240984010e1d415a20f/6TER_Mr Bean_Quand tu n’arrives pas à te lever_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/49 Camille 2025-10-06_08-53-52/a9cd44d69467c0636d0ac45a5de8b852f8db03b209fac240984010e1d415a20f/6TER_Mr Bean_Quand tu n’arrives pas à te lever_tracking.json"
+  }
+}

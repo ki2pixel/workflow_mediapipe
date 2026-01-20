@@ -1,0 +1,48 @@
+# Core Flask Application Dependencies - Updated for security
+Flask==3.0.0  # Updated for security fixes
+Flask-Caching==2.1.0
+Werkzeug==3.0.1  # Security update
+
+# Video Processing and Computer Vision
+opencv-python==4.8.1.78
+mediapipe==0.10.7
+numpy==1.24.4  # Security update
+
+# Audio Processing
+torch==2.1.0  # Updated version
+torchaudio==2.1.0
+transformers==4.35.0  # Updated version
+
+# Video Analysis and Scene Detection
+ffmpeg-python==0.2.0
+scipy==1.11.2
+
+# System Monitoring and GPU Support
+psutil==5.9.6  # Updated version
+pynvml==11.5.0
+
+# Archive Handling
+rarfile==4.0
+
+# HTTP Requests
+requests==2.31.0
+
+# Airtable Integration
+pyairtable==2.3.3
+
+# MySQL Integration
+PyMySQL==1.1.0
+
+# Environment Management
+python-dotenv==1.0.0
+
+# Development and Testing (optional)
+pytest==7.4.2
+pytest-cov==4.1.0
+black==23.7.0
+flake8==6.0.0
+mypy==1.5.1
+
+# Documentation
+Sphinx==7.1.2
+sphinx-rtd-theme==1.3.0

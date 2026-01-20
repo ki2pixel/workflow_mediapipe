@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/38 Camille/docs/M6 - LRDLF - Les célébrités ont du mal à trouver l'énigme !.mp4",
+  "video_stem": "M6 - LRDLF - Les célébrités ont du mal à trouver l'énigme !",
+  "video_hash": "f72ac9e41604e9aaf5a082b672c370974ac1f67fbe528e8a1554139fbaf93932",
+  "created_at": "2026-01-07T11:26:13.387567+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/38 Camille 2026-01-07_11-26-13/f72ac9e41604e9aaf5a082b672c370974ac1f67fbe528e8a1554139fbaf93932/M6 - LRDLF - Les célébrités ont du mal à trouver l'énigme !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/38 Camille 2026-01-07_11-26-13/f72ac9e41604e9aaf5a082b672c370974ac1f67fbe528e8a1554139fbaf93932/M6 - LRDLF - Les célébrités ont du mal à trouver l'énigme !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/38 Camille 2026-01-07_11-26-13/f72ac9e41604e9aaf5a082b672c370974ac1f67fbe528e8a1554139fbaf93932/M6 - LRDLF - Les célébrités ont du mal à trouver l'énigme !_tracking.json"
+  }
+}

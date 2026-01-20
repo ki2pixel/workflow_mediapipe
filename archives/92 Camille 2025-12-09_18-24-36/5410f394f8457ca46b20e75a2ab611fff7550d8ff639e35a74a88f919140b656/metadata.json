@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/92 Camille/docs/R3136511_RH Veste.mp4",
+  "video_stem": "R3136511_RH Veste",
+  "video_hash": "5410f394f8457ca46b20e75a2ab611fff7550d8ff639e35a74a88f919140b656",
+  "created_at": "2025-12-09T18:24:36.680144+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/92 Camille 2025-12-09_18-24-36/5410f394f8457ca46b20e75a2ab611fff7550d8ff639e35a74a88f919140b656/R3136511_RH Veste_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/92 Camille 2025-12-09_18-24-36/5410f394f8457ca46b20e75a2ab611fff7550d8ff639e35a74a88f919140b656/R3136511_RH Veste_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/92 Camille 2025-12-09_18-24-36/5410f394f8457ca46b20e75a2ab611fff7550d8ff639e35a74a88f919140b656/R3136511_RH Veste_tracking.json"
+  }
+}

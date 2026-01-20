@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/157 Camille/docs/Marguerite et Emma Peters interprètent « Les filles les meufs .mp4",
+  "video_stem": "Marguerite et Emma Peters interprètent « Les filles les meufs ",
+  "video_hash": "dcd5dd839859283dd21b4ab1985477ea503200208974a83fc1d71a463a4a2462",
+  "created_at": "2025-12-16T14:32:03.260255+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/dcd5dd839859283dd21b4ab1985477ea503200208974a83fc1d71a463a4a2462/Marguerite et Emma Peters interprètent « Les filles les meufs _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/dcd5dd839859283dd21b4ab1985477ea503200208974a83fc1d71a463a4a2462/Marguerite et Emma Peters interprètent « Les filles les meufs _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/157 Camille 2025-12-16_14-32-03/dcd5dd839859283dd21b4ab1985477ea503200208974a83fc1d71a463a4a2462/Marguerite et Emma Peters interprètent « Les filles les meufs _tracking.json"
+  }
+}

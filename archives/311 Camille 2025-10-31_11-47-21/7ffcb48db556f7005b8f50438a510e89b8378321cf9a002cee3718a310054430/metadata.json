@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/311 Camille/docs/post-diff 1 – La dernière cérémonie d’élimination réserve des surprises.mp4",
+  "video_stem": "post-diff 1 – La dernière cérémonie d’élimination réserve des surprises",
+  "video_hash": "7ffcb48db556f7005b8f50438a510e89b8378321cf9a002cee3718a310054430",
+  "created_at": "2025-10-31T11:47:21.288312+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/311 Camille 2025-10-31_11-47-21/7ffcb48db556f7005b8f50438a510e89b8378321cf9a002cee3718a310054430/post-diff 1 – La dernière cérémonie d’élimination réserve des surprises_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/311 Camille 2025-10-31_11-47-21/7ffcb48db556f7005b8f50438a510e89b8378321cf9a002cee3718a310054430/post-diff 1 – La dernière cérémonie d’élimination réserve des surprises_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/311 Camille 2025-10-31_11-47-21/7ffcb48db556f7005b8f50438a510e89b8378321cf9a002cee3718a310054430/post-diff 1 – La dernière cérémonie d’élimination réserve des surprises_tracking.json"
+  }
+}

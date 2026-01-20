@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/39 Camille/docs/prédiff – Nikola va-t-il fait honore à son pacte avec Colette .mp4",
+  "video_stem": "prédiff – Nikola va-t-il fait honore à son pacte avec Colette ",
+  "video_hash": "fb7cffd4f6b5956ec67aaf36a1a06cdf435b14bd0c80e8495c287e1c9ef6313d",
+  "created_at": "2025-12-03T15:23:29.017820+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/fb7cffd4f6b5956ec67aaf36a1a06cdf435b14bd0c80e8495c287e1c9ef6313d/prédiff – Nikola va-t-il fait honore à son pacte avec Colette _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/fb7cffd4f6b5956ec67aaf36a1a06cdf435b14bd0c80e8495c287e1c9ef6313d/prédiff – Nikola va-t-il fait honore à son pacte avec Colette _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/39 Camille 2025-12-03_15-23-28/fb7cffd4f6b5956ec67aaf36a1a06cdf435b14bd0c80e8495c287e1c9ef6313d/prédiff – Nikola va-t-il fait honore à son pacte avec Colette _tracking.json"
+  }
+}

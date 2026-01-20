@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/125 Camille/docs/66M - DEPLACEMENT BUREAU_TAT_M6.mp4",
+  "video_stem": "66M - DEPLACEMENT BUREAU_TAT_M6",
+  "video_hash": "857d05a3711e72be5310e67f22a263840f0eeb181e0ffc355c0e1b52153d10a3",
+  "created_at": "2025-12-13T13:09:49.026894+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/125 Camille 2025-12-13_13-09-48/857d05a3711e72be5310e67f22a263840f0eeb181e0ffc355c0e1b52153d10a3/66M - DEPLACEMENT BUREAU_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/125 Camille 2025-12-13_13-09-48/857d05a3711e72be5310e67f22a263840f0eeb181e0ffc355c0e1b52153d10a3/66M - DEPLACEMENT BUREAU_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/125 Camille 2025-12-13_13-09-48/857d05a3711e72be5310e67f22a263840f0eeb181e0ffc355c0e1b52153d10a3/66M - DEPLACEMENT BUREAU_TAT_M6_tracking.json"
+  }
+}

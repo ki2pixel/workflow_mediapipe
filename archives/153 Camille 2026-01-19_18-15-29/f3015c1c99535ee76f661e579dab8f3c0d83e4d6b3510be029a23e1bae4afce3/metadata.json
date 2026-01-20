@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/153 Camille/docs/UJUD - COMMANDE SHEIN.mp4",
+  "video_stem": "UJUD - COMMANDE SHEIN",
+  "video_hash": "f3015c1c99535ee76f661e579dab8f3c0d83e4d6b3510be029a23e1bae4afce3",
+  "created_at": "2026-01-19T18:15:29.136041+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2026-01-19_18-15-29/f3015c1c99535ee76f661e579dab8f3c0d83e4d6b3510be029a23e1bae4afce3/UJUD - COMMANDE SHEIN_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2026-01-19_18-15-29/f3015c1c99535ee76f661e579dab8f3c0d83e4d6b3510be029a23e1bae4afce3/UJUD - COMMANDE SHEIN_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/153 Camille 2026-01-19_18-15-29/f3015c1c99535ee76f661e579dab8f3c0d83e4d6b3510be029a23e1bae4afce3/UJUD - COMMANDE SHEIN_tracking.json"
+  }
+}

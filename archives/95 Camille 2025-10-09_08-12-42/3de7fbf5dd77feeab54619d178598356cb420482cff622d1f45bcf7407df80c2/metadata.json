@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/95 Camille/docs/Extrait pré-diff 2 – Est-il chanteur ou imposteur .mp4",
+  "video_stem": "Extrait pré-diff 2 – Est-il chanteur ou imposteur ",
+  "video_hash": "3de7fbf5dd77feeab54619d178598356cb420482cff622d1f45bcf7407df80c2",
+  "created_at": "2025-10-09T08:12:42.312192+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/95 Camille 2025-10-09_08-12-42/3de7fbf5dd77feeab54619d178598356cb420482cff622d1f45bcf7407df80c2/Extrait pré-diff 2 – Est-il chanteur ou imposteur _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/95 Camille 2025-10-09_08-12-42/3de7fbf5dd77feeab54619d178598356cb420482cff622d1f45bcf7407df80c2/Extrait pré-diff 2 – Est-il chanteur ou imposteur _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/95 Camille 2025-10-09_08-12-42/3de7fbf5dd77feeab54619d178598356cb420482cff622d1f45bcf7407df80c2/Extrait pré-diff 2 – Est-il chanteur ou imposteur _tracking.json"
+  }
+}

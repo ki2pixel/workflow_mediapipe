@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/225 Camille/docs/Thibault et Jess sont en finale !.mp4",
+  "video_stem": "Thibault et Jess sont en finale !",
+  "video_hash": "632a0446d25edca9fa8b8f641d858775638a5bd82a1ec5401575ff74b1e2803d",
+  "created_at": "2025-10-22T11:20:49.360563+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/632a0446d25edca9fa8b8f641d858775638a5bd82a1ec5401575ff74b1e2803d/Thibault et Jess sont en finale !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/632a0446d25edca9fa8b8f641d858775638a5bd82a1ec5401575ff74b1e2803d/Thibault et Jess sont en finale !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/225 Camille 2025-10-22_11-20-49/632a0446d25edca9fa8b8f641d858775638a5bd82a1ec5401575ff74b1e2803d/Thibault et Jess sont en finale !_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/237 Camille/docs/Extrait pré-diff – Laura et Marco jouent avec le feu .mp4",
+  "video_stem": "Extrait pré-diff – Laura et Marco jouent avec le feu ",
+  "video_hash": "c44f34a9fcd89dfc92d79ab3928aa8fa8863f279f8f5ae8b763cdb9a2bba830d",
+  "created_at": "2025-10-23T10:59:51.033123+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/c44f34a9fcd89dfc92d79ab3928aa8fa8863f279f8f5ae8b763cdb9a2bba830d/Extrait pré-diff – Laura et Marco jouent avec le feu _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/c44f34a9fcd89dfc92d79ab3928aa8fa8863f279f8f5ae8b763cdb9a2bba830d/Extrait pré-diff – Laura et Marco jouent avec le feu _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/237 Camille 2025-10-23_10-59-50/c44f34a9fcd89dfc92d79ab3928aa8fa8863f279f8f5ae8b763cdb9a2bba830d/Extrait pré-diff – Laura et Marco jouent avec le feu _tracking.json"
+  }
+}

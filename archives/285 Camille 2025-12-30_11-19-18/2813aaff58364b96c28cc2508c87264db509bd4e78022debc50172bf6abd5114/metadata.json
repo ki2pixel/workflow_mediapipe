@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/285 Camille/docs/EP3_L'arrivée de Maïssane dans les Marseillais !.mp4",
+  "video_stem": "EP3_L'arrivée de Maïssane dans les Marseillais !",
+  "video_hash": "2813aaff58364b96c28cc2508c87264db509bd4e78022debc50172bf6abd5114",
+  "created_at": "2025-12-30T11:19:18.397249+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/285 Camille 2025-12-30_11-19-18/2813aaff58364b96c28cc2508c87264db509bd4e78022debc50172bf6abd5114/EP3_L'arrivée de Maïssane dans les Marseillais !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/285 Camille 2025-12-30_11-19-18/2813aaff58364b96c28cc2508c87264db509bd4e78022debc50172bf6abd5114/EP3_L'arrivée de Maïssane dans les Marseillais !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/285 Camille 2025-12-30_11-19-18/2813aaff58364b96c28cc2508c87264db509bd4e78022debc50172bf6abd5114/EP3_L'arrivée de Maïssane dans les Marseillais !_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/108 Camille/docs/prédiff – Un guest de taille débarque sur le campus.mp4",
+  "video_stem": "prédiff – Un guest de taille débarque sur le campus",
+  "video_hash": "1f4145bfd1b928d7c1d0b1bbe62a93b6f5d9cb3ec32e1b4f96d9f8bf3b6aec7b",
+  "created_at": "2025-11-12T10:28:55.870938+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/108 Camille 2025-11-12_10-28-55/1f4145bfd1b928d7c1d0b1bbe62a93b6f5d9cb3ec32e1b4f96d9f8bf3b6aec7b/prédiff – Un guest de taille débarque sur le campus_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/108 Camille 2025-11-12_10-28-55/1f4145bfd1b928d7c1d0b1bbe62a93b6f5d9cb3ec32e1b4f96d9f8bf3b6aec7b/prédiff – Un guest de taille débarque sur le campus_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/108 Camille 2025-11-12_10-28-55/1f4145bfd1b928d7c1d0b1bbe62a93b6f5d9cb3ec32e1b4f96d9f8bf3b6aec7b/prédiff – Un guest de taille débarque sur le campus_tracking.json"
+  }
+}

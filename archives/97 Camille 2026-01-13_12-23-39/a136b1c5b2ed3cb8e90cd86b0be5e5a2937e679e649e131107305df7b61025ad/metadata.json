@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/97 Camille/docs/prédiff – Quels sont les anciens qui accompagneront les finalistes .mp4",
+  "video_stem": "prédiff – Quels sont les anciens qui accompagneront les finalistes ",
+  "video_hash": "a136b1c5b2ed3cb8e90cd86b0be5e5a2937e679e649e131107305df7b61025ad",
+  "created_at": "2026-01-13T12:23:39.776744+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/97 Camille 2026-01-13_12-23-39/a136b1c5b2ed3cb8e90cd86b0be5e5a2937e679e649e131107305df7b61025ad/prédiff – Quels sont les anciens qui accompagneront les finalistes _scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/97 Camille 2026-01-13_12-23-39/a136b1c5b2ed3cb8e90cd86b0be5e5a2937e679e649e131107305df7b61025ad/prédiff – Quels sont les anciens qui accompagneront les finalistes _audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/97 Camille 2026-01-13_12-23-39/a136b1c5b2ed3cb8e90cd86b0be5e5a2937e679e649e131107305df7b61025ad/prédiff – Quels sont les anciens qui accompagneront les finalistes _tracking.json"
+  }
+}

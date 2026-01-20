@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/119 Camille/docs/Gulli - Totally Spies - Rien ne va plus chez Toby.mp4",
+  "video_stem": "Gulli - Totally Spies - Rien ne va plus chez Toby",
+  "video_hash": "2fc41afe993f5b4dcbe623fd81e785a1917eff1c6467efac6a0bafadb80d8b5b",
+  "created_at": "2025-10-10T13:35:54.733867+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/2fc41afe993f5b4dcbe623fd81e785a1917eff1c6467efac6a0bafadb80d8b5b/Gulli - Totally Spies - Rien ne va plus chez Toby_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/2fc41afe993f5b4dcbe623fd81e785a1917eff1c6467efac6a0bafadb80d8b5b/Gulli - Totally Spies - Rien ne va plus chez Toby_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/119 Camille 2025-10-10_13-35-54/2fc41afe993f5b4dcbe623fd81e785a1917eff1c6467efac6a0bafadb80d8b5b/Gulli - Totally Spies - Rien ne va plus chez Toby_tracking.json"
+  }
+}

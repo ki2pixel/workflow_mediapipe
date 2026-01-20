@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/34 Camille/docs/M6 - LRDLF - Elle pique la cagnotte avec le jackpot juste avant la finale.mp4",
+  "video_stem": "M6 - LRDLF - Elle pique la cagnotte avec le jackpot juste avant la finale",
+  "video_hash": "0976a358ec2238b3466d21ca9b57e5439d7b0c8ac037a846a3951a578636f3c7",
+  "created_at": "2025-12-03T12:01:04.667099+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/34 Camille 2025-12-03_12-01-04/0976a358ec2238b3466d21ca9b57e5439d7b0c8ac037a846a3951a578636f3c7/M6 - LRDLF - Elle pique la cagnotte avec le jackpot juste avant la finale_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/34 Camille 2025-12-03_12-01-04/0976a358ec2238b3466d21ca9b57e5439d7b0c8ac037a846a3951a578636f3c7/M6 - LRDLF - Elle pique la cagnotte avec le jackpot juste avant la finale_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/34 Camille 2025-12-03_12-01-04/0976a358ec2238b3466d21ca9b57e5439d7b0c8ac037a846a3951a578636f3c7/M6 - LRDLF - Elle pique la cagnotte avec le jackpot juste avant la finale_tracking.json"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/35 Camille/docs/M6 - LMCR - Sa tante critique le plat qu'il a servi aux chefs.mov",
+  "video_stem": "M6 - LMCR - Sa tante critique le plat qu'il a servi aux chefs",
+  "video_hash": "b86c8902e087646fa0d3b6ed430e288b937179feb29c5992f330f4f95a6f383e",
+  "created_at": "2025-11-05T09:09:58.164781+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2025-11-05_09-09-57/b86c8902e087646fa0d3b6ed430e288b937179feb29c5992f330f4f95a6f383e/M6 - LMCR - Sa tante critique le plat qu'il a servi aux chefs_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2025-11-05_09-09-57/b86c8902e087646fa0d3b6ed430e288b937179feb29c5992f330f4f95a6f383e/M6 - LMCR - Sa tante critique le plat qu'il a servi aux chefs_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/35 Camille 2025-11-05_09-09-57/b86c8902e087646fa0d3b6ed430e288b937179feb29c5992f330f4f95a6f383e/M6 - LMCR - Sa tante critique le plat qu'il a servi aux chefs_tracking.json"
+  }
+}
