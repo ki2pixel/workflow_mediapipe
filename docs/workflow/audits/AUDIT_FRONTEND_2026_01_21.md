@@ -80,6 +80,12 @@ Le frontend est très bien optimisé pour une application Vanilla.
 1.  **Build Tool :** Le projet utilise beaucoup de fichiers CSS/JS chargés individuellement. Pour la production, l'ajout d'un bundler (Vite ou Webpack) permettrait de minifier et concaténer les assets, réduisant les requêtes HTTP.
 2.  **Refactoring CSS :** Passer à une méthodologie BEM plus stricte ou utiliser des Modules CSS pour éviter les conflits de spécificité (surtout avec les modes `compact`, `logs-active`, `details-active` qui s'empilent).
 
+### Références de mise en œuvre
+- `static/state/AppState.js` — `_deepClone` s'appuie désormais sur `structuredClone` avec repli manuel, et `_stateChanged` utilise le diff superficiel `_areValuesEqual` pour réduire la charge CPU @static/state/AppState.js#174-262.
+- `static/domElements.js` — l'accès DOM est uniformisé via des getters paresseux (`getLogPanelContextStep`, `getLogPanelSpecificButtonsContainer`, etc.) avec validations de clés d'étape @static/domElements.js#11-150.
+
+> **Validation tests** : `npm run test:frontend` (6/7 réussis — `test_timeline_logs_phase2.mjs` reste en échec mineur documenté pour suivi futur).
+
 ---
 
 ## 4. Score de l'Audit

@@ -473,16 +473,11 @@ grep "STEP1" logs/app.log
 # [Progression-MultiLine], [Gestionnaire] Succès/Échec, [WORKER-XXXX] (chunk boundaries, retries, profiling)
 ```
 
-#### Cinematic Log Mode (option visuelle)
+#### Logs — rendu et auto-scroll
 
-- **Activation** : toggle « Cinematic » dans les Settings (checkbox `#cinematic-mode-toggle`).
-- **Effet** : applique un habillage “Matrix-style” sur tous les panneaux de logs (`data-cinematic-mode="true"`, animations contrôlées par CSS).
-- **Persistance** : l’état est stocké dans `localStorage` (`workflow-cinematic-logs`) via `static/cinematicLogMode.js`.
-- **Réinitialisation** :
-  1. Désactiver le toggle dans l’UI **ou**
-  2. Vider la clé dans la console : `localStorage.removeItem('workflow-cinematic-logs');`
-- **Événements** : l’activation déclenche `window.dispatchEvent(new CustomEvent('cinematicModeChanged', { detail: { enabled: true/false } }))` permettant aux modules (Logs Panel, Step Details) d’ajuster leurs animations.
-- **Bonnes pratiques** : désactiver le mode lors de captures d’écran destinées à la documentation standard afin de limiter le bruit visuel.
+- **Mode cinématique retiré** : le toggle “Cinematic Log Mode” et `static/cinematicLogMode.js` ont été supprimés le 2026‑01‑21 pour alléger l’UI. Les panneaux utilisent désormais le thème standard Timeline Connectée défini dans `static/css/components/logs.css`.
+- **Auto-scroll structurel** : le centrage des étapes est géré automatiquement par `scrollManager` et `sequenceManager` (spacer dédié, throttling 700 ms, prise en compte de la topbar). Il n’existe plus de réglage utilisateur pour activer/désactiver cette fonctionnalité.
+- **Accessibilité** : les animations suivent `prefers-reduced-motion`; aucun attribut `data-cinematic-mode` n’est injecté. Les captures destinées à la documentation reflètent donc toujours le rendu par défaut.
 
 ### Gestion des Environnements
 

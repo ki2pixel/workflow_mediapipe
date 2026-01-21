@@ -10,6 +10,15 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-21 20:05:00+01:00: Frontend — Retrait des toggles “Logs Cinématiques” & “Défilement Auto”
+- **Décision** : Supprimer les contrôles UI “Logs Cinématiques” et “📜 Défilement Auto” devenus redondants depuis l’achèvement de Timeline Connectée (auto-scroll structurel géré par `scrollManager`/`sequenceManager`).
+- **Raison** : Ces toggles n’étaient plus branchés sur une logique active et maintenaient du code mort (DOM, JS, CSS). Ils alourdissaient les bundles et rendaient l’UI confuse alors que l’autoscroll et les effets logs sont désormais automatiques.
+- **Implémentation** :
+  - Retrait des blocs HTML dans `templates/index_new.html`.
+  - Nettoyage des modules frontend (`static/main.js`, `static/eventHandlers.js`, `static/domElements.js`) pour enlever imports et handlers associés.
+  - Suppression des assets exclusifs (`static/cinematicLogMode.js`, `static/css/features/cinematic-logs.css`).
+- **Impact** : Allègement visuel et technique, réduction du coût de chargement, cohérence renforcée avec Timeline Connectée. Aucun impact fonctionnel (features déjà inactives).
+
 ## 2026-01-21 18:05:00+01:00: Frontend — Optimisations Audit 🟡 Priorité Moyenne (structuredClone + lazy DOM)
 - **Décision** : Implémenter les recommandations de l'audit `AUDIT_FRONTEND_2026_01_21.md` section "🟡 Priorité Moyenne (Optimisations)" pour améliorer les performances et la robustesse du frontend.
 - **Raison** : L'audit identifiait deux goulots d'étranglement : (1) `_deepClone` manuel dans `AppState` moins performant que `structuredClone` natif, et (2) accès DOM statique dans `domElements.js` pouvant causer des erreurs si le DOM n'est pas prêt.

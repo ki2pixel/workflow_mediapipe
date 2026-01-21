@@ -4,6 +4,11 @@
 
 Ce document résume les mises à jour apportées à la documentation pour refléter les optimisations v4.1 incluant les améliorations de progression, le mode CPU-only pour le tracking, et les optimisations audio ffmpeg.
 
+## 2026-01-21 — Retrait des toggles “Logs Cinématiques” & “Auto-scroll” (COMPLET)
+- ✅ **GUIDE_DEMARRAGE_RAPIDE.md** : Remplacement de la section “Cinematic Log Mode” par un paragraphe “Logs — rendu et auto-scroll” détaillant la disparition du toggle, l’auto-scroll structurel (`scrollManager`/`sequenceManager`) et l’alignement accessibilité.
+- ✅ **ARCHITECTURE_COMPLETE_FR.md** : Section “Logs Panel — Theme & Auto-scroll” mise à jour pour noter la suppression de `static/cinematicLogMode.js`, l’absence d’attributs `data-cinematic-mode` et le comportement auto-scroll sans réglage utilisateur.
+- 📌 **Décision associée** : Voir `memory-bank/decisionLog.md` (entrée du 2026‑01‑21 20:05:00) confirmant que ces toggles étaient du code mort depuis Timeline Connectée.
+
 ## 2026-01-20 — Audit Logs Panel — Phase 2 (Intégration Timeline-Logs) (COMPLET)
 - ✅ **Header contextuel** : Étape/statut/timer dans le panneau logs
 - ✅ **Boutons globaux** : Conteneur unifié pour "logs spécifiques"

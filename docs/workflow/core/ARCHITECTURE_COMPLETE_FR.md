@@ -709,14 +709,11 @@ domBatcher.batchUpdate(() => {
 - **Prévention des reflows** : Minimise les recalculs de layout
 - **Mesure de performance** : Métriques de temps d'exécution
 
-#### Cinematic Log Mode (`static/cinematicLogMode.js`)
+#### Logs Panel — Theme & Auto-scroll
 
-- **Objectif** : proposer un rendu “Matrix-style” optionnel pour les panneaux de logs (Logs Panel global, logs spécifiques, Step Details overlay) sans impacter la logique métier.
-- **Activation** : toggle « Cinematic » dans les Settings (checkbox `#cinematic-mode-toggle` au sein de `.cinematic-toggle-container`). L’état est stocké dans `localStorage` sous la clé `workflow-cinematic-logs`.
-- **Application** : à l’activation, tous les panneaux héritent de `class="log-panel"` et de l’attribut `data-cinematic-mode="true"` ; les effets visuels sont gérés dans `static/css/components/logs.css`.
-- **Événements** : le module publie `window.dispatchEvent(new CustomEvent('cinematicModeChanged', { detail: { enabled } }))` afin que les autres modules (Logs Panel Phase 2, StepDetailsPanel) puissent s’adapter (densité, animations).
-- **Réinitialisation** : désactiver le toggle ou exécuter `localStorage.removeItem('workflow-cinematic-logs')`.
-- **Accessibilité** : respecte `prefers-reduced-motion`; pour les captures officielles, désactiver ce mode afin de conserver le rendu standard.
+- **Mode cinématique retiré** : depuis le 2026‑01‑21, il n’existe plus de module `static/cinematicLogMode.js` ni de toggle associé. Tous les panneaux utilisent le thème Timeline Connectée (CSS `static/css/components/logs.css`).
+- **Animations & accessibilité** : les effets respectent `prefers-reduced-motion` et n’injectent plus d’attributs `data-cinematic-mode`.
+- **Auto-scroll structurel** : `scrollManager` et `sequenceManager` gèrent automatiquement le centrage vertical (spacer dédié, throttling 700 ms, compensation topbar) sans réglage utilisateur.
 
 #### Cache-busting CSS (v4.1)
 

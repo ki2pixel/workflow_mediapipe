@@ -5,7 +5,7 @@ import { runStepSequence } from './sequenceManager.js';
 import { defaultSequenceableStepsKeys } from './constants.js';
 import { showNotification } from './utils.js';
 import { openPopupUI, closePopupUI, showCustomSequenceConfirmUI } from './popupManager.js';
-import { scrollToStepImmediate, setAutoScrollEnabled, isAutoScrollEnabled } from './scrollManager.js';
+import { scrollToStepImmediate } from './scrollManager.js';
 import { soundEvents } from './soundManager.js';
 import { appState } from './state/AppState.js';
 
@@ -22,12 +22,31 @@ function setSelectedStepsOrder(order) {
     appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
 }
 
+function resolveElement(getterFn, legacyValue = null) {
+    if (typeof getterFn === 'function') {
+        try {
+            return getterFn();
+        } catch (_) {
+            return legacyValue;
+        }
+    }
+    return legacyValue;
+}
+
+function resolveCollection(getterFn, legacyValue = null) {
+    const resolved = resolveElement(getterFn, legacyValue);
+    if (!resolved) return [];
+    return Array.from(resolved);
+}
+
 export function initializeEventHandlers() {
-    if (dom.getCloseLogPanelButton()) {
-        dom.getCloseLogPanelButton().addEventListener('click', ui.closeLogPanelUI);
+    const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
+    if (closeLogButton) {
+        closeLogButton.addEventListener('click', ui.closeLogPanelUI);
     }
 
-    dom.allRunButtons.forEach(button => {
+    const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
+    runButtons.forEach(button => {
         button.addEventListener('click', async () => {
             try {
                 if (getIsAnySequenceRunning()) {
@@ -36,7 +55,8 @@ export function initializeEventHandlers() {
                 }
                 const stepKey = button.dataset.step;
                 ui.updateMainLogOutputUI('');
-                dom.specificLogContainerPanel.style.display = 'none';
+                const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+                if (specificLogContainer) specificLogContainer.style.display = 'none';
                 ui.openLogPanelUI(stepKey);
 
                 // Scroll to the step immediately when manually triggered
@@ -53,7 +73,8 @@ export function initializeEventHandlers() {
         });
     });
 
-    dom.allCancelButtons.forEach(button => {
+    const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
+    cancelButtons.forEach(button => {
         button.addEventListener('click', async () => {
             try {
                 const stepKey = button.dataset.step;
@@ -65,12 +86,14 @@ export function initializeEventHandlers() {
         });
     });
 
-    dom.allSpecificLogButtons.forEach(button => {
+    const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
+    specificLogButtons.forEach(button => {
         button.addEventListener('click', async () => {
             const stepKey = button.dataset.step;
             const logIndex = button.dataset.logIndex;
+            const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
 
-            if (!dom.workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
+            if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
                 ui.openLogPanelUI(stepKey);
                 try {
                     const statusResponse = await fetch(`/status/${stepKey}`);
@@ -87,8 +110,9 @@ export function initializeEventHandlers() {
         });
     });
 
-    if (dom.runAllButton) {
-        dom.runAllButton.addEventListener('click', async () => {
+    const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+    if (runAllButton) {
+        runAllButton.addEventListener('click', async () => {
             if (getIsAnySequenceRunning()) {
                 showNotification("Séquence déjà en cours.", 'warning'); return;
             }
@@ -98,7 +122,8 @@ export function initializeEventHandlers() {
         });
     }
 
-    dom.customSequenceCheckboxes.forEach(checkbox => {
+    const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+    customSequenceCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', (event) => {
             const stepKey = event.target.dataset.stepKey;
             const stepCard = document.getElementById(`step-${stepKey}`);
@@ -119,7 +144,7 @@ export function initializeEventHandlers() {
                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
             }
             setSelectedStepsOrder(currentOrder);
-            document.querySelectorAll('.step-selection-order-number').forEach(el => el.textContent = '');
+            document.querySelectorAll('.step-selection-order-number').forEach(el => { el.textContent = ''; });
             getSelectedStepsOrder().forEach((sk, idx) => {
                 const orderEl = document.getElementById(`order-${sk}`);
                 if (orderEl) orderEl.textContent = idx + 1;
@@ -128,10 +153,11 @@ export function initializeEventHandlers() {
         });
     });
 
-    if (dom.clearCustomSequenceButton) {
-        dom.clearCustomSequenceButton.addEventListener('click', () => {
+    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+    if (clearCustomSequenceButton) {
+        clearCustomSequenceButton.addEventListener('click', () => {
             setSelectedStepsOrder([]);
-            dom.customSequenceCheckboxes.forEach(cb => {
+            customSequenceCheckboxes.forEach(cb => {
                 cb.checked = false;
                 const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
@@ -142,8 +168,9 @@ export function initializeEventHandlers() {
         });
     }
 
-    if (dom.runCustomSequenceButton) {
-        dom.runCustomSequenceButton.addEventListener('click', () => {
+    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+    if (runCustomSequenceButton) {
+        runCustomSequenceButton.addEventListener('click', () => {
             if (getSelectedStepsOrder().length === 0) {
                 showNotification("Veuillez sélectionner au moins une étape.", 'warning');
                 return;
@@ -155,37 +182,42 @@ export function initializeEventHandlers() {
         });
     }
 
-    if (dom.confirmRunCustomSequenceButton) {
-        dom.confirmRunCustomSequenceButton.addEventListener('click', async () => {
-            closePopupUI(dom.customSequenceConfirmPopupOverlay);
+    const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
+    const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
+    if (confirmRunCustomSequenceButton) {
+        confirmRunCustomSequenceButton.addEventListener('click', async () => {
+            closePopupUI(customSequenceConfirmOverlay);
             if (getIsAnySequenceRunning()) {
                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
             }
             // Loading state on confirm button and disable run-custom while executing
             try {
-                dom.confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
-                dom.confirmRunCustomSequenceButton.disabled = true;
-                if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = true;
+                confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
+                confirmRunCustomSequenceButton.disabled = true;
+                if (runCustomSequenceButton) runCustomSequenceButton.disabled = true;
 
                 // Play workflow start sound for custom sequence
                 soundEvents.workflowStart();
                 await runStepSequence(getSelectedStepsOrder(), "Séquence Personnalisée");
             } finally {
-                dom.confirmRunCustomSequenceButton.removeAttribute('data-loading');
-                dom.confirmRunCustomSequenceButton.disabled = false;
-                if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = getIsAnySequenceRunning();
+                confirmRunCustomSequenceButton.removeAttribute('data-loading');
+                confirmRunCustomSequenceButton.disabled = false;
+                if (runCustomSequenceButton) runCustomSequenceButton.disabled = getIsAnySequenceRunning();
             }
         });
     }
 
-    if (dom.cancelRunCustomSequenceButton) {
-        dom.cancelRunCustomSequenceButton.addEventListener('click', () => {
-            closePopupUI(dom.customSequenceConfirmPopupOverlay);
+    const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
+    if (cancelRunCustomSequenceButton) {
+        cancelRunCustomSequenceButton.addEventListener('click', () => {
+            closePopupUI(customSequenceConfirmOverlay);
         });
     }
-    if (dom.closeSummaryPopupButton) {
-        dom.closeSummaryPopupButton.addEventListener('click', () => {
-            closePopupUI(dom.sequenceSummaryPopupOverlay);
+    const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
+    const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
+    if (closeSummaryPopupButton) {
+        closeSummaryPopupButton.addEventListener('click', () => {
+            closePopupUI(sequenceSummaryOverlay);
         });
     }
 
@@ -201,25 +233,6 @@ export function initializeEventHandlers() {
     // --- DELETION END ---
 
 
-
-    // Auto-scroll toggle event handler
-    if (dom.getAutoScrollToggle()) {
-        // Initialize the toggle state from localStorage
-        const isEnabled = isAutoScrollEnabled();
-        dom.getAutoScrollToggle().checked = isEnabled;
-        if (dom.getAutoScrollStatus()) {
-            dom.getAutoScrollStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
-        }
-
-        dom.getAutoScrollToggle().addEventListener('change', (event) => {
-            const enabled = event.target.checked;
-            setAutoScrollEnabled(enabled);
-            if (dom.getAutoScrollStatus()) {
-                dom.getAutoScrollStatus().textContent = enabled ? 'Activé' : 'Désactivé';
-            }
-            console.log(`[EVENT] Auto-scroll ${enabled ? 'enabled' : 'disabled'} by user`);
-        });
-    }
 
     // Sound control toggle event handler
     if (dom.getSoundToggle()) {

@@ -7,7 +7,7 @@ import { showNotification } from './utils.js';
 
 window.showNotification = showNotification;
 import { showSequenceSummaryUI } from './popupManager.js';
-import { scrollToStepImmediate, setAutoScrollEnabled } from './scrollManager.js';
+import { scrollToStepImmediate } from './scrollManager.js';
 
 import { initializeSoundManager } from './soundManager.js';
 import { pollingManager } from './utils/PollingManager.js';
@@ -19,7 +19,6 @@ import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
 import { appState } from './state/AppState.js';
 import { initializeCSVDownloadMonitor } from './csvDownloadMonitor.js';
 import { themeManager } from './themeManager.js';
-import { cinematicLogMode } from './cinematicLogMode.js';
 import { reportViewer } from './reportViewer.js';
 import { fetchWithLoadingState } from './apiService.js';
 
@@ -407,9 +406,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize theme system
     themeManager.init();
 
-    // Initialize cinematic log mode
-    cinematicLogMode.init();
-
     if (document.getElementById('report-overlay')) {
         reportViewer.init();
     }
@@ -501,7 +497,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupCompactMode() {
-    const wrapper = dom.workflowWrapper;
+    const wrapper = typeof dom.getWorkflowWrapper === 'function'
+        ? dom.getWorkflowWrapper()
+        : dom.workflowWrapper;
     if (!wrapper) {
         console.warn('[COMPACT] Wrapper not found, skipping setup');
         return;

@@ -34,6 +34,25 @@ export function setStepsConfig(config) {
     STEPS_CONFIG_FROM_SERVER = config;
 }
 
+function getWorkflowWrapperElement() {
+    return typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
+}
+
+function getLogsColumnElement() {
+    return typeof dom.getLogsColumnGlobal === 'function' ? dom.getLogsColumnGlobal() : dom.logsColumnGlobal;
+}
+
+function resolveElement(getterFn, legacyValue = null) {
+    if (typeof getterFn === 'function') {
+        try {
+            return getterFn();
+        } catch (_) {
+            return legacyValue || null;
+        }
+    }
+    return legacyValue || null;
+}
+
 function getIsAnySequenceRunning() {
     return !!appState.getStateProperty('isAnySequenceRunning');
 }
@@ -81,7 +100,7 @@ function deleteStepTimer(stepKey) {
 }
 
 function onWrapperTransitionEndOnce(callback, fallbackMs = 500) {
-    const el = dom.workflowWrapper;
+    const el = getWorkflowWrapperElement();
     if (!el) { callback(); return; }
     let called = false;
     const handler = (e) => {
@@ -149,19 +168,23 @@ function updateLogPanelContextUI(stepKey) {
     const statusEl = stepKey ? document.getElementById(`status-${stepKey}`) : null;
     const timerEl = stepKey ? document.getElementById(`timer-${stepKey}`) : null;
 
-    if (dom.logPanelContextStep) {
-        dom.logPanelContextStep.textContent = stepKey ? displayName : 'Aucune étape active';
+    const contextStepEl = resolveElement(dom.getLogPanelContextStep, dom.logPanelContextStep);
+    const contextStatusEl = resolveElement(dom.getLogPanelContextStatus, dom.logPanelContextStatus);
+    const contextTimerEl = resolveElement(dom.getLogPanelContextTimer, dom.logPanelContextTimer);
+
+    if (contextStepEl) {
+        contextStepEl.textContent = stepKey ? displayName : 'Aucune étape active';
     }
-    if (dom.logPanelContextStatus) {
-        dom.logPanelContextStatus.textContent = statusEl ? (statusEl.textContent || '') : '';
+    if (contextStatusEl) {
+        contextStatusEl.textContent = statusEl ? (statusEl.textContent || '') : '';
     }
-    if (dom.logPanelContextTimer) {
-        dom.logPanelContextTimer.textContent = timerEl ? (timerEl.textContent || '') : '';
+    if (contextTimerEl) {
+        contextTimerEl.textContent = timerEl ? (timerEl.textContent || '') : '';
     }
 }
 
 function clearLogPanelSpecificButtons() {
-    const container = dom.logPanelSpecificButtonsContainer;
+    const container = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
     if (!container) return;
 
     while (container.firstChild) {
@@ -171,8 +194,10 @@ function clearLogPanelSpecificButtons() {
 
 function positionLogsPanelNearActiveStep(stepKey) {
     if (!stepKey) return;
-    if (!dom.workflowWrapper || !dom.logsColumnGlobal) return;
-    if (!dom.workflowWrapper.classList.contains('compact-mode')) return;
+    const workflowWrapper = getWorkflowWrapperElement();
+    const logsColumn = getLogsColumnElement();
+    if (!workflowWrapper || !logsColumn) return;
+    if (!workflowWrapper.classList.contains('compact-mode')) return;
 
     const activeStepElement = document.getElementById(`step-${stepKey}`);
     if (!activeStepElement || typeof activeStepElement.getBoundingClientRect !== 'function') return;
@@ -185,8 +210,8 @@ function positionLogsPanelNearActiveStep(stepKey) {
     const maxTop = Math.max(minTop, (window.innerHeight || 800) - minHeight - bottomPadding);
     const targetTop = Math.max(minTop, Math.min(Math.round(rect.top), maxTop));
 
-    dom.logsColumnGlobal.style.top = `${targetTop}px`;
-    dom.logsColumnGlobal.style.height = `${Math.max(minHeight, (window.innerHeight || 800) - targetTop - bottomPadding)}px`;
+    logsColumn.style.top = `${targetTop}px`;
+    logsColumn.style.height = `${Math.max(minHeight, (window.innerHeight || 800) - targetTop - bottomPadding)}px`;
 }
 
 function updateStepStateChip(stepKey, status) {
@@ -270,11 +295,16 @@ export function resetStepTimerDisplay(stepKey) {
 }
 
 export function updateGlobalUIForSequenceState(isRunning) {
-    if (dom.runAllButton) dom.runAllButton.disabled = isRunning;
-    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
-    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+    const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+    const customSequenceCheckboxes = resolveElement(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes) || [];
 
-    dom.customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
+    if (runAllButton) runAllButton.disabled = isRunning;
+    if (runCustomSequenceButton) runCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+    if (clearCustomSequenceButton) clearCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+
+    customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
 
     Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
         const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
@@ -306,7 +336,8 @@ export function setActiveStepForLogPanelUI(stepKey) {
         if (activeStepElement) {
             activeStepElement.classList.add('active-for-log-panel');
 
-            const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
+            const workflowWrapper = getWorkflowWrapperElement();
+            const logsOpen = workflowWrapper && workflowWrapper.classList.contains('logs-active');
             if (logsOpen) {
                 hideNonActiveSteps(stepKey, true);
             }
@@ -325,11 +356,14 @@ export function setActiveStepForLogPanelUI(stepKey) {
         const displayName = stepConfig ? stepConfig.display_name : stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         console.log(`[UI] setActiveStepForLogPanelUI, displayName for logs: ${displayName}`);
 
-        if(dom.logPanelTitle) dom.logPanelTitle.textContent = `Logs: ${displayName}`;
-        if(dom.currentStepLogNamePanel) dom.currentStepLogNamePanel.textContent = displayName;
+        const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
+        const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
+        if(logPanelTitle) logPanelTitle.textContent = `Logs: ${displayName}`;
+        if(currentStepLogName) currentStepLogName.textContent = displayName;
         updateLogPanelContextUI(stepKey);
 
-        if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && dom.logPanelSpecificButtonsContainer) {
+        const buttonsContainer = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
+        if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && buttonsContainer) {
             stepConfig.specific_logs.forEach((logConf, index) => {
                 const button = document.createElement('button');
                 button.className = 'specific-log-button';
@@ -340,12 +374,14 @@ export function setActiveStepForLogPanelUI(stepKey) {
                     const apiModule = await import('./apiService.js');
                     await apiModule.fetchSpecificLogAPI(stepKey, index, logConf.name);
                 });
-                dom.logPanelSpecificButtonsContainer.appendChild(button);
+                buttonsContainer.appendChild(button);
             });
         }
     } else {
-        if(dom.logPanelTitle) dom.logPanelTitle.textContent = "Logs";
-        if(dom.currentStepLogNamePanel) dom.currentStepLogNamePanel.textContent = "Aucune étape active";
+        const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
+        const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
+        if(logPanelTitle) logPanelTitle.textContent = "Logs";
+        if(currentStepLogName) currentStepLogName.textContent = "Aucune étape active";
         updateLogPanelContextUI(null);
     }
 }
@@ -357,12 +393,16 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
     const stepConfig = getStepsConfig()[stepKeyToFocus];
     const displayName = stepConfig ? (stepConfig.display_name || stepKeyToFocus) : stepKeyToFocus;
 
-    if (dom.mainLogOutputPanel) {
-        dom.mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
+    const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+    const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+    const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+
+    if (mainLogOutputPanel) {
+        mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
     }
 
-    if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'flex';
-    if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
+    if(mainLogContainer) mainLogContainer.style.display = 'flex';
+    if(specificLogContainer) specificLogContainer.style.display = 'none';
 
     try {
         const response = await fetch(`/status/${stepKeyToFocus}`);
@@ -374,7 +414,7 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
         setProcessInfo(stepKeyToFocus, { ...(getProcessInfo(stepKeyToFocus) || {}), ...data });
         console.log(`[UI] fetchAndDisplayLogsForPanel - response for: ${stepKeyToFocus}, Log content length: ${data.log ? data.log.length : 'N/A'}`);
 
-        if (getActiveStepKeyForLogs() === stepKeyToFocus) {
+        if (getActiveStepKeyForLogs() === stepKeyToFocus && mainLogOutputPanel) {
             console.log(`[UI] fetchAndDisplayLogsForPanel - Updating main log for ${stepKeyToFocus} with ${data.log ? data.log.length : 0} lines.`);
             updateMainLogOutputUI(data.log.join(''));
         } else {
@@ -382,26 +422,33 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
         }
     } catch (error) {
         console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
-        if (getActiveStepKeyForLogs() === stepKeyToFocus && dom.mainLogOutputPanel) {
-            dom.mainLogOutputPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
+        const logPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+        if (getActiveStepKeyForLogs() === stepKeyToFocus && logPanel) {
+            logPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
         }
     }
 }
 
 export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
+    const workflowWrapper = getWorkflowWrapperElement();
+    if (!workflowWrapper) {
+        console.warn('[UI] openLogPanelUI aborted: workflow wrapper missing.');
+        return;
+    }
+
     const currentActiveLogStep = getActiveStepKeyForLogs();
-    const isPanelOpen = dom.workflowWrapper.classList.contains('logs-active');
+    const isPanelOpen = workflowWrapper.classList.contains('logs-active');
     console.log(`[UI] openLogPanelUI called for: ${stepKeyToFocus}, forceOpen: ${forceOpen}, currentActive: ${currentActiveLogStep}, isPanelOpen: ${isPanelOpen}`);
 
     if (forceOpen) {
         console.log(`[UI] Forcing panel open/update for ${stepKeyToFocus}`);
-        dom.workflowWrapper.classList.add('logs-entering');
+        workflowWrapper.classList.add('logs-entering');
         setActiveStepForLogPanelUI(stepKeyToFocus);
         hideNonActiveSteps(stepKeyToFocus, true);
         requestAnimationFrame(() => {
-            dom.workflowWrapper.classList.add('logs-active');
+            workflowWrapper.classList.add('logs-active');
             onWrapperTransitionEndOnce(() => {
-                dom.workflowWrapper.classList.remove('logs-entering');
+                workflowWrapper.classList.remove('logs-entering');
             }, 500);
         });
         positionLogsPanelNearActiveStep(stepKeyToFocus);
@@ -425,13 +472,13 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
     }
 
     console.log(`[UI] Opening panel for ${stepKeyToFocus} (or was closed/open for null).`);
-    dom.workflowWrapper.classList.add('logs-entering');
+    workflowWrapper.classList.add('logs-entering');
     setActiveStepForLogPanelUI(stepKeyToFocus);
     hideNonActiveSteps(stepKeyToFocus, true);
     requestAnimationFrame(() => {
-        dom.workflowWrapper.classList.add('logs-active');
+        workflowWrapper.classList.add('logs-active');
         onWrapperTransitionEndOnce(() => {
-            dom.workflowWrapper.classList.remove('logs-entering');
+            workflowWrapper.classList.remove('logs-entering');
         }, 500);
     });
     positionLogsPanelNearActiveStep(stepKeyToFocus);
@@ -439,28 +486,48 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
 }
 
 export function closeLogPanelUI() {
-    console.log('[CLOSE_LOG] Starting closeLogPanelUI, current classes:', dom.workflowWrapper.className);
-    dom.workflowWrapper.classList.add('logs-leaving');
-    console.log('[CLOSE_LOG] Added logs-leaving class, new classes:', dom.workflowWrapper.className);
+    const workflowWrapper = getWorkflowWrapperElement();
+    if (!workflowWrapper) {
+        console.warn('[CLOSE_LOG] Workflow wrapper missing; aborting close sequence.');
+        setActiveStepForLogPanelUI(null);
+        const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+        const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+        if (mainLogOutputPanel) mainLogOutputPanel.textContent = "";
+        if (specificLogContainer) specificLogContainer.style.display = 'none';
+        const logsColumn = getLogsColumnElement();
+        if (logsColumn) {
+            logsColumn.style.removeProperty('top');
+            logsColumn.style.removeProperty('height');
+        }
+        clearLogPanelSpecificButtons();
+        return;
+    }
+
+    console.log('[CLOSE_LOG] Starting closeLogPanelUI, current classes:', workflowWrapper.className);
+    workflowWrapper.classList.add('logs-leaving');
+    console.log('[CLOSE_LOG] Added logs-leaving class, new classes:', workflowWrapper.className);
 
     requestAnimationFrame(() => {
-        console.log('[CLOSE_LOG] In RAF, removing logs-active class, current classes:', dom.workflowWrapper.className);
-        dom.workflowWrapper.classList.remove('logs-active');
+        console.log('[CLOSE_LOG] In RAF, removing logs-active class, current classes:', workflowWrapper.className);
+        workflowWrapper.classList.remove('logs-active');
 
         onWrapperTransitionEndOnce(() => {
-            console.log('[CLOSE_LOG] Cleanup - removing logs-leaving class, current classes:', dom.workflowWrapper.className);
-            dom.workflowWrapper.classList.remove('logs-leaving');
+            console.log('[CLOSE_LOG] Cleanup - removing logs-leaving class, current classes:', workflowWrapper.className);
+            workflowWrapper.classList.remove('logs-leaving');
             hideNonActiveSteps(null, false);
         }, 500);
     });
 
     setActiveStepForLogPanelUI(null);
-    if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.textContent = "";
-    if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
+    const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+    const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+    if(mainLogOutputPanel) mainLogOutputPanel.textContent = "";
+    if(specificLogContainer) specificLogContainer.style.display = 'none';
 
-    if (dom.logsColumnGlobal) {
-        dom.logsColumnGlobal.style.removeProperty('top');
-        dom.logsColumnGlobal.style.removeProperty('height');
+    const logsColumn = getLogsColumnElement();
+    if (logsColumn) {
+        logsColumn.style.removeProperty('top');
+        logsColumn.style.removeProperty('height');
     }
     clearLogPanelSpecificButtons();
 }
@@ -481,6 +548,7 @@ export function updateStepCardUI(stepKey, data) {
             const statusEl = document.getElementById(`status-${stepKey}`);
             const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
             const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+            const workflowWrapper = getWorkflowWrapperElement();
 
             const normalizedStatus = normalizeStatus(data.status || 'idle');
             const statusMeta = getStatusMeta(normalizedStatus);
@@ -503,7 +571,7 @@ export function updateStepCardUI(stepKey, data) {
                 cancelButton.disabled = !isCurrentlyRunningOrStarting;
             }
 
-            const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
+            const logsOpen = workflowWrapper && workflowWrapper.classList.contains('logs-active');
             if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
                 if (getActiveStepKeyForLogs() !== stepKey) {
                     setActiveStepForLogPanelUI(stepKey);
@@ -599,7 +667,7 @@ export function updateStepCardUI(stepKey, data) {
 
                     const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
                     if (shouldAutoCenter) {
-                        const logsOpenNow = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
+                        const logsOpenNow = workflowWrapper && workflowWrapper.classList.contains('logs-active');
                         if (!logsOpenNow) {
                             const now = performance.now();
                             const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
@@ -710,17 +778,17 @@ export function updateStepCardUI(stepKey, data) {
             }
 
             const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
-            if (dom.workflowWrapper) {
+            if (workflowWrapper) {
                 if (anyRunning) {
-                    dom.workflowWrapper.classList.add('any-step-running');
+                    workflowWrapper.classList.add('any-step-running');
                     if (['running','starting','initiated'].includes(data.status)) {
-                        dom.workflowWrapper.setAttribute('data-active-step', stepKey);
+                        workflowWrapper.setAttribute('data-active-step', stepKey);
                     } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
-                        dom.workflowWrapper.removeAttribute('data-active-step');
+                        workflowWrapper.removeAttribute('data-active-step');
                     }
                 } else {
-                    dom.workflowWrapper.classList.remove('any-step-running');
-                    dom.workflowWrapper.removeAttribute('data-active-step');
+                    workflowWrapper.classList.remove('any-step-running');
+                    workflowWrapper.removeAttribute('data-active-step');
                 }
             }
 
@@ -768,20 +836,26 @@ export function updateGlobalProgressUI(text, percentage, isError = false) {
 
 export function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
     domBatcher.scheduleUpdate('specific-log-ui', () => {
-        if(dom.specificLogHeaderTextPanel) dom.specificLogHeaderTextPanel.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
-        if(dom.specificLogPathInfoPanel) dom.specificLogPathInfoPanel.textContent = path ? `(Source: ${path})` : "";
+        const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
+        const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
+        const outputContent = resolveElement(dom.getSpecificLogOutputContentPanel, dom.specificLogOutputContentPanel);
+        const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+        const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+
+        if(headerText) headerText.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
+        if(pathInfo) pathInfo.textContent = path ? `(Source: ${path})` : "";
         if (isError) {
-            if(dom.specificLogOutputContentPanel) {
+            if(outputContent) {
                 const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
-                dom.specificLogOutputContentPanel.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
+                outputContent.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
             }
         } else {
-const styledContent = parseAndStyleLogContent(content);
-            if(dom.specificLogOutputContentPanel) dom.specificLogOutputContentPanel.innerHTML = styledContent;
+            const styledContent = parseAndStyleLogContent(content);
+            if(outputContent) outputContent.innerHTML = styledContent;
         }
-        if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'flex';
-        if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'none';
-        if(dom.specificLogOutputContentPanel) dom.specificLogOutputContentPanel.scrollTop = 0;
+        if(specificLogContainer) specificLogContainer.style.display = 'flex';
+        if(mainLogContainer) mainLogContainer.style.display = 'none';
+        if(outputContent) outputContent.scrollTop = 0;
     });
 }
 

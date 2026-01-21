@@ -129,11 +129,6 @@ export const localDownloadsList = document.getElementById('local-downloads-list'
 
 
 
-// ÉLÉMENTS POUR LE CONTRÔLE AUTO-SCROLL
-export const autoScrollToggle = document.getElementById('auto-scroll-toggle');
-export const autoScrollStatus = document.getElementById('auto-scroll-status');
-export const autoScrollWidget = document.getElementById('auto-scroll-widget');
-
 // ÉLÉMENTS POUR LE CONTRÔLE SONORE
 export const soundToggle = document.getElementById('sound-toggle');
 export const soundStatus = document.getElementById('sound-status');
@@ -147,11 +142,6 @@ export const settingsPanel = document.getElementById('settings-panel');
 // New getter functions for lazy DOM access
 export const getCloseLogPanelButton = () => byId('close-log-panel');
 export const getLocalDownloadsList = () => byId('local-downloads-list');
-
-// ÉLÉMENTS POUR LE CONTRÔLE AUTO-SCROLL
-export const getAutoScrollToggle = () => byId('auto-scroll-toggle');
-export const getAutoScrollStatus = () => byId('auto-scroll-status');
-export const getAutoScrollWidget = () => byId('auto-scroll-widget');
 
 // ÉLÉMENTS POUR LE CONTRÔLE SONORE
 export const getSoundToggle = () => byId('sound-toggle');

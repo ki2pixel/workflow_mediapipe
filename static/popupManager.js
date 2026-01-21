@@ -107,15 +107,26 @@ export function closePopupUI(popupOverlay) {
     appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_clear');
 }
 
+function resolveSequenceSummaryElements() {
+    const overlay = typeof dom.getSequenceSummaryPopupOverlay === 'function'
+        ? dom.getSequenceSummaryPopupOverlay()
+        : dom.sequenceSummaryPopupOverlay;
+    const list = typeof dom.getSequenceSummaryList === 'function'
+        ? dom.getSequenceSummaryList()
+        : dom.sequenceSummaryList;
+    return { overlay, list };
+}
+
 export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "Séquence", overallDuration = null) {
-    if (!dom.sequenceSummaryList || !dom.sequenceSummaryPopupOverlay) {
+    const { overlay, list } = resolveSequenceSummaryElements();
+    if (!overlay || !list) {
         console.error("Éléments DOM pour la popup de résumé non trouvés!");
         return;
     }
-    const summaryTitle = dom.sequenceSummaryPopupOverlay.querySelector("h3");
+    const summaryTitle = overlay.querySelector("h3");
     if (summaryTitle) summaryTitle.textContent = `Résumé: ${sequenceName}`;
 
-    dom.sequenceSummaryList.innerHTML = '';
+    list.innerHTML = '';
     if (overallDuration && typeof overallDuration === 'string') {
         const totalItem = document.createElement('li');
         totalItem.style.fontWeight = 'bold';
@@ -124,7 +135,7 @@ export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "S
         totalItem.style.borderBottom = `1px solid var(--border-color)`;
         const safeDuration = DOMUpdateUtils.escapeHtml(overallDuration);
         totalItem.innerHTML = `<span class="status-icon" style="color:var(--accent-color);">⏱️</span> Durée totale: ${safeDuration}`;
-        dom.sequenceSummaryList.appendChild(totalItem);
+        list.appendChild(totalItem);
     }
     results.forEach(result => {
         const listItem = document.createElement('li');
@@ -133,7 +144,7 @@ export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "S
         const safeDurationText = result.duration && result.duration !== "N/A" ? DOMUpdateUtils.escapeHtml(String(result.duration)) : "";
         const durationText = safeDurationText ? `<span class="duration">(${safeDurationText})</span>` : "";
         listItem.innerHTML = `${icon} ${safeName}: ${result.success ? 'Terminée avec succès' : 'Échouée ou annulée'} ${durationText}`;
-        dom.sequenceSummaryList.appendChild(listItem);
+        list.appendChild(listItem);
     });
 
     const overallStatusItem = document.createElement('li');
@@ -147,8 +158,8 @@ export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "S
     } else {
         overallStatusItem.innerHTML = `<span class="status-icon status-failed" style="color:var(--red);">⚠️</span> ${safeSequenceName} a rencontré une ou plusieurs erreurs.`;
     }
-    dom.sequenceSummaryList.appendChild(overallStatusItem);
-    openPopupUI(dom.sequenceSummaryPopupOverlay);
+    list.appendChild(overallStatusItem);
+    openPopupUI(overlay);
 }
 
 export function showCustomSequenceConfirmUI() {

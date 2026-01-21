@@ -223,6 +223,21 @@ class PollingManager {
     }
 
     /**
+     * Get summarized statistics for monitoring consumers (PerformanceMonitor).
+     *
+     * @returns {Object}
+     */
+    getStats() {
+        const ops = this.getActiveOperations();
+        return {
+            totalIntervals: ops.totalIntervals,
+            totalTimeouts: ops.totalTimeouts,
+            intervals: ops.intervals,
+            timeouts: ops.timeouts
+        };
+    }
+
+    /**
      * Destroy the polling manager and clean up all resources.
      */
     destroy() {

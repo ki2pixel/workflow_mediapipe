@@ -204,7 +204,8 @@ export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
 
             ui.updateStepCardUI(stepKey, data);
 
-            if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey && dom.workflowWrapper.classList.contains('logs-active')) {
+            const workflowWrapper = typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
+            if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey && workflowWrapper && workflowWrapper.classList.contains('logs-active')) {
                 ui.updateMainLogOutputUI(data.log.join(''));
             }
             const isTerminal = ['completed', 'failed'].includes(data.status);

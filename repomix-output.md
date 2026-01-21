@@ -87,7 +87,6 @@ static/
       widgets.css
       workflow-buttons.css
     features/
-      cinematic-logs.css
       reports.css
       responsive.css
       stats-dashboard.css
@@ -108,7 +107,6 @@ static/
     PerformanceOptimizer.js
     PollingManager.js
   apiService.js
-  cinematicLogMode.js
   constants.js
   csvDownloadMonitor.js
   csvWorkflowPrompt.js
@@ -2867,404 +2865,6 @@ def __getattr__(name: str) -> Any:
     if name == 'PerformanceService':
         return import_module('services.performance_service').PerformanceService
     raise AttributeError(f"module 'services' has no attribute {name!r}")
-```
-
-## File: services/cache_service.py
-```python
-"""
-Cache Service
-Centralized caching service for improved performance.
-"""
-
-import logging
-import json
-import time
-from functools import lru_cache, wraps
-from typing import Dict, Any, Optional, Callable
-from pathlib import Path
-from flask_caching import Cache
-
-from config.settings import config
-from services.workflow_state import get_workflow_state
-
-logger = logging.getLogger(__name__)
-
-# Global cache instance (will be initialized by Flask app)
-cache_instance: Optional[Cache] = None
-
-# Cache statistics
-cache_stats = {
-    "hits": 0,
-    "misses": 0,
-    "errors": 0,
-    "last_reset": time.time()
-}
-
-
-class CacheService:
-    """
-    Centralized caching service with performance tracking.
-    Provides intelligent caching for expensive operations.
-    """
-    
-    @staticmethod
-    def initialize(cache: Cache) -> None:
-        """
-        Initialize the cache service with Flask-Caching instance.
-        
-        Args:
-            cache: Flask-Caching instance
-        """
-        global cache_instance
-        cache_instance = cache
-        logger.info("Cache service initialized")
-    
-    @staticmethod
-    def get_cache_stats() -> Dict[str, Any]:
-        """
-        Get cache performance statistics.
-        
-        Returns:
-            Cache statistics dictionary
-        """
-        total_requests = cache_stats["hits"] + cache_stats["misses"]
-        hit_rate = (cache_stats["hits"] / total_requests * 100) if total_requests > 0 else 0
-        
-        return {
-            "hits": cache_stats["hits"],
-            "misses": cache_stats["misses"],
-            "errors": cache_stats["errors"],
-            "hit_rate_percent": round(hit_rate, 2),
-            "total_requests": total_requests,
-            "uptime_seconds": round(time.time() - cache_stats["last_reset"], 1)
-        }
-    
-    @staticmethod
-    def clear_cache() -> None:
-        """Clear all cached data."""
-        if cache_instance:
-            cache_instance.clear()
-            logger.info("Cache cleared")
-    
-    @staticmethod
-    def reset_stats() -> None:
-        """Reset cache statistics."""
-        global cache_stats
-        cache_stats = {
-            "hits": 0,
-            "misses": 0,
-            "errors": 0,
-            "last_reset": time.time()
-        }
-        logger.info("Cache statistics reset")
-    
-    @staticmethod
-    def cached_with_stats(timeout: int = 300, key_prefix: str = ""):
-        """
-        Decorator for caching with statistics tracking.
-        
-        Args:
-            timeout: Cache timeout in seconds
-            key_prefix: Prefix for cache keys
-            
-        Returns:
-            Decorator function
-        """
-        def decorator(func: Callable) -> Callable:
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                if not cache_instance:
-                    cache_stats["errors"] += 1
-                    return func(*args, **kwargs)
-                
-                # Generate cache key
-                cache_key = f"{key_prefix}:{func.__name__}:{hash(str(args) + str(kwargs))}"
-                
-                try:
-                    # Try to get from cache
-                    result = cache_instance.get(cache_key)
-                    if result is not None:
-                        cache_stats["hits"] += 1
-                        return result
-                    
-                    # Cache miss - execute function
-                    cache_stats["misses"] += 1
-                    result = func(*args, **kwargs)
-                    
-                    # Store in cache
-                    cache_instance.set(cache_key, result, timeout=timeout)
-                    return result
-                    
-                except Exception as e:
-                    cache_stats["errors"] += 1
-                    logger.error(f"Cache error for {func.__name__}: {e}")
-                    return func(*args, **kwargs)
-            
-            return wrapper
-        return decorator
-    
-    @staticmethod
-    @lru_cache(maxsize=128)
-    def get_video_metadata(video_path: str) -> Dict[str, Any]:
-        """
-        Get video metadata with caching to avoid repeated file reads.
-        
-        Args:
-            video_path: Path to video file
-            
-        Returns:
-            Video metadata dictionary
-        """
-        try:
-            import cv2
-            cap = cv2.VideoCapture(video_path)
-            try:
-                if not cap.isOpened():
-                    raise ValueError(f"Cannot open video: {video_path}")
-                
-                metadata = {
-                    'frame_count': int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
-                    'fps': cap.get(cv2.CAP_PROP_FPS),
-                    'width': int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                    'height': int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-                    'duration_seconds': None
-                }
-                
-                # Calculate duration
-                if metadata['fps'] > 0 and metadata['frame_count'] > 0:
-                    metadata['duration_seconds'] = metadata['frame_count'] / metadata['fps']
-                
-                return metadata
-            finally:
-                cap.release()
-                
-        except Exception as e:
-            logger.error(f"Video metadata error for {video_path}: {e}")
-            return {
-                'frame_count': 0,
-                'fps': 0,
-                'width': 0,
-                'height': 0,
-                'duration_seconds': None,
-                'error': str(e)
-            }
-    
-    @staticmethod
-    def get_cached_frontend_config() -> Dict[str, Any]:
-        """
-        Get cached frontend configuration.
-
-        Returns:
-            Frontend-safe configuration dictionary
-        """
-        try:
-            # Try to use cache if available
-            if cache_instance:
-                try:
-                    cached_result = cache_instance.get("frontend_config")
-                    if cached_result is not None:
-                        cache_stats["hits"] += 1
-                        logger.debug("Frontend config cache hit")
-                        return cached_result
-                except Exception as cache_error:
-                    logger.warning(f"Cache access failed, generating fresh config: {cache_error}")
-
-            # Generate fresh config
-            from config.workflow_commands import WorkflowCommandsConfig
-
-            commands_config = WorkflowCommandsConfig().get_config()
-            if not commands_config:
-                logger.error("WorkflowCommandsConfig is empty or not available")
-                cache_stats["errors"] += 1
-                return {}
-
-            result: Dict[str, Any] = {}
-            for step_key, step_data_orig in commands_config.items():
-                frontend_step_data: Dict[str, Any] = {}
-                for key, value in step_data_orig.items():
-                    if key == "progress_patterns":
-                        continue
-                    if isinstance(value, Path):
-                        frontend_step_data[key] = str(value)
-                    elif key == "cmd" and isinstance(value, list):
-                        frontend_step_data[key] = [str(item) for item in value]
-                    elif key == "specific_logs" and isinstance(value, list):
-                        safe_logs = []
-                        for log_entry in value:
-                            if not isinstance(log_entry, dict):
-                                continue
-                            safe_entry = log_entry.copy()
-                            if 'path' in safe_entry and isinstance(safe_entry['path'], Path):
-                                safe_entry['path'] = str(safe_entry['path'])
-                            safe_logs.append(safe_entry)
-                        frontend_step_data[key] = safe_logs
-                    else:
-                        frontend_step_data[key] = value
-                result[step_key] = frontend_step_data
-            logger.debug(f"Generated fresh frontend config with {len(result)} steps")
-
-            # Cache the result if cache is available
-            if cache_instance:
-                try:
-                    cache_instance.set("frontend_config", result, timeout=300)
-                    cache_stats["misses"] += 1
-                    logger.debug("Frontend config cached successfully")
-                except Exception as cache_error:
-                    logger.warning(f"Failed to cache frontend config: {cache_error}")
-
-            return result
-        except Exception as e:
-            logger.error(f"Frontend config cache error: {e}")
-            cache_stats["errors"] += 1
-            return {}
-    
-    @staticmethod
-    def get_cached_log_content(step_key: str, log_index: int) -> Dict[str, Any]:
-        """
-        Get cached log file content.
-
-        Args:
-            step_key: Step identifier
-            log_index: Log file index
-
-        Returns:
-            Log content dictionary
-
-        Raises:
-            ValueError: If step or log not found
-        """
-        try:
-            # Try to use cache if available
-            cache_key = f"log_content:{step_key}:{log_index}"
-            if cache_instance:
-                cached_result = cache_instance.get(cache_key)
-                if cached_result is not None:
-                    cache_stats["hits"] += 1
-                    return cached_result
-
-            from services.workflow_service import WorkflowService
-
-            result = WorkflowService.get_step_log_file(step_key, log_index)
-
-            # Cache the result if cache is available
-            if cache_instance:
-                cache_instance.set(cache_key, result, timeout=60)
-                cache_stats["misses"] += 1
-
-            return result
-            
-        except Exception as e:
-            logger.error(f"Log content cache error for {step_key}/{log_index}: {e}")
-            raise
-    
-    @staticmethod
-    def get_cached_step_status(step_key: str) -> Dict[str, Any]:
-        """
-        Get cached step status to reduce computation.
-        
-        Args:
-            step_key: Step identifier
-            
-        Returns:
-            Step status dictionary
-        """
-        try:
-            step_info = get_workflow_state().get_step_info(step_key)
-
-            if not step_info:
-                raise ValueError(f"Step '{step_key}' not found")
-
-            return step_info.copy()
-            
-        except Exception as e:
-            logger.error(f"Step status cache error for {step_key}: {e}")
-            raise
-    
-    @staticmethod
-    def invalidate_step_cache(step_key: str) -> None:
-        """
-        Invalidate cache entries for a specific step.
-        
-        Args:
-            step_key: Step identifier
-        """
-        if not cache_instance:
-            return
-        
-        try:
-            # Clear step-specific cache entries
-            cache_keys_to_clear = [
-                f"step_status:{step_key}",
-                f"log_content:{step_key}"
-            ]
-            
-            for key in cache_keys_to_clear:
-                cache_instance.delete(key)
-            
-            logger.debug(f"Invalidated cache for step {step_key}")
-            
-        except Exception as e:
-            logger.error(f"Cache invalidation error for {step_key}: {e}")
-    
-    @staticmethod
-    def warm_cache() -> None:
-        """
-        Pre-populate cache with commonly accessed data.
-        """
-        try:
-            logger.info("Starting cache warm-up")
-            
-            # Warm up frontend config
-            CacheService.get_cached_frontend_config()
-            
-            # Warm up step statuses
-            workflow_state = get_workflow_state()
-            step_keys = list((workflow_state.get_all_steps_info() or {}).keys())
-            if not step_keys:
-                from config.workflow_commands import WorkflowCommandsConfig
-                step_keys = WorkflowCommandsConfig().get_all_step_keys()
-
-            for step_key in step_keys:
-                try:
-                    CacheService.get_cached_step_status(step_key)
-                except Exception:
-                    pass  # Skip errors during warm-up
-            
-            logger.info("Cache warm-up completed")
-            
-        except Exception as e:
-            logger.error(f"Cache warm-up error: {e}")
-    
-    @staticmethod
-    def get_cache_size_estimate() -> Dict[str, Any]:
-        """
-        Get an estimate of cache memory usage.
-        
-        Returns:
-            Cache size information
-        """
-        try:
-            # This is a rough estimate since Flask-Caching doesn't provide direct size info
-            stats = CacheService.get_cache_stats()
-            
-            # Estimate based on number of cached items
-            estimated_items = stats["hits"] + stats["misses"]
-            estimated_size_mb = estimated_items * 0.001  # Rough estimate: 1KB per item
-            
-            return {
-                "estimated_items": estimated_items,
-                "estimated_size_mb": round(estimated_size_mb, 2),
-                "cache_type": "SimpleCache",
-                "note": "Size estimates are approximate"
-            }
-            
-        except Exception as e:
-            logger.error(f"Cache size estimation error: {e}")
-            return {
-                "estimated_items": 0,
-                "estimated_size_mb": 0,
-                "error": str(e)
-            }
 ```
 
 ## File: services/download_history_repository.py
@@ -10439,343 +10039,6 @@ input:checked + .sound-control-slider:before {
 /* ===== Overrides for topbar integration (no floating panels) ===== */
 ```
 
-## File: static/css/features/cinematic-logs.css
-```css
-/* =============================================================================
-   CINEMATIC LOG MODE - Workflow MediaPipe v4.0
-   Matrix-style log visualization with enhanced effects
-   ============================================================================= */
-
-/* Cinematic mode container */
-.log-panel[data-cinematic-mode="true"] .log-output,
-.log-panel[data-cinematic-mode="true"] .specific-log-output {
-    background: linear-gradient(180deg, #000000 0%, #0a0a0f 100%);
-    color: #00ff41;
-    font-family: 'Courier New', 'SFMono-Regular', Consolas, monospace;
-    text-shadow: 0 0 5px rgba(0, 255, 65, 0.7);
-    padding: 20px;
-    line-height: 1.8;
-    position: relative;
-    overflow: hidden;
-    animation: cinematicScanlines 8s linear infinite;
-}
-
-/* Scanline effect overlay */
-.log-panel[data-cinematic-mode="true"] .log-output::before,
-.log-panel[data-cinematic-mode="true"] .specific-log-output::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 255, 65, 0.03) 0px,
-        rgba(0, 255, 65, 0.03) 1px,
-        transparent 1px,
-        transparent 2px
-    );
-    pointer-events: none;
-    z-index: 1;
-}
-
-/* Animated glow effect */
-.log-panel[data-cinematic-mode="true"] .log-output::after,
-.log-panel[data-cinematic-mode="true"] .specific-log-output::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    right: -50%;
-    bottom: -50%;
-    background: radial-gradient(
-        circle,
-        rgba(0, 255, 65, 0.1) 0%,
-        transparent 70%
-    );
-    animation: cinematicGlow 4s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* Ensure log content is above effects */
-.log-panel[data-cinematic-mode="true"] .log-line {
-    position: relative;
-    z-index: 2;
-}
-
-/* Enhanced log line styles for cinematic mode */
-.log-panel[data-cinematic-mode="true"] .log-line {
-    margin: 4px 0;
-    padding: 4px 10px;
-    border-radius: 2px;
-    border-left: 2px solid transparent;
-    animation: cinematicFadeIn 0.5s ease-out;
-    transition: all 0.3s ease;
-}
-
-/* Hover effect with matrix-style glow */
-.log-panel[data-cinematic-mode="true"] .log-line:hover {
-    background-color: rgba(0, 255, 65, 0.15);
-    border-left-color: #00ff41;
-    box-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
-    transform: translateX(5px);
-}
-
-/* SUCCESS logs - Bright green with pulse */
-.log-panel[data-cinematic-mode="true"] .log-line.log-success {
-    color: #00ff41;
-    border-left-color: #00ff41;
-    background-color: rgba(0, 255, 65, 0.1);
-    text-shadow: 0 0 8px rgba(0, 255, 65, 0.8);
-    animation: cinematicFadeIn 0.5s ease-out, cinematicPulse 2s ease-in-out infinite;
-}
-
-/* ERROR logs - Red with intense glow */
-.log-panel[data-cinematic-mode="true"] .log-line.log-error {
-    color: #ff0044;
-    border-left-color: #ff0044;
-    background-color: rgba(255, 0, 68, 0.15);
-    text-shadow: 0 0 10px rgba(255, 0, 68, 0.9);
-    font-weight: 600;
-    animation: cinematicFadeIn 0.5s ease-out, cinematicFlash 1.5s ease-in-out infinite;
-}
-
-/* WARNING logs - Orange/Yellow */
-.log-panel[data-cinematic-mode="true"] .log-line.log-warning {
-    color: #ffaa00;
-    border-left-color: #ffaa00;
-    background-color: rgba(255, 170, 0, 0.1);
-    text-shadow: 0 0 8px rgba(255, 170, 0, 0.7);
-}
-
-/* INFO logs - Cyan blue */
-.log-panel[data-cinematic-mode="true"] .log-line.log-info {
-    color: #00d4ff;
-    border-left-color: #00d4ff;
-    background-color: rgba(0, 212, 255, 0.08);
-    text-shadow: 0 0 6px rgba(0, 212, 255, 0.6);
-}
-
-/* DEBUG logs - Dim gray */
-.log-panel[data-cinematic-mode="true"] .log-line.log-debug {
-    color: #666666;
-    border-left-color: #444444;
-    background-color: rgba(102, 102, 102, 0.05);
-    text-shadow: none;
-    font-size: 0.85em;
-    opacity: 0.7;
-}
-
-/* COMMAND logs - Purple/Magenta */
-.log-panel[data-cinematic-mode="true"] .log-line.log-command {
-    color: #ff00ff;
-    border-left-color: #ff00ff;
-    background-color: rgba(255, 0, 255, 0.1);
-    text-shadow: 0 0 8px rgba(255, 0, 255, 0.7);
-    font-weight: 500;
-}
-
-/* PROGRESS logs - Light blue */
-.log-panel[data-cinematic-mode="true"] .log-line.log-progress {
-    color: #44ddff;
-    border-left-color: #44ddff;
-    background-color: rgba(68, 221, 255, 0.08);
-    text-shadow: 0 0 6px rgba(68, 221, 255, 0.6);
-}
-
-/* Cinematic log panel header */
-.log-panel[data-cinematic-mode="true"] .log-panel-header {
-    background: linear-gradient(90deg, #000000 0%, #0a1a0f 100%);
-    color: #00ff41;
-    text-shadow: 0 0 10px rgba(0, 255, 65, 0.8);
-    border-bottom-color: #00ff41;
-    position: relative;
-}
-
-.log-panel[data-cinematic-mode="true"] .log-panel-header::before {
-    content: '🎬';
-    margin-right: 8px;
-}
-
-/* Cinematic scrollbar */
-.log-panel[data-cinematic-mode="true"] .log-output::-webkit-scrollbar,
-.log-panel[data-cinematic-mode="true"] .specific-log-output::-webkit-scrollbar {
-    width: 12px;
-}
-
-.log-panel[data-cinematic-mode="true"] .log-output::-webkit-scrollbar-track,
-.log-panel[data-cinematic-mode="true"] .specific-log-output::-webkit-scrollbar-track {
-    background: #000000;
-    border: 1px solid #00ff41;
-}
-
-.log-panel[data-cinematic-mode="true"] .log-output::-webkit-scrollbar-thumb,
-.log-panel[data-cinematic-mode="true"] .specific-log-output::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #00ff41 0%, #009922 100%);
-    border-radius: 6px;
-    box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
-}
-
-.log-panel[data-cinematic-mode="true"] .log-output::-webkit-scrollbar-thumb:hover,
-.log-panel[data-cinematic-mode="true"] .specific-log-output::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #00ff88 0%, #00bb33 100%);
-    box-shadow: 0 0 15px rgba(0, 255, 65, 0.8);
-}
-
-/* =============================================================================
-   ANIMATIONS
-   ============================================================================= */
-
-@keyframes cinematicScanlines {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.95; }
-}
-
-@keyframes cinematicGlow {
-    0%, 100% { 
-        transform: rotate(0deg) scale(1);
-        opacity: 0.3;
-    }
-    50% { 
-        transform: rotate(180deg) scale(1.5);
-        opacity: 0.5;
-    }
-}
-
-@keyframes cinematicFadeIn {
-    from {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes cinematicPulse {
-    0%, 100% { 
-        text-shadow: 0 0 8px rgba(0, 255, 65, 0.8);
-        border-left-width: 2px;
-    }
-    50% { 
-        text-shadow: 0 0 15px rgba(0, 255, 65, 1);
-        border-left-width: 3px;
-    }
-}
-
-@keyframes cinematicFlash {
-    0%, 100% { 
-        text-shadow: 0 0 10px rgba(255, 0, 68, 0.9);
-        opacity: 1;
-    }
-    50% { 
-        text-shadow: 0 0 20px rgba(255, 0, 68, 1);
-        opacity: 0.9;
-    }
-}
-
-/* =============================================================================
-   CINEMATIC MODE TOGGLE BUTTON
-   ============================================================================= */
-
-.cinematic-toggle-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    transition: all 0.3s ease;
-    cursor: pointer;
-    user-select: none;
-}
-
-.cinematic-toggle-container:hover {
-    border-color: var(--accent-primary);
-    background: var(--bg-tertiary);
-}
-
-.cinematic-toggle-container input[type="checkbox"] {
-    cursor: pointer;
-    width: 18px;
-    height: 18px;
-    accent-color: #00ff41;
-}
-
-.cinematic-toggle-label {
-    font-size: 14px;
-    color: var(--text-secondary);
-    font-weight: 500;
-    cursor: pointer;
-}
-
-/* Active state styling */
-.cinematic-toggle-container.active {
-    background: linear-gradient(90deg, #000000 0%, #0a1a0f 100%);
-    border-color: #00ff41;
-    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
-}
-
-.cinematic-toggle-container.active .cinematic-toggle-label {
-    color: #00ff41;
-    text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
-}
-
-/* Icon before label */
-.cinematic-toggle-container::before {
-    content: '🎬';
-    font-size: 16px;
-}
-
-/* =============================================================================
-   RESPONSIVE ADJUSTMENTS
-   ============================================================================= */
-
-@media (max-width: 768px) {
-    .log-panel[data-cinematic-mode="true"] .log-output,
-    .log-panel[data-cinematic-mode="true"] .specific-log-output {
-        font-size: 0.8em;
-        padding: 15px;
-    }
-    
-    .cinematic-toggle-container {
-        margin-top: 8px;
-        width: 100%;
-        justify-content: space-between;
-    }
-}
-
-/* =============================================================================
-   ACCESSIBILITY
-   ============================================================================= */
-
-/* Reduce motion for users who prefer it */
-@media (prefers-reduced-motion: reduce) {
-    .log-panel[data-cinematic-mode="true"] .log-output,
-    .log-panel[data-cinematic-mode="true"] .specific-log-output {
-        animation: none;
-    }
-    
-    .log-panel[data-cinematic-mode="true"] .log-output::after,
-    .log-panel[data-cinematic-mode="true"] .specific-log-output::after {
-        animation: none;
-    }
-    
-    .log-panel[data-cinematic-mode="true"] .log-line {
-        animation: none;
-    }
-    
-    .log-panel[data-cinematic-mode="true"] .log-line.log-success,
-    .log-panel[data-cinematic-mode="true"] .log-line.log-error {
-        animation: none;
-    }
-}
-```
-
 ## File: static/css/features/reports.css
 ```css
 /**
@@ -12025,268 +11288,6 @@ textarea {
         flex: 1;
     }
 }
-```
-
-## File: static/state/AppState.js
-```javascript
-class AppState {
-    constructor() {
-        this.state = {
-            pollingIntervals: {},
-            
-            activeStepKeyForLogsPanel: null,
-            isAnySequenceRunning: false,
-            focusedElementBeforePopup: null,
-            ui: {
-                compactMode: false
-            },
-            
-            stepTimers: {},
-            selectedStepsOrder: [],
-            
-            processInfo: {},
-            
-            performanceMetrics: {
-                apiResponseTimes: [],
-                errorCounts: {},
-                lastUpdate: null
-            },
-            
-            cacheStats: {
-                hits: 0,
-                misses: 0,
-                hitRate: 0
-            }
-        };
-        
-        this.listeners = new Set();
-        this.isDestroyed = false;
-        
-        this.stateChangeCount = 0;
-        this.lastStateChange = Date.now();
-        
-        console.debug('[AppState] Initialized with immutable state management');
-    }
-    
-    getState() {
-        if (this.isDestroyed) {
-            console.warn('[AppState] Attempted to access destroyed state');
-            return {};
-        }
-        return this._deepClone(this.state);
-    }
-    
-    getStateProperty(path) {
-        if (this.isDestroyed) return undefined;
-        
-        return path.split('.').reduce((obj, key) => {
-            return obj && obj[key] !== undefined ? obj[key] : undefined;
-        }, this.state);
-    }
-    
-    setState(updates, source = 'unknown') {
-        if (this.isDestroyed) {
-            console.warn('[AppState] Attempted to update destroyed state');
-            return;
-        }
-        
-        const oldState = this._deepClone(this.state);
-        const newState = this._mergeDeep(this.state, updates);
-        
-        if (this._stateChanged(oldState, newState)) {
-            this.state = newState;
-            this.stateChangeCount++;
-            this.lastStateChange = Date.now();
-            
-            console.debug(`[AppState] State updated from ${source}:`, updates);
-            
-            this._notifyListeners(newState, oldState, source);
-        }
-    }
-    
-    subscribe(listener) {
-        if (typeof listener !== 'function') {
-            throw new Error('[AppState] Listener must be a function');
-        }
-        
-        this.listeners.add(listener);
-        
-        return () => {
-            this.listeners.delete(listener);
-        };
-    }
-    
-    /**
-     * Subscribe to specific state property changes.
-     * @param {string} path - Dot-notation path to property
-     * @param {Function} listener - Callback function (newValue, oldValue) => void
-     * @returns {Function} Unsubscribe function
-     */
-    subscribeToProperty(path, listener) {
-        const propertyListener = (newState, oldState) => {
-            const newValue = this._getPropertyByPath(newState, path);
-            const oldValue = this._getPropertyByPath(oldState, path);
-            
-            if (newValue !== oldValue) {
-                listener(newValue, oldValue);
-            }
-        };
-        
-        return this.subscribe(propertyListener);
-    }
-    
-    batchUpdate(updateFn, source = 'batch') {
-        const originalNotify = this._notifyListeners;
-        const updates = [];
-        
-        this._notifyListeners = (newState, oldState, updateSource) => {
-            updates.push({ newState, oldState, source: updateSource });
-        };
-        
-        try {
-            updateFn();
-        } finally {
-            this._notifyListeners = originalNotify;
-            
-            if (updates.length > 0) {
-                const finalUpdate = updates[updates.length - 1];
-                this._notifyListeners(finalUpdate.newState, updates[0].oldState, source);
-            }
-        }
-    }
-    
-    reset() {
-        const initialState = {
-            pollingIntervals: {},
-            activeStepKeyForLogsPanel: null,
-            isAnySequenceRunning: false,
-            focusedElementBeforePopup: null,
-            ui: {
-                compactMode: false
-            },
-            stepTimers: {},
-            selectedStepsOrder: [],
-
-            processInfo: {},
-            performanceMetrics: {
-                apiResponseTimes: [],
-                errorCounts: {},
-                lastUpdate: null
-            },
-            cacheStats: {
-                hits: 0,
-                misses: 0,
-                hitRate: 0
-            }
-        };
-        
-        this.setState(initialState, 'reset');
-        console.info('[AppState] State reset to initial values');
-    }
-    
-    getStats() {
-        return {
-            listenerCount: this.listeners.size,
-            stateChangeCount: this.stateChangeCount,
-            lastStateChange: this.lastStateChange,
-            isDestroyed: this.isDestroyed,
-            stateSize: JSON.stringify(this.state).length
-        };
-    }
-    
-    destroy() {
-        console.info('[AppState] Destroying state manager');
-        
-        this.listeners.clear();
-        this.state = {};
-        this.isDestroyed = true;
-    }
-    
-    _deepClone(obj, visited = new WeakMap()) {
-        if (obj === null || typeof obj !== 'object') return obj;
-        if (obj instanceof Date) return new Date(obj);
-
-        if (visited.has(obj)) {
-            console.warn('[AppState] Circular reference detected in _deepClone, returning empty object');
-            return {};
-        }
-
-        if (obj instanceof Array) {
-            visited.set(obj, true);
-            const cloned = obj.map(item => this._deepClone(item, visited));
-            visited.delete(obj);
-            return cloned;
-        }
-
-        if (typeof obj === 'object') {
-            visited.set(obj, true);
-            const cloned = {};
-            for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                    cloned[key] = this._deepClone(obj[key], visited);
-                }
-            }
-            visited.delete(obj);
-            return cloned;
-        }
-        return obj;
-    }
-    
-    _mergeDeep(target, source) {
-        const result = this._deepClone(target);
-        
-        for (const key in source) {
-            if (source.hasOwnProperty(key)) {
-                if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-                    result[key] = this._mergeDeep(result[key] || {}, source[key]);
-                } else {
-                    result[key] = source[key];
-                }
-            }
-        }
-        
-        return result;
-    }
-    
-    _stateChanged(oldState, newState) {
-        return JSON.stringify(oldState) !== JSON.stringify(newState);
-    }
-    
-    _getPropertyByPath(obj, path) {
-        return path.split('.').reduce((current, key) => {
-            return current && current[key] !== undefined ? current[key] : undefined;
-        }, obj);
-    }
-    
-    _notifyListeners(newState, oldState, source) {
-        this.listeners.forEach(listener => {
-            try {
-                listener(newState, oldState, source);
-            } catch (error) {
-                console.error('[AppState] Listener error:', error);
-            }
-        });
-    }
-}
-
-export const appState = new AppState();
-
-window.addEventListener('beforeunload', () => {
-    appState.destroy();
-});
-
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    window.appState = appState;
-    
-    appState.subscribe((newState, oldState, source) => {
-        console.debug(`[AppState] Change from ${source}:`, {
-            newState: newState,
-            oldState: oldState
-        });
-    });
-}
-
-export default appState;
 ```
 
 ## File: static/test-exports/fetchWithLoadingState.js
@@ -14156,6 +13157,21 @@ class PollingManager {
     }
 
     /**
+     * Get summarized statistics for monitoring consumers (PerformanceMonitor).
+     *
+     * @returns {Object}
+     */
+    getStats() {
+        const ops = this.getActiveOperations();
+        return {
+            totalIntervals: ops.totalIntervals,
+            totalTimeouts: ops.totalTimeouts,
+            intervals: ops.intervals,
+            timeouts: ops.timeouts
+        };
+    }
+
+    /**
      * Destroy the polling manager and clean up all resources.
      */
     destroy() {
@@ -14234,562 +13250,6 @@ const pollingManager = new PollingManager();
 export { PollingManager, pollingManager };
 
 window.pollingManager = pollingManager;
-```
-
-## File: static/apiService.js
-```javascript
-// --- START OF REFACTORED apiService.js ---
-
-import { POLLING_INTERVAL } from './constants.js';
-import * as ui from './uiUpdater.js';
-import * as dom from './domElements.js';
-import * as state from './state.js';
-import { appState } from './state/AppState.js';
-import { showNotification, sendBrowserNotification } from './utils.js';
-import { soundEvents } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js';
-import { errorHandler } from './utils/ErrorHandler.js';
-
-
-/**
- * Fetch helper that toggles a loading state on a button during the request.
- * It adds data-loading="true" and disables the button while the fetch runs.
- * @param {string} url
- * @param {RequestInit} options
- * @param {HTMLElement|string|null} buttonElOrId - element or element id
- * @returns {Promise<any>} parsed JSON response (or throws on network/error)
- */
-export async function fetchWithLoadingState(url, options = {}, buttonElOrId = null) {
-    let btn = null;
-    if (typeof buttonElOrId === 'string') {
-        btn = document.getElementById(buttonElOrId);
-    } else if (buttonElOrId && buttonElOrId.nodeType === 1) {
-        btn = buttonElOrId;
-    }
-
-    try {
-        if (btn) {
-            btn.setAttribute('data-loading', 'true');
-            btn.disabled = true;
-        }
-        const response = await fetch(url, options);
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error((data && data.message) || `Erreur HTTP ${response.status}`);
-        }
-        return data;
-    } finally {
-        if (btn) {
-            btn.removeAttribute('data-loading');
-            btn.disabled = false;
-        }
-    }
-}
-
-/**
- * Centralized function to handle UI updates and state changes when a step fails.
- * This avoids code duplication in runStepAPI and performPoll.
- * @param {string} stepKey - The key of the step that failed.
- * @param {Error} error - The error object.
- * @param {string} errorSource - A string indicating where the error occurred (e.g., 'Lancement', 'Polling').
- */
-function handleStepFailure(stepKey, error, errorSource) {
-    const errorMessage = error.message || 'Erreur inconnue.';
-    console.error(`[API handleStepFailure] Erreur ${errorSource} pour ${stepKey}:`, error);
-
-    if (errorMessage.includes('Étape inconnue')) {
-        console.warn(`[API handleStepFailure] Étape '${stepKey}' n'est pas reconnue.`);
-    }
-
-    soundEvents.errorEvent();
-
-    showNotification(`Erreur ${errorSource} ${stepKey}: ${errorMessage}`, 'error');
-
-    const statusEl = document.getElementById(`status-${stepKey}`);
-    if (statusEl) {
-        statusEl.textContent = `Erreur: ${errorMessage.substring(0, 50)}`;
-        statusEl.className = 'status-badge status-failed';
-    }
-
-    if (state.getActiveStepKeyForLogs() === stepKey) {
-        ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${errorMessage}</i>`);
-    }
-
-    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
-    if (runButton) {
-        runButton.disabled = state.getIsAnySequenceRunning();
-    }
-    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-    if (cancelButton) {
-        cancelButton.disabled = true;
-    }
-
-    ui.stopStepTimer(stepKey);
-    const progressBar = document.getElementById(`progress-bar-${stepKey}`);
-    if (progressBar) {
-        progressBar.style.backgroundColor = 'var(--red)';
-    }
-
-    stopPollingAPI(stepKey);
-}
-
-
-export async function runStepAPI(stepKey) {
-    // --- UI setup (unchanged) ---
-    ui.resetStepTimerDisplay(stepKey);
-    const statusEl = document.getElementById(`status-${stepKey}`);
-    if(statusEl) { statusEl.textContent = 'Initiation...'; statusEl.className = 'status-badge status-initiated'; }
-    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
-    if(runButton) runButton.disabled = true;
-    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-    if(cancelButton) cancelButton.disabled = false;
-
-    if (state.getActiveStepKeyForLogs() === stepKey) {
-        ui.updateMainLogOutputUI('<i>Initiation du processus...</i>');
-    }
-
-    try {
-        const data = await fetchWithLoadingState(`/run/${stepKey}`, { method: 'POST' }, runButton);
-        console.log(`[API runStepAPI] Réponse pour ${stepKey}:`, data);
-
-        if (data.status === 'initiated') {
-            const statusEl = document.getElementById(`status-${stepKey}`);
-            if(statusEl) { statusEl.textContent = 'Lancé'; statusEl.className = 'status-badge status-starting'; }
-            ui.startStepTimer(stepKey);
-            console.log(`[API runStepAPI] Appel de startPollingAPI pour ${stepKey}`);
-            startPollingAPI(stepKey);
-            return true;
-        } else {
-            throw new Error(data.message || `Réponse invalide du serveur pour le lancement de ${stepKey}.`);
-        }
-    } catch (error) {
-        handleStepFailure(stepKey, error, 'Lancement');
-        return false;
-    }
-}
-
-function appendItalicLineToMainLog(panelEl, message) {
-    if (!panelEl) return;
-    const br = document.createElement('br');
-    const i = document.createElement('i');
-    i.textContent = String(message ?? '');
-    panelEl.appendChild(br);
-    panelEl.appendChild(i);
-}
-
-export async function cancelStepAPI(stepKey) {
-    if (state.getActiveStepKeyForLogs() === stepKey) {
-        appendItalicLineToMainLog(dom.mainLogOutputPanel, 'Annulation en cours...');
-    }
-
-    try {
-        const cancelUrl = `/cancel/${stepKey}`;
-        const fullUrl = new URL(cancelUrl, window.location.origin).href;
-        console.log(`[CANCEL DEBUG] Attempting to cancel ${stepKey}:`);
-        console.log(`  - Relative URL: ${cancelUrl}`);
-        console.log(`  - Full URL: ${fullUrl}`);
-        console.log(`  - Current origin: ${window.location.origin}`);
-        console.log(`  - Current port: ${window.location.port}`);
-
-        const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-        const data = await fetchWithLoadingState(cancelUrl, { method: 'POST' }, cancelButton);
-        console.log(`[CANCEL DEBUG] Response received (ok):`, data);
-        showNotification(data.message || "Annulation demandée", 'info');
-
-        if (state.getActiveStepKeyForLogs() === stepKey) {
-            appendItalicLineToMainLog(dom.mainLogOutputPanel, data.message || 'Annulation demandée');
-        }
-    } catch (error) {
-        console.error(`Erreur annulation ${stepKey}:`, error);
-
-        errorHandler.handleApiError(`cancel/${stepKey}`, error, { stepKey });
-
-        if (state.getActiveStepKeyForLogs() === stepKey) {
-            appendItalicLineToMainLog(dom.mainLogOutputPanel, `Erreur communication pour annulation: ${error.toString()}`);
-        }
-    }
-}
-
-export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
-    state.clearPollingInterval(stepKey);
-
-    const pollingInterval = isAutoModeHighFrequency ? 200 : POLLING_INTERVAL;
-    console.log(`[API startPollingAPI] 🚀 Polling démarré pour ${stepKey}. Intervalle: ${pollingInterval}ms ${isAutoModeHighFrequency ? '(AutoMode high-frequency)' : '(normal)'}`);
-
-    const performPoll = async () => {
-        try {
-            const pollStartTime = performance.now();
-            console.log(`[API POLL] Fetching status for ${stepKey} at ${new Date().toISOString()}`);
-
-            const response = await fetch(`/status/${stepKey}`);
-            if (!response.ok) {
-                console.warn(`[API performPoll] Erreur ${response.status} lors du polling pour ${stepKey}. Arrêt du polling.`);
-                stopPollingAPI(stepKey);
-                if (!state.getIsAnySequenceRunning()) {
-                    handleStepFailure(stepKey, new Error(`Erreur statut (${response.status})`), 'Polling');
-                }
-                return;
-            }
-            const data = await response.json();
-
-            const pollEndTime = performance.now();
-            const statusEmoji = data.status === 'running' ? '🔄' : data.status === 'completed' ? '✅' : data.status === 'failed' ? '❌' : '⚪';
-            console.log(`[API POLL RESPONSE] ${statusEmoji} ${stepKey} (${(pollEndTime - pollStartTime).toFixed(2)}ms): status="${data.status}", progress=${data.progress_current}/${data.progress_total}, return_code=${data.return_code}`);
-
-            const previousStatus = (state.PROCESS_INFO_CLIENT[stepKey] && state.PROCESS_INFO_CLIENT[stepKey].status) || 'unknown';
-            state.PROCESS_INFO_CLIENT[stepKey] = data;
-
-            if (typeof data.is_any_sequence_running === 'boolean') {
-                state.setIsAnySequenceRunning(data.is_any_sequence_running);
-            }
-
-            ui.updateStepCardUI(stepKey, data);
-
-            if (state.getActiveStepKeyForLogs() === stepKey && dom.workflowWrapper.classList.contains('logs-active')) {
-                ui.updateMainLogOutputUI(data.log.join(''));
-            }
-            const isTerminal = ['completed', 'failed'].includes(data.status);
-            if (isTerminal && previousStatus !== data.status) {
-                const title = data.status === 'completed' ? '✅ Étape terminée' : '❌ Étape en erreur';
-                const body = `${stepKey} — statut: ${data.status}`;
-                sendBrowserNotification(title, body).catch(() => {});
-            }
-
-            const shouldStopPolling = isTerminal ||
-                                    (data.status === 'idle' && !appState.getStateProperty('autoModeEnabled'));
-
-            if (shouldStopPolling) {
-                console.log(`[API performPoll] Statut final '${data.status}' pour ${stepKey}. Arrêt du polling.`);
-                stopPollingAPI(stepKey);
-            } else if (data.status === 'idle' && appState.getStateProperty('autoModeEnabled')) {
-                console.log(`[API performPoll] ⚪ ${stepKey} idle mais AutoMode actif - maintien du polling pour détecter les transitions`);
-            }
-        } catch (error) {
-            console.error(`[API performPoll] Erreur CATCH polling ${stepKey}:`, error);
-            stopPollingAPI(stepKey);
-            if (!state.getIsAnySequenceRunning()) {
-                handleStepFailure(stepKey, error, 'Polling');
-            }
-        }
-    };
-
-    const pollingId = pollingManager.startPolling(
-        `step-${stepKey}`,
-        performPoll,
-        pollingInterval, // Use dynamic interval (200ms for AutoMode, 500ms for normal)
-        { immediate: true, maxErrors: 3 }
-    );
-
-    state.addPollingInterval(stepKey, pollingId);
-}
-
-export function stopPollingAPI(stepKey) {
-    pollingManager.stopPolling(`step-${stepKey}`);
-    state.clearPollingInterval(stepKey);
-    console.log(`[API stopPollingAPI] Polling arrêté pour ${stepKey}.`);
-}
-
-export async function fetchSpecificLogAPI(stepKey, logIndex, logName, buttonElOrId = null) {
-    ui.updateSpecificLogUI(logName, null, "<i>Chargement...</i>");
-    try {
-        let data;
-        const url = `/get_specific_log/${stepKey}/${logIndex}`;
-        if (buttonElOrId) {
-            data = await fetchWithLoadingState(url, {}, buttonElOrId);
-        } else {
-            const response = await fetch(url);
-            data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || `Erreur HTTP ${response.status}`);
-            }
-        }
-        ui.updateSpecificLogUI(logName, data.path, data.content);
-    } catch (error) {
-        console.error(`Erreur fetch log spécifique ${stepKey}/${logIndex}:`, error);
-        ui.updateSpecificLogUI(logName, null, '', true, `Erreur de communication: ${error.toString()}`);
-    }
-}
-
-
-export async function fetchInitialStatusAPI(stepKey) {
-    try {
-        const response = await fetch(`/status/${stepKey}`);
-        if (!response.ok) {
-            console.warn(`Initial status fetch failed for ${stepKey}: ${response.status}. Using fallback.`);
-            state.PROCESS_INFO_CLIENT[stepKey] = state.PROCESS_INFO_CLIENT[stepKey] || {
-                status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
-                is_any_sequence_running: false
-            };
-        } else {
-            const data = await response.json();
-            state.PROCESS_INFO_CLIENT[stepKey] = data;
-            if (data.is_any_sequence_running && !state.getIsAnySequenceRunning()) {
-                state.setIsAnySequenceRunning(true);
-            }
-        }
-
-        if (stepKey === 'clear_disk_cache') {
-            ui.updateClearCacheGlobalButtonState(state.PROCESS_INFO_CLIENT[stepKey].status);
-        } else {
-            ui.updateStepCardUI(stepKey, state.PROCESS_INFO_CLIENT[stepKey]);
-        }
-        
-        if (['running', 'starting', 'initiated'].includes(state.PROCESS_INFO_CLIENT[stepKey].status)) {
-            console.log(`[API fetchInitialStatusAPI] Étape ${stepKey} en cours au démarrage. Lancement du polling.`);
-            startPollingAPI(stepKey);
-        }
-
-    } catch (err) {
-        console.error(`Erreur CATCH fetchInitialStatusAPI pour ${stepKey}:`, err);
-        const fallbackData = state.PROCESS_INFO_CLIENT[stepKey] || {
-            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
-            is_any_sequence_running: false
-        };
-        if (stepKey === 'clear_disk_cache') {
-            ui.updateClearCacheGlobalButtonState(fallbackData.status);
-        } else {
-            ui.updateStepCardUI(stepKey, fallbackData);
-        }
-    }
-}
-
-export async function fetchLocalDownloadsStatusAPI() {
-    try {
-        const response = await fetch('/api/csv_downloads_status');
-        if (!response.ok) {
-            console.warn(`Erreur lors de la récupération du statut des téléchargements CSV: ${response.status}`);
-            return [];
-        }
-        return await response.json();
-    } catch (error) {
-        console.error("Erreur réseau fetchLocalDownloadsStatusAPI:", error);
-        return [];
-    }
-}
-
-
-
-export async function fetchCSVMonitorStatusAPI() {
-    try {
-        const response = await fetch('/api/csv_monitor_status');
-        if (!response.ok) {
-            throw new Error(`Erreur HTTP ${response.status}`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error("Erreur fetchCSVMonitorStatusAPI:", error);
-        return {
-            csv_monitor: { status: "error", last_check: null, error: "Impossible de récupérer le statut" },
-            auto_mode_enabled: false,
-            csv_url: "",
-            check_interval: 15
-        };
-    }
-}
-```
-
-## File: static/cinematicLogMode.js
-```javascript
-/**
- * Cinematic Log Mode Manager - Workflow MediaPipe v4.0
- * Matrix-style log visualization with enhanced visual effects
- */
-
-const CINEMATIC_MODE_STORAGE_KEY = 'workflow-cinematic-logs';
-
-class CinematicLogMode {
-    constructor() {
-        this.isEnabled = this.loadPreference();
-        this.toggleCheckbox = null;
-        this.logPanels = [];
-    }
-
-    /**
-     * Initialize the cinematic log mode system
-     */
-    init() {
-        console.log('[CinematicLogMode] Initializing...');
-        
-        if (this.isEnabled) {
-            this.enable();
-        }
-        
-        this.setupToggle();
-        
-        console.log(`[CinematicLogMode] Initialized - Mode: ${this.isEnabled ? 'ENABLED' : 'DISABLED'}`);
-    }
-
-    /**
-     * Load preference from localStorage
-     * @returns {boolean}
-     */
-    loadPreference() {
-        try {
-            const saved = localStorage.getItem(CINEMATIC_MODE_STORAGE_KEY);
-            return saved === 'true';
-        } catch (error) {
-            console.error('[CinematicLogMode] Error loading preference:', error);
-            return false;
-        }
-    }
-
-    /**
-     * Save preference to localStorage
-     * @param {boolean} enabled
-     */
-    savePreference(enabled) {
-        try {
-            localStorage.setItem(CINEMATIC_MODE_STORAGE_KEY, enabled.toString());
-            console.log(`[CinematicLogMode] Saved preference: ${enabled}`);
-        } catch (error) {
-            console.error('[CinematicLogMode] Error saving preference:', error);
-        }
-    }
-
-    /**
-     * Setup the toggle checkbox
-     */
-    setupToggle() {
-        this.toggleCheckbox = document.getElementById('cinematic-mode-toggle');
-        const container = document.querySelector('.cinematic-toggle-container');
-        
-        if (!this.toggleCheckbox) {
-            console.warn('[CinematicLogMode] Toggle checkbox not found');
-            return;
-        }
-
-        this.toggleCheckbox.checked = this.isEnabled;
-        if (this.isEnabled && container) {
-            container.classList.add('active');
-        }
-
-        this.toggleCheckbox.addEventListener('change', (e) => {
-            const enabled = e.target.checked;
-            console.log(`[CinematicLogMode] User toggled: ${enabled}`);
-            
-            if (enabled) {
-                this.enable();
-            } else {
-                this.disable();
-            }
-            
-            if (container) {
-                container.classList.toggle('active', enabled);
-            }
-        });
-
-        if (container) {
-            container.addEventListener('click', (e) => {
-                if (e.target === container || e.target.classList.contains('cinematic-toggle-label')) {
-                    this.toggleCheckbox.checked = !this.toggleCheckbox.checked;
-                    this.toggleCheckbox.dispatchEvent(new Event('change'));
-                }
-            });
-        }
-
-        console.log('[CinematicLogMode] Toggle setup complete');
-    }
-
-    /**
-     * Get all log panel elements
-     * @returns {NodeList}
-     */
-    getLogPanels() {
-        return document.querySelectorAll('#logs-column-global, .log-panel, #log-panel');
-    }
-
-    /**
-     * Enable cinematic mode
-     */
-    enable() {
-        console.log('[CinematicLogMode] Enabling cinematic mode...');
-        
-        this.isEnabled = true;
-        this.savePreference(true);
-        
-        const panels = this.getLogPanels();
-        panels.forEach(panel => {
-            if (!panel.classList.contains('log-panel')) {
-                panel.classList.add('log-panel');
-            }
-            panel.setAttribute('data-cinematic-mode', 'true');
-        });
-
-        if (this.toggleCheckbox && !this.toggleCheckbox.checked) {
-            this.toggleCheckbox.checked = true;
-        }
-
-        window.dispatchEvent(new CustomEvent('cinematicModeChanged', {
-            detail: { enabled: true }
-        }));
-
-        console.log(`[CinematicLogMode] Enabled on ${panels.length} panel(s)`);
-    }
-
-    /**
-     * Disable cinematic mode
-     */
-    disable() {
-        console.log('[CinematicLogMode] Disabling cinematic mode...');
-        
-        this.isEnabled = false;
-        this.savePreference(false);
-        
-        const panels = this.getLogPanels();
-        panels.forEach(panel => {
-            panel.removeAttribute('data-cinematic-mode');
-        });
-
-        if (this.toggleCheckbox && this.toggleCheckbox.checked) {
-            this.toggleCheckbox.checked = false;
-        }
-
-        window.dispatchEvent(new CustomEvent('cinematicModeChanged', {
-            detail: { enabled: false }
-        }));
-
-        console.log(`[CinematicLogMode] Disabled on ${panels.length} panel(s)`);
-    }
-
-    /**
-     * Toggle cinematic mode
-     */
-    toggle() {
-        if (this.isEnabled) {
-            this.disable();
-        } else {
-            this.enable();
-        }
-    }
-
-    /**
-     * Apply cinematic mode to a specific element
-     * Useful for dynamically created log panels
-     * @param {HTMLElement} element
-     */
-    applyToElement(element) {
-        if (!element) return;
-        
-        if (this.isEnabled) {
-            element.setAttribute('data-cinematic-mode', 'true');
-            console.log('[CinematicLogMode] Applied to new element');
-        }
-    }
-
-    /**
-     * Get current state
-     * @returns {boolean}
-     */
-    getState() {
-        return this.isEnabled;
-    }
-}
-
-const cinematicLogMode = new CinematicLogMode();
-
-export { cinematicLogMode };
-
-window.cinematicLogMode = cinematicLogMode;
 ```
 
 ## File: static/constants.js
@@ -15493,411 +13953,6 @@ function handleWorkflowDismiss(download) {
 }
 
 // Using DOMUpdateUtils.escapeHtml from DOMBatcher for XSS safety (project standard)
-```
-
-## File: static/eventHandlers.js
-```javascript
-import * as dom from './domElements.js';
-import * as ui from './uiUpdater.js';
-import * as state from './state.js';
-import * as api from './apiService.js';
-import { runStepSequence } from './sequenceManager.js';
-import { defaultSequenceableStepsKeys } from './constants.js';
-import { showNotification } from './utils.js';
-import { openPopupUI, closePopupUI, showCustomSequenceConfirmUI } from './popupManager.js';
-import { scrollToStepImmediate, setAutoScrollEnabled, isAutoScrollEnabled } from './scrollManager.js';
-import { soundEvents } from './soundManager.js';
-
-export function initializeEventHandlers() {
-    if (dom.closeLogPanelButton) {
-        dom.closeLogPanelButton.addEventListener('click', ui.closeLogPanelUI);
-    }
-
-    dom.allRunButtons.forEach(button => {
-        button.addEventListener('click', async () => {
-            try {
-                if (state.getIsAnySequenceRunning()) {
-                    showNotification("Une séquence est déjà en cours. Veuillez attendre sa fin.", 'warning');
-                    return;
-                }
-                const stepKey = button.dataset.step;
-                ui.updateMainLogOutputUI('');
-                dom.specificLogContainerPanel.style.display = 'none';
-                ui.openLogPanelUI(stepKey);
-
-                // Scroll to the step immediately when manually triggered
-                scrollToStepImmediate(stepKey, { scrollDelay: 0 });
-
-                // Play workflow start sound for individual step execution
-                soundEvents.workflowStart();
-
-                await api.runStepAPI(stepKey);
-            } catch (error) {
-                console.error('[EVENT] Error in run button handler:', error);
-                showNotification("Erreur lors de l'exécution de l'étape", 'error');
-            }
-        });
-    });
-
-    dom.allCancelButtons.forEach(button => {
-        button.addEventListener('click', async () => {
-            try {
-                const stepKey = button.dataset.step;
-                await api.cancelStepAPI(stepKey);
-            } catch (error) {
-                console.error('[EVENT] Error in cancel button handler:', error);
-                showNotification("Erreur lors de l'annulation de l'étape", 'error');
-            }
-        });
-    });
-
-    dom.allSpecificLogButtons.forEach(button => {
-        button.addEventListener('click', async () => {
-            const stepKey = button.dataset.step;
-            const logIndex = button.dataset.logIndex;
-
-            if (!dom.workflowWrapper.classList.contains('logs-active') || state.activeStepKeyForLogsPanel !== stepKey) {
-                ui.openLogPanelUI(stepKey);
-                try {
-                    const statusResponse = await fetch(`/status/${stepKey}`);
-                    if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
-                    const statusData = await statusResponse.json();
-                    ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');
-                } catch (error) {
-                    console.error("Erreur chargement statut pour log panel:", error);
-                    ui.updateMainLogOutputUI(`<i>Erreur chargement log principal: ${error.message}</i>`);
-                }
-            }
-            // Pass the clicked button to enable loading state (spinner + disabled)
-            await api.fetchSpecificLogAPI(stepKey, logIndex, button.textContent.trim(), button);
-        });
-    });
-
-    if (dom.runAllButton) {
-        dom.runAllButton.addEventListener('click', async () => {
-            if (state.getIsAnySequenceRunning()) {
-                showNotification("Séquence déjà en cours.", 'warning'); return;
-            }
-            // Play workflow start sound for complete sequence 1-6
-            soundEvents.workflowStart();
-            await runStepSequence(defaultSequenceableStepsKeys, "Séquence 0-4");
-        });
-    }
-
-    dom.customSequenceCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', (event) => {
-            const stepKey = event.target.dataset.stepKey;
-            const stepCard = document.getElementById(`step-${stepKey}`);
-            const orderNumberEl = document.getElementById(`order-${stepKey}`);
-            let currentOrder = state.getSelectedStepsOrder();
-
-            // Play checkbox interaction sound
-            soundEvents.checkboxInteraction();
-
-            if (event.target.checked) {
-                if (!currentOrder.includes(stepKey)) {
-                    currentOrder.push(stepKey);
-                    if (stepCard) stepCard.classList.add('custom-sequence-selected');
-                }
-            } else {
-                const index = currentOrder.indexOf(stepKey);
-                if (index > -1) currentOrder.splice(index, 1);
-                if (stepCard) stepCard.classList.remove('custom-sequence-selected');
-            }
-            state.setSelectedStepsOrder(currentOrder);
-            document.querySelectorAll('.step-selection-order-number').forEach(el => el.textContent = '');
-            state.getSelectedStepsOrder().forEach((sk, idx) => {
-                const orderEl = document.getElementById(`order-${sk}`);
-                if (orderEl) orderEl.textContent = idx + 1;
-            });
-            ui.updateCustomSequenceButtonsUI();
-        });
-    });
-
-    if (dom.clearCustomSequenceButton) {
-        dom.clearCustomSequenceButton.addEventListener('click', () => {
-            state.setSelectedStepsOrder([]);
-            dom.customSequenceCheckboxes.forEach(cb => {
-                cb.checked = false;
-                const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
-                if (stepCard) stepCard.classList.remove('custom-sequence-selected');
-                const orderEl = document.getElementById(`order-${cb.dataset.stepKey}`);
-                if (orderEl) orderEl.textContent = '';
-            });
-            ui.updateCustomSequenceButtonsUI();
-        });
-    }
-
-    if (dom.runCustomSequenceButton) {
-        dom.runCustomSequenceButton.addEventListener('click', () => {
-            if (state.getSelectedStepsOrder().length === 0) {
-                showNotification("Veuillez sélectionner au moins une étape.", 'warning');
-                return;
-            }
-            if (state.getIsAnySequenceRunning()) {
-                showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
-            }
-            showCustomSequenceConfirmUI();
-        });
-    }
-
-    if (dom.confirmRunCustomSequenceButton) {
-        dom.confirmRunCustomSequenceButton.addEventListener('click', async () => {
-            closePopupUI(dom.customSequenceConfirmPopupOverlay);
-            if (state.getIsAnySequenceRunning()) {
-                showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
-            }
-            // Loading state on confirm button and disable run-custom while executing
-            try {
-                dom.confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
-                dom.confirmRunCustomSequenceButton.disabled = true;
-                if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = true;
-
-                // Play workflow start sound for custom sequence
-                soundEvents.workflowStart();
-                await runStepSequence(state.getSelectedStepsOrder(), "Séquence Personnalisée");
-            } finally {
-                dom.confirmRunCustomSequenceButton.removeAttribute('data-loading');
-                dom.confirmRunCustomSequenceButton.disabled = false;
-                if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = state.getIsAnySequenceRunning();
-            }
-        });
-    }
-
-    if (dom.cancelRunCustomSequenceButton) {
-        dom.cancelRunCustomSequenceButton.addEventListener('click', () => {
-            closePopupUI(dom.customSequenceConfirmPopupOverlay);
-        });
-    }
-    if (dom.closeSummaryPopupButton) {
-        dom.closeSummaryPopupButton.addEventListener('click', () => {
-            closePopupUI(dom.sequenceSummaryPopupOverlay);
-        });
-    }
-
-    // --- DELETION START: Suppression du gestionnaire d'événement pour le bouton de cache ---
-    /*
-    if (dom.clearCacheGlobalButton) {
-        dom.clearCacheGlobalButton.addEventListener('click', async () => {
-            const stepKey = 'clear_disk_cache'; 
-            // ... (toute la logique interne est supprimée) ...
-        });
-    }
-    */
-    // --- DELETION END ---
-
-
-
-    // Auto-scroll toggle event handler
-    if (dom.autoScrollToggle) {
-        // Initialize the toggle state from localStorage
-        const isEnabled = isAutoScrollEnabled();
-        dom.autoScrollToggle.checked = isEnabled;
-        if (dom.autoScrollStatus) {
-            dom.autoScrollStatus.textContent = isEnabled ? 'Activé' : 'Désactivé';
-        }
-
-        dom.autoScrollToggle.addEventListener('change', (event) => {
-            const enabled = event.target.checked;
-            setAutoScrollEnabled(enabled);
-            if (dom.autoScrollStatus) {
-                dom.autoScrollStatus.textContent = enabled ? 'Activé' : 'Désactivé';
-            }
-            console.log(`[EVENT] Auto-scroll ${enabled ? 'enabled' : 'disabled'} by user`);
-        });
-    }
-
-    // Sound control toggle event handler
-    if (dom.soundToggle) {
-        // Import sound manager functions
-        import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
-            // Initialize the toggle state from localStorage
-            const isEnabled = isSoundEnabled();
-            dom.soundToggle.checked = isEnabled;
-            if (dom.soundStatus) {
-                dom.soundStatus.textContent = isEnabled ? 'Activé' : 'Désactivé';
-            }
-
-            dom.soundToggle.addEventListener('change', (event) => {
-                const enabled = event.target.checked;
-                setSoundEnabled(enabled);
-                if (dom.soundStatus) {
-                    dom.soundStatus.textContent = enabled ? 'Activé' : 'Désactivé';
-                }
-                console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
-            });
-        });
-    }
-}
-```
-
-## File: static/popupManager.js
-```javascript
-import * as dom from './domElements.js';
-import * as state from './state.js';
-import { DOMUpdateUtils } from './utils/DOMBatcher.js';
-
-function handlePopupKeydown(event) {
-    const popupOverlay = event.currentTarget;
-    if (event.key === 'Escape') {
-        closePopupUI(popupOverlay);
-    }
-    if (event.key === 'Tab') {
-        const focusableElements = Array.from(popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
-        if (focusableElements.length === 0) return;
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        if (event.shiftKey) {
-            if (document.activeElement === firstElement) {
-                lastElement.focus();
-                event.preventDefault();
-            }
-        } else {
-            if (document.activeElement === lastElement) {
-                firstElement.focus();
-                event.preventDefault();
-            }
-        }
-    }
-}
-
-export function openPopupUI(popupOverlay) {
-    if (!popupOverlay) return;
-
-    const currentFocused = document.activeElement;
-    if (currentFocused &&
-        currentFocused !== document.body &&
-        currentFocused !== document.documentElement &&
-        typeof currentFocused.focus === 'function' &&
-        currentFocused.nodeType === Node.ELEMENT_NODE) {
-        state.setFocusedElementBeforePopup(currentFocused);
-        console.debug('[POPUP] Stored focusable element:', {
-            tagName: currentFocused.tagName,
-            id: currentFocused.id || 'no-id',
-            className: currentFocused.className || 'no-class'
-        });
-    } else {
-        state.setFocusedElementBeforePopup(null);
-        console.debug('[POPUP] No valid focusable element to store');
-    }
-
-    popupOverlay.style.display = 'flex';
-    popupOverlay.setAttribute('data-visible', 'true');
-    popupOverlay.setAttribute('aria-hidden', 'false');
-    const focusableElements = popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-
-    let elementToFocus = null;
-    for (let i = 0; i < focusableElements.length; i++) {
-        const element = focusableElements[i];
-        if (element.offsetParent !== null && typeof element.focus === 'function') {
-            elementToFocus = element;
-            break;
-        }
-    }
-
-    if (elementToFocus) {
-        try {
-            elementToFocus.focus();
-        } catch (error) {
-            console.warn('[POPUP] Failed to focus element in popup:', error);
-        }
-    }
-
-    popupOverlay.addEventListener('keydown', handlePopupKeydown);
-}
-
-export function closePopupUI(popupOverlay) {
-    if (!popupOverlay) return;
-    popupOverlay.removeAttribute('data-visible');
-    popupOverlay.setAttribute('aria-hidden', 'true');
-    popupOverlay.style.display = 'none';
-    popupOverlay.removeEventListener('keydown', handlePopupKeydown);
-    const prevFocused = state.getFocusedElementBeforePopup();
-
-    if (prevFocused && typeof prevFocused.focus === 'function') {
-        try {
-            if (prevFocused.isConnected && document.hasFocus()) {
-                if (document.contains(prevFocused) && prevFocused.offsetParent !== null) {
-                    prevFocused.focus();
-                } else {
-                    console.debug('[POPUP] Previous focused element no longer focusable, skipping focus restoration');
-                }
-            }
-        } catch (error) {
-            console.warn('[POPUP] Failed to restore focus to previous element:', error);
-        }
-    } else if (prevFocused) {
-        const elementInfo = {
-            tagName: prevFocused.tagName || 'unknown',
-            id: prevFocused.id || 'no-id',
-            className: prevFocused.className || 'no-class',
-            nodeType: prevFocused.nodeType || 'unknown',
-            hasFocusMethod: typeof prevFocused.focus === 'function'
-        };
-        console.debug('[POPUP] Previous focused element is not focusable:', elementInfo);
-    }
-
-    state.setFocusedElementBeforePopup(null);
-}
-
-export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "Séquence", overallDuration = null) {
-    if (!dom.sequenceSummaryList || !dom.sequenceSummaryPopupOverlay) {
-        console.error("Éléments DOM pour la popup de résumé non trouvés!");
-        return;
-    }
-    const summaryTitle = dom.sequenceSummaryPopupOverlay.querySelector("h3");
-    if (summaryTitle) summaryTitle.textContent = `Résumé: ${sequenceName}`;
-
-    dom.sequenceSummaryList.innerHTML = '';
-    if (overallDuration && typeof overallDuration === 'string') {
-        const totalItem = document.createElement('li');
-        totalItem.style.fontWeight = 'bold';
-        totalItem.style.marginBottom = '8px';
-        totalItem.style.paddingBottom = '8px';
-        totalItem.style.borderBottom = `1px solid var(--border-color)`;
-        const safeDuration = DOMUpdateUtils.escapeHtml(overallDuration);
-        totalItem.innerHTML = `<span class="status-icon" style="color:var(--accent-color);">⏱️</span> Durée totale: ${safeDuration}`;
-        dom.sequenceSummaryList.appendChild(totalItem);
-    }
-    results.forEach(result => {
-        const listItem = document.createElement('li');
-        const icon = result.success ? '<span class="status-icon status-completed" style="color:var(--green);">✔️</span>' : '<span class="status-icon status-failed" style="color:var(--red);">❌</span>';
-        const safeName = DOMUpdateUtils.escapeHtml(String(result.name ?? ''));
-        const safeDurationText = result.duration && result.duration !== "N/A" ? DOMUpdateUtils.escapeHtml(String(result.duration)) : "";
-        const durationText = safeDurationText ? `<span class="duration">(${safeDurationText})</span>` : "";
-        listItem.innerHTML = `${icon} ${safeName}: ${result.success ? 'Terminée avec succès' : 'Échouée ou annulée'} ${durationText}`;
-        dom.sequenceSummaryList.appendChild(listItem);
-    });
-
-    const overallStatusItem = document.createElement('li');
-    overallStatusItem.style.fontWeight = 'bold';
-    overallStatusItem.style.marginTop = '10px';
-    overallStatusItem.style.paddingTop = '10px';
-    overallStatusItem.style.borderTop = `1px solid var(--border-color)`;
-    const safeSequenceName = DOMUpdateUtils.escapeHtml(String(sequenceName ?? 'Séquence'));
-    if (overallSuccess) {
-        overallStatusItem.innerHTML = `<span class="status-icon status-completed" style="color:var(--green);">🎉</span> ${safeSequenceName} terminée avec succès !`;
-    } else {
-        overallStatusItem.innerHTML = `<span class="status-icon status-failed" style="color:var(--red);">⚠️</span> ${safeSequenceName} a rencontré une ou plusieurs erreurs.`;
-    }
-    dom.sequenceSummaryList.appendChild(overallStatusItem);
-    openPopupUI(dom.sequenceSummaryPopupOverlay);
-}
-
-export function showCustomSequenceConfirmUI() {
-    dom.customSequenceConfirmList.innerHTML = '';
-    state.getSelectedStepsOrder().forEach((stepKey, index) => {
-        const stepElement = document.getElementById(`step-${stepKey}`);
-        const stepName = stepElement ? stepElement.dataset.stepName : stepKey;
-        const li = document.createElement('li');
-        const safeStepName = DOMUpdateUtils.escapeHtml(String(stepName ?? ''));
-        li.innerHTML = `<span class="order-prefix">${index + 1}.</span> ${safeStepName}`;
-        dom.customSequenceConfirmList.appendChild(li);
-    });
-    openPopupUI(dom.customSequenceConfirmPopupOverlay);
-}
 ```
 
 ## File: static/reportViewer.js
@@ -16788,136 +14843,6 @@ export const soundEvents = {
 };
 ```
 
-## File: static/state.js
-```javascript
-// Import new immutable state management
-import { appState } from './state/AppState.js';
-
-// Initialize process info from DOM
-const initialProcessInfo = {};
-document.querySelectorAll('.step').forEach(s => {
-    initialProcessInfo[s.dataset.stepKey] = {
-        status: 'idle',
-        log: [],
-        progress_current: 0,
-        progress_total: 0,
-        progress_text: '',
-        is_any_sequence_running: false
-    };
-});
-
-// Initialize app state with process info
-appState.setState({
-    processInfo: initialProcessInfo
-}, 'initialization');
-
-export const PROCESS_INFO_CLIENT = initialProcessInfo;
-
-// Legacy exports for backward compatibility (deprecated - use appState instead)
-export let pollingIntervals = {};
-export let activeStepKeyForLogsPanel = null;
-export let stepTimers = {};
-export let selectedStepsOrder = [];
-export let isAnySequenceRunning = false;
-export let focusedElementBeforePopup = null;
-
-
-// --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
-export const REMOTE_SEQUENCE_STEP_KEYS = [
-    "STEP1",
-    "STEP2",
-    "STEP3",
-    "STEP4",
-    "STEP5",
-    "STEP6",
-    "STEP7"
-];
-
-// Modern state management functions using AppState
-export function setActiveStepKeyForLogs(key) {
-    activeStepKeyForLogsPanel = key; // Legacy
-    appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
-}
-export function getActiveStepKeyForLogs() {
-    return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
-}
-
-export function addStepTimer(stepKey, timerData) {
-    stepTimers[stepKey] = timerData; // Legacy
-    appState.setState({
-        stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
-    }, 'addStepTimer');
-}
-export function getStepTimer(stepKey) {
-    return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
-}
-export function clearStepTimerInterval(stepKey) {
-    const timer = getStepTimer(stepKey);
-    if (timer && timer.intervalId) {
-        clearInterval(timer.intervalId);
-        const updatedTimer = { ...timer, intervalId: null };
-        addStepTimer(stepKey, updatedTimer);
-    }
-}
-export function deleteStepTimer(stepKey) {
-    if (getStepTimer(stepKey)) {
-        clearStepTimerInterval(stepKey);
-        delete stepTimers[stepKey]; // Legacy
-        const currentTimers = appState.getStateProperty('stepTimers') || {};
-        const { [stepKey]: removed, ...remainingTimers } = currentTimers;
-        appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
-    }
-}
-
-export function setSelectedStepsOrder(order) {
-    selectedStepsOrder = order; // Legacy
-    appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
-}
-export function getSelectedStepsOrder() {
-    return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
-}
-
-export function setIsAnySequenceRunning(running) {
-    isAnySequenceRunning = running; // Legacy
-    appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
-}
-export function getIsAnySequenceRunning() {
-    return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
-}
-
-export function setFocusedElementBeforePopup(element) {
-    focusedElementBeforePopup = element; // Legacy
-    appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
-}
-export function getFocusedElementBeforePopup() {
-    return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
-}
-
-export function addPollingInterval(stepKey, id) {
-    pollingIntervals[stepKey] = id; // Legacy
-    appState.setState({
-        pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
-    }, 'addPollingInterval');
-}
-export function clearPollingInterval(stepKey) {
-    if (pollingIntervals[stepKey]) {
-        clearInterval(pollingIntervals[stepKey]);
-        delete pollingIntervals[stepKey]; // Legacy
-    }
-    const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
-    const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
-    appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
-}
-export function getPollingInterval(stepKey) {
-    return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
-}
-
-
-
-// Export the appState for direct access to modern state management
-export { appState };
-```
-
 ## File: static/stepDetailsPanel.js
 ```javascript
 import { domBatcher } from './utils/DOMBatcher.js';
@@ -17387,68 +15312,6 @@ export { themeManager, THEMES };
 
 // Also expose globally for non-module scripts
 window.themeManager = themeManager;
-```
-
-## File: static/utils.js
-```javascript
-import { notificationsArea } from './domElements.js';
-
-export function formatElapsedTime(startTime) {
-    if (!startTime) return "";
-    const now = new Date();
-    let seconds = Math.floor((now - startTime) / 1000);
-    let minutes = Math.floor(seconds / 60);
-    let hours = Math.floor(minutes / 60);
-    seconds %= 60;
-    minutes %= 60;
-    let timeStr = "";
-    if (hours > 0) timeStr += `${hours}h `;
-    if (minutes > 0 || hours > 0) timeStr += `${minutes}m `;
-    timeStr += `${seconds}s`;
-    return timeStr;
-}
-
-export function showNotification(message, type = 'info') { // type can be 'info', 'success', 'error', 'warning'
-    if (!notificationsArea) return;
-    const notif = document.createElement('div');
-    notif.className = `notification ${type}`;
-    notif.textContent = message;
-    notificationsArea.appendChild(notif);
-    setTimeout(() => {
-        notif.remove();
-    }, 5000);
-}
-
-// Web Notifications API helpers
-export async function ensureBrowserNotificationsPermission() {
-    if (!('Notification' in window)) {
-        console.warn('[Notifications] Browser does not support Notification API');
-        return false;
-    }
-    if (Notification.permission === 'granted') return true;
-    if (Notification.permission === 'denied') return false;
-    try {
-        const perm = await Notification.requestPermission();
-        return perm === 'granted';
-    } catch (e) {
-        console.warn('[Notifications] Permission request failed:', e);
-        return false;
-    }
-}
-
-export async function sendBrowserNotification(title, body, options = {}) {
-    try {
-        const ok = await ensureBrowserNotificationsPermission();
-        if (!ok) return false;
-        const notif = new Notification(title || 'Notification', { body: body || '', ...options });
-        setTimeout(() => notif && notif.close && notif.close(), 8000);
-        return true;
-    } catch (e) {
-        console.debug('[Notifications] Fallback to UI banner due to error:', e);
-        showNotification(`${title || 'Notification'}: ${body || ''}`, 'info');
-        return false;
-    }
-}
 ```
 
 ## File: templates/reports/analysis_report.html
@@ -27897,1080 +25760,411 @@ if __name__ == "__main__":
         sys.exit(1)
 ```
 
-## File: app_new.py
+## File: services/cache_service.py
 ```python
-import csv
-import html
-import json
-import logging
-import os
-import re
-import subprocess
-import sys
-import threading
-import time
-import atexit
-from collections import deque
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-import uuid
+"""
+Cache Service
+Centralized caching service for improved performance.
+"""
 
-import psutil
-import requests
-from flask import Flask, render_template, jsonify, request, send_from_directory
+import logging
+import json
+import time
+import re
+from functools import lru_cache, wraps
+from typing import Dict, Any, Optional, Callable
+from pathlib import Path
 from flask_caching import Cache
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-    print("✅ Dotenv loaded successfully")
-except ImportError:
-    print("⚠️ Dotenv not available - using environment variables directly")
-    pass
-
 from config.settings import config
-from config.security import SecurityConfig, require_internal_worker_token, require_render_register_token
-from config.workflow_commands import WorkflowCommandsConfig
+from services.workflow_state import get_workflow_state
 
-from routes.api_routes import api_bp
-from routes.workflow_routes import workflow_bp
-from services.monitoring_service import MonitoringService
-from services.csv_service import CSVService
-from services.workflow_service import WorkflowService
-from services.cache_service import CacheService
-from services.performance_service import PerformanceService
-from services.filesystem_service import FilesystemService
-from services.download_service import DownloadService
-from services.workflow_state import get_workflow_state, reset_workflow_state
-import urllib.parse
-
-try:
-    import pandas as pd
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
-    print("AVERTISSEMENT: pandas non disponible. Les fichiers Excel ne pourront pas être traités.")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
 
-try:
-    import pynvml
-    if config.ENABLE_GPU_MONITORING:
-        PYNVML_AVAILABLE = True
-        pynvml.nvmlInit()
-        logger.info("GPU monitoring initialized successfully")
-    else:
-        PYNVML_AVAILABLE = False
-        logger.info("GPU monitoring disabled by configuration")
-except ImportError:
-    PYNVML_AVAILABLE = False
-    logger.warning("pynvml not available. GPU monitoring disabled.")
-except Exception as e:
-    PYNVML_AVAILABLE = False
-    logger.error(f"Failed to initialize GPU monitoring: {e}")
+_SAFE_STEP_KEY_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
 
-BASE_PATH_SCRIPTS = config.BASE_PATH_SCRIPTS
-PYTHON_VENV_EXE = config.PYTHON_VENV_EXE
+# Global cache instance (will be initialized by Flask app)
+cache_instance: Optional[Cache] = None
 
-PARALLEL_TRACKING_SCRIPT_PATH = BASE_PATH_SCRIPTS / "workflow_scripts" / "step5" / "run_tracking_manager.py"
+# Cache statistics
+cache_stats = {
+    "hits": 0,
+    "misses": 0,
+    "errors": 0,
+    "last_reset": time.time()
+}
 
-os.environ['ROOT_SCAN_DIR'] = str(BASE_PATH_SCRIPTS / "projets_extraits")
-KEYWORD_FILTER_TRACKING_ENV = "Camille"
-os.environ['FOLDER_KEYWORD'] = KEYWORD_FILTER_TRACKING_ENV
-SUBDIR_FILTER_TRACKING_ENV = "docs"
-os.environ['SUBFOLDER_NAME'] = SUBDIR_FILTER_TRACKING_ENV
-os.environ.setdefault('TRACKING_DISABLE_GPU', '1')
-os.environ.setdefault('TRACKING_CPU_WORKERS', '15')
 
-LOGS_BASE_DIR = BASE_PATH_SCRIPTS / "logs"
-os.makedirs(LOGS_BASE_DIR, exist_ok=True)
-
-for step in range(1, 8):
-    os.makedirs(LOGS_BASE_DIR / f"step{step}", exist_ok=True)
-
-STEP0_PREP_LOG_DIR = Path(os.environ.get('STEP0_PREP_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step1")))
-MEDIA_ENCODER_LOGS_DIR = Path(os.environ.get('MEDIA_ENCODER_LOGS_DIR_ENV', str(LOGS_BASE_DIR / "step2")))
-SCENE_DETECT_LOG_DIR = Path(os.environ.get('SCENE_DETECT_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step3")))
-AUDIO_ANALYSIS_LOG_DIR = Path(os.environ.get('AUDIO_ANALYSIS_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step4")))
-
-BASE_TRACKING_LOG_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_LOG_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))
-BASE_TRACKING_PROGRESS_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_PROGRESS_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))
-HF_AUTH_TOKEN_ENV = os.environ.get("HF_AUTH_TOKEN")
-
-security_config = SecurityConfig()
-
-RENDER_APP_CALLBACK_URL_ENV = os.environ.get("RENDER_APP_CALLBACK_URL")
-RENDER_APP_CALLBACK_TOKEN_ENV = os.environ.get("RENDER_APP_CALLBACK_TOKEN")
-RENDER_REGISTER_URL_ENDPOINT_ENV = os.environ.get("RENDER_REGISTER_URL_ENDPOINT")
-
-RENDER_REGISTER_TOKEN_ENV = security_config.RENDER_REGISTER_TOKEN
-INTERNAL_WORKER_COMMS_TOKEN_ENV = security_config.INTERNAL_WORKER_TOKEN
-
-WEBHOOK_MONITOR_INTERVAL = config.WEBHOOK_MONITOR_INTERVAL
-LOCAL_DOWNLOADS_DIR = config.LOCAL_DOWNLOADS_DIR
-DOWNLOAD_HISTORY_FILE = config.BASE_PATH_SCRIPTS / "download_history.json"
-
-def create_app(config_class=None):
+class CacheService:
     """
-    Create and configure Flask application with modular architecture.
-
-    Args:
-        config_class: Configuration class to use (defaults to main config)
-
-    Returns:
-        Configured Flask application
+    Centralized caching service with performance tracking.
+    Provides intelligent caching for expensive operations.
     """
-    app = Flask(__name__)
-
-    app.config.update({
-        'SECRET_KEY': config.SECRET_KEY,
-        'DEBUG': config.DEBUG,
-        'CACHE_TYPE': 'SimpleCache',
-        'CACHE_DEFAULT_TIMEOUT': 300,
-        'SEND_FILE_MAX_AGE_DEFAULT': 0
-    })
-
-    import logging
-    logging.getLogger('werkzeug').setLevel(logging.WARNING)
-
-    try:
-        config.validate()
-        logger.info("Application configuration validated successfully")
-    except ValueError as e:
-        logger.error(f"Configuration validation failed: {e}")
-
-    cache = Cache(app)
-
-    app._cache_service_initialized = False
-    app._services_initialized = False
-    app._cache_instance = cache
-
-    app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(workflow_bp)
-
-    logger.info("Flask application created with modular architecture")
-    return app
-
-APP_FLASK = create_app()
-APP_LOGGER = APP_FLASK.logger
-
-with APP_FLASK.app_context():
-    CACHE = APP_FLASK.extensions['cache']
-
-KEYWORD_FILTER_TRACKING_ENV = os.environ.get('KEYWORD_FILTER_TRACKING_ENV', "Camille")
-SUBDIR_FILTER_TRACKING_ENV = os.environ.get('SUBDIR_FILTER_TRACKING_ENV', "docs")
-
-if not HF_AUTH_TOKEN_ENV:
-    APP_LOGGER.warning("HF_AUTH_TOKEN environment variable not set. Step 4 (Audio Analysis) will fail if executed.")
-else:
-    APP_LOGGER.info("HF_AUTH_TOKEN environment variable found and will be used for Analyze Audio.")
-
-try:
-    security_config.validate_tokens()
-    logger.info("Security tokens validated successfully")
-    if INTERNAL_WORKER_COMMS_TOKEN_ENV:
-        logger.info(f"CFG TOKEN: INTERNAL_WORKER_COMMS_TOKEN_ENV configured: '...{INTERNAL_WORKER_COMMS_TOKEN_ENV[-5:]}'")
-    if RENDER_REGISTER_TOKEN_ENV:
-        logger.info(f"CFG TOKEN: RENDER_REGISTER_TOKEN_ENV configured: '...{RENDER_REGISTER_TOKEN_ENV[-5:]}'")
-except ValueError as e:
-    logger.error(f"Security configuration error: {e}")
-    logger.error("Application will continue but some endpoints will be INSECURE")
-
-workflow_commands_config = WorkflowCommandsConfig(
-    base_path=BASE_PATH_SCRIPTS,
-    hf_token=HF_AUTH_TOKEN_ENV
-)
-
-workflow_state = get_workflow_state()
-workflow_state.initialize_all_steps(workflow_commands_config.get_all_step_keys())
-
-
-
-_services_initialized = False
-_services_lock = threading.Lock()
-
-def initialize_services():
-    """Initialize all services with proper configuration."""
-    global _services_initialized
-
-    with _services_lock:
-        if _services_initialized:
-            logger.debug("Services already initialized, skipping")
-            return
-
-        try:
-            with APP_FLASK.app_context():
-                if not APP_FLASK._cache_service_initialized:
-                    CacheService.initialize(APP_FLASK._cache_instance)
-                    APP_FLASK._cache_service_initialized = True
-                    logger.info("CacheService initialized")
-
-                if not APP_FLASK._services_initialized:
-                    CSVService.initialize()
-                    WorkflowService.initialize(workflow_commands_config.get_config())
-                    PerformanceService.start_background_monitoring()
-                    APP_FLASK._services_initialized = True
-                    logger.info("All services initialized successfully")
-
-            _services_initialized = True
-
-        except Exception as e:
-            logger.error(f"Service initialization failed: {e}")
-
-_app_initialized = False
-_app_init_lock = threading.Lock()
-
-def init_app():
-    global _app_initialized
-
-    with _app_init_lock:
-        if _app_initialized:
-            return APP_FLASK
-
-        APP_LOGGER.handlers.clear()
-
-        logs_dir = BASE_PATH_SCRIPTS / "logs"
-        logs_dir.mkdir(exist_ok=True)
-
-        log_file_path = logs_dir / "app.log"
-        file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
-        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
-        file_handler.setFormatter(file_formatter)
-
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
-        console_handler.setFormatter(console_formatter)
-
-        APP_LOGGER.addHandler(file_handler)
-        APP_LOGGER.addHandler(console_handler)
-        APP_LOGGER.propagate = False
-
-        is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
-        APP_LOGGER.setLevel(logging.DEBUG)
-
-        APP_LOGGER.info(f"=== COMPREHENSIVE LOGGING INITIALIZED ===")
-        APP_LOGGER.info(f"Log file: {log_file_path}")
-        APP_LOGGER.info(f"Debug mode: {is_debug_mode}")
-        APP_LOGGER.info(f"Logger level: {APP_LOGGER.level}")
-        APP_LOGGER.info(f"=== STARTING APPLICATION ===")
-
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.DEBUG)
-        if not root_logger.handlers:
-            root_logger.addHandler(file_handler)
-            root_logger.addHandler(console_handler)
-
-        APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
-
-        APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
-        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
-        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
-        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
-        APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
-        APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
-        APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
-
-        os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
-
-        if not HF_AUTH_TOKEN_ENV:
-            APP_LOGGER.warning("HF_AUTH_TOKEN non défini. L'étape 4 (Analyse Audio) nécessitera cette variable d'environnement.")
-
-        if not INTERNAL_WORKER_COMMS_TOKEN_ENV:
-            APP_LOGGER.warning("INTERNAL_WORKER_COMMS_TOKEN non défini. API critiques INSECURES.")
-        else:
-            APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
-
-        if not RENDER_REGISTER_TOKEN_ENV:
-            APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
-        else:
-            APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
-
-        initialize_services()
-
-        if not getattr(APP_FLASK, "_polling_threads_started", False):
-            remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
-            remote_poll_thread.daemon = True
-            remote_poll_thread.start()
-
-            csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
-            csv_monitor_thread.daemon = True
-            csv_monitor_thread.start()
-
-            APP_FLASK._polling_threads_started = True
-
-        APP_LOGGER.info("WEBHOOK MONITOR: Système de monitoring activé et prêt (Webhook uniquement).")
-
-        _app_initialized = True
-        return APP_FLASK
-
-initialize_services()
-
-REMOTE_TRIGGER_URL = os.environ.get('REMOTE_TRIGGER_URL', "https://render-signal-server.onrender.com/api/check_trigger")
-REMOTE_POLLING_INTERVAL = int(os.environ.get('REMOTE_POLLING_INTERVAL', "15"))
-
-REMOTE_SEQUENCE_STEP_KEYS = [
-    "STEP1",
-    "STEP2",
-    "STEP3",
-    "STEP4",
-    "STEP5",
-    "STEP6",
-    "STEP7"
-]
-
-if PYNVML_AVAILABLE:
-    atexit.register(pynvml.nvmlShutdown)
-    print("INFO: La fonction de nettoyage pynvml.nvmlShutdown a été enregistrée pour la sortie de l'application.")
-def format_duration_seconds(seconds_total: float) -> str:
-    if seconds_total is None or seconds_total < 0: return "N/A"
-    seconds_total = int(seconds_total)
-    hours, remainder = divmod(seconds_total, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    time_str = ""
-    if hours > 0: time_str += f"{hours}h "
-    if minutes > 0 or hours > 0: time_str += f"{minutes}m "
-    time_str += f"{seconds}s"
-    return time_str.strip() if time_str else "0s"
-
-def create_frontend_safe_config(config_dict: dict) -> dict:
-    frontend_config = {}
-    for step_key, step_data_orig in config_dict.items():
-        frontend_step_data = {}
-        for key, value in step_data_orig.items():
-            if key == "progress_patterns":
-                pass
-            elif isinstance(value, Path):
-                frontend_step_data[key] = str(value)
-            elif key == "cmd" and isinstance(value, list):
-                frontend_step_data[key] = [str(item) for item in value]
-            elif key == "specific_logs" and isinstance(value, list):
-                safe_logs = []
-                for log_entry in value:
-                    safe_entry = log_entry.copy()
-                    if 'path' in safe_entry and isinstance(safe_entry['path'], Path):
-                        safe_entry['path'] = str(safe_entry['path'])
-                    safe_logs.append(safe_entry)
-                frontend_step_data[key] = safe_logs
-            else:
-                frontend_step_data[key] = value
-        frontend_config[step_key] = frontend_step_data
-    return frontend_config
-
-def execute_csv_download_worker(dropbox_url, timestamp_str, fallback_url=None, original_filename=None):
-    LOCAL_DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     
-    download_id = f"csv_{uuid.uuid4().hex[:8]}"
+    @staticmethod
+    def initialize(cache: Cache) -> None:
+        """
+        Initialize the cache service with Flask-Caching instance.
+        
+        Args:
+            cache: Flask-Caching instance
+        """
+        global cache_instance
+        cache_instance = cache
+        logger.info("Cache service initialized")
     
-    download_info = {
-        'id': download_id,
-        'filename': 'Détermination en cours...',
-        'original_url': dropbox_url,
-        'url': dropbox_url,
-        'url_type': 'dropbox',
-        'status': 'pending',
-        'progress': 0,
-        'message': 'En attente de démarrage...',
-        'timestamp': datetime.now(),
-        'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'csv_timestamp': timestamp_str
-    }
-    
-    CSVService.add_csv_download(download_id, download_info)
-    
-    def progress_callback(status, progress, message):
-        """Callback to update CSVService with download progress."""
-        update_kwargs = {
-            'progress': progress,
-            'message': message,
-            'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'timestamp': datetime.now()
+    @staticmethod
+    def get_cache_stats() -> Dict[str, Any]:
+        """
+        Get cache performance statistics.
+        
+        Returns:
+            Cache statistics dictionary
+        """
+        total_requests = cache_stats["hits"] + cache_stats["misses"]
+        hit_rate = (cache_stats["hits"] / total_requests * 100) if total_requests > 0 else 0
+        
+        return {
+            "hits": cache_stats["hits"],
+            "misses": cache_stats["misses"],
+            "errors": cache_stats["errors"],
+            "hit_rate_percent": round(hit_rate, 2),
+            "total_requests": total_requests,
+            "uptime_seconds": round(time.time() - cache_stats["last_reset"], 1)
         }
-        CSVService.update_csv_download(download_id, status, **update_kwargs)
     
-    try:
-        urls_to_try = [dropbox_url]
-        if fallback_url and str(fallback_url).strip() and str(fallback_url).strip() != str(dropbox_url).strip():
-            urls_to_try.append(str(fallback_url).strip())
-
-        forced_name = str(original_filename).strip() if original_filename else None
-
-        result = None
-        last_attempt_url = dropbox_url
-        for attempt_url in urls_to_try:
-            last_attempt_url = attempt_url
-            result = DownloadService.download_dropbox_file(
-                url=attempt_url,
-                timestamp=timestamp_str,
-                output_dir=LOCAL_DOWNLOADS_DIR,
-                progress_callback=progress_callback,
-                forced_filename=forced_name
-            )
-            if result and result.success:
-                break
-
-        if result and result.success:
-            CSVService.update_csv_download(
-                download_id,
-                'completed',
-                progress=100,
-                message=result.message,
-                filename=result.filename,
-                display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                timestamp=datetime.now()
-            )
+    @staticmethod
+    def clear_cache() -> None:
+        """Clear all cached data."""
+        if cache_instance:
+            cache_instance.clear()
+            logger.info("Cache cleared")
+    
+    @staticmethod
+    def reset_stats() -> None:
+        """Reset cache statistics."""
+        global cache_stats
+        cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "errors": 0,
+            "last_reset": time.time()
+        }
+        logger.info("Cache statistics reset")
+    
+    @staticmethod
+    def cached_with_stats(timeout: int = 300, key_prefix: str = ""):
+        """
+        Decorator for caching with statistics tracking.
+        
+        Args:
+            timeout: Cache timeout in seconds
+            key_prefix: Prefix for cache keys
             
-            try:
-                CSVService.add_to_download_history_with_timestamp(dropbox_url, timestamp_str)
-                if fallback_url and str(fallback_url).strip():
-                    CSVService.add_to_download_history_with_timestamp(str(fallback_url).strip(), timestamp_str)
-            except Exception as e:
-                APP_LOGGER.error(f"Error adding to download history: {e}")
-            
-            APP_LOGGER.info(f"CSV DOWNLOAD: File '{result.filename}' downloaded successfully ({result.size_bytes} bytes)")
-        else:
-            CSVService.update_csv_download(
-                download_id,
-                'failed',
-                message=result.message if result else 'N/A',
-                filename=result.filename if (result and result.filename) else 'N/A',
-                display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                timestamp=datetime.now()
-            )
-            APP_LOGGER.error(
-                f"CSV DOWNLOAD: Failed - {(result.message if result else 'N/A')} (last_url={last_attempt_url})"
-            )
-            
-    except Exception as e:
-        error_msg = f"Unexpected error: {str(e)}"
-        APP_LOGGER.error(f"CSV DOWNLOAD: {error_msg}", exc_info=True)
-        CSVService.update_csv_download(
-            download_id,
-            'failed',
-            message=error_msg,
-            display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            timestamp=datetime.now()
-        )
-    
-    APP_LOGGER.info(f"CSV DOWNLOAD: Worker for {download_id} completed")
-
-def csv_monitor_service():
-    """Service de monitoring Webhook qui s'exécute en arrière-plan."""
-    APP_LOGGER.info("WEBHOOK MONITOR: Service démarré.")
-
-    from services.csv_service import CSVService
-
-    while True:
-        try:
-            workflow_state.update_csv_monitor_status(
-                status="checking",
-                last_check=datetime.now().isoformat(),
-                error=None
-            )
-
-            try:
-                CSVService._check_csv_for_downloads()
-                APP_LOGGER.debug("Webhook monitor check completed successfully")
-            except Exception as check_error:
-                APP_LOGGER.error(f"Webhook monitor check error: {check_error}")
-                workflow_state.update_csv_monitor_status(
-                    status="error",
-                    last_check=datetime.now().isoformat(),
-                    error=str(check_error)
-                )
-                time.sleep(WEBHOOK_MONITOR_INTERVAL)
-                continue
-
-            workflow_state.update_csv_monitor_status(
-                status="active",
-                last_check=datetime.now().isoformat(),
-                error=None
-            )
-
-        except Exception as e:
-            error_msg = f"Erreur dans le service CSV monitor: {e}"
-            APP_LOGGER.error(error_msg, exc_info=True)
-            workflow_state.update_csv_monitor_status(
-                status="error",
-                last_check=datetime.now().isoformat(),
-                error=error_msg
-            )
-
-        time.sleep(WEBHOOK_MONITOR_INTERVAL)
-
-
-def run_process_async(step_key: str):
-    from services.workflow_service import WorkflowService
-    
-    APP_LOGGER.info(f"[RUN_PROCESS] Starting execution for {step_key}")
-
-    projects_dir = os.path.join(BASE_PATH_SCRIPTS, 'projets_extraits')
-    os.makedirs(projects_dir, exist_ok=True)
-
-    config = workflow_commands_config.get_step_config(step_key)
-    if not config:
-        APP_LOGGER.error(f"Invalid step_key: {step_key}")
-        return
-    workflow_state.update_step_status(step_key, 'starting')
-    workflow_state.clear_step_log(step_key)
-    workflow_state.append_step_log(step_key, f"--- Lancement de: {html.escape(config['display_name'])} ---\n")
-    workflow_state.update_step_info(
-        step_key,
-        return_code=None,
-        progress_current=0,
-        progress_total=0,
-        progress_text='',
-        start_time_epoch=time.time(),
-        duration_str=None
-    )
-
-
-    
-    cmd_str_list = [str(c) for c in config['cmd']]
-    temp_json_path_for_tracking = None
-
-    if step_key == "STEP5":
-        workflow_state.append_step_log(step_key, "Préparation de l'étape de tracking : recherche des vidéos à traiter...\n")
-        try:
-            videos_to_process = WorkflowService.prepare_tracking_step(
-                BASE_TRACKING_LOG_SEARCH_PATH,
-                KEYWORD_FILTER_TRACKING_ENV,
-                SUBDIR_FILTER_TRACKING_ENV
-            )
-            
-            if not videos_to_process:
-                APP_LOGGER.info(f"{step_key}: No videos require tracking, completing immediately")
-                workflow_state.append_step_log(step_key, "Toutes les vidéos candidates semblent déjà traitées (aucun .mp4/.mov/... sans .json trouvé). Étape terminée.\n")
-                workflow_state.update_step_info(step_key, status='completed', return_code=0)
-                start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
-                workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
-                return
-
-            temp_json_path_for_tracking = WorkflowService.create_tracking_temp_file(videos_to_process)
-            cmd_str_list.extend(["--videos_json_path", str(temp_json_path_for_tracking)])
-            workflow_state.append_step_log(step_key, f"{len(videos_to_process)} vidéo(s) ajoutée(s) au lot de traitement.\nLe script gestionnaire va maintenant prendre le relais.\n\n")
-
-        except Exception as e_prep:
-            APP_LOGGER.error(f"{step_key}: Preparation failed - {e_prep}", exc_info=True)
-            error_msg = f"Erreur lors de la préparation de l'étape de tracking: {e_prep}"
-            workflow_state.append_step_log(step_key, html.escape(error_msg))
-            workflow_state.update_step_info(step_key, status='failed', return_code=-1)
-            return
-
-    workflow_state.append_step_log(step_key, f"Commande: {html.escape(' '.join(cmd_str_list))}\n")
-    workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(config['cwd']))}\n\n")
-    
-    step_progress_patterns = config.get("progress_patterns", {})
-    total_pattern_re = step_progress_patterns.get("total")
-    current_pattern_re = step_progress_patterns.get("current")
-    current_success_line_pattern_re = step_progress_patterns.get("current_success_line_pattern")
-    current_item_counter = 0
-
-    try:
-        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} executing command: {cmd_str_list}")
-        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} working directory: {config['cwd']}")
-
-        process_env = os.environ.copy()
-        process_env["PYTHONIOENCODING"] = "UTF-8"; process_env["PYTHONUTF8"] = "1"
-
-        if step_key == "STEP3":
-            try:
-                process_env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-            except Exception as _e:
-                APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF: {_e}")
-
-        if step_key == "STEP4":
-            try:
-                process_env["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
-                process_env["AUDIO_PARTIAL_SUCCESS_OK"] = "1"
-            except Exception as _e:
-                APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
-
-        process = subprocess.Popen(
-            cmd_str_list, cwd=str(config['cwd']),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1, encoding='utf-8', errors='replace', env=process_env
-        )
-
-        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess started successfully (PID: {process.pid})")
-
-        workflow_state.set_step_process(step_key, process)
-        workflow_state.update_step_status(step_key, 'running')
-        running_status_start_time = time.time()
-
-        log_deque = workflow_state.get_step_log_deque(step_key)
-
-        if process.stdout:
-            for line in iter(process.stdout.readline, ''):
-                line_strip = line.strip()
-
-                if line_strip.startswith("[Progression-MultiLine]"):
-                    progress_data = line_strip.replace("[Progression-MultiLine]", "", 1)
-                    text_progress = progress_data.replace(" || ", "\n")
-                    workflow_state.set_step_field(step_key, 'progress_text', text_progress)
-                    continue
-
-                if '\r' in line or '\x1b[' in line or '\033[' in line:
-                    continue
-
-                if log_deque is not None:
-                    log_deque.append(html.escape(line))
+        Returns:
+            Decorator function
+        """
+        def decorator(func: Callable) -> Callable:
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                if not cache_instance:
+                    cache_stats["errors"] += 1
+                    return func(*args, **kwargs)
+                
+                # Generate cache key
+                cache_key = f"{key_prefix}:{func.__name__}:{hash(str(args) + str(kwargs))}"
+                
                 try:
-                    APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT: {line_strip}")
-                except UnicodeEncodeError:
-                    APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT (ascii): {line_strip.encode('ascii', 'replace').decode('ascii')}")
+                    # Try to get from cache
+                    result = cache_instance.get(cache_key)
+                    if result is not None:
+                        cache_stats["hits"] += 1
+                        return result
+                    
+                    # Cache miss - execute function
+                    cache_stats["misses"] += 1
+                    result = func(*args, **kwargs)
+                    
+                    # Store in cache
+                    cache_instance.set(cache_key, result, timeout=timeout)
+                    return result
+                    
+                except Exception as e:
+                    cache_stats["errors"] += 1
+                    logger.error(f"Cache error for {func.__name__}: {e}")
+                    return func(*args, **kwargs)
+            
+            return wrapper
+        return decorator
+    
+    @staticmethod
+    @lru_cache(maxsize=128)
+    def get_video_metadata(video_path: str) -> Dict[str, Any]:
+        """
+        Get video metadata with caching to avoid repeated file reads.
+        
+        Args:
+            video_path: Path to video file
+            
+        Returns:
+            Video metadata dictionary
+        """
+        try:
+            import cv2
+            cap = cv2.VideoCapture(video_path)
+            try:
+                if not cap.isOpened():
+                    raise ValueError(f"Cannot open video: {video_path}")
+                
+                metadata = {
+                    'frame_count': int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+                    'fps': cap.get(cv2.CAP_PROP_FPS),
+                    'width': int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    'height': int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                    'duration_seconds': None
+                }
+                
+                # Calculate duration
+                if metadata['fps'] > 0 and metadata['frame_count'] > 0:
+                    metadata['duration_seconds'] = metadata['frame_count'] / metadata['fps']
+                
+                return metadata
+            finally:
+                cap.release()
+                
+        except Exception as e:
+            logger.error(f"Video metadata error for {video_path}: {e}")
+            return {
+                'frame_count': 0,
+                'fps': 0,
+                'width': 0,
+                'height': 0,
+                'duration_seconds': None,
+                'error': str(e)
+            }
+    
+    @staticmethod
+    def get_cached_frontend_config() -> Dict[str, Any]:
+        """
+        Get cached frontend configuration.
 
-                if total_pattern_re:
-                    total_match = total_pattern_re.search(line_strip)
-                    if total_match:
-                        try:
-                            workflow_state.set_step_field(step_key, 'progress_total', int(total_match.group(1)))
-                            files_completed = workflow_state.get_step_field(step_key, 'files_completed')
-                            if files_completed is None or not isinstance(files_completed, int):
-                                workflow_state.set_step_field(step_key, 'files_completed', 0)
-                        except (ValueError, IndexError):
-                            APP_LOGGER.warning(f"[{step_key}] ProgTotal parse error: {line_strip}")
+        Returns:
+            Frontend-safe configuration dictionary
+        """
+        try:
+            # Try to use cache if available
+            if cache_instance:
+                try:
+                    cached_result = cache_instance.get("frontend_config")
+                    if cached_result is not None:
+                        cache_stats["hits"] += 1
+                        logger.debug("Frontend config cache hit")
+                        return cached_result
+                except Exception as cache_error:
+                    logger.warning(f"Cache access failed, generating fresh config: {cache_error}")
 
-                if current_pattern_re:
-                    current_match = current_pattern_re.search(line_strip)
-                    if current_match:
-                        try:
-                            groups = current_match.groups()
+            # Generate fresh config
+            from config.workflow_commands import WorkflowCommandsConfig
 
-                            if len(groups) >= 3 and groups[0].isdigit() and groups[1].isdigit():
-                                current_num = int(groups[0])
-                                total_num = int(groups[1])
-                                filename = groups[2].strip()
-                                workflow_state.set_step_field(step_key, 'progress_current', current_num)
-                                if workflow_state.get_step_field(step_key, 'progress_total', 0) == 0:
-                                    workflow_state.set_step_field(step_key, 'progress_total', total_num)
-                                if filename:
-                                    workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
-                            elif len(groups) >= 1 and step_key == 'STEP3':
-                                filename = groups[0].strip()
-                                if filename:
-                                    workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
-                                progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
-                                if progress_total > 0:
-                                    files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
-                                    workflow_state.set_step_field(step_key, 'progress_current', min(progress_total, max(files_completed, 0) + 1))
-                                    workflow_state.set_step_field(step_key, 'progress_current_fractional', min(float(progress_total), float(workflow_state.get_step_field(step_key, 'progress_current', 0)) - 0.0 + 0.01))
-                            else:
-                                filename = groups[0].strip() if len(groups) >= 1 else ""
-                                percent = int(groups[1]) if len(groups) >= 2 and str(groups[1]).isdigit() else None
-                                if filename:
-                                    workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
-                                progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
-                                if percent is not None and progress_total > 0:
-                                    files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
-                                    current_file_progress = max(0.0, min(0.99, percent / 100.0))
-                                    overall_progress = (files_completed + current_file_progress)
-                                    workflow_state.set_step_field(step_key, 'progress_current_fractional', max(0.0, min(float(progress_total), overall_progress)))
-                        except (ValueError, IndexError):
-                            APP_LOGGER.warning(f"[{step_key}] ProgCurrent parse error: {line_strip}")
+            commands_config = WorkflowCommandsConfig().get_config()
+            if not commands_config:
+                logger.error("WorkflowCommandsConfig is empty or not available")
+                cache_stats["errors"] += 1
+                return {}
 
-                internal_pattern_re = step_progress_patterns.get("internal")
-                if internal_pattern_re:
-                    internal_match = internal_pattern_re.search(line_strip)
-                    if internal_match:
-                        try:
-                            groups = internal_match.groups()
-
-                            if len(groups) >= 4:
-                                current_batch = int(groups[0])
-                                total_batches = int(groups[1])
-                                percent = int(groups[2])
-                                filename = groups[3].strip() if groups[3] else ""
-                            elif len(groups) >= 2:
-                                filename = groups[0].strip() if groups[0] else ""
-                                percent = int(groups[1])
-                                current_batch = percent
-                                total_batches = 100
-                            else:
+            result: Dict[str, Any] = {}
+            for step_key, step_data_orig in commands_config.items():
+                if not isinstance(step_key, str) or not _SAFE_STEP_KEY_PATTERN.match(step_key):
+                    logger.error(
+                        "Unsafe step_key detected in WorkflowCommandsConfig; skipping for frontend DOM safety: %r",
+                        step_key,
+                    )
+                    continue
+                frontend_step_data: Dict[str, Any] = {}
+                for key, value in step_data_orig.items():
+                    if key == "progress_patterns":
+                        continue
+                    if isinstance(value, Path):
+                        frontend_step_data[key] = str(value)
+                    elif key == "cmd" and isinstance(value, list):
+                        frontend_step_data[key] = [str(item) for item in value]
+                    elif key == "specific_logs" and isinstance(value, list):
+                        safe_logs = []
+                        for log_entry in value:
+                            if not isinstance(log_entry, dict):
                                 continue
+                            safe_entry = log_entry.copy()
+                            if 'path' in safe_entry and isinstance(safe_entry['path'], Path):
+                                safe_entry['path'] = str(safe_entry['path'])
+                            safe_logs.append(safe_entry)
+                        frontend_step_data[key] = safe_logs
+                    else:
+                        frontend_step_data[key] = value
+                result[step_key] = frontend_step_data
+            logger.debug(f"Generated fresh frontend config with {len(result)} steps")
 
-                            progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
-                            if progress_total > 0:
-                                files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
-                                current_file_progress = max(0.0, min(0.99, percent / 100.0))
-                                overall_progress_files = files_completed + current_file_progress
-                                overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
-                                workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
+            # Cache the result if cache is available
+            if cache_instance:
+                try:
+                    cache_instance.set("frontend_config", result, timeout=300)
+                    cache_stats["misses"] += 1
+                    logger.debug("Frontend config cached successfully")
+                except Exception as cache_error:
+                    logger.warning(f"Failed to cache frontend config: {cache_error}")
 
-                            if filename:
-                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(f"{filename} ({percent}%)"))
+            return result
+        except Exception as e:
+            logger.error(f"Frontend config cache error: {e}")
+            cache_stats["errors"] += 1
+            return {}
+    
+    @staticmethod
+    def get_cached_log_content(step_key: str, log_index: int) -> Dict[str, Any]:
+        """
+        Get cached log file content.
 
-                        except (ValueError, IndexError):
-                            APP_LOGGER.warning(f"[{step_key}] Internal progress parse error: {line_strip}")
+        Args:
+            step_key: Step identifier
+            log_index: Log file index
 
-                internal_simple_re = step_progress_patterns.get("internal_simple")
-                if internal_simple_re:
-                    internal_simple_match = internal_simple_re.search(line_strip)
-                    if internal_simple_match:
-                        try:
-                            batches = int(internal_simple_match.group(1))
-                            filename = internal_simple_match.group(2).strip() if internal_simple_match.group(2) else ""
-                            progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
-                            if progress_total > 0:
-                                files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
-                                current_file_progress = 0.01
-                                overall_progress_files = files_completed + current_file_progress
-                                overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
-                                workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
-                            if filename:
-                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
-                        except Exception:
-                            APP_LOGGER.warning(f"[{step_key}] Internal simple progress parse error: {line_strip}")
+        Returns:
+            Log content dictionary
 
-                if current_success_line_pattern_re:
-                    success_match = current_success_line_pattern_re.search(line_strip)
-                    if success_match:
-                        current_item_counter += 1
-                        workflow_state.set_step_field(step_key, 'progress_current', current_item_counter)
-                        workflow_state.set_step_field(step_key, 'files_completed', current_item_counter)
-                        workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
-                        if step_progress_patterns.get("current_item_text_from_success_line"):
-                            try:
-                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(success_match.group(1).strip()))
-                            except IndexError:
-                                pass
+        Raises:
+            ValueError: If step or log not found
+        """
+        try:
+            # Try to use cache if available
+            cache_key = f"log_content:{step_key}:{log_index}"
+            if cache_instance:
+                cached_result = cache_instance.get(cache_key)
+                if cached_result is not None:
+                    cache_stats["hits"] += 1
+                    return cached_result
+
+            from services.workflow_service import WorkflowService
+
+            result = WorkflowService.get_step_log_file(step_key, log_index)
+
+            # Cache the result if cache is available
+            if cache_instance:
+                cache_instance.set(cache_key, result, timeout=60)
+                cache_stats["misses"] += 1
+
+            return result
             
-            process.stdout.close()
-        subprocess_start_time = time.time()
-        process.wait()
-        subprocess_duration = time.time() - subprocess_start_time
-
-        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess completed in {subprocess_duration:.2f} seconds (return_code: {process.returncode})")
-
-        running_status_duration = time.time() - running_status_start_time
-        min_running_time = 0.6
-
-        if running_status_duration < min_running_time:
-            sleep_time = min_running_time - running_status_duration
-            APP_LOGGER.info(f"[TIMING_FIX] {step_key} ensuring minimum running time: sleeping {sleep_time:.3f}s (total running time will be {min_running_time:.3f}s)")
-            time.sleep(sleep_time)
-
-        workflow_state.update_step_info(
-            step_key,
-            return_code=process.returncode,
-            status='completed' if process.returncode == 0 else 'failed'
-        )
-        log_suffix = "terminé avec succès" if process.returncode == 0 else f"a échoué (code: {process.returncode})"
-        workflow_state.append_step_log(step_key, f"\n--- {html.escape(config['display_name'])} {log_suffix} ---")
-
-        status = workflow_state.get_step_status(step_key)
-        progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
-        progress_current = workflow_state.get_step_field(step_key, 'progress_current', 0)
-        if status == 'completed' and progress_total > 0 and progress_current < progress_total:
-            workflow_state.set_step_field(step_key, 'progress_current', progress_total)
-        progress_text = workflow_state.get_step_field(step_key, 'progress_text', '')
-        if not progress_text and status == 'completed':
-            workflow_state.set_step_field(step_key, 'progress_text', "Terminé")
-    except FileNotFoundError:
-        APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - executable not found: {cmd_str_list[0] if cmd_str_list else 'N/A'}")
-
-        error_msg = f"Erreur: Exécutable non trouvé pour {step_key}: {cmd_str_list[0]}"
-        workflow_state.append_step_log(step_key, html.escape(error_msg))
-        workflow_state.update_step_info(step_key, status='failed', return_code=-1)
-        APP_LOGGER.error(error_msg)
-    except Exception as e:
-        APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - general exception: {e}")
-
-        error_msg = f"Erreur exécution {step_key}: {str(e)}"
-        workflow_state.append_step_log(step_key, html.escape(error_msg))
-        workflow_state.update_step_info(step_key, status='failed', return_code=-1)
-        APP_LOGGER.error(f"Exception run_process_async pour {step_key}: {e}", exc_info=True)
-    finally:
-        start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
-        workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
-        workflow_state.set_step_process(step_key, None)
-        if temp_json_path_for_tracking and temp_json_path_for_tracking.exists():
-            try:
-                os.remove(temp_json_path_for_tracking)
-                APP_LOGGER.info(f"Fichier temporaire de tracking '{temp_json_path_for_tracking.name}' supprimé.")
-            except Exception as e_clean:
-                APP_LOGGER.error(f"Impossible de supprimer le fichier temporaire de tracking '{temp_json_path_for_tracking.name}': {e_clean}")
-
-
-def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="Custom"):
-    """Execute a sequence of workflow steps.
+        except Exception as e:
+            logger.error(f"Log content cache error for {step_key}/{log_index}: {e}")
+            raise
     
-    This function has been migrated to use WorkflowState for sequence management.
-    
-    Args:
-        steps_to_run_list: List of step keys to execute in order
-        sequence_type: Type of sequence ('Full', 'Remote', 'Custom', etc.)
-    """
-    APP_LOGGER.info("🔥🔥🔥 [SEQUENCE_WORKER_TEST] UPDATED SEQUENCE WORKER WITH DEBUGGING IS RUNNING! 🔥🔥🔥")
-    
-    if sequence_type != "InternalPollingCheck" and workflow_state.is_sequence_running():
-        APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Tentative de lancement alors qu'une séquence est déjà en cours.")
-        return
-    
-    if not workflow_state.start_sequence(sequence_type):
-        APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Could not start - already running")
-        return
-    
-    APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence démarrée.")
-    all_steps_succeeded = True; sequence_summary_data = []
-    try:
-        APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Thread démarré pour {len(steps_to_run_list)} étapes: {steps_to_run_list}")
-
-        APP_LOGGER.info(f"[CACHE_CLEAR_TEST] *** UPDATED CODE IS RUNNING - CACHE CLEARED SUCCESSFULLY ***")
-        for i, step_key in enumerate(steps_to_run_list):
-            step_config = workflow_commands_config.get_step_config(step_key)
-            if not step_config:
-                APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Clé invalide '{step_key}'. Interruption.")
-                all_steps_succeeded = False; sequence_summary_data.append({"name": f"Étape Invalide ({html.escape(step_key)})", "status": "Erreur de config", "duration": "0s", "success": False}); break
-            step_display_name = step_config['display_name']
-            APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Lancement étape {i+1}/{len(steps_to_run_list)}: '{step_display_name}' ({step_key})")
+    @staticmethod
+    def get_cached_step_status(step_key: str) -> Dict[str, Any]:
+        """
+        Get cached step status to reduce computation.
+        
+        Args:
+            step_key: Step identifier
             
-            workflow_state.update_step_info(
-                step_key,
-                status='idle',
-                progress_current=0,
-                progress_total=0,
-                progress_text='',
-                start_time_epoch=None,
-                duration_str=None
-            )
+        Returns:
+            Step status dictionary
+        """
+        try:
+            step_info = get_workflow_state().get_step_info(step_key)
 
-            current_status = workflow_state.get_step_status(step_key)
+            if not step_info:
+                raise ValueError(f"Step '{step_key}' not found")
 
-            try:
-                run_process_async(step_key)
-                final_status = workflow_state.get_step_status(step_key)
-                return_code = workflow_state.get_step_field(step_key, 'return_code')
-                APP_LOGGER.info(f"[SEQUENCE_DEBUG] run_process_async completed for {step_key} (final status: {final_status}, return_code: {return_code})")
-            except Exception as e:
-                APP_LOGGER.error(f"[SEQUENCE_DEBUG] Exception in run_process_async for {step_key}: {e}", exc_info=True)
-                workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+            return step_info.copy()
             
-            step_info = workflow_state.get_step_info(step_key)
-            duration_str_step = step_info.get('duration_str', 'N/A')
-            if step_info['status'] == 'completed':
-                sequence_summary_data.append({"name": html.escape(step_display_name), "status": "Réussie", "duration": duration_str_step, "success": True})
-            else:
-                all_steps_succeeded = False
-                sequence_summary_data.append({"name": html.escape(step_display_name), "status": f"Échouée ({step_info['status']})", "duration": duration_str_step, "success": False})
-                APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Étape '{html.escape(step_display_name)}' Échouée. Interruption.")
-                break 
-        final_overall_status_text = "Terminée avec succès" if all_steps_succeeded else "Terminée avec erreurs"
-        summary_log = [f"{s['name']}: {s['status']} ({s['duration']})" for s in sequence_summary_data]
-        full_summary_log_text = f"Séquence {sequence_type} {final_overall_status_text}. Détails: " + " | ".join(summary_log)
-        APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: {full_summary_log_text}")
+        except Exception as e:
+            logger.error(f"Step status cache error for {step_key}: {e}")
+            raise
+    
+    @staticmethod
+    def invalidate_step_cache(step_key: str) -> None:
+        """
+        Invalidate cache entries for a specific step.
         
-        workflow_state.complete_sequence(success=all_steps_succeeded, message=full_summary_log_text, sequence_type=sequence_type)
-    except Exception as e_seq:
-        APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Erreur inattendue dans le worker de séquence: {e_seq}", exc_info=True)
-        all_steps_succeeded = False
-        workflow_state.complete_sequence(success=False, message=f"Erreur critique durant la séquence: {e_seq}", sequence_type=sequence_type)
-    finally:
-        if workflow_state.is_sequence_running():
-            workflow_state.complete_sequence(success=False, message="Séquence terminée de façon inattendue", sequence_type=sequence_type)
-        APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence terminée.")
-
-def run_full_sequence_from_remote():
-    """Launch full sequence from remote trigger.
-    
-    Migrated to use WorkflowState for sequence management.
-    """
-    APP_LOGGER.info("REMOTE TRIGGER: Demande de lancement de la séquence complète reçue.")
-    
-    if workflow_state.is_sequence_running():
-        APP_LOGGER.warning("REMOTE TRIGGER: Séquence complète non lancée, une autre séquence est déjà en cours.")
-        return
-    
-    seq_thread = threading.Thread(target=execute_step_sequence_worker, args=(list(REMOTE_SEQUENCE_STEP_KEYS), "Remote"))
-    seq_thread.daemon = True
-    seq_thread.start()
-
-def poll_remote_trigger():
-    """Poll remote trigger URL for pending commands.
-    
-    Migrated to use WorkflowState for sequence status checking.
-    """
-    APP_LOGGER.info(f"REMOTE POLLER: Démarré. Interrogation de {REMOTE_TRIGGER_URL} toutes les {REMOTE_POLLING_INTERVAL}s.")
-    
-    while True:
-        time.sleep(REMOTE_POLLING_INTERVAL)
-        
-        if workflow_state.is_sequence_running():
-            APP_LOGGER.debug("REMOTE POLLER: Une séquence est marquée comme en cours, attente.")
-            continue
-        
-        if workflow_state.is_any_step_running():
-            APP_LOGGER.debug("REMOTE POLLER: Une étape individuelle est active. Attente.")
-            continue
+        Args:
+            step_key: Step identifier
+        """
+        if not cache_instance:
+            return
         
         try:
-            APP_LOGGER.debug(f"REMOTE POLLER: Vérification de {REMOTE_TRIGGER_URL}.")
-            response = requests.get(REMOTE_TRIGGER_URL, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            # Clear step-specific cache entries
+            cache_keys_to_clear = [
+                f"step_status:{step_key}",
+                f"log_content:{step_key}"
+            ]
             
-            if data.get('command_pending'):
-                APP_LOGGER.info(f"REMOTE POLLER: Commande reçue! Payload: {data.get('payload')}")
-                
-                if not workflow_state.is_sequence_running():
-                    run_full_sequence_from_remote()
-                else:
-                    APP_LOGGER.warning("REMOTE POLLER: Signal reçu, mais une séquence est déjà en cours.")
-            else:
-                APP_LOGGER.debug("REMOTE POLLER: Aucune commande en attente.")
-        except requests.exceptions.RequestException as e:
-            APP_LOGGER.warning(f"REMOTE POLLER: Erreur communication {REMOTE_TRIGGER_URL}: {e}")
-        except Exception as e_poll:
-            APP_LOGGER.error(f"REMOTE POLLER: Erreur inattendue: {e_poll}", exc_info=True)
-
-@APP_FLASK.route('/test-slideshow-fixes')
-def test_slideshow_fixes():
-    """Serve the slideshow fixes test page."""
-    APP_LOGGER.debug("Serving slideshow fixes test page")
-
-    try:
-        with open('test_dom_slideshow_fixes.html', 'r', encoding='utf-8') as f:
-            test_content = f.read()
-
-        return test_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
-
-    except Exception as e:
-        APP_LOGGER.error(f"Error serving test page: {e}")
-        return f"Error loading test page: {e}", 500
-
-@APP_FLASK.route('/favicon.ico')
-def favicon():
-    """
-    Handle favicon.ico requests to prevent 404 errors in browser console.
-    Returns a 204 No Content response since we don't have a favicon file.
-    """
-    APP_LOGGER.debug("Favicon requested - returning 204 No Content")
-    return '', 204
-
-def get_current_workflow_status_summary():
-    """Get comprehensive workflow status summary including CSV downloads.
+            for key in cache_keys_to_clear:
+                cache_instance.delete(key)
+            
+            logger.debug(f"Invalidated cache for step {step_key}")
+            
+        except Exception as e:
+            logger.error(f"Cache invalidation error for {step_key}: {e}")
     
-    Migrated to use WorkflowState for all state access.
-    """
-    overall_status_code_val = "idle"
-    overall_status_text_display_val = "Prêt et en attente."
-    current_step_name_val = None
-    progress_current_val = 0
-    progress_total_val = 0
-    active_step_key_found = None
+    @staticmethod
+    def warm_cache() -> None:
+        """
+        Pre-populate cache with commonly accessed data.
+        """
+        try:
+            logger.info("Starting cache warm-up")
+            
+            # Warm up frontend config
+            CacheService.get_cached_frontend_config()
+            
+            # Warm up step statuses
+            workflow_state = get_workflow_state()
+            step_keys = list((workflow_state.get_all_steps_info() or {}).keys())
+            if not step_keys:
+                from config.workflow_commands import WorkflowCommandsConfig
+                step_keys = WorkflowCommandsConfig().get_all_step_keys()
+
+            for step_key in step_keys:
+                try:
+                    CacheService.get_cached_step_status(step_key)
+                except Exception:
+                    pass  # Skip errors during warm-up
+            
+            logger.info("Cache warm-up completed")
+            
+        except Exception as e:
+            logger.error(f"Cache warm-up error: {e}")
     
-    is_sequence_globally_active = workflow_state.is_sequence_running()
-    
-    if is_sequence_globally_active:
-        sequence_outcome = workflow_state.get_sequence_outcome()
-        active_sequence_type = sequence_outcome.get("type", "Inconnue") if sequence_outcome.get("status", "").startswith("running_") else "Inconnue"
+    @staticmethod
+    def get_cache_size_estimate() -> Dict[str, Any]:
+        """
+        Get an estimate of cache memory usage.
         
-        for step_key_seq in REMOTE_SEQUENCE_STEP_KEYS:
-            step_status = workflow_state.get_step_status(step_key_seq)
-            if step_status in ['running', 'starting']:
-                active_step_key_found = step_key_seq
-                overall_status_code_val = f"sequence_running_{active_sequence_type.lower()}"
-                break
-    
-    if not active_step_key_found:
-        all_steps_info = workflow_state.get_all_steps_info()
-        for step_key_ind, info_ind in all_steps_info.items():
-            if info_ind['status'] in ['running', 'starting']:
-                active_step_key_found = step_key_ind
-                overall_status_code_val = f"step_running_{step_key_ind}"
-                break
-    
-    if active_step_key_found:
-        active_step_info = workflow_state.get_step_info(active_step_key_found)
-        active_step_config = workflow_commands_config.get_step_config(active_step_key_found)
-        current_step_name_val = active_step_config['display_name'] if active_step_config else 'Étape inconnue'
-        progress_current_val = active_step_info['progress_current']
-        progress_total_val = active_step_info['progress_total']
-        
-        if overall_status_code_val.startswith("sequence_running"):
-            seq_type_disp = overall_status_code_val.split("_")[-1].capitalize()
-            overall_status_text_display_val = f"Séquence {seq_type_disp} - En cours: {current_step_name_val}"
-        elif overall_status_code_val.startswith("step_running"):
-            overall_status_text_display_val = f"En cours: {current_step_name_val}"
-    else:
-        sequence_outcome = workflow_state.get_sequence_outcome()
-        if sequence_outcome and sequence_outcome.get("timestamp"):
-            last_seq_time_str = sequence_outcome["timestamp"]
-            if last_seq_time_str.endswith('Z'):
-                last_seq_time_str = last_seq_time_str[:-1] + '+00:00'
-            try:
-                last_seq_dt = datetime.fromisoformat(last_seq_time_str)
-                if last_seq_dt.tzinfo is None:
-                    last_seq_dt = last_seq_dt.replace(tzinfo=timezone.utc)
-                time_since_last_seq = datetime.now(timezone.utc) - last_seq_dt
-                
-                if time_since_last_seq < timedelta(hours=1):
-                    seq_type_display = sequence_outcome.get('type', 'N/A')
-                    if sequence_outcome.get("status") == "success":
-                        overall_status_code_val = "completed_success_recent"
-                        overall_status_text_display_val = f"Terminé avec succès (Séquence {seq_type_display})"
-                        current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
-                    elif sequence_outcome.get("status") == "error":
-                        overall_status_code_val = "completed_error_recent"
-                        overall_status_text_display_val = f"Terminé avec erreur(s) (Séquence {seq_type_display})"
-                        current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
-                    elif sequence_outcome.get("status", "").startswith("running_"):
-                        seq_type_running = sequence_outcome.get("type", "N/A")
-                        overall_status_code_val = f"sequence_starting_{seq_type_running.lower()}"
-                        overall_status_text_display_val = f"Démarrage Séquence {seq_type_running}..."
-                else:
-                    overall_status_code_val = "idle_after_completion"
-                    overall_status_text_display_val = "Prêt (dernière opération terminée il y a >1h)."
-            except ValueError as e_ts:
-                APP_LOGGER.warning(f"Error parsing sequence outcome timestamp '{sequence_outcome['timestamp']}': {e_ts}")
-                overall_status_code_val = "idle_parse_error"
-                overall_status_text_display_val = "Prêt (erreur parsing dernier statut)."
-        else:
-            overall_status_code_val = "idle_initial"
-            overall_status_text_display_val = "Prêt et en attente (jamais exécuté)."
-
-    active_list_csv = workflow_state.get_active_csv_downloads_list()
-    kept_list_csv = workflow_state.get_kept_csv_downloads_list()
-
-    all_csv_downloads_intermediate = active_list_csv + kept_list_csv
-    all_csv_downloads_intermediate.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
-
-    recent_downloads_summary_val = []
-    for item_csv in all_csv_downloads_intermediate[:5]:
-        recent_downloads_summary_val.append({
-            "filename": item_csv.get('filename', 'N/A'),
-            "status": item_csv.get('status', 'N/A'),
-            "timestamp": item_csv.get('display_timestamp', 'N/A'),
-            "csv_timestamp": item_csv.get('csv_timestamp', 'N/A')
-        })
-    status_text_detail_val = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-
-    return {
-        "overall_status_code": overall_status_code_val,
-        "overall_status_text_display": overall_status_text_display_val,
-        "current_step_name": current_step_name_val,
-        "status_text_detail": status_text_detail_val,
-        "progress_current": progress_current_val,
-        "progress_total": progress_total_val,
-        "recent_downloads": recent_downloads_summary_val,
-        "last_updated_utc": datetime.now(timezone.utc).isoformat(),
-        "last_sequence_summary": workflow_state.get_sequence_outcome()
-    }
-
-
-if __name__ == '__main__':
-    init_app()
-
-    APP_FLASK.run(
-        debug=config.DEBUG,
-        host=config.HOST,
-        port=config.PORT,
-        threaded=True,
-        use_reloader=False
-    )
+        Returns:
+            Cache size information
+        """
+        try:
+            # This is a rough estimate since Flask-Caching doesn't provide direct size info
+            stats = CacheService.get_cache_stats()
+            
+            # Estimate based on number of cached items
+            estimated_items = stats["hits"] + stats["misses"]
+            estimated_size_mb = estimated_items * 0.001  # Rough estimate: 1KB per item
+            
+            return {
+                "estimated_items": estimated_items,
+                "estimated_size_mb": round(estimated_size_mb, 2),
+                "cache_type": "SimpleCache",
+                "note": "Size estimates are approximate"
+            }
+            
+        except Exception as e:
+            logger.error(f"Cache size estimation error: {e}")
+            return {
+                "estimated_items": 0,
+                "estimated_size_mb": 0,
+                "error": str(e)
+            }
 ```
 
 ## File: services/csv_service.py
@@ -32142,642 +29336,845 @@ input[type="radio"]:disabled {
 }
 ```
 
-## File: static/main.js
+## File: static/state/AppState.js
 ```javascript
-import * as dom from './domElements.js';
-import * as ui from './uiUpdater.js';
-import * as api from './apiService.js';
-import { initializeEventHandlers } from './eventHandlers.js';
-import { POLLING_INTERVAL } from './constants.js';
-import { showNotification } from './utils.js';
-
-window.showNotification = showNotification;
-import { showSequenceSummaryUI } from './popupManager.js';
-import { scrollToStepImmediate, setAutoScrollEnabled } from './scrollManager.js';
-
-import { initializeSoundManager } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js';
-import { errorHandler } from './utils/ErrorHandler.js';
-import { performanceMonitor } from './utils/PerformanceMonitor.js';
-import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
-
-import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
-import { appState } from './state/AppState.js';
-import { initializeCSVDownloadMonitor } from './csvDownloadMonitor.js';
-import { themeManager } from './themeManager.js';
-import { cinematicLogMode } from './cinematicLogMode.js';
-import { reportViewer } from './reportViewer.js';
-import { fetchWithLoadingState } from './apiService.js';
-
-import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
-
-window.addEventListener('unhandledrejection', (event) => {
-    console.error('[MAIN] Unhandled promise rejection:', event.reason);
-
-    // Check if this is the specific browser extension error we're trying to fix
-    if (event.reason && event.reason.message &&
-        event.reason.message.includes('message channel closed')) {
-        console.debug('[MAIN] Suppressing browser extension message channel error');
-        event.preventDefault(); // Prevent the error from appearing in console
-        return;
-    }
-});
-
-function setupLocalDownloadsToggle() {
-    const section = document.querySelector('.local-downloads-section');
-    const btn = document.getElementById('toggle-local-downloads');
-    if (!section || !btn) return;
-
-    let visible = true;
-    try {
-        const stored = localStorage.getItem('ui.localDownloadsVisible');
-        if (stored !== null) visible = stored === 'true';
-    } catch (_) {}
-
-    if (visible) {
-        section.style.display = '';
-    } else {
-        section.style.display = 'none';
-    }
-
-    applyLocalDownloadsVisibility(section, btn, visible);
-
-    btn.addEventListener('click', () => {
-        visible = !(btn.getAttribute('aria-pressed') === 'true');
-        applyLocalDownloadsVisibility(section, btn, visible);
-        try { localStorage.setItem('ui.localDownloadsVisible', String(visible)); } catch (_) {}
-        appState.setState({ ui: { localDownloadsVisible: visible } }, 'downloads_visibility_toggle');
-        // Clear alert state if revealing
-        if (visible) {
-            btn.classList.remove('downloads-toggle--alert');
-            try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
-        }
-    });
-
-    updateDownloadsToggleAlert(appState.getStateProperty('csvDownloads') || []);
-}
-
-function applyLocalDownloadsVisibility(section, btn, visible) {
-    domBatcher.scheduleUpdate('downloads-visibility-toggle', () => {
-        if (visible) {
-            section.style.display = '';
-            section.classList.remove('minimized');
-            btn.setAttribute('aria-pressed', 'true');
-            btn.classList.remove('downloads-toggle--hidden');
-            // Focus and highlight the Downloads section title for accessibility feedback
-            requestAnimationFrame(() => {
-                const title = section.querySelector('h2');
-                if (title) {
-                    safeFocusAndHighlight(title);
-                }
-            });
-        } else {
-            btn.setAttribute('aria-pressed', 'false');
-            btn.classList.add('downloads-toggle--hidden');
-            section.style.display = 'none';
-        }
-    });
-}
-
-function safeFocusAndHighlight(el) {
-    if (!el || typeof el !== 'object') return;
-    try {
-        // Make sure element can be focused without altering tab order permanently
-        let removeTabIndex = false;
-        if (el !== document.body && el.tabIndex === -1) {
-            // Already programmatically focusable
-        } else if (el !== document.body && (el.getAttribute && el.getAttribute('tabindex') === null)) {
-            el.setAttribute('tabindex', '-1');
-            removeTabIndex = true;
-        }
-        el.focus && el.focus();
-        // Apply highlight flash
-        if (el.classList) {
-            el.classList.add('section-focus-highlight');
-            setTimeout(() => { try { el.classList.remove('section-focus-highlight'); } catch(_){} }, 450);
-        }
-        if (removeTabIndex) {
-            setTimeout(() => { try { el.removeAttribute('tabindex'); } catch(_){} }, 500);
-        }
-    } catch(_){}
-}
-
-function updateDownloadsToggleAlert(downloads) {
-    const btn = document.getElementById('toggle-local-downloads');
-    const section = document.querySelector('.local-downloads-section');
-    if (!btn || !section) return;
-
-    const visible = btn.getAttribute('aria-pressed') === 'true';
-    const list = Array.isArray(downloads) ? downloads : [];
-    const inProgress = list.some(d => {
-        const s = (d && d.status) ? String(d.status).toLowerCase() : '';
-        return s === 'downloading' || s === 'starting' || s === 'pending';
-    });
-
-    if (!visible && inProgress) {
-        btn.classList.add('downloads-toggle--alert');
-        try {
-            const alerted = localStorage.getItem('ui.localDownloadsAlertedOnce') === 'true';
-            if (!alerted && typeof window.showNotification === 'function') {
-                window.showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
-                localStorage.setItem('ui.localDownloadsAlertedOnce', 'true');
+class AppState {
+    constructor() {
+        this.state = {
+            pollingIntervals: {},
+            
+            activeStepKeyForLogsPanel: null,
+            isAnySequenceRunning: false,
+            focusedElementBeforePopup: null,
+            ui: {
+                compactMode: false
+            },
+            
+            stepTimers: {},
+            selectedStepsOrder: [],
+            
+            processInfo: {},
+            
+            performanceMetrics: {
+                apiResponseTimes: [],
+                errorCounts: {},
+                lastUpdate: null
+            },
+            
+            cacheStats: {
+                hits: 0,
+                misses: 0,
+                hitRate: 0
             }
-        } catch (_) {}
-    } else {
-        btn.classList.remove('downloads-toggle--alert');
-        try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
+        };
+        
+        this.listeners = new Set();
+        this.isDestroyed = false;
+        
+        this.stateChangeCount = 0;
+        this.lastStateChange = Date.now();
+        
+        console.debug('[AppState] Initialized with immutable state management');
     }
-}
-
-window.addEventListener('error', (event) => {
-    console.error('[MAIN] Uncaught error:', event.error);
-    errorHandler.handleApiError('uncaught-error', event.error);
-});
-
-let stepsConfigData = {};
-try {
-    stepsConfigData = JSON.parse(document.getElementById('steps-config-data').textContent);
-} catch (e) {
-    console.error("Could not parse steps_config_data:", e);
-}
-ui.setStepsConfig(stepsConfigData);
-
-const LOCAL_DOWNLOAD_POLLING_INTERVAL = POLLING_INTERVAL * 2;
-
-const SYSTEM_MONITOR_POLLING_INTERVAL = 5000;
-
-
-
-function initializeStateManagement() {
-    console.log('Initializing state management and performance monitoring...');
-
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        appState.subscribe((newState, oldState, source) => {
-            console.debug(`[StateManagement] State changed from ${source}:`, {
-                changes: findStateChanges(oldState, newState),
-                newState: newState
-            });
-        });
+    
+    getState() {
+        if (this.isDestroyed) {
+            console.warn('[AppState] Attempted to access destroyed state');
+            return {};
+        }
+        return this._deepClone(this.state);
     }
-
-    appState.subscribeToProperty('isAnySequenceRunning', (newValue, oldValue) => {
-        if (newValue !== oldValue) {
-            ui.updateGlobalUIForSequenceState(newValue);
-        }
-    });
-
-    appState.subscribeToProperty('activeStepKeyForLogsPanel', (newValue, oldValue) => {
-        if (newValue !== oldValue && newValue) {
-            domBatcher.scheduleUpdate('logs-panel-update', () => {
-                console.debug(`Active step for logs changed to: ${newValue}`);
-            });
-        }
-    });
-
-    console.log('Performance monitoring initialized automatically');
-
-    setTimeout(() => {
-        if (typeof CacheService !== 'undefined' && CacheService.warm_cache) {
-            CacheService.warm_cache();
-        }
-    }, 1000);
-
-    console.log('State management and performance monitoring initialized successfully');
-}
-
-function findStateChanges(oldState, newState) {
-    const changes = {};
-
-    function compareObjects(old, current, path = '') {
-        for (const key in current) {
-            const currentPath = path ? `${path}.${key}` : key;
-
-            if (typeof current[key] === 'object' && current[key] !== null && !Array.isArray(current[key])) {
-                if (typeof old[key] === 'object' && old[key] !== null) {
-                    compareObjects(old[key], current[key], currentPath);
-                } else {
-                    changes[currentPath] = { from: old[key], to: current[key] };
-                }
-            } else if (old[key] !== current[key]) {
-                changes[currentPath] = { from: old[key], to: current[key] };
-            }
-        }
+    
+    getStateProperty(path) {
+        if (this.isDestroyed) return undefined;
+        
+        return path.split('.').reduce((obj, key) => {
+            return obj && obj[key] !== undefined ? obj[key] : undefined;
+        }, this.state);
     }
-
-    compareObjects(oldState, newState);
-    return changes;
-}
-
-async function pollLocalDownloadsStatus() {
-    if (!dom.localDownloadsList) return;
-
-    try {
-        const downloads = await api.fetchLocalDownloadsStatusAPI();
-        ui.updateLocalDownloadsListUI(downloads);
-
-        // Update app state with current downloads for CSV monitoring
-        appState.setState({ csvDownloads: downloads }, 'downloads_polled');
-
-        // Update toggle alert state if section is hidden and activity occurs
-        updateDownloadsToggleAlert(downloads);
-
-        // Clear error state on success
-        errorHandler.clearErrors('localDownloadsStatus', {
-            elementId: 'local-downloads-list'
-        });
-
-    } catch (error) {
-        // Handle error with proper user feedback and exponential backoff
-        const delay = await errorHandler.handlePollingError('localDownloadsStatus', error, {
-            elementId: 'local-downloads-list'
-        });
-
-        // Apply delay if needed (PollingManager will handle this automatically)
-        if (delay > 0) {
-            console.debug(`Applying ${delay}ms delay for localDownloadsStatus polling`);
-        }
-    }
-}
-
-
-
-async function pollSystemMonitor() {
-    const monitorWidget = document.getElementById('system-monitor-widget');
-    if (!monitorWidget) {
-        console.warn('[MAIN] System monitor widget not found during polling');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/system_monitor');
-        if (!response.ok) {
-            console.warn(`[MAIN] System monitor API failed: ${response.status}`);
-            monitorWidget.style.opacity = '0.5';
+    
+    setState(updates, source = 'unknown') {
+        if (this.isDestroyed) {
+            console.warn('[AppState] Attempted to update destroyed state');
             return;
         }
-        const data = await response.json();
-        console.debug('[MAIN] System monitor data received:', data);
-
-        // Batch DOM updates to minimize reflows
-        domBatcher.scheduleUpdate('system-monitor-update', () => {
-            // CPU
-            const cpuBar = document.getElementById('cpu-monitor-bar');
-            const cpuValue = document.getElementById('cpu-monitor-value');
-            if (cpuBar && cpuValue) {
-                const cpuPercent = data.cpu_percent || 0;
-                cpuBar.style.width = `${cpuPercent}%`;
-                cpuValue.textContent = `${cpuPercent.toFixed(1)} %`;
-                cpuBar.dataset.usageLevel = cpuPercent > 85 ? 'high' : cpuPercent > 60 ? 'medium' : 'low';
+        
+        const oldState = this._deepClone(this.state);
+        const newState = this._mergeDeep(this.state, updates);
+        
+        if (this._stateChanged(oldState, newState)) {
+            this.state = newState;
+            this.stateChangeCount++;
+            this.lastStateChange = Date.now();
+            
+            console.debug(`[AppState] State updated from ${source}:`, updates);
+            
+            this._notifyListeners(newState, oldState, source);
+        }
+    }
+    
+    subscribe(listener) {
+        if (typeof listener !== 'function') {
+            throw new Error('[AppState] Listener must be a function');
+        }
+        
+        this.listeners.add(listener);
+        
+        return () => {
+            this.listeners.delete(listener);
+        };
+    }
+    
+    /**
+     * Subscribe to specific state property changes.
+     * @param {string} path - Dot-notation path to property
+     * @param {Function} listener - Callback function (newValue, oldValue) => void
+     * @returns {Function} Unsubscribe function
+     */
+    subscribeToProperty(path, listener) {
+        const propertyListener = (newState, oldState) => {
+            const newValue = this._getPropertyByPath(newState, path);
+            const oldValue = this._getPropertyByPath(oldState, path);
+            
+            if (newValue !== oldValue) {
+                listener(newValue, oldValue);
             }
-
-            // RAM
-            const ramBar = document.getElementById('ram-monitor-bar');
-            const ramValue = document.getElementById('ram-monitor-value');
-            const ramDetails = document.getElementById('ram-monitor-details');
-            if (ramBar && ramValue && ramDetails && data.memory) {
-                const memPercent = data.memory.percent || 0;
-                ramBar.style.width = `${memPercent}%`;
-                ramValue.textContent = `${memPercent.toFixed(1)} %`;
-                ramDetails.textContent = `${data.memory.used_gb.toFixed(2)} / ${data.memory.total_gb.toFixed(2)} GB`;
-                ramBar.dataset.usageLevel = memPercent > 85 ? 'high' : memPercent > 70 ? 'medium' : 'low';
+        };
+        
+        return this.subscribe(propertyListener);
+    }
+    
+    batchUpdate(updateFn, source = 'batch') {
+        const originalNotify = this._notifyListeners;
+        const updates = [];
+        
+        this._notifyListeners = (newState, oldState, updateSource) => {
+            updates.push({ newState, oldState, source: updateSource });
+        };
+        
+        try {
+            updateFn();
+        } finally {
+            this._notifyListeners = originalNotify;
+            
+            if (updates.length > 0) {
+                const finalUpdate = updates[updates.length - 1];
+                this._notifyListeners(finalUpdate.newState, updates[0].oldState, source);
             }
+        }
+    }
+    
+    reset() {
+        const initialState = {
+            pollingIntervals: {},
+            activeStepKeyForLogsPanel: null,
+            isAnySequenceRunning: false,
+            focusedElementBeforePopup: null,
+            ui: {
+                compactMode: false
+            },
+            stepTimers: {},
+            selectedStepsOrder: [],
 
-            // GPU
-            const gpuSection = document.getElementById('gpu-monitor-section');
-            const gpuError = document.getElementById('gpu-monitor-error');
-            if (gpuSection && gpuError) {
-                if (data.gpu && !data.gpu.error) {
-                    gpuSection.style.display = 'block';
-                    gpuError.style.display = 'none';
+            processInfo: {},
+            performanceMetrics: {
+                apiResponseTimes: [],
+                errorCounts: {},
+                lastUpdate: null
+            },
+            cacheStats: {
+                hits: 0,
+                misses: 0,
+                hitRate: 0
+            }
+        };
+        
+        this.setState(initialState, 'reset');
+        console.info('[AppState] State reset to initial values');
+    }
+    
+    getStats() {
+        return {
+            listenerCount: this.listeners.size,
+            stateChangeCount: this.stateChangeCount,
+            lastStateChange: this.lastStateChange,
+            isDestroyed: this.isDestroyed,
+            stateSize: JSON.stringify(this.state).length
+        };
+    }
+    
+    destroy() {
+        console.info('[AppState] Destroying state manager');
+        
+        this.listeners.clear();
+        this.state = {};
+        this.isDestroyed = true;
+    }
+    
+    _deepClone(obj) {
+        if (typeof structuredClone === 'function') {
+            try {
+                return structuredClone(obj);
+            } catch (error) {
+                console.warn('[AppState] structuredClone failed, falling back to manual clone:', error);
+            }
+        }
 
-                    const gpuBar = document.getElementById('gpu-monitor-bar');
-                    const gpuValue = document.getElementById('gpu-monitor-value');
-                    const gpuDetails = document.getElementById('gpu-monitor-details');
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
 
-                    const gpuPercent = data.gpu.utilization_percent || 0;
-                    gpuBar.style.width = `${gpuPercent}%`;
-                    gpuValue.textContent = `${gpuPercent.toFixed(1)} %`;
-                    gpuBar.dataset.usageLevel = gpuPercent > 85 ? 'high' : gpuPercent > 60 ? 'medium' : 'low';
+        if (obj instanceof Date) {
+            return new Date(obj.getTime());
+        }
 
-                    const temp = data.gpu.temperature_c || 'N/A';
-                    const memUsed = data.gpu.memory ? data.gpu.memory.used_gb.toFixed(2) : 'N/A';
-                    const memTotal = data.gpu.memory ? data.gpu.memory.total_gb.toFixed(2) : 'N/A';
-                    gpuDetails.textContent = `${temp}°C | ${memUsed} / ${memTotal} GB`;
+        if (Array.isArray(obj)) {
+            return obj.map(item => this._deepClone(item));
+        }
+
+        const cloned = {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                cloned[key] = this._deepClone(obj[key]);
+            }
+        }
+        return cloned;
+    }
+    
+    _mergeDeep(target, source) {
+        const result = this._deepClone(target);
+        
+        for (const key in source) {
+            if (source.hasOwnProperty(key)) {
+                if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                    result[key] = this._mergeDeep(result[key] || {}, source[key]);
                 } else {
-                    gpuSection.style.display = 'none';
-                    if (data.gpu && data.gpu.error) {
-                        gpuError.textContent = data.gpu.error;
-                        gpuError.style.display = 'block';
-                    }
+                    result[key] = source[key];
                 }
             }
+        }
+        
+        return result;
+    }
+    
+    _stateChanged(oldState, newState) {
+        return !this._areValuesEqual(oldState, newState);
+    }
 
-            // Compact line values (shown when minimized)
-            const compactLine = document.getElementById('monitor-compact-line');
-            if (compactLine) {
-                const compactCpu = document.getElementById('compact-cpu');
-                const compactRam = document.getElementById('compact-ram');
-                const compactGpu = document.getElementById('compact-gpu');
+    _areValuesEqual(a, b, visited = new WeakMap()) {
+        if (Object.is(a, b)) {
+            return true;
+        }
 
-                const cpuPercent = data.cpu_percent || 0;
-                const memPercent = (data.memory && data.memory.percent) ? data.memory.percent : 0;
+        if (typeof a !== typeof b) {
+            return false;
+        }
 
-                if (compactCpu) compactCpu.textContent = `${cpuPercent.toFixed(1)}%`;
-                if (compactRam && data.memory) {
-                    const used = (typeof data.memory.used_gb === 'number') ? data.memory.used_gb.toFixed(1) : 'N/A';
-                    const total = (typeof data.memory.total_gb === 'number') ? data.memory.total_gb.toFixed(1) : 'N/A';
-                    compactRam.textContent = `${memPercent.toFixed(1)}% (${used}/${total}G)`;
-                }
-                if (compactGpu) {
-                    if (data.gpu && !data.gpu.error && typeof data.gpu.utilization_percent === 'number') {
-                        const temp = (typeof data.gpu.temperature_c === 'number') ? data.gpu.temperature_c : 'N/A';
-                        const gUsed = data.gpu.memory && typeof data.gpu.memory.used_gb === 'number' ? data.gpu.memory.used_gb.toFixed(1) : 'N/A';
-                        const gTotal = data.gpu.memory && typeof data.gpu.memory.total_gb === 'number' ? data.gpu.memory.total_gb.toFixed(1) : 'N/A';
-                        compactGpu.textContent = `${data.gpu.utilization_percent.toFixed(1)}% (${temp}C)`;
-                    } else if (data.gpu && data.gpu.error) {
-                        compactGpu.textContent = 'err';
-                    } else {
-                        compactGpu.textContent = 'N/A';
-                    }
-                }
+        if (a === null || b === null) {
+            return false;
+        }
+
+        if (typeof a !== 'object') {
+            return false;
+        }
+
+        if (visited.has(a) && visited.get(a) === b) {
+            return true;
+        }
+        visited.set(a, b);
+
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+        if (aKeys.length !== bKeys.length) {
+            return false;
+        }
+
+        for (const key of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(b, key)) {
+                return false;
             }
+            if (!this._areValuesEqual(a[key], b[key], visited)) {
+                return false;
+            }
+        }
 
-            monitorWidget.style.opacity = '1';
+        return true;
+    }
+    
+    _getPropertyByPath(obj, path) {
+        return path.split('.').reduce((current, key) => {
+            return current && current[key] !== undefined ? current[key] : undefined;
+        }, obj);
+    }
+    
+    _notifyListeners(newState, oldState, source) {
+        this.listeners.forEach(listener => {
+            try {
+                listener(newState, oldState, source);
+            } catch (error) {
+                console.error('[AppState] Listener error:', error);
+            }
         });
+    }
+}
 
-        // Clear error state on success
-        errorHandler.clearErrors('systemMonitor', {
-            elementId: 'system-monitor-widget'
+export const appState = new AppState();
+
+window.addEventListener('beforeunload', () => {
+    appState.destroy();
+});
+
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    window.appState = appState;
+    
+    appState.subscribe((newState, oldState, source) => {
+        console.debug(`[AppState] Change from ${source}:`, {
+            newState: newState,
+            oldState: oldState
         });
+    });
+}
 
-    } catch (error) {
-        // Handle error with proper user feedback
-        const delay = await errorHandler.handlePollingError('systemMonitor', error, {
-            elementId: 'system-monitor-widget'
-        });
+export default appState;
+```
 
-        // Visual feedback for system monitor errors
-        domBatcher.scheduleUpdate('system-monitor-error', () => {
-            monitorWidget.style.opacity = '0.5';
-        });
+## File: static/apiService.js
+```javascript
+// --- START OF REFACTORED apiService.js ---
 
-        if (delay > 0) {
-            console.debug(`Applying ${delay}ms delay for systemMonitor polling`);
+import { POLLING_INTERVAL } from './constants.js';
+import * as ui from './uiUpdater.js';
+import * as dom from './domElements.js';
+import { appState } from './state/AppState.js';
+import { showNotification, sendBrowserNotification } from './utils.js';
+import { soundEvents } from './soundManager.js';
+import { pollingManager } from './utils/PollingManager.js';
+import { errorHandler } from './utils/ErrorHandler.js';
+
+
+/**
+ * Fetch helper that toggles a loading state on a button during the request.
+ * It adds data-loading="true" and disables the button while the fetch runs.
+ * @param {string} url
+ * @param {RequestInit} options
+ * @param {HTMLElement|string|null} buttonElOrId - element or element id
+ * @returns {Promise<any>} parsed JSON response (or throws on network/error)
+ */
+export async function fetchWithLoadingState(url, options = {}, buttonElOrId = null) {
+    let btn = null;
+    if (typeof buttonElOrId === 'string') {
+        btn = document.getElementById(buttonElOrId);
+    } else if (buttonElOrId && buttonElOrId.nodeType === 1) {
+        btn = buttonElOrId;
+    }
+
+    try {
+        if (btn) {
+            btn.setAttribute('data-loading', 'true');
+            btn.disabled = true;
+        }
+        const response = await fetch(url, options);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error((data && data.message) || `Erreur HTTP ${response.status}`);
+        }
+        return data;
+    } finally {
+        if (btn) {
+            btn.removeAttribute('data-loading');
+            btn.disabled = false;
         }
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    ui.closeLogPanelUI();
-    if (dom.sequenceSummaryPopupOverlay) dom.sequenceSummaryPopupOverlay.style.display = 'none';
-    
-    if (dom.customSequenceConfirmPopupOverlay) dom.customSequenceConfirmPopupOverlay.style.display = 'none';
+/**
+ * Centralized function to handle UI updates and state changes when a step fails.
+ * This avoids code duplication in runStepAPI and performPoll.
+ * @param {string} stepKey - The key of the step that failed.
+ * @param {Error} error - The error object.
+ * @param {string} errorSource - A string indicating where the error occurred (e.g., 'Lancement', 'Polling').
+ */
+function handleStepFailure(stepKey, error, errorSource) {
+    const errorMessage = error.message || 'Erreur inconnue.';
+    console.error(`[API handleStepFailure] Erreur ${errorSource} pour ${stepKey}:`, error);
 
-    // Initialize theme system
-    themeManager.init();
-
-    // Initialize cinematic log mode
-    cinematicLogMode.init();
-
-    if (document.getElementById('report-overlay')) {
-        reportViewer.init();
+    if (errorMessage.includes('Étape inconnue')) {
+        console.warn(`[API handleStepFailure] Étape '${stepKey}' n'est pas reconnue.`);
     }
 
+    soundEvents.errorEvent();
 
-    const initialStatusPromises = [];
-    const allStepKeysForInitialStatus = Object.keys(stepsConfigData);
+    showNotification(`Erreur ${errorSource} ${stepKey}: ${errorMessage}`, 'error');
 
-    allStepKeysForInitialStatus.forEach(stepKey => {
-        initialStatusPromises.push(api.fetchInitialStatusAPI(stepKey));
-    });
+    const statusEl = document.getElementById(`status-${stepKey}`);
+    if (statusEl) {
+        statusEl.textContent = `Erreur: ${errorMessage.substring(0, 50)}`;
+        statusEl.className = 'status-badge status-failed';
+    }
+
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+        ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${errorMessage}</i>`);
+    }
+
+    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+    if (runButton) {
+        runButton.disabled = !!appState.getStateProperty('isAnySequenceRunning');
+    }
+    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+    if (cancelButton) {
+        cancelButton.disabled = true;
+    }
+
+    ui.stopStepTimer(stepKey);
+    const progressBar = document.getElementById(`progress-bar-${stepKey}`);
+    if (progressBar) {
+        progressBar.style.backgroundColor = 'var(--red)';
+    }
+
+    stopPollingAPI(stepKey);
+}
 
 
+export async function runStepAPI(stepKey) {
+    // --- UI setup (unchanged) ---
+    ui.resetStepTimerDisplay(stepKey);
+    const statusEl = document.getElementById(`status-${stepKey}`);
+    if(statusEl) { statusEl.textContent = 'Initiation...'; statusEl.className = 'status-badge status-initiated'; }
+    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+    if(runButton) runButton.disabled = true;
+    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+    if(cancelButton) cancelButton.disabled = false;
+
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+        ui.updateMainLogOutputUI('<i>Initiation du processus...</i>');
+    }
 
     try {
-        await Promise.all(initialStatusPromises);
-    } catch (error) {
-        console.warn("[Main.js DOMContentLoaded] Error fetching some initial statuses:", error);
-    } finally {
-        ui.updateGlobalUIForSequenceState(appState.getStateProperty('isAnySequenceRunning'));
-        ui.updateCustomSequenceButtonsUI();
-    }
+        const data = await fetchWithLoadingState(`/run/${stepKey}`, { method: 'POST' }, runButton);
+        console.log(`[API runStepAPI] Réponse pour ${stepKey}:`, data);
 
-    initializeEventHandlers();
-
-    // Initialize sound manager
-    initializeSoundManager();
-
-    // Initialize CSV download monitor for auto-workflow prompts
-    initializeCSVDownloadMonitor();
-
-    // Initialize state management and performance monitoring
-    initializeStateManagement();
-
-    // Initialize polling with proper resource management
-    if (dom.localDownloadsList) {
-        pollingManager.startPolling(
-            'localDownloadsStatus',
-            pollLocalDownloadsStatus,
-            LOCAL_DOWNLOAD_POLLING_INTERVAL,
-            { immediate: true }
-        );
-    }
-
-    // Setup unified-controls toggle for Local Downloads visibility
-    setupLocalDownloadsToggle();
-
-
-
-
-    // System monitor polling - with retry mechanism
-    const startSystemMonitorPolling = () => {
-        const widget = document.getElementById('system-monitor-widget');
-        if (widget) {
-            console.log('[MAIN] ✅ Starting system monitor polling');
-            pollingManager.startPolling(
-                'systemMonitor',
-                pollSystemMonitor,
-                SYSTEM_MONITOR_POLLING_INTERVAL,
-                { immediate: true }
-            );
+        if (data.status === 'initiated') {
+            const statusEl = document.getElementById(`status-${stepKey}`);
+            if(statusEl) { statusEl.textContent = 'Lancé'; statusEl.className = 'status-badge status-starting'; }
+            ui.startStepTimer(stepKey);
+            console.log(`[API runStepAPI] Appel de startPollingAPI pour ${stepKey}`);
+            startPollingAPI(stepKey);
             return true;
         } else {
-            console.warn('[MAIN] ⚠️ System monitor widget not found, retrying...');
-            return false;
+            throw new Error(data.message || `Réponse invalide du serveur pour le lancement de ${stepKey}.`);
+        }
+    } catch (error) {
+        handleStepFailure(stepKey, error, 'Lancement');
+        return false;
+    }
+}
+
+function appendItalicLineToMainLog(panelEl, message) {
+    if (!panelEl) return;
+    const br = document.createElement('br');
+    const i = document.createElement('i');
+    i.textContent = String(message ?? '');
+    panelEl.appendChild(br);
+    panelEl.appendChild(i);
+}
+
+export async function cancelStepAPI(stepKey) {
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+        appendItalicLineToMainLog(dom.mainLogOutputPanel, 'Annulation en cours...');
+    }
+
+    try {
+        const cancelUrl = `/cancel/${stepKey}`;
+        const fullUrl = new URL(cancelUrl, window.location.origin).href;
+        console.log(`[CANCEL DEBUG] Attempting to cancel ${stepKey}:`);
+        console.log(`  - Relative URL: ${cancelUrl}`);
+        console.log(`  - Full URL: ${fullUrl}`);
+        console.log(`  - Current origin: ${window.location.origin}`);
+        console.log(`  - Current port: ${window.location.port}`);
+
+        const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+        const data = await fetchWithLoadingState(cancelUrl, { method: 'POST' }, cancelButton);
+        console.log(`[CANCEL DEBUG] Response received (ok):`, data);
+        showNotification(data.message || "Annulation demandée", 'info');
+
+        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+            appendItalicLineToMainLog(dom.mainLogOutputPanel, data.message || 'Annulation demandée');
+        }
+    } catch (error) {
+        console.error(`Erreur annulation ${stepKey}:`, error);
+
+        errorHandler.handleApiError(`cancel/${stepKey}`, error, { stepKey });
+
+        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+            appendItalicLineToMainLog(dom.mainLogOutputPanel, `Erreur communication pour annulation: ${error.toString()}`);
+        }
+    }
+}
+
+export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
+    stopPollingAPI(stepKey);
+
+    const pollingInterval = isAutoModeHighFrequency ? 200 : POLLING_INTERVAL;
+    console.log(`[API startPollingAPI] 🚀 Polling démarré pour ${stepKey}. Intervalle: ${pollingInterval}ms ${isAutoModeHighFrequency ? '(AutoMode high-frequency)' : '(normal)'}`);
+
+    const performPoll = async () => {
+        try {
+            const pollStartTime = performance.now();
+            console.log(`[API POLL] Fetching status for ${stepKey} at ${new Date().toISOString()}`);
+
+            const response = await fetch(`/status/${stepKey}`);
+            if (!response.ok) {
+                console.warn(`[API performPoll] Erreur ${response.status} lors du polling pour ${stepKey}. Arrêt du polling.`);
+                stopPollingAPI(stepKey);
+                if (!appState.getStateProperty('isAnySequenceRunning')) {
+                    handleStepFailure(stepKey, new Error(`Erreur statut (${response.status})`), 'Polling');
+                }
+                return;
+            }
+            const data = await response.json();
+
+            const pollEndTime = performance.now();
+            const statusEmoji = data.status === 'running' ? '🔄' : data.status === 'completed' ? '✅' : data.status === 'failed' ? '❌' : '⚪';
+            console.log(`[API POLL RESPONSE] ${statusEmoji} ${stepKey} (${(pollEndTime - pollStartTime).toFixed(2)}ms): status="${data.status}", progress=${data.progress_current}/${data.progress_total}, return_code=${data.return_code}`);
+
+            const previousStatus = appState.getStateProperty(`processInfo.${stepKey}.status`) || 'unknown';
+            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_polled');
+
+            if (typeof data.is_any_sequence_running === 'boolean') {
+                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_polled');
+            }
+
+            ui.updateStepCardUI(stepKey, data);
+
+            const workflowWrapper = typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
+            if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey && workflowWrapper && workflowWrapper.classList.contains('logs-active')) {
+                ui.updateMainLogOutputUI(data.log.join(''));
+            }
+            const isTerminal = ['completed', 'failed'].includes(data.status);
+            if (isTerminal && previousStatus !== data.status) {
+                const title = data.status === 'completed' ? '✅ Étape terminée' : '❌ Étape en erreur';
+                const body = `${stepKey} — statut: ${data.status}`;
+                sendBrowserNotification(title, body).catch(() => {});
+            }
+
+            const shouldStopPolling = isTerminal ||
+                                    (data.status === 'idle' && !appState.getStateProperty('autoModeEnabled'));
+
+            if (shouldStopPolling) {
+                console.log(`[API performPoll] Statut final '${data.status}' pour ${stepKey}. Arrêt du polling.`);
+                stopPollingAPI(stepKey);
+            } else if (data.status === 'idle' && appState.getStateProperty('autoModeEnabled')) {
+                console.log(`[API performPoll] ⚪ ${stepKey} idle mais AutoMode actif - maintien du polling pour détecter les transitions`);
+            }
+        } catch (error) {
+            console.error(`[API performPoll] Erreur CATCH polling ${stepKey}:`, error);
+            stopPollingAPI(stepKey);
+            if (!appState.getStateProperty('isAnySequenceRunning')) {
+                handleStepFailure(stepKey, error, 'Polling');
+            }
         }
     };
 
-    // Try immediately, then retry if needed
-    if (!startSystemMonitorPolling()) {
-        setTimeout(() => {
-            if (!startSystemMonitorPolling()) {
-                console.error('[MAIN] ❌ System monitor widget not found after retry');
-            }
-        }, 1000);
-    }
-
-    setupCompactMode();
-
-    setupSettingsPanel();
-
-    setupSystemMonitorMinimize();
-
-    setupKeyboardShortcuts();
-
-    initializeStepDetailsPanel();
-});
-
-function setupCompactMode() {
-    const wrapper = dom.workflowWrapper;
-    if (!wrapper) {
-        console.warn('[COMPACT] Wrapper not found, skipping setup');
-        return;
-    }
-
-    // Force compact mode as the only mode
-    appState.setState({ ui: { compactMode: true } }, 'compact_forced_default');
-    try { localStorage.setItem('ui.compactMode', 'true'); } catch (_) {}
-
-    // Apply immediately and keep in sync if state changes elsewhere
-    applyCompactClass(wrapper, true);
-    appState.subscribeToProperty('ui.compactMode', (newVal) => {
-        applyCompactClass(wrapper, !!newVal);
-    });
+    const pollingId = pollingManager.startPolling(
+        `step-${stepKey}`,
+        performPoll,
+        pollingInterval, // Use dynamic interval (200ms for AutoMode, 500ms for normal)
+        { immediate: true, maxErrors: 3 }
+    );
 }
 
-function applyCompactClass(wrapper, enabled) {
-    domBatcher.scheduleUpdate('compact-mode-toggle', () => {
-        if (enabled) {
-            wrapper.classList.add('compact-mode');
-        } else {
-            wrapper.classList.remove('compact-mode');
-        }
-    });
+export function stopPollingAPI(stepKey) {
+    pollingManager.stopPolling(`step-${stepKey}`);
+    console.log(`[API stopPollingAPI] Polling arrêté pour ${stepKey}.`);
 }
 
-
-function setupSystemMonitorMinimize() {
-    const widget = document.getElementById('system-monitor-widget');
-    const btn = document.getElementById('system-monitor-minimize');
-    const compactLine = document.getElementById('monitor-compact-line');
-    if (!widget || !btn) {
-        console.warn('[SYSTEM-MONITOR] Elements not found, skipping minimize setup');
-        return;
-    }
-
-    // Init from storage
-    let stored = null;
-    try { stored = localStorage.getItem('ui.systemMonitorMinimized'); } catch (_) {}
-    const minimized = stored === 'true';
-    appState.setState({ ui: { systemMonitorMinimized: minimized } }, 'system_monitor_init');
-    applySystemMonitorMinimized(widget, compactLine, minimized);
-
-    // Subscribe to state changes
-    appState.subscribeToProperty('ui.systemMonitorMinimized', (newVal) => {
-        applySystemMonitorMinimized(widget, compactLine, !!newVal);
-        try { localStorage.setItem('ui.systemMonitorMinimized', (!!newVal).toString()); } catch (_) {}
-    });
-
-    // Click on button to minimize
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const current = !!appState.getStateProperty('ui.systemMonitorMinimized');
-        appState.setState({ ui: { systemMonitorMinimized: !current } }, 'system_monitor_toggle');
-    });
-
-    // Click on widget restores when minimized
-    widget.addEventListener('click', () => {
-        const isMinimized = widget.classList.contains('minimized');
-        if (isMinimized) {
-            appState.setState({ ui: { systemMonitorMinimized: false } }, 'system_monitor_restore_click');
-        }
-    });
-}
-
-function applySystemMonitorMinimized(widget, compactLine, minimized) {
-    domBatcher.scheduleUpdate('system-monitor-minimized-toggle', () => {
-        if (minimized) {
-            widget.classList.add('minimized');
-            if (compactLine) {
-                compactLine.style.display = 'flex';
-                compactLine.setAttribute('aria-hidden', 'false');
-            }
-        } else {
-            widget.classList.remove('minimized');
-            if (compactLine) {
-                compactLine.style.display = 'none';
-                compactLine.setAttribute('aria-hidden', 'true');
-            }
-        }
-    });
-}
-
-function setupSettingsPanel() {
-    const toggle = dom.settingsToggle;
-    const panel = dom.settingsPanel;
-    if (!toggle || !panel) {
-        console.warn('[SETTINGS] Elements not found, skipping setup');
-        return;
-    }
-
-    // Init from storage (optional), then AppState
+export async function fetchSpecificLogAPI(stepKey, logIndex, logName, buttonElOrId = null) {
+    ui.updateSpecificLogUI(logName, null, "<i>Chargement...</i>");
     try {
-        const stored = localStorage.getItem('ui.settingsOpen');
-        if (stored !== null) {
-            appState.setState({ ui: { settingsOpen: stored === 'true' } }, 'settings_init_storage');
-        }
-    } catch (e) {
-        console.debug('[SETTINGS] localStorage not available', e);
-    }
-
-    // Apply initial state
-    const initialOpen = !!appState.getStateProperty('ui.settingsOpen');
-    applySettingsPanel(panel, toggle, initialOpen);
-
-    // Keep DOM in sync with state changes
-    appState.subscribeToProperty('ui.settingsOpen', (open) => {
-        applySettingsPanel(panel, toggle, !!open);
-    });
-
-    // Toggle handler
-    toggle.addEventListener('click', () => {
-        const next = !appState.getStateProperty('ui.settingsOpen');
-        appState.setState({ ui: { settingsOpen: next } }, 'settings_toggle');
-        try { localStorage.setItem('ui.settingsOpen', String(next)); } catch (_) {}
-    });
-}
-
-function applySettingsPanel(panel, toggle, open) {
-    domBatcher.scheduleUpdate('settings-panel-update', () => {
-        if (!panel || !toggle) return;
-        if (open) {
-            panel.classList.add('open');
-            panel.hidden = false;
+        let data;
+        const url = `/get_specific_log/${stepKey}/${logIndex}`;
+        if (buttonElOrId) {
+            data = await fetchWithLoadingState(url, {}, buttonElOrId);
         } else {
-            panel.classList.remove('open');
-            panel.hidden = true;
-        }
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        toggle.setAttribute('aria-label', open ? 'Refermer les réglages' : 'Ouvrir les réglages');
-    });
-}
-
-function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', (e) => {
-        // Only handle shortcuts when not typing in inputs
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true')) {
-            return;
-        }
-
-        // Toggle Settings panel with 'S' key
-        if (e.key === 's' || e.key === 'S') {
-            e.preventDefault();
-            const toggle = dom.settingsToggle;
-            if (toggle) {
-                toggle.click();
+            const response = await fetch(url);
+            data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || `Erreur HTTP ${response.status}`);
             }
         }
+        ui.updateSpecificLogUI(logName, data.path, data.content);
+    } catch (error) {
+        console.error(`Erreur fetch log spécifique ${stepKey}/${logIndex}:`, error);
+        ui.updateSpecificLogUI(logName, null, '', true, `Erreur de communication: ${error.toString()}`);
+    }
+}
+
+
+export async function fetchInitialStatusAPI(stepKey) {
+    try {
+        const response = await fetch(`/status/${stepKey}`);
+        if (!response.ok) {
+            console.warn(`Initial status fetch failed for ${stepKey}: ${response.status}. Using fallback.`);
+            appState.setState({
+                processInfo: {
+                    [stepKey]: appState.getStateProperty(`processInfo.${stepKey}`) || {
+                        status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+                        is_any_sequence_running: false
+                    }
+                }
+            }, 'process_info_initial_fallback');
+        } else {
+            const data = await response.json();
+            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_initial');
+
+            if (typeof data.is_any_sequence_running === 'boolean') {
+                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_initial');
+            }
+        }
+
+        const stepInfo = appState.getStateProperty(`processInfo.${stepKey}`) || {
+            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+            is_any_sequence_running: false
+        };
+
+        if (stepKey === 'clear_disk_cache') {
+            ui.updateClearCacheGlobalButtonState(stepInfo.status);
+        } else {
+            ui.updateStepCardUI(stepKey, stepInfo);
+        }
+        
+        if (['running', 'starting', 'initiated'].includes(stepInfo.status)) {
+            console.log(`[API fetchInitialStatusAPI] Étape ${stepKey} en cours au démarrage. Lancement du polling.`);
+            startPollingAPI(stepKey);
+        }
+
+    } catch (err) {
+        console.error(`Erreur CATCH fetchInitialStatusAPI pour ${stepKey}:`, err);
+        const fallbackData = appState.getStateProperty(`processInfo.${stepKey}`) || {
+            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+            is_any_sequence_running: false
+        };
+        if (stepKey === 'clear_disk_cache') {
+            ui.updateClearCacheGlobalButtonState(fallbackData.status);
+        } else {
+            ui.updateStepCardUI(stepKey, fallbackData);
+        }
+    }
+}
+
+export async function fetchLocalDownloadsStatusAPI() {
+    try {
+        const response = await fetch('/api/csv_downloads_status');
+        if (!response.ok) {
+            console.warn(`Erreur lors de la récupération du statut des téléchargements CSV: ${response.status}`);
+            return [];
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Erreur réseau fetchLocalDownloadsStatusAPI:", error);
+        return [];
+    }
+}
+
+
+
+export async function fetchCSVMonitorStatusAPI() {
+    try {
+        const response = await fetch('/api/csv_monitor_status');
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Erreur fetchCSVMonitorStatusAPI:", error);
+        return {
+            csv_monitor: { status: "error", last_check: null, error: "Impossible de récupérer le statut" },
+            auto_mode_enabled: false,
+            csv_url: "",
+            check_interval: 15
+        };
+    }
+}
+```
+
+## File: static/popupManager.js
+```javascript
+import * as dom from './domElements.js';
+import { appState } from './state/AppState.js';
+import { DOMUpdateUtils } from './utils/DOMBatcher.js';
+
+function handlePopupKeydown(event) {
+    const popupOverlay = event.currentTarget;
+    if (event.key === 'Escape') {
+        closePopupUI(popupOverlay);
+    }
+    if (event.key === 'Tab') {
+        const focusableElements = Array.from(popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement) {
+                lastElement.focus();
+                event.preventDefault();
+            }
+        } else {
+            if (document.activeElement === lastElement) {
+                firstElement.focus();
+                event.preventDefault();
+            }
+        }
+    }
+}
+
+export function openPopupUI(popupOverlay) {
+    if (!popupOverlay) return;
+
+    const currentFocused = document.activeElement;
+    if (currentFocused &&
+        currentFocused !== document.body &&
+        currentFocused !== document.documentElement &&
+        typeof currentFocused.focus === 'function' &&
+        currentFocused.nodeType === Node.ELEMENT_NODE) {
+        appState.setState({ focusedElementBeforePopup: currentFocused }, 'popup_focus_store');
+        console.debug('[POPUP] Stored focusable element:', {
+            tagName: currentFocused.tagName,
+            id: currentFocused.id || 'no-id',
+            className: currentFocused.className || 'no-class'
+        });
+    } else {
+        appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_store');
+        console.debug('[POPUP] No valid focusable element to store');
+    }
+
+    popupOverlay.style.display = 'flex';
+    popupOverlay.setAttribute('data-visible', 'true');
+    popupOverlay.setAttribute('aria-hidden', 'false');
+    const focusableElements = popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+
+    let elementToFocus = null;
+    for (let i = 0; i < focusableElements.length; i++) {
+        const element = focusableElements[i];
+        if (element.offsetParent !== null && typeof element.focus === 'function') {
+            elementToFocus = element;
+            break;
+        }
+    }
+
+    if (elementToFocus) {
+        try {
+            elementToFocus.focus();
+        } catch (error) {
+            console.warn('[POPUP] Failed to focus element in popup:', error);
+        }
+    }
+
+    popupOverlay.addEventListener('keydown', handlePopupKeydown);
+}
+
+export function closePopupUI(popupOverlay) {
+    if (!popupOverlay) return;
+    popupOverlay.removeAttribute('data-visible');
+    popupOverlay.setAttribute('aria-hidden', 'true');
+    popupOverlay.style.display = 'none';
+    popupOverlay.removeEventListener('keydown', handlePopupKeydown);
+    const prevFocused = appState.getStateProperty('focusedElementBeforePopup');
+
+    if (prevFocused && typeof prevFocused.focus === 'function') {
+        try {
+            if (prevFocused.isConnected && document.hasFocus()) {
+                if (document.contains(prevFocused) && prevFocused.offsetParent !== null) {
+                    prevFocused.focus();
+                } else {
+                    console.debug('[POPUP] Previous focused element no longer focusable, skipping focus restoration');
+                }
+            }
+        } catch (error) {
+            console.warn('[POPUP] Failed to restore focus to previous element:', error);
+        }
+    } else if (prevFocused) {
+        const elementInfo = {
+            tagName: prevFocused.tagName || 'unknown',
+            id: prevFocused.id || 'no-id',
+            className: prevFocused.className || 'no-class',
+            nodeType: prevFocused.nodeType || 'unknown',
+            hasFocusMethod: typeof prevFocused.focus === 'function'
+        };
+        console.debug('[POPUP] Previous focused element is not focusable:', elementInfo);
+    }
+
+    appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_clear');
+}
+
+function resolveSequenceSummaryElements() {
+    const overlay = typeof dom.getSequenceSummaryPopupOverlay === 'function'
+        ? dom.getSequenceSummaryPopupOverlay()
+        : dom.sequenceSummaryPopupOverlay;
+    const list = typeof dom.getSequenceSummaryList === 'function'
+        ? dom.getSequenceSummaryList()
+        : dom.sequenceSummaryList;
+    return { overlay, list };
+}
+
+export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "Séquence", overallDuration = null) {
+    const { overlay, list } = resolveSequenceSummaryElements();
+    if (!overlay || !list) {
+        console.error("Éléments DOM pour la popup de résumé non trouvés!");
+        return;
+    }
+    const summaryTitle = overlay.querySelector("h3");
+    if (summaryTitle) summaryTitle.textContent = `Résumé: ${sequenceName}`;
+
+    list.innerHTML = '';
+    if (overallDuration && typeof overallDuration === 'string') {
+        const totalItem = document.createElement('li');
+        totalItem.style.fontWeight = 'bold';
+        totalItem.style.marginBottom = '8px';
+        totalItem.style.paddingBottom = '8px';
+        totalItem.style.borderBottom = `1px solid var(--border-color)`;
+        const safeDuration = DOMUpdateUtils.escapeHtml(overallDuration);
+        totalItem.innerHTML = `<span class="status-icon" style="color:var(--accent-color);">⏱️</span> Durée totale: ${safeDuration}`;
+        list.appendChild(totalItem);
+    }
+    results.forEach(result => {
+        const listItem = document.createElement('li');
+        const icon = result.success ? '<span class="status-icon status-completed" style="color:var(--green);">✔️</span>' : '<span class="status-icon status-failed" style="color:var(--red);">❌</span>';
+        const safeName = DOMUpdateUtils.escapeHtml(String(result.name ?? ''));
+        const safeDurationText = result.duration && result.duration !== "N/A" ? DOMUpdateUtils.escapeHtml(String(result.duration)) : "";
+        const durationText = safeDurationText ? `<span class="duration">(${safeDurationText})</span>` : "";
+        listItem.innerHTML = `${icon} ${safeName}: ${result.success ? 'Terminée avec succès' : 'Échouée ou annulée'} ${durationText}`;
+        list.appendChild(listItem);
     });
+
+    const overallStatusItem = document.createElement('li');
+    overallStatusItem.style.fontWeight = 'bold';
+    overallStatusItem.style.marginTop = '10px';
+    overallStatusItem.style.paddingTop = '10px';
+    overallStatusItem.style.borderTop = `1px solid var(--border-color)`;
+    const safeSequenceName = DOMUpdateUtils.escapeHtml(String(sequenceName ?? 'Séquence'));
+    if (overallSuccess) {
+        overallStatusItem.innerHTML = `<span class="status-icon status-completed" style="color:var(--green);">🎉</span> ${safeSequenceName} terminée avec succès !`;
+    } else {
+        overallStatusItem.innerHTML = `<span class="status-icon status-failed" style="color:var(--red);">⚠️</span> ${safeSequenceName} a rencontré une ou plusieurs erreurs.`;
+    }
+    list.appendChild(overallStatusItem);
+    openPopupUI(overlay);
+}
+
+export function showCustomSequenceConfirmUI() {
+    dom.customSequenceConfirmList.innerHTML = '';
+    const selectedStepsOrder = appState.getStateProperty('selectedStepsOrder') || [];
+    selectedStepsOrder.forEach((stepKey, index) => {
+        const stepElement = document.getElementById(`step-${stepKey}`);
+        const stepName = stepElement ? stepElement.dataset.stepName : stepKey;
+        const li = document.createElement('li');
+        const safeStepName = DOMUpdateUtils.escapeHtml(String(stepName ?? ''));
+        li.innerHTML = `<span class="order-prefix">${index + 1}.</span> ${safeStepName}`;
+        dom.customSequenceConfirmList.appendChild(li);
+    });
+    openPopupUI(dom.customSequenceConfirmPopupOverlay);
 }
 ```
 
@@ -33193,200 +30590,207 @@ export function scrollToStepAbsolute(stepKey, options = {}) {
 export { SCROLL_CONFIG };
 ```
 
-## File: static/sequenceManager.js
+## File: static/state.js
 ```javascript
-import { POLLING_INTERVAL } from './constants.js';
-import * as ui from './uiUpdater.js';
-import * as state from './state.js';
-import { runStepAPI } from './apiService.js';
-import { showSequenceSummaryUI } from './popupManager.js';
-import { formatElapsedTime } from './utils.js';
-import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
+// Import new immutable state management
+import { appState } from './state/AppState.js';
 
-import { soundEvents } from './soundManager.js';
-
-/**
- * Executes and tracks a single step within a sequence.
- * This helper function encapsulates all logic for one step, from initiation to completion.
- * @private
- * @param {string} stepKey - The unique key for the step.
- * @param {string} sequenceName - The name of the parent sequence.
- * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
- * @param {number} totalSteps - The total number of steps in the sequence.
- * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
- */
-async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
-    const stepConfig = ui.getStepsConfig()[stepKey];
-    const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
-
-    console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
-
-    ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
-        Math.round(((currentStepNum - 1) / totalSteps) * 100)
-    );
-
-    if (stepKey !== 'clear_disk_cache') {
-        ui.openLogPanelUI(stepKey, true);
-        ui.setActiveStepForLogPanelUI(stepKey);
-        
-        if (isSequenceAutoScrollEnabled()) {
-            setTimeout(() => {
-                scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
-            }, 0);
+export const PROCESS_INFO_CLIENT = new Proxy({}, {
+    get(_target, prop) {
+        if (typeof prop !== 'string') return undefined;
+        return appState.getStateProperty(`processInfo.${prop}`);
+    },
+    set(_target, prop, value) {
+        if (typeof prop !== 'string') return false;
+        appState.setState({ processInfo: { [prop]: value } }, 'process_info_update');
+        return true;
+    },
+    ownKeys() {
+        const root = appState.getStateProperty('processInfo') || {};
+        return Reflect.ownKeys(root);
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+        const root = appState.getStateProperty('processInfo') || {};
+        if (Object.prototype.hasOwnProperty.call(root, prop)) {
+            return { enumerable: true, configurable: true };
         }
+        return undefined;
     }
+});
 
-    const stepInitiated = await runStepAPI(stepKey);
-    if (!stepInitiated) {
-        console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
-        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
-            Math.round(((currentStepNum - 1) / totalSteps) * 100), true
-        );
-        return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
+// Legacy exports for backward compatibility (deprecated - use appState instead)
+export let pollingIntervals = {};
+export let activeStepKeyForLogsPanel = null;
+export let stepTimers = {};
+export let selectedStepsOrder = [];
+export let isAnySequenceRunning = false;
+export let focusedElementBeforePopup = null;
+
+
+// --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
+export const REMOTE_SEQUENCE_STEP_KEYS = [
+    "STEP1",
+    "STEP2",
+    "STEP3",
+    "STEP4",
+    "STEP5",
+    "STEP6",
+    "STEP7"
+];
+
+// Modern state management functions using AppState
+export function setActiveStepKeyForLogs(key) {
+    activeStepKeyForLogsPanel = key; // Legacy
+    appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
+}
+export function getActiveStepKeyForLogs() {
+    return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
+}
+
+export function addStepTimer(stepKey, timerData) {
+    stepTimers[stepKey] = timerData; // Legacy
+    appState.setState({
+        stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
+    }, 'addStepTimer');
+}
+export function getStepTimer(stepKey) {
+    return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
+}
+export function clearStepTimerInterval(stepKey) {
+    const timer = getStepTimer(stepKey);
+    if (timer && timer.intervalId) {
+        clearInterval(timer.intervalId);
+        const updatedTimer = { ...timer, intervalId: null };
+        addStepTimer(stepKey, updatedTimer);
     }
+}
+export function deleteStepTimer(stepKey) {
+    if (getStepTimer(stepKey)) {
+        clearStepTimerInterval(stepKey);
+        delete stepTimers[stepKey]; // Legacy
+        const currentTimers = appState.getStateProperty('stepTimers') || {};
+        const { [stepKey]: removed, ...remainingTimers } = currentTimers;
+        appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
+    }
+}
 
-    ui.startStepTimer(stepKey);
-    console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
+export function setSelectedStepsOrder(order) {
+    selectedStepsOrder = order; // Legacy
+    appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
+}
+export function getSelectedStepsOrder() {
+    return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
+}
 
+export function setIsAnySequenceRunning(running) {
+    isAnySequenceRunning = running; // Legacy
+    appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
+}
+export function getIsAnySequenceRunning() {
+    return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
+}
+
+export function setFocusedElementBeforePopup(element) {
+    focusedElementBeforePopup = element; // Legacy
+    appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
+}
+export function getFocusedElementBeforePopup() {
+    return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
+}
+
+export function setAutoModeLogPanelOpened(opened) {
+    appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
+}
+
+export function getAutoModeLogPanelOpened() {
+    return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
+}
+
+export function addPollingInterval(stepKey, id) {
+    pollingIntervals[stepKey] = id; // Legacy
+    appState.setState({
+        pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
+    }, 'addPollingInterval');
+}
+export function clearPollingInterval(stepKey) {
+    if (pollingIntervals[stepKey]) {
+        clearInterval(pollingIntervals[stepKey]);
+        delete pollingIntervals[stepKey]; // Legacy
+    }
+    const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
+    const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
+    appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
+}
+export function getPollingInterval(stepKey) {
+    return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
+}
+
+
+
+// Export the appState for direct access to modern state management
+export { appState };
+```
+
+## File: static/utils.js
+```javascript
+import { getNotificationsArea } from './domElements.js';
+
+export function formatElapsedTime(startTime) {
+    if (!startTime) return "";
+    const now = new Date();
+    let seconds = Math.floor((now - startTime) / 1000);
+    let minutes = Math.floor(seconds / 60);
+    let hours = Math.floor(minutes / 60);
+    seconds %= 60;
+    minutes %= 60;
+    let timeStr = "";
+    if (hours > 0) timeStr += `${hours}h `;
+    if (minutes > 0 || hours > 0) timeStr += `${minutes}m `;
+    timeStr += `${seconds}s`;
+    return timeStr;
+}
+
+export function showNotification(message, type = 'info') { // type can be 'info', 'success', 'error', 'warning'
+    const notificationsArea = getNotificationsArea();
+    if (!notificationsArea) return;
+    const notif = document.createElement('div');
+    notif.className = `notification ${type}`;
+    notif.textContent = message;
+    notificationsArea.appendChild(notif);
+    setTimeout(() => {
+        notif.remove();
+    }, 5000);
+}
+
+// Web Notifications API helpers
+export async function ensureBrowserNotificationsPermission() {
+    if (!('Notification' in window)) {
+        console.warn('[Notifications] Browser does not support Notification API');
+        return false;
+    }
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
     try {
-        ui.setActiveStepForLogPanelUI(stepKey);
+        const perm = await Notification.requestPermission();
+        return perm === 'granted';
     } catch (e) {
-        console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
-    }
-
-    let timerData = state.getStepTimer(stepKey);
-    if (timerData && timerData.startTime) {
-        console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
-    } else {
-        console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
-    }
-
-    console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
-    const stepCompleted = await waitForStepCompletionInSequence(stepKey);
-
-    ui.stopStepTimer(stepKey);
-    console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
-
-    timerData = state.getStepTimer(stepKey);
-    const duration = (timerData?.elapsedTimeFormatted) || "N/A";
-
-    console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
-        timerData,
-        duration,
-        startTime: timerData?.startTime,
-        elapsedTimeFormatted: timerData?.elapsedTimeFormatted
-    });
-
-    if (!stepCompleted) {
-        console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
-
-        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
-            Math.round((currentStepNum / totalSteps) * 100), true
-        );
-        return { name: stepDisplayName, success: false, duration };
-    }
-
-    console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
-
-    soundEvents.stepSuccess();
-
-    return { name: stepDisplayName, success: true, duration };
-}
-
-export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
-    console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
-    ui.updateGlobalUIForSequenceState(true);
-    ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
-
-    const sequenceStart = Date.now();
-
-    const sequenceResults = [];
-    const totalStepsInThisSequence = stepsToExecute.length;
-    const isAutoModeSequence = sequenceName === "AutoMode";
-    let sequenceFailed = false;
-
-    if (isAutoModeSequence) {
-        state.setAutoModeLogPanelOpened(false); // Reset flag for this new auto sequence
-    }
-
-    for (let i = 0; i < stepsToExecute.length; i++) {
-        const stepKey = stepsToExecute[i];
-        const currentStepNum = i + 1;
-
-        const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
-        sequenceResults.push(result);
-
-        if (!result.success) {
-            sequenceFailed = true;
-            break; // Exit the loop immediately on failure
-        }
-
-        if (i < stepsToExecute.length - 1) {
-            const nextStepKey = stepsToExecute[i + 1];
-            if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
-                try {
-                    ui.openLogPanelUI(nextStepKey, true);
-                    ui.setActiveStepForLogPanelUI(nextStepKey);
-                    
-                    if (isSequenceAutoScrollEnabled()) {
-                        setTimeout(() => {
-                            scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
-                        }, 0);
-                    }
-                } catch (e) {
-                    console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
-                }
-            }
-            ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
-                Math.round((currentStepNum / totalStepsInThisSequence) * 100)
-            );
-        }
-    }
-
-    console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
-
-    if (sequenceFailed) {
-    } else {
-        ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
-        soundEvents.workflowCompletion();
-    }
-
-    if (sequenceResults.length > 0) {
-        const overallDuration = formatElapsedTime(new Date(sequenceStart));
-        showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
-    } else {
-        console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
-    }
-
-    ui.updateGlobalUIForSequenceState(false);
-    if (isAutoModeSequence) {
-        state.setAutoModeLogPanelOpened(false);
+        console.warn('[Notifications] Permission request failed:', e);
+        return false;
     }
 }
 
-function waitForStepCompletionInSequence(stepKey) {
-    return new Promise((resolve) => {
-        const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
-        console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
-
-        const checkInterval = setInterval(() => {
-            const data = state.PROCESS_INFO_CLIENT[stepKey];
-
-            if (!data) {
-                return;
-            }
-
-            if (data.status === 'completed') {
-                console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
-                clearInterval(checkInterval);
-                resolve(true);
-            } else if (data.status === 'failed' || data.return_code === -9) {
-                console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
-                clearInterval(checkInterval);
-                resolve(false);
-            }
-            }, POLLING_INTERVAL / 2);
-    });
+export async function sendBrowserNotification(title, body, options = {}) {
+    try {
+        const ok = await ensureBrowserNotificationsPermission();
+        if (!ok) return false;
+        const notif = new Notification(title || 'Notification', { body: body || '', ...options });
+        setTimeout(() => notif && notif.close && notif.close(), 8000);
+        return true;
+    } catch (e) {
+        console.debug('[Notifications] Fallback to UI banner due to error:', e);
+        showNotification(`${title || 'Notification'}: ${body || ''}`, 'info');
+        return false;
+    }
 }
 ```
 
@@ -34046,6 +31450,1082 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
+
+## File: app_new.py
+```python
+import csv
+import html
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+import atexit
+from collections import deque
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+import uuid
+
+import psutil
+import requests
+from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask_caching import Cache
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Dotenv loaded successfully")
+except ImportError:
+    print("⚠️ Dotenv not available - using environment variables directly")
+    pass
+
+from config.settings import config
+from config.security import SecurityConfig, require_internal_worker_token, require_render_register_token
+from config.workflow_commands import WorkflowCommandsConfig
+
+from routes.api_routes import api_bp
+from routes.workflow_routes import workflow_bp
+from services.monitoring_service import MonitoringService
+from services.csv_service import CSVService
+from services.workflow_service import WorkflowService
+from services.cache_service import CacheService
+from services.performance_service import PerformanceService
+from services.filesystem_service import FilesystemService
+from services.download_service import DownloadService
+from services.workflow_state import get_workflow_state, reset_workflow_state
+import urllib.parse
+
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    print("AVERTISSEMENT: pandas non disponible. Les fichiers Excel ne pourront pas être traités.")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+try:
+    import pynvml
+    if config.ENABLE_GPU_MONITORING:
+        PYNVML_AVAILABLE = True
+        pynvml.nvmlInit()
+        logger.info("GPU monitoring initialized successfully")
+    else:
+        PYNVML_AVAILABLE = False
+        logger.info("GPU monitoring disabled by configuration")
+except ImportError:
+    PYNVML_AVAILABLE = False
+    logger.warning("pynvml not available. GPU monitoring disabled.")
+except Exception as e:
+    PYNVML_AVAILABLE = False
+    logger.error(f"Failed to initialize GPU monitoring: {e}")
+
+BASE_PATH_SCRIPTS = config.BASE_PATH_SCRIPTS
+PYTHON_VENV_EXE = config.PYTHON_VENV_EXE
+
+PARALLEL_TRACKING_SCRIPT_PATH = BASE_PATH_SCRIPTS / "workflow_scripts" / "step5" / "run_tracking_manager.py"
+
+os.environ['ROOT_SCAN_DIR'] = str(BASE_PATH_SCRIPTS / "projets_extraits")
+KEYWORD_FILTER_TRACKING_ENV = "Camille"
+os.environ['FOLDER_KEYWORD'] = KEYWORD_FILTER_TRACKING_ENV
+SUBDIR_FILTER_TRACKING_ENV = "docs"
+os.environ['SUBFOLDER_NAME'] = SUBDIR_FILTER_TRACKING_ENV
+os.environ.setdefault('TRACKING_DISABLE_GPU', '1')
+os.environ.setdefault('TRACKING_CPU_WORKERS', '15')
+
+LOGS_BASE_DIR = BASE_PATH_SCRIPTS / "logs"
+os.makedirs(LOGS_BASE_DIR, exist_ok=True)
+
+for step in range(1, 8):
+    os.makedirs(LOGS_BASE_DIR / f"step{step}", exist_ok=True)
+
+STEP0_PREP_LOG_DIR = Path(os.environ.get('STEP0_PREP_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step1")))
+MEDIA_ENCODER_LOGS_DIR = Path(os.environ.get('MEDIA_ENCODER_LOGS_DIR_ENV', str(LOGS_BASE_DIR / "step2")))
+SCENE_DETECT_LOG_DIR = Path(os.environ.get('SCENE_DETECT_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step3")))
+AUDIO_ANALYSIS_LOG_DIR = Path(os.environ.get('AUDIO_ANALYSIS_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step4")))
+
+BASE_TRACKING_LOG_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_LOG_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))
+BASE_TRACKING_PROGRESS_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_PROGRESS_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))
+HF_AUTH_TOKEN_ENV = os.environ.get("HF_AUTH_TOKEN")
+
+security_config = SecurityConfig()
+
+RENDER_APP_CALLBACK_URL_ENV = os.environ.get("RENDER_APP_CALLBACK_URL")
+RENDER_APP_CALLBACK_TOKEN_ENV = os.environ.get("RENDER_APP_CALLBACK_TOKEN")
+RENDER_REGISTER_URL_ENDPOINT_ENV = os.environ.get("RENDER_REGISTER_URL_ENDPOINT")
+
+RENDER_REGISTER_TOKEN_ENV = security_config.RENDER_REGISTER_TOKEN
+INTERNAL_WORKER_COMMS_TOKEN_ENV = security_config.INTERNAL_WORKER_TOKEN
+
+WEBHOOK_MONITOR_INTERVAL = config.WEBHOOK_MONITOR_INTERVAL
+LOCAL_DOWNLOADS_DIR = config.LOCAL_DOWNLOADS_DIR
+DOWNLOAD_HISTORY_FILE = config.BASE_PATH_SCRIPTS / "download_history.json"
+
+def create_app(config_class=None):
+    """
+    Create and configure Flask application with modular architecture.
+
+    Args:
+        config_class: Configuration class to use (defaults to main config)
+
+    Returns:
+        Configured Flask application
+    """
+    app = Flask(__name__)
+
+    app.config.update({
+        'SECRET_KEY': config.SECRET_KEY,
+        'DEBUG': config.DEBUG,
+        'CACHE_TYPE': 'SimpleCache',
+        'CACHE_DEFAULT_TIMEOUT': 300,
+        'SEND_FILE_MAX_AGE_DEFAULT': 0
+    })
+
+    import logging
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
+    try:
+        config.validate()
+        logger.info("Application configuration validated successfully")
+    except ValueError as e:
+        logger.error(f"Configuration validation failed: {e}")
+
+    cache = Cache(app)
+
+    app._cache_service_initialized = False
+    app._services_initialized = False
+    app._cache_instance = cache
+
+    app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(workflow_bp)
+
+    logger.info("Flask application created with modular architecture")
+    return app
+
+APP_FLASK = create_app()
+APP_LOGGER = APP_FLASK.logger
+
+with APP_FLASK.app_context():
+    CACHE = APP_FLASK.extensions['cache']
+
+KEYWORD_FILTER_TRACKING_ENV = os.environ.get('KEYWORD_FILTER_TRACKING_ENV', "Camille")
+SUBDIR_FILTER_TRACKING_ENV = os.environ.get('SUBDIR_FILTER_TRACKING_ENV', "docs")
+
+if not HF_AUTH_TOKEN_ENV:
+    APP_LOGGER.warning("HF_AUTH_TOKEN environment variable not set. Step 4 (Audio Analysis) will fail if executed.")
+else:
+    APP_LOGGER.info("HF_AUTH_TOKEN environment variable found and will be used for Analyze Audio.")
+
+try:
+    security_config.validate_tokens()
+    logger.info("Security tokens validated successfully")
+    if INTERNAL_WORKER_COMMS_TOKEN_ENV:
+        logger.info(f"CFG TOKEN: INTERNAL_WORKER_COMMS_TOKEN_ENV configured: '...{INTERNAL_WORKER_COMMS_TOKEN_ENV[-5:]}'")
+    if RENDER_REGISTER_TOKEN_ENV:
+        logger.info(f"CFG TOKEN: RENDER_REGISTER_TOKEN_ENV configured: '...{RENDER_REGISTER_TOKEN_ENV[-5:]}'")
+except ValueError as e:
+    logger.error(f"Security configuration error: {e}")
+    logger.error("Application will continue but some endpoints will be INSECURE")
+
+workflow_commands_config = WorkflowCommandsConfig(
+    base_path=BASE_PATH_SCRIPTS,
+    hf_token=HF_AUTH_TOKEN_ENV
+)
+
+workflow_state = get_workflow_state()
+workflow_state.initialize_all_steps(workflow_commands_config.get_all_step_keys())
+
+
+
+_services_initialized = False
+_services_lock = threading.Lock()
+
+def initialize_services():
+    """Initialize all services with proper configuration."""
+    global _services_initialized
+
+    with _services_lock:
+        if _services_initialized:
+            logger.debug("Services already initialized, skipping")
+            return
+
+        try:
+            with APP_FLASK.app_context():
+                if not APP_FLASK._cache_service_initialized:
+                    CacheService.initialize(APP_FLASK._cache_instance)
+                    APP_FLASK._cache_service_initialized = True
+                    logger.info("CacheService initialized")
+
+                if not APP_FLASK._services_initialized:
+                    CSVService.initialize()
+                    WorkflowService.initialize(workflow_commands_config.get_config())
+                    PerformanceService.start_background_monitoring()
+                    APP_FLASK._services_initialized = True
+                    logger.info("All services initialized successfully")
+
+            _services_initialized = True
+
+        except Exception as e:
+            logger.error(f"Service initialization failed: {e}")
+
+_app_initialized = False
+_app_init_lock = threading.Lock()
+
+def init_app():
+    global _app_initialized
+
+    with _app_init_lock:
+        if _app_initialized:
+            return APP_FLASK
+
+        APP_LOGGER.handlers.clear()
+
+        logs_dir = BASE_PATH_SCRIPTS / "logs"
+        logs_dir.mkdir(exist_ok=True)
+
+        log_file_path = logs_dir / "app.log"
+        file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
+        file_handler.setFormatter(file_formatter)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+
+        APP_LOGGER.addHandler(file_handler)
+        APP_LOGGER.addHandler(console_handler)
+        APP_LOGGER.propagate = False
+
+        is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
+        APP_LOGGER.setLevel(logging.DEBUG)
+
+        APP_LOGGER.info(f"=== COMPREHENSIVE LOGGING INITIALIZED ===")
+        APP_LOGGER.info(f"Log file: {log_file_path}")
+        APP_LOGGER.info(f"Debug mode: {is_debug_mode}")
+        APP_LOGGER.info(f"Logger level: {APP_LOGGER.level}")
+        APP_LOGGER.info(f"=== STARTING APPLICATION ===")
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        if not root_logger.handlers:
+            root_logger.addHandler(file_handler)
+            root_logger.addHandler(console_handler)
+
+        APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
+
+        APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
+        APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
+        APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
+        APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
+
+        os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
+
+        if not HF_AUTH_TOKEN_ENV:
+            APP_LOGGER.warning("HF_AUTH_TOKEN non défini. L'étape 4 (Analyse Audio) nécessitera cette variable d'environnement.")
+
+        if not INTERNAL_WORKER_COMMS_TOKEN_ENV:
+            APP_LOGGER.warning("INTERNAL_WORKER_COMMS_TOKEN non défini. API critiques INSECURES.")
+        else:
+            APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
+
+        if not RENDER_REGISTER_TOKEN_ENV:
+            APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
+        else:
+            APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
+
+        initialize_services()
+
+        if not getattr(APP_FLASK, "_polling_threads_started", False):
+            remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
+            remote_poll_thread.daemon = True
+            remote_poll_thread.start()
+
+            csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
+            csv_monitor_thread.daemon = True
+            csv_monitor_thread.start()
+
+            APP_FLASK._polling_threads_started = True
+
+        APP_LOGGER.info("WEBHOOK MONITOR: Système de monitoring activé et prêt (Webhook uniquement).")
+
+        _app_initialized = True
+        return APP_FLASK
+
+initialize_services()
+
+REMOTE_TRIGGER_URL = os.environ.get('REMOTE_TRIGGER_URL', "https://render-signal-server.onrender.com/api/check_trigger")
+REMOTE_POLLING_INTERVAL = int(os.environ.get('REMOTE_POLLING_INTERVAL', "15"))
+
+REMOTE_SEQUENCE_STEP_KEYS = [
+    "STEP1",
+    "STEP2",
+    "STEP3",
+    "STEP4",
+    "STEP5",
+    "STEP6",
+    "STEP7"
+]
+
+if PYNVML_AVAILABLE:
+    atexit.register(pynvml.nvmlShutdown)
+    print("INFO: La fonction de nettoyage pynvml.nvmlShutdown a été enregistrée pour la sortie de l'application.")
+def format_duration_seconds(seconds_total: float) -> str:
+    if seconds_total is None or seconds_total < 0: return "N/A"
+    seconds_total = int(seconds_total)
+    hours, remainder = divmod(seconds_total, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    time_str = ""
+    if hours > 0: time_str += f"{hours}h "
+    if minutes > 0 or hours > 0: time_str += f"{minutes}m "
+    time_str += f"{seconds}s"
+    return time_str.strip() if time_str else "0s"
+
+def create_frontend_safe_config(config_dict: dict) -> dict:
+    frontend_config = {}
+    for step_key, step_data_orig in config_dict.items():
+        frontend_step_data = {}
+        for key, value in step_data_orig.items():
+            if key == "progress_patterns":
+                pass
+            elif isinstance(value, Path):
+                frontend_step_data[key] = str(value)
+            elif key == "cmd" and isinstance(value, list):
+                frontend_step_data[key] = [str(item) for item in value]
+            elif key == "specific_logs" and isinstance(value, list):
+                safe_logs = []
+                for log_entry in value:
+                    safe_entry = log_entry.copy()
+                    if 'path' in safe_entry and isinstance(safe_entry['path'], Path):
+                        safe_entry['path'] = str(safe_entry['path'])
+                    safe_logs.append(safe_entry)
+                frontend_step_data[key] = safe_logs
+            else:
+                frontend_step_data[key] = value
+        frontend_config[step_key] = frontend_step_data
+    return frontend_config
+
+def execute_csv_download_worker(dropbox_url, timestamp_str, fallback_url=None, original_filename=None):
+    LOCAL_DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    download_id = f"csv_{uuid.uuid4().hex[:8]}"
+    
+    download_info = {
+        'id': download_id,
+        'filename': 'Détermination en cours...',
+        'original_url': dropbox_url,
+        'url': dropbox_url,
+        'url_type': 'dropbox',
+        'status': 'pending',
+        'progress': 0,
+        'message': 'En attente de démarrage...',
+        'timestamp': datetime.now(),
+        'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'csv_timestamp': timestamp_str
+    }
+    
+    CSVService.add_csv_download(download_id, download_info)
+    
+    def progress_callback(status, progress, message):
+        """Callback to update CSVService with download progress."""
+        update_kwargs = {
+            'progress': progress,
+            'message': message,
+            'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'timestamp': datetime.now()
+        }
+        CSVService.update_csv_download(download_id, status, **update_kwargs)
+    
+    try:
+        urls_to_try = [dropbox_url]
+        if fallback_url and str(fallback_url).strip() and str(fallback_url).strip() != str(dropbox_url).strip():
+            urls_to_try.append(str(fallback_url).strip())
+
+        forced_name = str(original_filename).strip() if original_filename else None
+
+        result = None
+        last_attempt_url = dropbox_url
+        for attempt_url in urls_to_try:
+            last_attempt_url = attempt_url
+            result = DownloadService.download_dropbox_file(
+                url=attempt_url,
+                timestamp=timestamp_str,
+                output_dir=LOCAL_DOWNLOADS_DIR,
+                progress_callback=progress_callback,
+                forced_filename=forced_name
+            )
+            if result and result.success:
+                break
+
+        if result and result.success:
+            CSVService.update_csv_download(
+                download_id,
+                'completed',
+                progress=100,
+                message=result.message,
+                filename=result.filename,
+                display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                timestamp=datetime.now()
+            )
+            
+            try:
+                CSVService.add_to_download_history_with_timestamp(dropbox_url, timestamp_str)
+                if fallback_url and str(fallback_url).strip():
+                    CSVService.add_to_download_history_with_timestamp(str(fallback_url).strip(), timestamp_str)
+            except Exception as e:
+                APP_LOGGER.error(f"Error adding to download history: {e}")
+            
+            APP_LOGGER.info(f"CSV DOWNLOAD: File '{result.filename}' downloaded successfully ({result.size_bytes} bytes)")
+        else:
+            CSVService.update_csv_download(
+                download_id,
+                'failed',
+                message=result.message if result else 'N/A',
+                filename=result.filename if (result and result.filename) else 'N/A',
+                display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                timestamp=datetime.now()
+            )
+            APP_LOGGER.error(
+                f"CSV DOWNLOAD: Failed - {(result.message if result else 'N/A')} (last_url={last_attempt_url})"
+            )
+            
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        APP_LOGGER.error(f"CSV DOWNLOAD: {error_msg}", exc_info=True)
+        CSVService.update_csv_download(
+            download_id,
+            'failed',
+            message=error_msg,
+            display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            timestamp=datetime.now()
+        )
+    
+    APP_LOGGER.info(f"CSV DOWNLOAD: Worker for {download_id} completed")
+
+def csv_monitor_service():
+    """Service de monitoring Webhook qui s'exécute en arrière-plan."""
+    APP_LOGGER.info("WEBHOOK MONITOR: Service démarré.")
+
+    from services.csv_service import CSVService
+
+    while True:
+        try:
+            workflow_state.update_csv_monitor_status(
+                status="checking",
+                last_check=datetime.now().isoformat(),
+                error=None
+            )
+
+            try:
+                CSVService._check_csv_for_downloads()
+                APP_LOGGER.debug("Webhook monitor check completed successfully")
+            except Exception as check_error:
+                APP_LOGGER.error(f"Webhook monitor check error: {check_error}")
+                workflow_state.update_csv_monitor_status(
+                    status="error",
+                    last_check=datetime.now().isoformat(),
+                    error=str(check_error)
+                )
+                time.sleep(WEBHOOK_MONITOR_INTERVAL)
+                continue
+
+            workflow_state.update_csv_monitor_status(
+                status="active",
+                last_check=datetime.now().isoformat(),
+                error=None
+            )
+
+        except Exception as e:
+            error_msg = f"Erreur dans le service CSV monitor: {e}"
+            APP_LOGGER.error(error_msg, exc_info=True)
+            workflow_state.update_csv_monitor_status(
+                status="error",
+                last_check=datetime.now().isoformat(),
+                error=error_msg
+            )
+
+        time.sleep(WEBHOOK_MONITOR_INTERVAL)
+
+
+def run_process_async(step_key: str):
+    from services.workflow_service import WorkflowService
+    
+    APP_LOGGER.info(f"[RUN_PROCESS] Starting execution for {step_key}")
+
+    projects_dir = os.path.join(BASE_PATH_SCRIPTS, 'projets_extraits')
+    os.makedirs(projects_dir, exist_ok=True)
+
+    config = workflow_commands_config.get_step_config(step_key)
+    if not config:
+        APP_LOGGER.error(f"Invalid step_key: {step_key}")
+        return
+    workflow_state.update_step_status(step_key, 'starting')
+    workflow_state.clear_step_log(step_key)
+    workflow_state.append_step_log(step_key, f"--- Lancement de: {html.escape(config['display_name'])} ---\n")
+    workflow_state.update_step_info(
+        step_key,
+        return_code=None,
+        progress_current=0,
+        progress_total=0,
+        progress_text='',
+        start_time_epoch=time.time(),
+        duration_str=None
+    )
+
+
+    
+    cmd_str_list = [str(c) for c in config['cmd']]
+    temp_json_path_for_tracking = None
+
+    if step_key == "STEP5":
+        workflow_state.append_step_log(step_key, "Préparation de l'étape de tracking : recherche des vidéos à traiter...\n")
+        try:
+            videos_to_process = WorkflowService.prepare_tracking_step(
+                BASE_TRACKING_LOG_SEARCH_PATH,
+                KEYWORD_FILTER_TRACKING_ENV,
+                SUBDIR_FILTER_TRACKING_ENV
+            )
+            
+            if not videos_to_process:
+                APP_LOGGER.info(f"{step_key}: No videos require tracking, completing immediately")
+                workflow_state.append_step_log(step_key, "Toutes les vidéos candidates semblent déjà traitées (aucun .mp4/.mov/... sans .json trouvé). Étape terminée.\n")
+                workflow_state.update_step_info(step_key, status='completed', return_code=0)
+                start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
+                workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
+                return
+
+            temp_json_path_for_tracking = WorkflowService.create_tracking_temp_file(videos_to_process)
+            cmd_str_list.extend(["--videos_json_path", str(temp_json_path_for_tracking)])
+            workflow_state.append_step_log(step_key, f"{len(videos_to_process)} vidéo(s) ajoutée(s) au lot de traitement.\nLe script gestionnaire va maintenant prendre le relais.\n\n")
+
+        except Exception as e_prep:
+            APP_LOGGER.error(f"{step_key}: Preparation failed - {e_prep}", exc_info=True)
+            error_msg = f"Erreur lors de la préparation de l'étape de tracking: {e_prep}"
+            workflow_state.append_step_log(step_key, html.escape(error_msg))
+            workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+            return
+
+    workflow_state.append_step_log(step_key, f"Commande: {html.escape(' '.join(cmd_str_list))}\n")
+    workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(config['cwd']))}\n\n")
+    
+    step_progress_patterns = config.get("progress_patterns", {})
+    total_pattern_re = step_progress_patterns.get("total")
+    current_pattern_re = step_progress_patterns.get("current")
+    current_success_line_pattern_re = step_progress_patterns.get("current_success_line_pattern")
+    current_item_counter = 0
+
+    try:
+        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} executing command: {cmd_str_list}")
+        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} working directory: {config['cwd']}")
+
+        process_env = os.environ.copy()
+        process_env["PYTHONIOENCODING"] = "UTF-8"; process_env["PYTHONUTF8"] = "1"
+
+        if step_key == "STEP3":
+            try:
+                process_env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+            except Exception as _e:
+                APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF: {_e}")
+
+        if step_key == "STEP4":
+            try:
+                process_env["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
+                process_env["AUDIO_PARTIAL_SUCCESS_OK"] = "1"
+            except Exception as _e:
+                APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
+
+        process = subprocess.Popen(
+            cmd_str_list, cwd=str(config['cwd']),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1, encoding='utf-8', errors='replace', env=process_env
+        )
+
+        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess started successfully (PID: {process.pid})")
+
+        workflow_state.set_step_process(step_key, process)
+        workflow_state.update_step_status(step_key, 'running')
+        running_status_start_time = time.time()
+
+        log_deque = workflow_state.get_step_log_deque(step_key)
+
+        if process.stdout:
+            for line in iter(process.stdout.readline, ''):
+                line_strip = line.strip()
+
+                if line_strip.startswith("[Progression-MultiLine]"):
+                    progress_data = line_strip.replace("[Progression-MultiLine]", "", 1)
+                    text_progress = progress_data.replace(" || ", "\n")
+                    workflow_state.set_step_field(step_key, 'progress_text', text_progress)
+                    continue
+
+                if '\r' in line or '\x1b[' in line or '\033[' in line:
+                    continue
+
+                if log_deque is not None:
+                    log_deque.append(html.escape(line))
+                try:
+                    APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT: {line_strip}")
+                except UnicodeEncodeError:
+                    APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT (ascii): {line_strip.encode('ascii', 'replace').decode('ascii')}")
+
+                if total_pattern_re:
+                    total_match = total_pattern_re.search(line_strip)
+                    if total_match:
+                        try:
+                            workflow_state.set_step_field(step_key, 'progress_total', int(total_match.group(1)))
+                            files_completed = workflow_state.get_step_field(step_key, 'files_completed')
+                            if files_completed is None or not isinstance(files_completed, int):
+                                workflow_state.set_step_field(step_key, 'files_completed', 0)
+                        except (ValueError, IndexError):
+                            APP_LOGGER.warning(f"[{step_key}] ProgTotal parse error: {line_strip}")
+
+                if current_pattern_re:
+                    current_match = current_pattern_re.search(line_strip)
+                    if current_match:
+                        try:
+                            groups = current_match.groups()
+
+                            if len(groups) >= 3 and groups[0].isdigit() and groups[1].isdigit():
+                                current_num = int(groups[0])
+                                total_num = int(groups[1])
+                                filename = groups[2].strip()
+                                workflow_state.set_step_field(step_key, 'progress_current', current_num)
+                                if workflow_state.get_step_field(step_key, 'progress_total', 0) == 0:
+                                    workflow_state.set_step_field(step_key, 'progress_total', total_num)
+                                if filename:
+                                    workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+                            elif len(groups) >= 1 and step_key == 'STEP3':
+                                filename = groups[0].strip()
+                                if filename:
+                                    workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+                                progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+                                if progress_total > 0:
+                                    files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+                                    workflow_state.set_step_field(step_key, 'progress_current', min(progress_total, max(files_completed, 0) + 1))
+                                    workflow_state.set_step_field(step_key, 'progress_current_fractional', min(float(progress_total), float(workflow_state.get_step_field(step_key, 'progress_current', 0)) - 0.0 + 0.01))
+                            else:
+                                filename = groups[0].strip() if len(groups) >= 1 else ""
+                                percent = int(groups[1]) if len(groups) >= 2 and str(groups[1]).isdigit() else None
+                                if filename:
+                                    workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+                                progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+                                if percent is not None and progress_total > 0:
+                                    files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+                                    current_file_progress = max(0.0, min(0.99, percent / 100.0))
+                                    overall_progress = (files_completed + current_file_progress)
+                                    workflow_state.set_step_field(step_key, 'progress_current_fractional', max(0.0, min(float(progress_total), overall_progress)))
+                        except (ValueError, IndexError):
+                            APP_LOGGER.warning(f"[{step_key}] ProgCurrent parse error: {line_strip}")
+
+                internal_pattern_re = step_progress_patterns.get("internal")
+                if internal_pattern_re:
+                    internal_match = internal_pattern_re.search(line_strip)
+                    if internal_match:
+                        try:
+                            groups = internal_match.groups()
+
+                            if len(groups) >= 4:
+                                current_batch = int(groups[0])
+                                total_batches = int(groups[1])
+                                percent = int(groups[2])
+                                filename = groups[3].strip() if groups[3] else ""
+                            elif len(groups) >= 2:
+                                filename = groups[0].strip() if groups[0] else ""
+                                percent = int(groups[1])
+                                current_batch = percent
+                                total_batches = 100
+                            else:
+                                continue
+
+                            progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+                            if progress_total > 0:
+                                files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+                                current_file_progress = max(0.0, min(0.99, percent / 100.0))
+                                overall_progress_files = files_completed + current_file_progress
+                                overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
+                                workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
+
+                            if filename:
+                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(f"{filename} ({percent}%)"))
+
+                        except (ValueError, IndexError):
+                            APP_LOGGER.warning(f"[{step_key}] Internal progress parse error: {line_strip}")
+
+                internal_simple_re = step_progress_patterns.get("internal_simple")
+                if internal_simple_re:
+                    internal_simple_match = internal_simple_re.search(line_strip)
+                    if internal_simple_match:
+                        try:
+                            batches = int(internal_simple_match.group(1))
+                            filename = internal_simple_match.group(2).strip() if internal_simple_match.group(2) else ""
+                            progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+                            if progress_total > 0:
+                                files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+                                current_file_progress = 0.01
+                                overall_progress_files = files_completed + current_file_progress
+                                overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
+                                workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
+                            if filename:
+                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+                        except Exception:
+                            APP_LOGGER.warning(f"[{step_key}] Internal simple progress parse error: {line_strip}")
+
+                if current_success_line_pattern_re:
+                    success_match = current_success_line_pattern_re.search(line_strip)
+                    if success_match:
+                        current_item_counter += 1
+                        workflow_state.set_step_field(step_key, 'progress_current', current_item_counter)
+                        workflow_state.set_step_field(step_key, 'files_completed', current_item_counter)
+                        workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
+                        if step_progress_patterns.get("current_item_text_from_success_line"):
+                            try:
+                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(success_match.group(1).strip()))
+                            except IndexError:
+                                pass
+            
+            process.stdout.close()
+        subprocess_start_time = time.time()
+        process.wait()
+        subprocess_duration = time.time() - subprocess_start_time
+
+        APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess completed in {subprocess_duration:.2f} seconds (return_code: {process.returncode})")
+
+        running_status_duration = time.time() - running_status_start_time
+        min_running_time = 0.6
+
+        if running_status_duration < min_running_time:
+            sleep_time = min_running_time - running_status_duration
+            APP_LOGGER.info(f"[TIMING_FIX] {step_key} ensuring minimum running time: sleeping {sleep_time:.3f}s (total running time will be {min_running_time:.3f}s)")
+            time.sleep(sleep_time)
+
+        workflow_state.update_step_info(
+            step_key,
+            return_code=process.returncode,
+            status='completed' if process.returncode == 0 else 'failed'
+        )
+        log_suffix = "terminé avec succès" if process.returncode == 0 else f"a échoué (code: {process.returncode})"
+        workflow_state.append_step_log(step_key, f"\n--- {html.escape(config['display_name'])} {log_suffix} ---")
+
+        status = workflow_state.get_step_status(step_key)
+        progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+        progress_current = workflow_state.get_step_field(step_key, 'progress_current', 0)
+        if status == 'completed' and progress_total > 0 and progress_current < progress_total:
+            workflow_state.set_step_field(step_key, 'progress_current', progress_total)
+        progress_text = workflow_state.get_step_field(step_key, 'progress_text', '')
+        if not progress_text and status == 'completed':
+            workflow_state.set_step_field(step_key, 'progress_text', "Terminé")
+    except FileNotFoundError:
+        APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - executable not found: {cmd_str_list[0] if cmd_str_list else 'N/A'}")
+
+        error_msg = f"Erreur: Exécutable non trouvé pour {step_key}: {cmd_str_list[0]}"
+        workflow_state.append_step_log(step_key, html.escape(error_msg))
+        workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+        APP_LOGGER.error(error_msg)
+    except Exception as e:
+        APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - general exception: {e}")
+
+        error_msg = f"Erreur exécution {step_key}: {str(e)}"
+        workflow_state.append_step_log(step_key, html.escape(error_msg))
+        workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+        APP_LOGGER.error(f"Exception run_process_async pour {step_key}: {e}", exc_info=True)
+    finally:
+        start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
+        workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
+        workflow_state.set_step_process(step_key, None)
+        if temp_json_path_for_tracking and temp_json_path_for_tracking.exists():
+            try:
+                os.remove(temp_json_path_for_tracking)
+                APP_LOGGER.info(f"Fichier temporaire de tracking '{temp_json_path_for_tracking.name}' supprimé.")
+            except Exception as e_clean:
+                APP_LOGGER.error(f"Impossible de supprimer le fichier temporaire de tracking '{temp_json_path_for_tracking.name}': {e_clean}")
+
+
+def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="Custom"):
+    """Execute a sequence of workflow steps.
+    
+    This function has been migrated to use WorkflowState for sequence management.
+    
+    Args:
+        steps_to_run_list: List of step keys to execute in order
+        sequence_type: Type of sequence ('Full', 'Remote', 'Custom', etc.)
+    """
+    APP_LOGGER.info("🔥🔥🔥 [SEQUENCE_WORKER_TEST] UPDATED SEQUENCE WORKER WITH DEBUGGING IS RUNNING! 🔥🔥🔥")
+    
+    if sequence_type != "InternalPollingCheck" and workflow_state.is_sequence_running():
+        APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Tentative de lancement alors qu'une séquence est déjà en cours.")
+        return
+    
+    if not workflow_state.start_sequence(sequence_type):
+        APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Could not start - already running")
+        return
+    
+    APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence démarrée.")
+    all_steps_succeeded = True; sequence_summary_data = []
+    try:
+        APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Thread démarré pour {len(steps_to_run_list)} étapes: {steps_to_run_list}")
+
+        APP_LOGGER.info(f"[CACHE_CLEAR_TEST] *** UPDATED CODE IS RUNNING - CACHE CLEARED SUCCESSFULLY ***")
+        for i, step_key in enumerate(steps_to_run_list):
+            step_config = workflow_commands_config.get_step_config(step_key)
+            if not step_config:
+                APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Clé invalide '{step_key}'. Interruption.")
+                all_steps_succeeded = False; sequence_summary_data.append({"name": f"Étape Invalide ({html.escape(step_key)})", "status": "Erreur de config", "duration": "0s", "success": False}); break
+            step_display_name = step_config['display_name']
+            APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Lancement étape {i+1}/{len(steps_to_run_list)}: '{step_display_name}' ({step_key})")
+            
+            workflow_state.update_step_info(
+                step_key,
+                status='idle',
+                progress_current=0,
+                progress_total=0,
+                progress_text='',
+                start_time_epoch=None,
+                duration_str=None
+            )
+
+            current_status = workflow_state.get_step_status(step_key)
+
+            try:
+                run_process_async(step_key)
+                final_status = workflow_state.get_step_status(step_key)
+                return_code = workflow_state.get_step_field(step_key, 'return_code')
+                APP_LOGGER.info(f"[SEQUENCE_DEBUG] run_process_async completed for {step_key} (final status: {final_status}, return_code: {return_code})")
+            except Exception as e:
+                APP_LOGGER.error(f"[SEQUENCE_DEBUG] Exception in run_process_async for {step_key}: {e}", exc_info=True)
+                workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+            
+            step_info = workflow_state.get_step_info(step_key)
+            duration_str_step = step_info.get('duration_str', 'N/A')
+            if step_info['status'] == 'completed':
+                sequence_summary_data.append({"name": html.escape(step_display_name), "status": "Réussie", "duration": duration_str_step, "success": True})
+            else:
+                all_steps_succeeded = False
+                sequence_summary_data.append({"name": html.escape(step_display_name), "status": f"Échouée ({step_info['status']})", "duration": duration_str_step, "success": False})
+                APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Étape '{html.escape(step_display_name)}' Échouée. Interruption.")
+                break 
+        final_overall_status_text = "Terminée avec succès" if all_steps_succeeded else "Terminée avec erreurs"
+        summary_log = [f"{s['name']}: {s['status']} ({s['duration']})" for s in sequence_summary_data]
+        full_summary_log_text = f"Séquence {sequence_type} {final_overall_status_text}. Détails: " + " | ".join(summary_log)
+        APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: {full_summary_log_text}")
+        
+        workflow_state.complete_sequence(success=all_steps_succeeded, message=full_summary_log_text, sequence_type=sequence_type)
+    except Exception as e_seq:
+        APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Erreur inattendue dans le worker de séquence: {e_seq}", exc_info=True)
+        all_steps_succeeded = False
+        workflow_state.complete_sequence(success=False, message=f"Erreur critique durant la séquence: {e_seq}", sequence_type=sequence_type)
+    finally:
+        if workflow_state.is_sequence_running():
+            workflow_state.complete_sequence(success=False, message="Séquence terminée de façon inattendue", sequence_type=sequence_type)
+        APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence terminée.")
+
+def run_full_sequence_from_remote():
+    """Launch full sequence from remote trigger.
+    
+    Migrated to use WorkflowState for sequence management.
+    """
+    APP_LOGGER.info("REMOTE TRIGGER: Demande de lancement de la séquence complète reçue.")
+    
+    if workflow_state.is_sequence_running():
+        APP_LOGGER.warning("REMOTE TRIGGER: Séquence complète non lancée, une autre séquence est déjà en cours.")
+        return
+    
+    seq_thread = threading.Thread(target=execute_step_sequence_worker, args=(list(REMOTE_SEQUENCE_STEP_KEYS), "Remote"))
+    seq_thread.daemon = True
+    seq_thread.start()
+
+def poll_remote_trigger():
+    """Poll remote trigger URL for pending commands.
+    
+    Migrated to use WorkflowState for sequence status checking.
+    """
+    APP_LOGGER.info(f"REMOTE POLLER: Démarré. Interrogation de {REMOTE_TRIGGER_URL} toutes les {REMOTE_POLLING_INTERVAL}s.")
+    
+    while True:
+        time.sleep(REMOTE_POLLING_INTERVAL)
+        
+        if workflow_state.is_sequence_running():
+            APP_LOGGER.debug("REMOTE POLLER: Une séquence est marquée comme en cours, attente.")
+            continue
+        
+        if workflow_state.is_any_step_running():
+            APP_LOGGER.debug("REMOTE POLLER: Une étape individuelle est active. Attente.")
+            continue
+        
+        try:
+            APP_LOGGER.debug(f"REMOTE POLLER: Vérification de {REMOTE_TRIGGER_URL}.")
+            response = requests.get(REMOTE_TRIGGER_URL, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('command_pending'):
+                APP_LOGGER.info(f"REMOTE POLLER: Commande reçue! Payload: {data.get('payload')}")
+                
+                if not workflow_state.is_sequence_running():
+                    run_full_sequence_from_remote()
+                else:
+                    APP_LOGGER.warning("REMOTE POLLER: Signal reçu, mais une séquence est déjà en cours.")
+            else:
+                APP_LOGGER.debug("REMOTE POLLER: Aucune commande en attente.")
+        except requests.exceptions.RequestException as e:
+            APP_LOGGER.warning(f"REMOTE POLLER: Erreur communication {REMOTE_TRIGGER_URL}: {e}")
+        except Exception as e_poll:
+            APP_LOGGER.error(f"REMOTE POLLER: Erreur inattendue: {e_poll}", exc_info=True)
+
+@APP_FLASK.route('/test-slideshow-fixes')
+def test_slideshow_fixes():
+    """Serve the slideshow fixes test page."""
+    APP_LOGGER.debug("Serving slideshow fixes test page")
+
+    try:
+        with open('test_dom_slideshow_fixes.html', 'r', encoding='utf-8') as f:
+            test_content = f.read()
+
+        return test_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+    except Exception as e:
+        APP_LOGGER.error(f"Error serving test page: {e}")
+        return f"Error loading test page: {e}", 500
+
+@APP_FLASK.route('/favicon.ico')
+def favicon():
+    """
+    Handle favicon.ico requests to prevent 404 errors in browser console.
+    Returns a 204 No Content response since we don't have a favicon file.
+    """
+    APP_LOGGER.debug("Favicon requested - returning 204 No Content")
+    return '', 204
+
+def get_current_workflow_status_summary():
+    """Get comprehensive workflow status summary including CSV downloads.
+    
+    Migrated to use WorkflowState for all state access.
+    """
+    overall_status_code_val = "idle"
+    overall_status_text_display_val = "Prêt et en attente."
+    current_step_name_val = None
+    progress_current_val = 0
+    progress_total_val = 0
+    active_step_key_found = None
+    
+    is_sequence_globally_active = workflow_state.is_sequence_running()
+    
+    if is_sequence_globally_active:
+        sequence_outcome = workflow_state.get_sequence_outcome()
+        active_sequence_type = sequence_outcome.get("type", "Inconnue") if sequence_outcome.get("status", "").startswith("running_") else "Inconnue"
+        
+        for step_key_seq in REMOTE_SEQUENCE_STEP_KEYS:
+            step_status = workflow_state.get_step_status(step_key_seq)
+            if step_status in ['running', 'starting']:
+                active_step_key_found = step_key_seq
+                overall_status_code_val = f"sequence_running_{active_sequence_type.lower()}"
+                break
+    
+    if not active_step_key_found:
+        all_steps_info = workflow_state.get_all_steps_info()
+        for step_key_ind, info_ind in all_steps_info.items():
+            if info_ind['status'] in ['running', 'starting']:
+                active_step_key_found = step_key_ind
+                overall_status_code_val = f"step_running_{step_key_ind}"
+                break
+    
+    if active_step_key_found:
+        active_step_info = workflow_state.get_step_info(active_step_key_found)
+        active_step_config = workflow_commands_config.get_step_config(active_step_key_found)
+        current_step_name_val = active_step_config['display_name'] if active_step_config else 'Étape inconnue'
+        progress_current_val = active_step_info['progress_current']
+        progress_total_val = active_step_info['progress_total']
+        
+        if overall_status_code_val.startswith("sequence_running"):
+            seq_type_disp = overall_status_code_val.split("_")[-1].capitalize()
+            overall_status_text_display_val = f"Séquence {seq_type_disp} - En cours: {current_step_name_val}"
+        elif overall_status_code_val.startswith("step_running"):
+            overall_status_text_display_val = f"En cours: {current_step_name_val}"
+    else:
+        sequence_outcome = workflow_state.get_sequence_outcome()
+        if sequence_outcome and sequence_outcome.get("timestamp"):
+            last_seq_time_str = sequence_outcome["timestamp"]
+            if last_seq_time_str.endswith('Z'):
+                last_seq_time_str = last_seq_time_str[:-1] + '+00:00'
+            try:
+                last_seq_dt = datetime.fromisoformat(last_seq_time_str)
+                if last_seq_dt.tzinfo is None:
+                    last_seq_dt = last_seq_dt.replace(tzinfo=timezone.utc)
+                time_since_last_seq = datetime.now(timezone.utc) - last_seq_dt
+                
+                if time_since_last_seq < timedelta(hours=1):
+                    seq_type_display = sequence_outcome.get('type', 'N/A')
+                    if sequence_outcome.get("status") == "success":
+                        overall_status_code_val = "completed_success_recent"
+                        overall_status_text_display_val = f"Terminé avec succès (Séquence {seq_type_display})"
+                        current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
+                    elif sequence_outcome.get("status") == "error":
+                        overall_status_code_val = "completed_error_recent"
+                        overall_status_text_display_val = f"Terminé avec erreur(s) (Séquence {seq_type_display})"
+                        current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
+                    elif sequence_outcome.get("status", "").startswith("running_"):
+                        seq_type_running = sequence_outcome.get("type", "N/A")
+                        overall_status_code_val = f"sequence_starting_{seq_type_running.lower()}"
+                        overall_status_text_display_val = f"Démarrage Séquence {seq_type_running}..."
+                else:
+                    overall_status_code_val = "idle_after_completion"
+                    overall_status_text_display_val = "Prêt (dernière opération terminée il y a >1h)."
+            except ValueError as e_ts:
+                APP_LOGGER.warning(f"Error parsing sequence outcome timestamp '{sequence_outcome['timestamp']}': {e_ts}")
+                overall_status_code_val = "idle_parse_error"
+                overall_status_text_display_val = "Prêt (erreur parsing dernier statut)."
+        else:
+            overall_status_code_val = "idle_initial"
+            overall_status_text_display_val = "Prêt et en attente (jamais exécuté)."
+
+    active_list_csv = workflow_state.get_active_csv_downloads_list()
+    kept_list_csv = workflow_state.get_kept_csv_downloads_list()
+
+    all_csv_downloads_intermediate = active_list_csv + kept_list_csv
+    all_csv_downloads_intermediate.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
+
+    recent_downloads_summary_val = []
+    for item_csv in all_csv_downloads_intermediate[:5]:
+        recent_downloads_summary_val.append({
+            "filename": item_csv.get('filename', 'N/A'),
+            "status": item_csv.get('status', 'N/A'),
+            "timestamp": item_csv.get('display_timestamp', 'N/A'),
+            "csv_timestamp": item_csv.get('csv_timestamp', 'N/A')
+        })
+    status_text_detail_val = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+
+    return {
+        "overall_status_code": overall_status_code_val,
+        "overall_status_text_display": overall_status_text_display_val,
+        "current_step_name": current_step_name_val,
+        "status_text_detail": status_text_detail_val,
+        "progress_current": progress_current_val,
+        "progress_total": progress_total_val,
+        "recent_downloads": recent_downloads_summary_val,
+        "last_updated_utc": datetime.now(timezone.utc).isoformat(),
+        "last_sequence_summary": workflow_state.get_sequence_outcome()
+    }
+
+
+if __name__ == '__main__':
+    init_app()
+
+    APP_FLASK.run(
+        debug=config.DEBUG,
+        host=config.HOST,
+        port=config.PORT,
+        threaded=True,
+        use_reloader=False
+    )
 ```
 
 ## File: config/settings.py
@@ -34859,1088 +33339,463 @@ html, body { overflow-y: scroll; }
  }
 ```
 
-## File: static/domElements.js
+## File: static/eventHandlers.js
 ```javascript
-export const workflowWrapper = document.getElementById('workflow-wrapper');
-export const stepsColumn = document.getElementById('steps-column');
-export const logsColumnGlobal = document.getElementById('logs-column-global');
-export const logPanelTitle = document.getElementById('log-panel-title');
-export const logPanelSubheader = document.getElementById('log-panel-subheader');
-export const logPanelContextStep = document.getElementById('log-panel-context-step');
-export const logPanelContextStatus = document.getElementById('log-panel-context-status');
-export const logPanelContextTimer = document.getElementById('log-panel-context-timer');
-export const logPanelSpecificButtonsContainer = document.getElementById('log-panel-specific-buttons-container');
-export const mainLogContainerPanel = document.getElementById('main-log-container-panel');
-export const mainLogOutputPanel = document.getElementById('main-log-output-panel');
-export const currentStepLogNamePanel = document.getElementById('current-step-log-name-panel');
-export const specificLogContainerPanel = document.getElementById('specific-log-container-panel');
-export const specificLogHeaderTextPanel = document.getElementById('specific-log-header-text-panel');
-export const specificLogPathInfoPanel = document.getElementById('specific-log-path-info-panel');
-export const specificLogOutputContentPanel = document.getElementById('specific-log-output-content-panel');
-export const runAllButton = document.getElementById('run-all-steps-button');
-export const topbarAffix = document.getElementById('topbar-affix');
-export const topbarControls = document.getElementById('topbar-controls');
-export const globalProgressAffix = document.getElementById('global-progress-affix');
-export const globalProgressContainer = document.getElementById('global-progress-container');
-export const globalProgressBar = document.getElementById('global-progress-bar');
-export const globalProgressText = document.getElementById('global-progress-text');
-export const sequenceSummaryPopupOverlay = document.getElementById('sequence-summary-popup-overlay');
-export const sequenceSummaryList = document.getElementById('sequence-summary-list');
-export const closeSummaryPopupButton = document.getElementById('close-summary-popup');
-export const runCustomSequenceButton = document.getElementById('run-custom-sequence-button');
-export const clearCustomSequenceButton = document.getElementById('clear-custom-sequence-button');
-export const customSequenceCheckboxes = document.querySelectorAll('.custom-sequence-checkbox');
-export const customSequenceConfirmPopupOverlay = document.getElementById('custom-sequence-confirm-popup-overlay');
-export const customSequenceConfirmList = document.getElementById('custom-sequence-confirm-list');
-export const confirmRunCustomSequenceButton = document.getElementById('confirm-run-custom-sequence-button');
-export const cancelRunCustomSequenceButton = document.getElementById('cancel-run-custom-sequence-button');
-export const notificationsArea = document.getElementById('notifications-area');
+import * as dom from './domElements.js';
+import * as ui from './uiUpdater.js';
+import * as api from './apiService.js';
+import { runStepSequence } from './sequenceManager.js';
+import { defaultSequenceableStepsKeys } from './constants.js';
+import { showNotification } from './utils.js';
+import { openPopupUI, closePopupUI, showCustomSequenceConfirmUI } from './popupManager.js';
+import { scrollToStepImmediate } from './scrollManager.js';
+import { soundEvents } from './soundManager.js';
+import { appState } from './state/AppState.js';
 
-// Lazy DOM element getters to ensure elements are available when accessed
-export function getAllStepDivs() {
-    const elements = document.querySelectorAll('.step');
-    console.debug(`[DOM] getAllStepDivs found ${elements.length} elements`);
-    return elements;
+function getIsAnySequenceRunning() {
+    return !!appState.getStateProperty('isAnySequenceRunning');
 }
 
-export function getAllRunButtons() {
-    const elements = document.querySelectorAll('.run-button');
-    console.debug(`[DOM] getAllRunButtons found ${elements.length} elements`);
-    return elements;
+function getSelectedStepsOrder() {
+    return appState.getStateProperty('selectedStepsOrder') || [];
 }
 
-export function getAllCancelButtons() {
-    const elements = document.querySelectorAll('.cancel-button');
-    console.debug(`[DOM] getAllCancelButtons found ${elements.length} elements`);
-    return elements;
+function setSelectedStepsOrder(order) {
+    const safeOrder = Array.isArray(order) ? [...order] : [];
+    appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
 }
 
-export function getAllSpecificLogButtons() {
-    const elements = document.querySelectorAll('.specific-log-button');
-    console.debug(`[DOM] getAllSpecificLogButtons found ${elements.length} elements`);
-    return elements;
+function resolveElement(getterFn, legacyValue = null) {
+    if (typeof getterFn === 'function') {
+        try {
+            return getterFn();
+        } catch (_) {
+            return legacyValue;
+        }
+    }
+    return legacyValue;
 }
 
-// Enhanced step element getter with validation
-export function getStepElement(stepKey) {
-    if (!stepKey) {
-        console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
-        return null;
+function resolveCollection(getterFn, legacyValue = null) {
+    const resolved = resolveElement(getterFn, legacyValue);
+    if (!resolved) return [];
+    return Array.from(resolved);
+}
+
+export function initializeEventHandlers() {
+    const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
+    if (closeLogButton) {
+        closeLogButton.addEventListener('click', ui.closeLogPanelUI);
     }
 
-    const element = document.getElementById(`step-${stepKey}`);
-    if (!element) {
-        console.warn(`[DOM] Step element not found: step-${stepKey}`);
-        console.debug('[DOM] Available step elements:',
-            Array.from(document.querySelectorAll('[id^="step-"]')).map(el => el.id));
+    const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
+    runButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            try {
+                if (getIsAnySequenceRunning()) {
+                    showNotification("Une séquence est déjà en cours. Veuillez attendre sa fin.", 'warning');
+                    return;
+                }
+                const stepKey = button.dataset.step;
+                ui.updateMainLogOutputUI('');
+                const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+                if (specificLogContainer) specificLogContainer.style.display = 'none';
+                ui.openLogPanelUI(stepKey);
+
+                // Scroll to the step immediately when manually triggered
+                scrollToStepImmediate(stepKey, { scrollDelay: 0 });
+
+                // Play workflow start sound for individual step execution
+                soundEvents.workflowStart();
+
+                await api.runStepAPI(stepKey);
+            } catch (error) {
+                console.error('[EVENT] Error in run button handler:', error);
+                showNotification("Erreur lors de l'exécution de l'étape", 'error');
+            }
+        });
+    });
+
+    const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
+    cancelButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            try {
+                const stepKey = button.dataset.step;
+                await api.cancelStepAPI(stepKey);
+            } catch (error) {
+                console.error('[EVENT] Error in cancel button handler:', error);
+                showNotification("Erreur lors de l'annulation de l'étape", 'error');
+            }
+        });
+    });
+
+    const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
+    specificLogButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            const stepKey = button.dataset.step;
+            const logIndex = button.dataset.logIndex;
+            const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
+
+            if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
+                ui.openLogPanelUI(stepKey);
+                try {
+                    const statusResponse = await fetch(`/status/${stepKey}`);
+                    if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
+                    const statusData = await statusResponse.json();
+                    ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');
+                } catch (error) {
+                    console.error("Erreur chargement statut pour log panel:", error);
+                    ui.updateMainLogOutputUI(`<i>Erreur chargement log principal: ${error.message}</i>`);
+                }
+            }
+            // Pass the clicked button to enable loading state (spinner + disabled)
+            await api.fetchSpecificLogAPI(stepKey, logIndex, button.textContent.trim(), button);
+        });
+    });
+
+    const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+    if (runAllButton) {
+        runAllButton.addEventListener('click', async () => {
+            if (getIsAnySequenceRunning()) {
+                showNotification("Séquence déjà en cours.", 'warning'); return;
+            }
+            // Play workflow start sound for complete sequence 1-6
+            soundEvents.workflowStart();
+            await runStepSequence(defaultSequenceableStepsKeys, "Séquence 0-4");
+        });
     }
 
-    return element;
+    const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+    customSequenceCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', (event) => {
+            const stepKey = event.target.dataset.stepKey;
+            const stepCard = document.getElementById(`step-${stepKey}`);
+            const orderNumberEl = document.getElementById(`order-${stepKey}`);
+            let currentOrder = getSelectedStepsOrder();
+
+            // Play checkbox interaction sound
+            soundEvents.checkboxInteraction();
+
+            if (event.target.checked) {
+                if (!currentOrder.includes(stepKey)) {
+                    currentOrder.push(stepKey);
+                    if (stepCard) stepCard.classList.add('custom-sequence-selected');
+                }
+            } else {
+                const index = currentOrder.indexOf(stepKey);
+                if (index > -1) currentOrder.splice(index, 1);
+                if (stepCard) stepCard.classList.remove('custom-sequence-selected');
+            }
+            setSelectedStepsOrder(currentOrder);
+            document.querySelectorAll('.step-selection-order-number').forEach(el => { el.textContent = ''; });
+            getSelectedStepsOrder().forEach((sk, idx) => {
+                const orderEl = document.getElementById(`order-${sk}`);
+                if (orderEl) orderEl.textContent = idx + 1;
+            });
+            ui.updateCustomSequenceButtonsUI();
+        });
+    });
+
+    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+    if (clearCustomSequenceButton) {
+        clearCustomSequenceButton.addEventListener('click', () => {
+            setSelectedStepsOrder([]);
+            customSequenceCheckboxes.forEach(cb => {
+                cb.checked = false;
+                const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
+                if (stepCard) stepCard.classList.remove('custom-sequence-selected');
+                const orderEl = document.getElementById(`order-${cb.dataset.stepKey}`);
+                if (orderEl) orderEl.textContent = '';
+            });
+            ui.updateCustomSequenceButtonsUI();
+        });
+    }
+
+    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+    if (runCustomSequenceButton) {
+        runCustomSequenceButton.addEventListener('click', () => {
+            if (getSelectedStepsOrder().length === 0) {
+                showNotification("Veuillez sélectionner au moins une étape.", 'warning');
+                return;
+            }
+            if (getIsAnySequenceRunning()) {
+                showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
+            }
+            showCustomSequenceConfirmUI();
+        });
+    }
+
+    const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
+    const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
+    if (confirmRunCustomSequenceButton) {
+        confirmRunCustomSequenceButton.addEventListener('click', async () => {
+            closePopupUI(customSequenceConfirmOverlay);
+            if (getIsAnySequenceRunning()) {
+                showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
+            }
+            // Loading state on confirm button and disable run-custom while executing
+            try {
+                confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
+                confirmRunCustomSequenceButton.disabled = true;
+                if (runCustomSequenceButton) runCustomSequenceButton.disabled = true;
+
+                // Play workflow start sound for custom sequence
+                soundEvents.workflowStart();
+                await runStepSequence(getSelectedStepsOrder(), "Séquence Personnalisée");
+            } finally {
+                confirmRunCustomSequenceButton.removeAttribute('data-loading');
+                confirmRunCustomSequenceButton.disabled = false;
+                if (runCustomSequenceButton) runCustomSequenceButton.disabled = getIsAnySequenceRunning();
+            }
+        });
+    }
+
+    const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
+    if (cancelRunCustomSequenceButton) {
+        cancelRunCustomSequenceButton.addEventListener('click', () => {
+            closePopupUI(customSequenceConfirmOverlay);
+        });
+    }
+    const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
+    const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
+    if (closeSummaryPopupButton) {
+        closeSummaryPopupButton.addEventListener('click', () => {
+            closePopupUI(sequenceSummaryOverlay);
+        });
+    }
+
+    // --- DELETION START: Suppression du gestionnaire d'événement pour le bouton de cache ---
+    /*
+    if (dom.clearCacheGlobalButton) {
+        dom.clearCacheGlobalButton.addEventListener('click', async () => {
+            const stepKey = 'clear_disk_cache'; 
+            // ... (toute la logique interne est supprimée) ...
+        });
+    }
+    */
+    // --- DELETION END ---
+
+
+
+    // Sound control toggle event handler
+    if (dom.getSoundToggle()) {
+        // Import sound manager functions
+        import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
+            // Initialize the toggle state from localStorage
+            const isEnabled = isSoundEnabled();
+            dom.getSoundToggle().checked = isEnabled;
+            if (dom.getSoundStatus()) {
+                dom.getSoundStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
+            }
+
+            dom.getSoundToggle().addEventListener('change', (event) => {
+                const enabled = event.target.checked;
+                setSoundEnabled(enabled);
+                if (dom.getSoundStatus()) {
+                    dom.getSoundStatus().textContent = enabled ? 'Activé' : 'Désactivé';
+                }
+                console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
+            });
+        });
+    }
 }
-
-// Validate DOM structure for debugging
-export function validateDOMStructure() {
-    const results = {
-        stepElements: getAllStepDivs().length,
-        runButtons: getAllRunButtons().length,
-        cancelButtons: getAllCancelButtons().length,
-        workflowWrapper: !!workflowWrapper,
-        stepsColumn: !!stepsColumn,
-        issues: []
-    };
-
-    // Check for common issues
-    if (results.stepElements === 0) {
-        results.issues.push('No step elements found (.step)');
-    }
-
-    if (!results.workflowWrapper) {
-        results.issues.push('Workflow wrapper not found (#workflow-wrapper)');
-    }
-
-    if (!results.stepsColumn) {
-        results.issues.push('Steps column not found (#steps-column)');
-    }
-
-    console.debug('[DOM] Structure validation:', results);
-    return results;
-}
-
-// Legacy exports for backward compatibility (will be deprecated)
-export const allStepDivs = getAllStepDivs();
-export const allRunButtons = getAllRunButtons();
-export const allCancelButtons = getAllCancelButtons();
-export const allSpecificLogButtons = getAllSpecificLogButtons();
-export const closeLogPanelButton = document.getElementById('close-log-panel');
-
-export const localDownloadsList = document.getElementById('local-downloads-list');
-
-
-
-// ÉLÉMENTS POUR LE CONTRÔLE AUTO-SCROLL
-export const autoScrollToggle = document.getElementById('auto-scroll-toggle');
-export const autoScrollStatus = document.getElementById('auto-scroll-status');
-export const autoScrollWidget = document.getElementById('auto-scroll-widget');
-
-// ÉLÉMENTS POUR LE CONTRÔLE SONORE
-export const soundToggle = document.getElementById('sound-toggle');
-export const soundStatus = document.getElementById('sound-status');
-export const soundControlWidget = document.getElementById('sound-control-widget');
-
-
-// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
-export const settingsToggle = document.getElementById('settings-toggle');
-export const settingsPanel = document.getElementById('settings-panel');
 ```
 
-## File: static/uiUpdater.js
+## File: static/sequenceManager.js
 ```javascript
-import { formatElapsedTime, showNotification } from './utils.js';
-import * as dom from './domElements.js';
-import * as state from './state.js';
-import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
+import { POLLING_INTERVAL } from './constants.js';
+import * as ui from './uiUpdater.js';
+import { runStepAPI } from './apiService.js';
+import { showSequenceSummaryUI } from './popupManager.js';
+import { formatElapsedTime } from './utils.js';
+import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
 
-const lastProgressTextByStep = {};
-
-const _lastAutoCenterTsByStep = {};
-const _AUTO_CENTER_THROTTLE_MS = 700;
+import { appState } from './state/AppState.js';
 
 import { soundEvents } from './soundManager.js';
-import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
-import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
-
-let _stepDetailsPanelModulePromise = null;
-
-const STATUS_UI_MAP = {
-    running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
-    starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
-    initiated: { label: 'Initialisation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
-    completed: { label: 'Terminé', badgeClass: 'status-completed', chipClass: 'state-success', icon: '✅' },
-    success: { label: 'Terminé', badgeClass: 'status-success', chipClass: 'state-success', icon: '✅' },
-    failed: { label: 'Échec', badgeClass: 'status-failed', chipClass: 'state-error', icon: '❌' },
-    error: { label: 'Erreur', badgeClass: 'status-error', chipClass: 'state-error', icon: '⚠️' },
-    cancelled: { label: 'Annulé', badgeClass: 'status-cancelled', chipClass: 'state-error', icon: '⛔' },
-    warning: { label: 'Attention', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⚠️' },
-    paused: { label: 'En pause', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏸️' },
-    idle: { label: 'Prêt', badgeClass: 'status-idle', chipClass: 'state-idle', icon: '🕒' },
-    pending: { label: 'En attente', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏳' }
-};
-
-let STEPS_CONFIG_FROM_SERVER = {};
-export function setStepsConfig(config) {
-    STEPS_CONFIG_FROM_SERVER = config;
-}
-
-function onWrapperTransitionEndOnce(callback, fallbackMs = 500) {
-    const el = dom.workflowWrapper;
-    if (!el) { callback(); return; }
-    let called = false;
-    const handler = (e) => {
-        if (called) return;
-        called = true;
-        el.removeEventListener('transitionend', handler);
-        callback();
-    };
-    el.addEventListener('transitionend', handler, { once: true });
-    setTimeout(() => {
-        if (called) return;
-        try { el.removeEventListener('transitionend', handler); } catch (_) {}
-        callback();
-    }, fallbackMs);
-}
-
-function hideNonActiveSteps(activeStepKey, hidden) {
-    try {
-        const stepDivs = dom.getAllStepDivs();
-        stepDivs.forEach(el => {
-            const isActive = activeStepKey && el.id === `step-${activeStepKey}`;
-            if (!isActive && hidden) {
-                el.classList.add('steps-hidden');
-            } else if (isActive && hidden) {
-                el.classList.remove('steps-hidden');
-            } else if (!hidden) {
-                el.classList.remove('steps-hidden');
-            }
-        });
-    } catch (e) {
-        console.warn('[UI] hideNonActiveSteps error', e);
-    }
-}
-
-let previousDownloadIds = new Set();
-export function getStepsConfig() {
-    return STEPS_CONFIG_FROM_SERVER;
-}
-
-function normalizeStatus(status) {
-    return typeof status === 'string' ? status.toLowerCase() : 'idle';
-}
-
-function getStatusMeta(status) {
-    const normalized = normalizeStatus(status);
-    return STATUS_UI_MAP[normalized] || STATUS_UI_MAP.idle;
-}
-
-function getStepDisplayNameForLogPanel(stepKey) {
-    if (!stepKey) return '';
-    const config = getStepsConfig();
-    const stepConfig = config ? config[stepKey] : null;
-    if (stepConfig && stepConfig.display_name) return stepConfig.display_name;
-
-    const stepEl = document.getElementById(`step-${stepKey}`);
-    const datasetName = stepEl && stepEl.dataset ? stepEl.dataset.stepName : null;
-    if (datasetName) return datasetName;
-
-    return stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-}
-
-function updateLogPanelContextUI(stepKey) {
-    const displayName = stepKey ? getStepDisplayNameForLogPanel(stepKey) : '';
-
-    const statusEl = stepKey ? document.getElementById(`status-${stepKey}`) : null;
-    const timerEl = stepKey ? document.getElementById(`timer-${stepKey}`) : null;
-
-    if (dom.logPanelContextStep) {
-        dom.logPanelContextStep.textContent = stepKey ? displayName : 'Aucune étape active';
-    }
-    if (dom.logPanelContextStatus) {
-        dom.logPanelContextStatus.textContent = statusEl ? (statusEl.textContent || '') : '';
-    }
-    if (dom.logPanelContextTimer) {
-        dom.logPanelContextTimer.textContent = timerEl ? (timerEl.textContent || '') : '';
-    }
-}
-
-function clearLogPanelSpecificButtons() {
-    const container = dom.logPanelSpecificButtonsContainer;
-    if (!container) return;
-
-    while (container.firstChild) {
-        container.removeChild(container.firstChild);
-    }
-}
-
-function positionLogsPanelNearActiveStep(stepKey) {
-    if (!stepKey) return;
-    if (!dom.workflowWrapper || !dom.logsColumnGlobal) return;
-    if (!dom.workflowWrapper.classList.contains('compact-mode')) return;
-
-    const activeStepElement = document.getElementById(`step-${stepKey}`);
-    if (!activeStepElement || typeof activeStepElement.getBoundingClientRect !== 'function') return;
-
-    const rect = activeStepElement.getBoundingClientRect();
-    const minTop = 120;
-    const minHeight = 280;
-    const bottomPadding = 20;
-
-    const maxTop = Math.max(minTop, (window.innerHeight || 800) - minHeight - bottomPadding);
-    const targetTop = Math.max(minTop, Math.min(Math.round(rect.top), maxTop));
-
-    dom.logsColumnGlobal.style.top = `${targetTop}px`;
-    dom.logsColumnGlobal.style.height = `${Math.max(minHeight, (window.innerHeight || 800) - targetTop - bottomPadding)}px`;
-}
-
-function updateStepStateChip(stepKey, status) {
-    const chip = document.getElementById(`state-chip-${stepKey}`);
-    if (!chip) return;
-    const meta = getStatusMeta(status);
-    chip.className = `step-state-chip ${meta.chipClass}`;
-    chip.textContent = `${meta.icon} ${meta.label}`;
-}
-
-export function startStepTimer(stepKey) {
-    const existingTimer = state.getStepTimer(stepKey);
-    if (existingTimer && existingTimer.intervalId) {
-        clearInterval(existingTimer.intervalId);
-    }
-
-    const startTime = Date.now();
-    state.addStepTimer(stepKey, {
-        startTime: startTime,
-        startTimeDate: new Date(startTime),
-        intervalId: null,
-        elapsedTimeFormatted: "0s"
-    });
-
-    if (stepKey !== 'clear_disk_cache') {
-        domBatcher.scheduleUpdate(`timer-init-${stepKey}`, () => {
-            const timerEl = document.getElementById(`timer-${stepKey}`);
-            if (timerEl) timerEl.textContent = "(0s)";
-        });
-    }
-
-    const newIntervalId = setInterval(() => {
-        const currentTimer = state.getStepTimer(stepKey);
-        if (!currentTimer || (!currentTimer.startTime && !currentTimer.startTimeDate)) {
-            if (currentTimer && currentTimer.intervalId) clearInterval(currentTimer.intervalId);
-            return;
-        }
-
-        const startTimeToUse = currentTimer.startTime ? new Date(currentTimer.startTime) : currentTimer.startTimeDate;
-        const elapsedTimeStr = formatElapsedTime(startTimeToUse);
-        currentTimer.elapsedTimeFormatted = elapsedTimeStr;
-
-        if (stepKey !== 'clear_disk_cache') {
-            domBatcher.scheduleUpdate(`timer-update-${stepKey}`, () => {
-                const timerEl = document.getElementById(`timer-${stepKey}`);
-                if (timerEl) timerEl.textContent = `(${elapsedTimeStr})`;
-            });
-        }
-    }, 1000);
-
-    const currentTimerData = state.getStepTimer(stepKey);
-    if (currentTimerData) {
-        currentTimerData.intervalId = newIntervalId;
-    }
-}
-
-export function stopStepTimer(stepKey) {
-    state.clearStepTimerInterval(stepKey);
-    const timerData = state.getStepTimer(stepKey);
-    if (timerData && (timerData.startTime || timerData.startTimeDate)) {
-        const startTimeToUse = timerData.startTime ? new Date(timerData.startTime) : timerData.startTimeDate;
-        const elapsedTimeStr = formatElapsedTime(startTimeToUse);
-        timerData.elapsedTimeFormatted = elapsedTimeStr;
-        if (stepKey !== 'clear_disk_cache') {
-            const timerEl = document.getElementById(`timer-${stepKey}`);
-            if (timerEl) timerEl.textContent = `(Terminé en ${elapsedTimeStr})`;
-        }
-    }
-}
-
-export function resetStepTimerDisplay(stepKey) {
-    if (stepKey !== 'clear_disk_cache') {
-        const timerEl = document.getElementById(`timer-${stepKey}`);
-        if (timerEl) timerEl.textContent = "";
-    }
-    state.deleteStepTimer(stepKey);
-}
-
-export function updateGlobalUIForSequenceState(isRunning) {
-    if (dom.runAllButton) dom.runAllButton.disabled = isRunning;
-    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = isRunning || state.getSelectedStepsOrder().length === 0;
-    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = isRunning || state.getSelectedStepsOrder().length === 0;
-
-    dom.customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
-
-    Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
-        const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
-        const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKeyConfig}"]`);
-        const stepInfo = state.PROCESS_INFO_CLIENT[stepKeyConfig];
-
-        if (runButton) runButton.disabled = isRunning;
-
-        if (cancelButton) {
-            if (stepInfo && ['running', 'starting', 'initiated'].includes(stepInfo.status)) {
-                cancelButton.disabled = false;
-            } else {
-                cancelButton.disabled = true;
-            }
-        }
-    });
-}
-
-export function setActiveStepForLogPanelUI(stepKey) {
-    console.log(`[UI] setActiveStepForLogPanelUI, new active step for logs: ${stepKey}`);
-    state.setActiveStepKeyForLogs(stepKey);
-
-    const allStepDivs = dom.getAllStepDivs();
-    allStepDivs.forEach(s => {
-        s.classList.remove('active-for-log-panel');
-    });
-    if (stepKey && stepKey !== 'clear_disk_cache') {
-        const activeStepElement = document.getElementById(`step-${stepKey}`);
-        if (activeStepElement) {
-            activeStepElement.classList.add('active-for-log-panel');
-
-            const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
-            if (logsOpen) {
-                hideNonActiveSteps(stepKey, true);
-            }
-            if (isAutoScrollEnabled() && !logsOpen) {
-                console.log(`[UI] Auto-scrolling to active step: ${stepKey}`);
-                scrollToActiveStep(stepKey);
-            }
-        }
-    }
-
-    clearLogPanelSpecificButtons();
-
-    if (stepKey) {
-        const config = getStepsConfig();
-        const stepConfig = config ? config[stepKey] : null;
-        const displayName = stepConfig ? stepConfig.display_name : stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        console.log(`[UI] setActiveStepForLogPanelUI, displayName for logs: ${displayName}`);
-
-        if(dom.logPanelTitle) dom.logPanelTitle.textContent = `Logs: ${displayName}`;
-        if(dom.currentStepLogNamePanel) dom.currentStepLogNamePanel.textContent = displayName;
-        updateLogPanelContextUI(stepKey);
-
-        if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && dom.logPanelSpecificButtonsContainer) {
-            stepConfig.specific_logs.forEach((logConf, index) => {
-                const button = document.createElement('button');
-                button.className = 'specific-log-button';
-                button.textContent = logConf.name;
-                button.dataset.step = stepKey;
-                button.dataset.logIndex = index;
-                button.addEventListener('click', async () => {
-                    const apiModule = await import('./apiService.js');
-                    await apiModule.fetchSpecificLogAPI(stepKey, index, logConf.name);
-                });
-                dom.logPanelSpecificButtonsContainer.appendChild(button);
-            });
-        }
-    } else {
-        if(dom.logPanelTitle) dom.logPanelTitle.textContent = "Logs";
-        if(dom.currentStepLogNamePanel) dom.currentStepLogNamePanel.textContent = "Aucune étape active";
-        updateLogPanelContextUI(null);
-    }
-}
-
-async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
-    console.log(`[UI] fetchAndDisplayLogsForPanel called for: ${stepKeyToFocus}. Current active log panel: ${state.getActiveStepKeyForLogs()}`);
-    if (!stepKeyToFocus) return;
-
-    const stepConfig = getStepsConfig()[stepKeyToFocus];
-    const displayName = stepConfig ? (stepConfig.display_name || stepKeyToFocus) : stepKeyToFocus;
-
-    if (dom.mainLogOutputPanel) {
-        dom.mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
-    }
-
-    if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'flex';
-    if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
-
-    try {
-        const response = await fetch(`/status/${stepKeyToFocus}`);
-        if (!response.ok) {
-            console.error(`[UI] fetchAndDisplayLogsForPanel - fetch failed for ${stepKeyToFocus}: ${response.status}`);
-            throw new Error(`Erreur ${response.status} lors de la récupération des logs pour ${displayName}`);
-        }
-        const data = await response.json();
-        state.PROCESS_INFO_CLIENT[stepKeyToFocus] = { ...state.PROCESS_INFO_CLIENT[stepKeyToFocus], ...data };
-        console.log(`[UI] fetchAndDisplayLogsForPanel - response for: ${stepKeyToFocus}, Log content length: ${data.log ? data.log.length : 'N/A'}`);
-
-        if (state.getActiveStepKeyForLogs() === stepKeyToFocus) {
-            console.log(`[UI] fetchAndDisplayLogsForPanel - Updating main log for ${stepKeyToFocus} with ${data.log ? data.log.length : 0} lines.`);
-            updateMainLogOutputUI(data.log.join(''));
-        } else {
-            console.log(`[UI] fetchAndDisplayLogsForPanel - Log focus changed. Current: ${state.getActiveStepKeyForLogs()}, Fetched for: ${stepKeyToFocus}. Not updating main log panel.`);
-        }
-    } catch (error) {
-        console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
-        if (state.getActiveStepKeyForLogs() === stepKeyToFocus && dom.mainLogOutputPanel) {
-            dom.mainLogOutputPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
-        }
-    }
-}
-
-export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
-    const currentActiveLogStep = state.getActiveStepKeyForLogs();
-    const isPanelOpen = dom.workflowWrapper.classList.contains('logs-active');
-    console.log(`[UI] openLogPanelUI called for: ${stepKeyToFocus}, forceOpen: ${forceOpen}, currentActive: ${currentActiveLogStep}, isPanelOpen: ${isPanelOpen}`);
-
-    if (forceOpen) {
-        console.log(`[UI] Forcing panel open/update for ${stepKeyToFocus}`);
-        dom.workflowWrapper.classList.add('logs-entering');
-        setActiveStepForLogPanelUI(stepKeyToFocus);
-        hideNonActiveSteps(stepKeyToFocus, true);
-        requestAnimationFrame(() => {
-            dom.workflowWrapper.classList.add('logs-active');
-            onWrapperTransitionEndOnce(() => {
-                dom.workflowWrapper.classList.remove('logs-entering');
-            }, 500);
-        });
-        positionLogsPanelNearActiveStep(stepKeyToFocus);
-        fetchAndDisplayLogsForPanel(stepKeyToFocus);
-        return;
-    }
-
-    if (isPanelOpen && currentActiveLogStep && currentActiveLogStep !== stepKeyToFocus) {
-        console.log(`[UI] Log panel already open for ${currentActiveLogStep}, switching to ${stepKeyToFocus}.`);
-        setActiveStepForLogPanelUI(stepKeyToFocus);
-        hideNonActiveSteps(stepKeyToFocus, true);
-        positionLogsPanelNearActiveStep(stepKeyToFocus);
-        fetchAndDisplayLogsForPanel(stepKeyToFocus);
-        return;
-    }
-
-    if (isPanelOpen && currentActiveLogStep === stepKeyToFocus) {
-        console.log(`[UI] Panel already open for ${stepKeyToFocus}. Refreshing its content.`);
-        fetchAndDisplayLogsForPanel(stepKeyToFocus);
-        return;
-    }
-
-    console.log(`[UI] Opening panel for ${stepKeyToFocus} (or was closed/open for null).`);
-    dom.workflowWrapper.classList.add('logs-entering');
-    setActiveStepForLogPanelUI(stepKeyToFocus);
-    hideNonActiveSteps(stepKeyToFocus, true);
-    requestAnimationFrame(() => {
-        dom.workflowWrapper.classList.add('logs-active');
-        onWrapperTransitionEndOnce(() => {
-            dom.workflowWrapper.classList.remove('logs-entering');
-        }, 500);
-    });
-    positionLogsPanelNearActiveStep(stepKeyToFocus);
-    fetchAndDisplayLogsForPanel(stepKeyToFocus);
-}
-
-export function closeLogPanelUI() {
-    console.log('[CLOSE_LOG] Starting closeLogPanelUI, current classes:', dom.workflowWrapper.className);
-    dom.workflowWrapper.classList.add('logs-leaving');
-    console.log('[CLOSE_LOG] Added logs-leaving class, new classes:', dom.workflowWrapper.className);
-
-    requestAnimationFrame(() => {
-        console.log('[CLOSE_LOG] In RAF, removing logs-active class, current classes:', dom.workflowWrapper.className);
-        dom.workflowWrapper.classList.remove('logs-active');
-
-        onWrapperTransitionEndOnce(() => {
-            console.log('[CLOSE_LOG] Cleanup - removing logs-leaving class, current classes:', dom.workflowWrapper.className);
-            dom.workflowWrapper.classList.remove('logs-leaving');
-            hideNonActiveSteps(null, false);
-        }, 500);
-    });
-
-    setActiveStepForLogPanelUI(null);
-    if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.textContent = "";
-    if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
-
-    if (dom.logsColumnGlobal) {
-        dom.logsColumnGlobal.style.removeProperty('top');
-        dom.logsColumnGlobal.style.removeProperty('height');
-    }
-    clearLogPanelSpecificButtons();
-}
-
-export function updateStepCardUI(stepKey, data) {
-    console.group(`[PROGRESS DEBUG] updateStepCardUI - ${stepKey}`);
-    console.log('Raw data received:', {
-        progress_current: data.progress_current,
-        progress_total: data.progress_total,
-        progress_current_fractional: data.progress_current_fractional,
-        status: data.status,
-        progress_text: data.progress_text,
-        timestamp: new Date().toISOString()
-    });
-
-    performanceOptimizer.measureDomUpdate(`updateStepCard-${stepKey}`, () => {
-        try {
-            const statusEl = document.getElementById(`status-${stepKey}`);
-            const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
-            const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-
-            const normalizedStatus = normalizeStatus(data.status || 'idle');
-            const statusMeta = getStatusMeta(normalizedStatus);
-
-            if (statusEl) {
-                statusEl.textContent = statusMeta.label;
-                statusEl.className = `status-badge ${statusMeta.badgeClass}`;
-            }
-
-            const stepCardEl = document.getElementById(`step-${stepKey}`);
-            if (stepCardEl) {
-                stepCardEl.setAttribute('data-status', normalizedStatus);
-            }
-
-            updateStepStateChip(stepKey, normalizedStatus);
-
-            if (runButton && cancelButton) {
-                const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
-                runButton.disabled = isCurrentlyRunningOrStarting || state.getIsAnySequenceRunning();
-                cancelButton.disabled = !isCurrentlyRunningOrStarting;
-            }
-
-            const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
-            if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
-                if (state.getActiveStepKeyForLogs() !== stepKey) {
-                    setActiveStepForLogPanelUI(stepKey);
-                    hideNonActiveSteps(stepKey, true);
-                }
-            }
-
-            if (logsOpen && state.getActiveStepKeyForLogs() === stepKey) {
-                updateLogPanelContextUI(stepKey);
-            }
-
-            if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && state.getStepTimer(stepKey))) {
-                stopStepTimer(stepKey);
-            } else if (normalizedStatus === 'idle' && !state.getStepTimer(stepKey)) {
-                resetStepTimerDisplay(stepKey);
-            } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !state.getStepTimer(stepKey)?.intervalId) {
-                // TODO: Implement proper timer resumption after page reload
-                // Date: 2026-01-19
-                // Owner: kidpixel
-                // Issue: startStepTimer doesn't resume from existing startTime
-                // Solution needed: Backend should provide duration_str for running steps
-            }
-
-            const progressContainer = document.getElementById(`progress-container-${stepKey}`);
-            const progressBar = document.getElementById(`progress-bar-${stepKey}`);
-            const progressTextEl = document.getElementById(`progress-text-${stepKey}`);
-
-            let percentage = 0;
-
-            if (progressContainer && progressBar && progressTextEl) {
-                if (data.progress_total > 0) {
-                    let currentProgress = data.progress_current_fractional || data.progress_current;
-
-                    if (data.progress_current_fractional === null && data.progress_text) {
-                        const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
-                        if (!isSpecialRunning) {
-                            const percentMatch = data.progress_text.match(/(\d+)%/);
-                            if (percentMatch) {
-                                const textPercent = parseInt(percentMatch[1]);
-                                currentProgress = (textPercent / 100) * data.progress_total;
-                                console.log(`[PROGRESS FALLBACK] ${stepKey}: Extracted ${textPercent}% from text, using fractional: ${currentProgress}`);
-                            }
-                        }
-                    }
-
-                    percentage = Math.round((currentProgress / data.progress_total) * 100);
-                    percentage = Math.min(percentage, 100);
-
-                    if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
-                        if (percentage >= 100) {
-                            percentage = 99;
-                        }
-                        if (data.progress_total > 0 && data.progress_current === data.progress_total) {
-                            percentage = Math.min(percentage, 99);
-                        }
-                    }
-
-                    console.log(`[PROGRESS CALC] ${stepKey}:`, {
-                        progress_current: data.progress_current,
-                        progress_current_fractional: data.progress_current_fractional,
-                        progress_total: data.progress_total,
-                        currentProgress: currentProgress,
-                        calculatedPercentage: (currentProgress / data.progress_total) * 100,
-                        finalPercentage: percentage,
-                        status: data.status,
-                        progress_text: data.progress_text
-                    });
-
-                    let displayCurrent = data.progress_current;
-                    if ((!displayCurrent || displayCurrent === 0) && typeof data.progress_current_fractional === 'number' && data.progress_current_fractional > 0) {
-                        const frac = Math.max(0, Math.min(data.progress_total, data.progress_current_fractional));
-                        displayCurrent = Math.min(data.progress_total, Math.floor(frac) + 1);
-                    }
-
-                    progressContainer.style.display = 'block';
-                    progressBar.style.backgroundColor = 'var(--blue)';
-                    progressBar.style.width = `${percentage}%`;
-                    progressBar.textContent = `${percentage}%`;
-                    progressBar.setAttribute('aria-valuenow', percentage);
-
-                    if (['running','starting','initiated'].includes(normalizedStatus)) {
-                        progressBar.setAttribute('data-active', 'true');
-                    } else {
-                        progressBar.removeAttribute('data-active');
-                    }
-
-                    const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
-                    if (data.progress_text && data.progress_text.trim()) {
-                        lastProgressTextByStep[stepKey] = data.progress_text;
-                    }
-                    const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
-                    progressTextEl.textContent = subText;
-
-                    const shouldAutoCenter = state.getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
-                    if (shouldAutoCenter) {
-                        const logsOpenNow = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
-                        if (!logsOpenNow) {
-                            const now = performance.now();
-                            const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
-                            if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
-                                _lastAutoCenterTsByStep[stepKey] = now;
-                                requestAnimationFrame(() => {
-                                    scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
-                                });
-                            }
-                        }
-                    }
-
-                    if (candidateText && ['running','starting','initiated'].includes(data.status)) {
-                        progressTextEl.setAttribute('data-processing', 'true');
-                    } else {
-                        progressTextEl.removeAttribute('data-processing');
-                    }
-
-                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
-                    }
-                } else if (data.status === 'completed' && data.progress_total === 0) {
-                    percentage = 0;
-                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
-                } else if (data.status === 'completed' && data.progress_total > 0) {
-                    percentage = 100;
-                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
-                } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
-                    percentage = 0;
-                    console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
-                }
-            } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
-                progressContainer.style.display = 'block';
-                progressBar.style.backgroundColor = 'var(--blue)';
-                progressBar.setAttribute('data-active', 'true');
-                const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
-                if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
-                progressTextEl.textContent = runningText;
-
-                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                    const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
-                    try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
-                }
-
-                if (runningText && runningText.trim()) {
-                    progressTextEl.setAttribute('data-processing', 'true');
-                } else {
-                    progressTextEl.removeAttribute('data-processing');
-                }
-            } else if (data.status === 'completed') {
-                progressContainer.style.display = 'block';
-                progressBar.style.backgroundColor = 'var(--green)';
-                progressBar.removeAttribute('data-active');
-
-                if (data.progress_total === 0) {
-                    let noWorkText = "Aucun élément à traiter";
-                    if (data.progress_text && data.progress_text.trim() !== "") {
-                        noWorkText = data.progress_text;
-                    }
-                    progressTextEl.textContent = noWorkText;
-                    progressBar.style.width = '10%';
-                    progressBar.textContent = '✓';
-                } else {
-                    let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
-                    if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
-                        baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
-                    }
-                    const config = STEPS_CONFIG_FROM_SERVER[stepKey];
-                    if (config && config.post_completion_message_ui) {
-                        progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
-                    } else {
-                        progressTextEl.textContent = baseCompletionText;
-                    }
-
-                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
-                    }
-                    delete lastProgressTextByStep[stepKey];
-                }
-            } else if (data.status === 'failed') {
-                progressContainer.style.display = 'block';
-                progressBar.style.backgroundColor = 'var(--red)';
-                let failureText = `Échec`;
-                if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
-                if (data.progress_text) failureText += `: ${data.progress_text}`;
-                progressTextEl.textContent = failureText;
-                progressBar.removeAttribute('data-active');
-                progressTextEl.removeAttribute('data-processing');
-
-                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                    try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
-                }
-                delete lastProgressTextByStep[stepKey];
-            } else if (data.status === 'starting' || data.status === 'initiated') {
-                progressContainer.style.display = 'block';
-                progressBar.style.width = `0%`;
-                progressBar.textContent = `0%`;
-                progressBar.style.backgroundColor = 'var(--blue)';
-                progressBar.setAttribute('data-active', 'true');
-                progressTextEl.textContent = "Démarrage...";
-            } else {
-                progressContainer.style.display = 'none';
-                progressBar.setAttribute('aria-valuenow', 0);
-            }
-
-            const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
-            if (dom.workflowWrapper) {
-                if (anyRunning) {
-                    dom.workflowWrapper.classList.add('any-step-running');
-                    if (['running','starting','initiated'].includes(data.status)) {
-                        dom.workflowWrapper.setAttribute('data-active-step', stepKey);
-                    } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
-                        dom.workflowWrapper.removeAttribute('data-active-step');
-                    }
-                } else {
-                    dom.workflowWrapper.classList.remove('any-step-running');
-                    dom.workflowWrapper.removeAttribute('data-active-step');
-                }
-            }
-
-            try {
-                if (!_stepDetailsPanelModulePromise) {
-                    _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
-                }
-                _stepDetailsPanelModulePromise
-                    .then((mod) => {
-                        if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
-                            mod.refreshStepDetailsPanelIfOpen(stepKey);
-                        }
-                    })
-                    .catch((e) => {
-                        console.debug('[UI] Step details module not available:', e);
-                    });
-            } catch (_) {}
-        } catch (_) {}
-
-        console.groupEnd();
-    });
-}
-
-export function updateCustomSequenceButtonsUI() {
-    const hasSelection = state.getSelectedStepsOrder().length > 0;
-    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || state.getIsAnySequenceRunning();
-    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || state.getIsAnySequenceRunning();
-}
-
-export function updateGlobalProgressUI(text, percentage, isError = false) {
-    if(dom.globalProgressAffix) dom.globalProgressAffix.style.display = 'flex';
-    if(dom.globalProgressContainer) dom.globalProgressContainer.style.display = 'block';
-    if(dom.globalProgressText) {
-        dom.globalProgressText.style.display = 'block';
-        dom.globalProgressText.textContent = text;
-        dom.globalProgressText.style.color = isError ? 'var(--red)' : 'var(--text-secondary)';
-    }
-    if(dom.globalProgressBar) {
-        dom.globalProgressBar.style.width = `${percentage}%`;
-        dom.globalProgressBar.textContent = `${percentage}%`;
-        dom.globalProgressBar.setAttribute('aria-valuenow', percentage);
-        dom.globalProgressBar.style.backgroundColor = isError ? 'var(--red)' : 'var(--green)';
-    }
-}
-
-export function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
-    domBatcher.scheduleUpdate('specific-log-ui', () => {
-        if(dom.specificLogHeaderTextPanel) dom.specificLogHeaderTextPanel.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
-        if(dom.specificLogPathInfoPanel) dom.specificLogPathInfoPanel.textContent = path ? `(Source: ${path})` : "";
-        if (isError) {
-            if(dom.specificLogOutputContentPanel) {
-                const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
-                dom.specificLogOutputContentPanel.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
-            }
-        } else {
-const styledContent = parseAndStyleLogContent(content);
-            if(dom.specificLogOutputContentPanel) dom.specificLogOutputContentPanel.innerHTML = styledContent;
-        }
-        if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'flex';
-        if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'none';
-        if(dom.specificLogOutputContentPanel) dom.specificLogOutputContentPanel.scrollTop = 0;
-    });
-}
-
-const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
-
-const _LOG_TIMESTAMP_PATTERN = /^(?:\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2})/;
-const _LOG_ERROR_PATTERN = /(?:erreur|error|échec|failed|exception|critical|fatal|crash)/i;
-const _LOG_WARNING_PATTERN = /(?:warning|attention|avertissement|warn|caution|deprecated)/i;
-const _LOG_SUCCESS_PATTERN = /(?:success|réussi|terminé|completed|finished|done|✓|✔|ok\b)/i;
-const _LOG_INFO_PATTERN = /(?:info|information|démarrage|starting|lancement|initiated|status)/i;
-const _LOG_DEBUG_PATTERN = /(?:debug|trace|verbose|détail)/i;
-const _LOG_COMMAND_PATTERN = /^(?:commande:|command:|executing:|exécution:|\$|>)/i;
-const _LOG_PROGRESS_PATTERN = /(?:\d+%|\d+\/\d+|progress|progression|chargement|loading|téléchargement|downloading)/i;
-
-const _LOG_PATTERNS = [
-    {
-        regex: _LOG_ERROR_PATTERN,
-        type: 'error'
-    },
-    {
-        regex: _LOG_WARNING_PATTERN,
-        type: 'warning'
-    },
-    {
-        regex: _LOG_SUCCESS_PATTERN,
-        type: 'success'
-    },
-    {
-        regex: _LOG_PROGRESS_PATTERN,
-        type: 'progress'
-    },
-    {
-        regex: _LOG_COMMAND_PATTERN,
-        type: 'command'
-    },
-    {
-        regex: _LOG_INFO_PATTERN,
-        type: 'info'
-    },
-    {
-        regex: _LOG_TIMESTAMP_PATTERN,
-        type: 'info'
-    },
-    {
-        regex: _LOG_DEBUG_PATTERN,
-        type: 'debug'
-    }
-];
-
-const _COMPILED_LOG_PATTERNS = _LOG_PATTERNS.map(p => ({
-    ...p,
-    regex: new RegExp(p.regex.source, p.regex.flags)
-}));
 
 /**
- * Parse and style log content with CSS classes for different log types.
- * Escapes all HTML to prevent XSS.
- * 
- * @param {string} rawContent - Raw log content
- * @returns {string} - Styled HTML content
+ * Executes and tracks a single step within a sequence.
+ * This helper function encapsulates all logic for one step, from initiation to completion.
+ * @private
+ * @param {string} stepKey - The unique key for the step.
+ * @param {string} sequenceName - The name of the parent sequence.
+ * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
+ * @param {number} totalSteps - The total number of steps in the sequence.
+ * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
  */
-export function parseAndStyleLogContent(rawContent) {
-    if (!rawContent || typeof rawContent !== 'string') {
-        return rawContent || '';
-    }
+async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
+    const stepConfig = ui.getStepsConfig()[stepKey];
+    const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
 
-const lines = rawContent.split('\n');
-    const styledLines = new Array(lines.length);
+    console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line === '' || _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN.test(line)) {
-            styledLines[i] = line;
-            continue;
+    ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
+        Math.round(((currentStepNum - 1) / totalSteps) * 100)
+    );
+
+    if (stepKey !== 'clear_disk_cache') {
+        ui.openLogPanelUI(stepKey, true);
+        ui.setActiveStepForLogPanelUI(stepKey);
+        
+        if (isSequenceAutoScrollEnabled()) {
+            setTimeout(() => {
+                scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
+            }, 0);
         }
-
-        const escapedLine = DOMUpdateUtils.escapeHtml(line);
-
-        let logType = 'default';
-        for (let j = 0; j < _COMPILED_LOG_PATTERNS.length; j++) {
-            const pattern = _COMPILED_LOG_PATTERNS[j];
-            if (pattern.regex.test(line)) {
-                logType = pattern.type;
-                break;
-            }
-        }
-
-        styledLines[i] = logType !== 'default'
-            ? `<span class="log-line log-${logType}">${escapedLine}</span>`
-            : escapedLine;
     }
 
-    return styledLines.join('\n');
-}
-
-export function updateMainLogOutputUI(htmlContent) {
-    if(dom.mainLogOutputPanel) {
-const styledContent = parseAndStyleLogContent(htmlContent);
-        dom.mainLogOutputPanel.innerHTML = styledContent;
-    }
-    if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.scrollTop = dom.mainLogOutputPanel.scrollHeight;
-
-    if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'flex';
-    if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
-}
-
-export function updateLocalDownloadsListUI(downloadsData) {
-    if (!dom.localDownloadsList) return;
-    dom.localDownloadsList.innerHTML = '';
-    if (!downloadsData || downloadsData.length === 0) {
-        const li = document.createElement('li');
-        li.textContent = 'Aucune activité de téléchargement locale récente.';
-        li.classList.add('placeholder');
-        dom.localDownloadsList.appendChild(li);
-        return;
+    const stepInitiated = await runStepAPI(stepKey);
+    if (!stepInitiated) {
+        console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
+        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
+            Math.round(((currentStepNum - 1) / totalSteps) * 100), true
+        );
+        return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
     }
 
-const currentDownloadIds = new Set();
-    downloadsData.forEach(download => {
-        if (download.id) {
-            currentDownloadIds.add(download.id);
-if (!previousDownloadIds.has(download.id) &&
-                (download.status === 'pending' || download.status === 'downloading')) {
-                console.log(`[SOUND] New CSV download detected: ${download.filename}`);
-                soundEvents.csvDownloadInitiation();
+    ui.startStepTimer(stepKey);
+    console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
 
-const filename = download.filename && download.filename !== 'Détermination en cours...'
-                    ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
-                    : 'nouveau fichier';
-                showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
-            }
-        }
+    try {
+        ui.setActiveStepForLogPanelUI(stepKey);
+    } catch (e) {
+        console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
+    }
+
+    let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+    if (timerData && timerData.startTime) {
+        console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
+    } else {
+        console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
+    }
+
+    console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
+    const stepCompleted = await waitForStepCompletionInSequence(stepKey);
+
+    ui.stopStepTimer(stepKey);
+    console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
+
+    timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+    const duration = (timerData?.elapsedTimeFormatted) || "N/A";
+
+    console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
+        timerData,
+        duration,
+        startTime: timerData?.startTime,
+        elapsedTimeFormatted: timerData?.elapsedTimeFormatted
     });
 
-previousDownloadIds = currentDownloadIds;
+    if (!stepCompleted) {
+        console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
 
-    downloadsData.forEach(download => {
-        const li = document.createElement('li');
-        li.classList.add(`download-status-${download.status}`);
+        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
+            Math.round((currentStepNum / totalSteps) * 100), true
+        );
+        return { name: stepDisplayName, success: false, duration };
+    }
 
-        const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
-        const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
-        const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
-        const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
+    console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
 
-        const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
-        const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
-        let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
-        let progressText = '';
-        if (download.status === 'downloading' && typeof download.progress === 'number') {
-            progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
-        }
-        if (download.message) {
-            const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
-            const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
-            statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
-        }
-        li.innerHTML = `${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}`;
-        dom.localDownloadsList.appendChild(li);
-    });
+    soundEvents.stepSuccess();
+
+    return { name: stepDisplayName, success: true, duration };
 }
 
-export function updateClearCacheGlobalButtonState(status, message = '') {
-    if (!dom.clearCacheGlobalButton) return;
+export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
+    console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
+    ui.updateGlobalUIForSequenceState(true);
+    ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
 
-    dom.clearCacheGlobalButton.classList.remove('idle', 'running', 'completed', 'failed');
-    const textSpan = dom.clearCacheGlobalButton.querySelector('.button-text');
-    const currentStepInfo = state.PROCESS_INFO_CLIENT['clear_disk_cache'];
+    const sequenceStart = Date.now();
 
-const isOtherSequenceRunning = state.getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
+    const sequenceResults = [];
+    const totalStepsInThisSequence = stepsToExecute.length;
+    const isAutoModeSequence = sequenceName === "AutoMode";
+    let sequenceFailed = false;
 
-
-    switch (status) {
-        case 'idle':
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Vider le Cache";
-            dom.clearCacheGlobalButton.classList.add('idle');
-            break;
-        case 'starting':
-        case 'initiated':
-            dom.clearCacheGlobalButton.disabled = true;
-            if (textSpan) textSpan.textContent = "Lancement...";
-            dom.clearCacheGlobalButton.classList.add('running');
-            break;
-        case 'running':
-            dom.clearCacheGlobalButton.disabled = true;
-            if (textSpan) textSpan.textContent = "Nettoyage...";
-            dom.clearCacheGlobalButton.classList.add('running');
-            break;
-        case 'completed':
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Cache Vidé";
-            dom.clearCacheGlobalButton.classList.add('completed');
-            showNotification("Nettoyage du cache disque terminé avec succès.", "success");
-            setTimeout(() => updateClearCacheGlobalButtonState('idle'), 5000);
-            break;
-        case 'failed':
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Échec Nettoyage";
-            dom.clearCacheGlobalButton.classList.add('failed');
-            let notifMessage = "Échec du nettoyage du cache disque.";
-            if (message && typeof message === 'string' && message.trim() !== '' && !message.startsWith('<')) {
-                notifMessage += ` Détail: ${message.substring(0,100)}`;
-            }
-            showNotification(notifMessage, "error");
-            setTimeout(() => updateClearCacheGlobalButtonState('idle'), 8000);
-            break;
-        default:
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Vider le Cache";
-            dom.clearCacheGlobalButton.classList.add('idle');
+    if (isAutoModeSequence) {
+        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
     }
+
+    for (let i = 0; i < stepsToExecute.length; i++) {
+        const stepKey = stepsToExecute[i];
+        const currentStepNum = i + 1;
+
+        const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
+        sequenceResults.push(result);
+
+        if (!result.success) {
+            sequenceFailed = true;
+            break; // Exit the loop immediately on failure
+        }
+
+        if (i < stepsToExecute.length - 1) {
+            const nextStepKey = stepsToExecute[i + 1];
+            if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
+                try {
+                    ui.openLogPanelUI(nextStepKey, true);
+                    ui.setActiveStepForLogPanelUI(nextStepKey);
+                    
+                    if (isSequenceAutoScrollEnabled()) {
+                        setTimeout(() => {
+                            scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
+                        }, 0);
+                    }
+                } catch (e) {
+                    console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
+                }
+            }
+            ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
+                Math.round((currentStepNum / totalStepsInThisSequence) * 100)
+            );
+        }
+    }
+
+    console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
+
+    if (sequenceFailed) {
+    } else {
+        ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
+        soundEvents.workflowCompletion();
+    }
+
+    if (sequenceResults.length > 0) {
+        const overallDuration = formatElapsedTime(new Date(sequenceStart));
+        showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
+    } else {
+        console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
+    }
+
+    ui.updateGlobalUIForSequenceState(false);
+    if (isAutoModeSequence) {
+        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
+    }
+}
+
+function waitForStepCompletionInSequence(stepKey) {
+    return new Promise((resolve) => {
+        const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
+        console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
+
+        const checkInterval = setInterval(() => {
+            const data = appState.getStateProperty(`processInfo.${stepKey}`);
+
+            if (!data) {
+                return;
+            }
+
+            if (data.status === 'completed') {
+                console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (data.status === 'failed' || data.return_code === -9) {
+                console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
+                clearInterval(checkInterval);
+                resolve(false);
+            }
+            }, POLLING_INTERVAL / 2);
+    });
 }
 ```
 
@@ -35969,9 +33824,6 @@ const isOtherSequenceRunning = state.getIsAnySequenceRunning() && currentStepInf
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
-    <!-- Feature styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/features/cinematic-logs.css') }}?v={{ cache_buster }}">
-    
     <!-- Utilities and responsive (loaded last) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
@@ -36014,18 +33866,6 @@ const isOtherSequenceRunning = state.getIsAnySequenceRunning() && currentStepInf
                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
                                 <!-- Options populated by themeManager.js -->
                             </select>
-                        </div>
-
-                        <div class="cinematic-toggle-container settings-block">
-                            <input type="checkbox" id="cinematic-mode-toggle" aria-label="Activer le mode cinématique pour les logs">
-                            <label for="cinematic-mode-toggle" class="cinematic-toggle-label">Logs Cinématiques</label>
-                        </div>
-
-                        <div id="auto-scroll-widget" class="auto-scroll-widget settings-block">
-                            <label class="btn-like-switch" for="auto-scroll-toggle" aria-label="Activer/Désactiver le défilement auto">
-                                📜 Défilement Auto
-                                <input type="checkbox" id="auto-scroll-toggle" checked>
-                            </label>
                         </div>
 
                         <div id="sound-control-widget" class="sound-control-widget settings-block">
@@ -36236,4 +34076,1892 @@ const isOtherSequenceRunning = state.getIsAnySequenceRunning() && currentStepInf
 </body>
 
 </html>
+```
+
+## File: static/main.js
+```javascript
+import * as dom from './domElements.js';
+import * as ui from './uiUpdater.js';
+import * as api from './apiService.js';
+import { initializeEventHandlers } from './eventHandlers.js';
+import { POLLING_INTERVAL } from './constants.js';
+import { showNotification } from './utils.js';
+
+window.showNotification = showNotification;
+import { showSequenceSummaryUI } from './popupManager.js';
+import { scrollToStepImmediate } from './scrollManager.js';
+
+import { initializeSoundManager } from './soundManager.js';
+import { pollingManager } from './utils/PollingManager.js';
+import { errorHandler } from './utils/ErrorHandler.js';
+import { performanceMonitor } from './utils/PerformanceMonitor.js';
+import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
+
+import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
+import { appState } from './state/AppState.js';
+import { initializeCSVDownloadMonitor } from './csvDownloadMonitor.js';
+import { themeManager } from './themeManager.js';
+import { reportViewer } from './reportViewer.js';
+import { fetchWithLoadingState } from './apiService.js';
+
+import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('[MAIN] Unhandled promise rejection:', event.reason);
+
+    // Check if this is the specific browser extension error we're trying to fix
+    if (event.reason && event.reason.message &&
+        event.reason.message.includes('message channel closed')) {
+        console.debug('[MAIN] Suppressing browser extension message channel error');
+        event.preventDefault(); // Prevent the error from appearing in console
+        return;
+    }
+});
+
+function setupLocalDownloadsToggle() {
+    const section = document.querySelector('.local-downloads-section');
+    const btn = document.getElementById('toggle-local-downloads');
+    if (!section || !btn) return;
+
+    let visible = true;
+    try {
+        const stored = localStorage.getItem('ui.localDownloadsVisible');
+        if (stored !== null) visible = stored === 'true';
+    } catch (_) {}
+
+    if (visible) {
+        section.style.display = '';
+    } else {
+        section.style.display = 'none';
+    }
+
+    applyLocalDownloadsVisibility(section, btn, visible);
+
+    btn.addEventListener('click', () => {
+        visible = !(btn.getAttribute('aria-pressed') === 'true');
+        applyLocalDownloadsVisibility(section, btn, visible);
+        try { localStorage.setItem('ui.localDownloadsVisible', String(visible)); } catch (_) {}
+        appState.setState({ ui: { localDownloadsVisible: visible } }, 'downloads_visibility_toggle');
+        // Clear alert state if revealing
+        if (visible) {
+            btn.classList.remove('downloads-toggle--alert');
+            try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
+        }
+    });
+
+    updateDownloadsToggleAlert(appState.getStateProperty('csvDownloads') || []);
+}
+
+function applyLocalDownloadsVisibility(section, btn, visible) {
+    domBatcher.scheduleUpdate('downloads-visibility-toggle', () => {
+        if (visible) {
+            section.style.display = '';
+            section.classList.remove('minimized');
+            btn.setAttribute('aria-pressed', 'true');
+            btn.classList.remove('downloads-toggle--hidden');
+            // Focus and highlight the Downloads section title for accessibility feedback
+            requestAnimationFrame(() => {
+                const title = section.querySelector('h2');
+                if (title) {
+                    safeFocusAndHighlight(title);
+                }
+            });
+        } else {
+            btn.setAttribute('aria-pressed', 'false');
+            btn.classList.add('downloads-toggle--hidden');
+            section.style.display = 'none';
+        }
+    });
+}
+
+function safeFocusAndHighlight(el) {
+    if (!el || typeof el !== 'object') return;
+    try {
+        // Make sure element can be focused without altering tab order permanently
+        let removeTabIndex = false;
+        if (el !== document.body && el.tabIndex === -1) {
+            // Already programmatically focusable
+        } else if (el !== document.body && (el.getAttribute && el.getAttribute('tabindex') === null)) {
+            el.setAttribute('tabindex', '-1');
+            removeTabIndex = true;
+        }
+        el.focus && el.focus();
+        // Apply highlight flash
+        if (el.classList) {
+            el.classList.add('section-focus-highlight');
+            setTimeout(() => { try { el.classList.remove('section-focus-highlight'); } catch(_){} }, 450);
+        }
+        if (removeTabIndex) {
+            setTimeout(() => { try { el.removeAttribute('tabindex'); } catch(_){} }, 500);
+        }
+    } catch(_){}
+}
+
+function updateDownloadsToggleAlert(downloads) {
+    const btn = document.getElementById('toggle-local-downloads');
+    const section = document.querySelector('.local-downloads-section');
+    if (!btn || !section) return;
+
+    const visible = btn.getAttribute('aria-pressed') === 'true';
+    const list = Array.isArray(downloads) ? downloads : [];
+    const inProgress = list.some(d => {
+        const s = (d && d.status) ? String(d.status).toLowerCase() : '';
+        return s === 'downloading' || s === 'starting' || s === 'pending';
+    });
+
+    if (!visible && inProgress) {
+        btn.classList.add('downloads-toggle--alert');
+        try {
+            const alerted = localStorage.getItem('ui.localDownloadsAlertedOnce') === 'true';
+            if (!alerted && typeof window.showNotification === 'function') {
+                window.showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
+                localStorage.setItem('ui.localDownloadsAlertedOnce', 'true');
+            }
+        } catch (_) {}
+    } else {
+        btn.classList.remove('downloads-toggle--alert');
+        try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
+    }
+}
+
+window.addEventListener('error', (event) => {
+    console.error('[MAIN] Uncaught error:', event.error);
+    errorHandler.handleApiError('uncaught-error', event.error);
+});
+
+let stepsConfigData = {};
+try {
+    stepsConfigData = JSON.parse(document.getElementById('steps-config-data').textContent);
+} catch (e) {
+    console.error("Could not parse steps_config_data:", e);
+}
+ui.setStepsConfig(stepsConfigData);
+
+function initializeProcessInfoFromDOM() {
+    const initialProcessInfo = {};
+    document.querySelectorAll('.step').forEach(s => {
+        const stepKey = s && s.dataset ? s.dataset.stepKey : null;
+        if (!stepKey) return;
+        initialProcessInfo[stepKey] = {
+            status: 'idle',
+            log: [],
+            progress_current: 0,
+            progress_total: 0,
+            progress_text: '',
+            is_any_sequence_running: false
+        };
+    });
+    appState.setState({ processInfo: initialProcessInfo }, 'process_info_init');
+}
+
+const LOCAL_DOWNLOAD_POLLING_INTERVAL = POLLING_INTERVAL * 2;
+
+const SYSTEM_MONITOR_POLLING_INTERVAL = 5000;
+
+
+
+function initializeStateManagement() {
+    console.log('Initializing state management and performance monitoring...');
+
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        appState.subscribe((newState, oldState, source) => {
+            console.debug(`[StateManagement] State changed from ${source}:`, {
+                changes: findStateChanges(oldState, newState),
+                newState: newState
+            });
+        });
+    }
+
+    appState.subscribeToProperty('isAnySequenceRunning', (newValue, oldValue) => {
+        if (newValue !== oldValue) {
+            ui.updateGlobalUIForSequenceState(newValue);
+        }
+    });
+
+    appState.subscribeToProperty('activeStepKeyForLogsPanel', (newValue, oldValue) => {
+        if (newValue !== oldValue && newValue) {
+            domBatcher.scheduleUpdate('logs-panel-update', () => {
+                console.debug(`Active step for logs changed to: ${newValue}`);
+            });
+        }
+    });
+
+    console.log('Performance monitoring initialized automatically');
+
+    setTimeout(() => {
+        if (typeof CacheService !== 'undefined' && CacheService.warm_cache) {
+            CacheService.warm_cache();
+        }
+    }, 1000);
+
+    console.log('State management and performance monitoring initialized successfully');
+}
+
+function findStateChanges(oldState, newState) {
+    const changes = {};
+
+    function compareObjects(old, current, path = '') {
+        for (const key in current) {
+            const currentPath = path ? `${path}.${key}` : key;
+
+            if (typeof current[key] === 'object' && current[key] !== null && !Array.isArray(current[key])) {
+                if (typeof old[key] === 'object' && old[key] !== null) {
+                    compareObjects(old[key], current[key], currentPath);
+                } else {
+                    changes[currentPath] = { from: old[key], to: current[key] };
+                }
+            } else if (old[key] !== current[key]) {
+                changes[currentPath] = { from: old[key], to: current[key] };
+            }
+        }
+    }
+
+    compareObjects(oldState, newState);
+    return changes;
+}
+
+async function pollLocalDownloadsStatus() {
+    if (!dom.getLocalDownloadsList()) return;
+
+    try {
+        const downloads = await api.fetchLocalDownloadsStatusAPI();
+        ui.updateLocalDownloadsListUI(downloads);
+
+        // Update app state with current downloads for CSV monitoring
+        appState.setState({ csvDownloads: downloads }, 'downloads_polled');
+
+        // Update toggle alert state if section is hidden and activity occurs
+        updateDownloadsToggleAlert(downloads);
+
+        // Clear error state on success
+        errorHandler.clearErrors('localDownloadsStatus', {
+            elementId: 'local-downloads-list'
+        });
+
+    } catch (error) {
+        // Handle error with proper user feedback and exponential backoff
+        const delay = await errorHandler.handlePollingError('localDownloadsStatus', error, {
+            elementId: 'local-downloads-list'
+        });
+
+        // Apply delay if needed (PollingManager will handle this automatically)
+        if (delay > 0) {
+            console.debug(`Applying ${delay}ms delay for localDownloadsStatus polling`);
+        }
+    }
+}
+
+
+
+async function pollSystemMonitor() {
+    const monitorWidget = document.getElementById('system-monitor-widget');
+    if (!monitorWidget) {
+        console.warn('[MAIN] System monitor widget not found during polling');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/system_monitor');
+        if (!response.ok) {
+            console.warn(`[MAIN] System monitor API failed: ${response.status}`);
+            monitorWidget.style.opacity = '0.5';
+            return;
+        }
+        const data = await response.json();
+        console.debug('[MAIN] System monitor data received:', data);
+
+        // Batch DOM updates to minimize reflows
+        domBatcher.scheduleUpdate('system-monitor-update', () => {
+            // CPU
+            const cpuBar = document.getElementById('cpu-monitor-bar');
+            const cpuValue = document.getElementById('cpu-monitor-value');
+            if (cpuBar && cpuValue) {
+                const cpuPercent = data.cpu_percent || 0;
+                cpuBar.style.width = `${cpuPercent}%`;
+                cpuValue.textContent = `${cpuPercent.toFixed(1)} %`;
+                cpuBar.dataset.usageLevel = cpuPercent > 85 ? 'high' : cpuPercent > 60 ? 'medium' : 'low';
+            }
+
+            // RAM
+            const ramBar = document.getElementById('ram-monitor-bar');
+            const ramValue = document.getElementById('ram-monitor-value');
+            const ramDetails = document.getElementById('ram-monitor-details');
+            if (ramBar && ramValue && ramDetails && data.memory) {
+                const memPercent = data.memory.percent || 0;
+                ramBar.style.width = `${memPercent}%`;
+                ramValue.textContent = `${memPercent.toFixed(1)} %`;
+                ramDetails.textContent = `${data.memory.used_gb.toFixed(2)} / ${data.memory.total_gb.toFixed(2)} GB`;
+                ramBar.dataset.usageLevel = memPercent > 85 ? 'high' : memPercent > 70 ? 'medium' : 'low';
+            }
+
+            // GPU
+            const gpuSection = document.getElementById('gpu-monitor-section');
+            const gpuError = document.getElementById('gpu-monitor-error');
+            if (gpuSection && gpuError) {
+                if (data.gpu && !data.gpu.error) {
+                    gpuSection.style.display = 'block';
+                    gpuError.style.display = 'none';
+
+                    const gpuBar = document.getElementById('gpu-monitor-bar');
+                    const gpuValue = document.getElementById('gpu-monitor-value');
+                    const gpuDetails = document.getElementById('gpu-monitor-details');
+
+                    const gpuPercent = data.gpu.utilization_percent || 0;
+                    gpuBar.style.width = `${gpuPercent}%`;
+                    gpuValue.textContent = `${gpuPercent.toFixed(1)} %`;
+                    gpuBar.dataset.usageLevel = gpuPercent > 85 ? 'high' : gpuPercent > 60 ? 'medium' : 'low';
+
+                    const temp = data.gpu.temperature_c || 'N/A';
+                    const memUsed = data.gpu.memory ? data.gpu.memory.used_gb.toFixed(2) : 'N/A';
+                    const memTotal = data.gpu.memory ? data.gpu.memory.total_gb.toFixed(2) : 'N/A';
+                    gpuDetails.textContent = `${temp}°C | ${memUsed} / ${memTotal} GB`;
+                } else {
+                    gpuSection.style.display = 'none';
+                    if (data.gpu && data.gpu.error) {
+                        gpuError.textContent = data.gpu.error;
+                        gpuError.style.display = 'block';
+                    }
+                }
+            }
+
+            // Compact line values (shown when minimized)
+            const compactLine = document.getElementById('monitor-compact-line');
+            if (compactLine) {
+                const compactCpu = document.getElementById('compact-cpu');
+                const compactRam = document.getElementById('compact-ram');
+                const compactGpu = document.getElementById('compact-gpu');
+
+                const cpuPercent = data.cpu_percent || 0;
+                const memPercent = (data.memory && data.memory.percent) ? data.memory.percent : 0;
+
+                if (compactCpu) compactCpu.textContent = `${cpuPercent.toFixed(1)}%`;
+                if (compactRam && data.memory) {
+                    const used = (typeof data.memory.used_gb === 'number') ? data.memory.used_gb.toFixed(1) : 'N/A';
+                    const total = (typeof data.memory.total_gb === 'number') ? data.memory.total_gb.toFixed(1) : 'N/A';
+                    compactRam.textContent = `${memPercent.toFixed(1)}% (${used}/${total}G)`;
+                }
+                if (compactGpu) {
+                    if (data.gpu && !data.gpu.error && typeof data.gpu.utilization_percent === 'number') {
+                        const temp = (typeof data.gpu.temperature_c === 'number') ? data.gpu.temperature_c : 'N/A';
+                        const gUsed = data.gpu.memory && typeof data.gpu.memory.used_gb === 'number' ? data.gpu.memory.used_gb.toFixed(1) : 'N/A';
+                        const gTotal = data.gpu.memory && typeof data.gpu.memory.total_gb === 'number' ? data.gpu.memory.total_gb.toFixed(1) : 'N/A';
+                        compactGpu.textContent = `${data.gpu.utilization_percent.toFixed(1)}% (${temp}C)`;
+                    } else if (data.gpu && data.gpu.error) {
+                        compactGpu.textContent = 'err';
+                    } else {
+                        compactGpu.textContent = 'N/A';
+                    }
+                }
+            }
+
+            monitorWidget.style.opacity = '1';
+        });
+
+        // Clear error state on success
+        errorHandler.clearErrors('systemMonitor', {
+            elementId: 'system-monitor-widget'
+        });
+
+    } catch (error) {
+        // Handle error with proper user feedback
+        const delay = await errorHandler.handlePollingError('systemMonitor', error, {
+            elementId: 'system-monitor-widget'
+        });
+
+        // Visual feedback for system monitor errors
+        domBatcher.scheduleUpdate('system-monitor-error', () => {
+            monitorWidget.style.opacity = '0.5';
+        });
+
+        if (delay > 0) {
+            console.debug(`Applying ${delay}ms delay for systemMonitor polling`);
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    ui.closeLogPanelUI();
+    if (dom.sequenceSummaryPopupOverlay) dom.sequenceSummaryPopupOverlay.style.display = 'none';
+    
+    if (dom.customSequenceConfirmPopupOverlay) dom.customSequenceConfirmPopupOverlay.style.display = 'none';
+
+    // Initialize theme system
+    themeManager.init();
+
+    if (document.getElementById('report-overlay')) {
+        reportViewer.init();
+    }
+
+
+    const initialStatusPromises = [];
+    const allStepKeysForInitialStatus = Object.keys(stepsConfigData);
+
+    initializeProcessInfoFromDOM();
+
+    allStepKeysForInitialStatus.forEach(stepKey => {
+        initialStatusPromises.push(api.fetchInitialStatusAPI(stepKey));
+    });
+
+
+
+    try {
+        await Promise.all(initialStatusPromises);
+    } catch (error) {
+        console.warn("[Main.js DOMContentLoaded] Error fetching some initial statuses:", error);
+    } finally {
+        ui.updateGlobalUIForSequenceState(appState.getStateProperty('isAnySequenceRunning'));
+        ui.updateCustomSequenceButtonsUI();
+    }
+
+    initializeEventHandlers();
+
+    // Initialize sound manager
+    initializeSoundManager();
+
+    // Initialize CSV download monitor for auto-workflow prompts
+    initializeCSVDownloadMonitor();
+
+    // Initialize state management and performance monitoring
+    initializeStateManagement();
+
+    // Initialize polling with proper resource management
+    if (dom.getLocalDownloadsList()) {
+        pollingManager.startPolling(
+            'localDownloadsStatus',
+            pollLocalDownloadsStatus,
+            LOCAL_DOWNLOAD_POLLING_INTERVAL,
+            { immediate: true }
+        );
+    }
+
+    // Setup unified-controls toggle for Local Downloads visibility
+    setupLocalDownloadsToggle();
+
+
+
+
+    // System monitor polling - with retry mechanism
+    const startSystemMonitorPolling = () => {
+        const widget = document.getElementById('system-monitor-widget');
+        if (widget) {
+            console.log('[MAIN] ✅ Starting system monitor polling');
+            pollingManager.startPolling(
+                'systemMonitor',
+                pollSystemMonitor,
+                SYSTEM_MONITOR_POLLING_INTERVAL,
+                { immediate: true }
+            );
+            return true;
+        } else {
+            console.warn('[MAIN] ⚠️ System monitor widget not found, retrying...');
+            return false;
+        }
+    };
+
+    // Try immediately, then retry if needed
+    if (!startSystemMonitorPolling()) {
+        setTimeout(() => {
+            if (!startSystemMonitorPolling()) {
+                console.error('[MAIN] ❌ System monitor widget not found after retry');
+            }
+        }, 1000);
+    }
+
+    setupCompactMode();
+
+    setupSettingsPanel();
+
+    setupSystemMonitorMinimize();
+
+    setupKeyboardShortcuts();
+
+    initializeStepDetailsPanel();
+});
+
+function setupCompactMode() {
+    const wrapper = typeof dom.getWorkflowWrapper === 'function'
+        ? dom.getWorkflowWrapper()
+        : dom.workflowWrapper;
+    if (!wrapper) {
+        console.warn('[COMPACT] Wrapper not found, skipping setup');
+        return;
+    }
+
+    // Force compact mode as the only mode
+    appState.setState({ ui: { compactMode: true } }, 'compact_forced_default');
+    try { localStorage.setItem('ui.compactMode', 'true'); } catch (_) {}
+
+    // Apply immediately and keep in sync if state changes elsewhere
+    applyCompactClass(wrapper, true);
+    appState.subscribeToProperty('ui.compactMode', (newVal) => {
+        applyCompactClass(wrapper, !!newVal);
+    });
+}
+
+function applyCompactClass(wrapper, enabled) {
+    domBatcher.scheduleUpdate('compact-mode-toggle', () => {
+        if (enabled) {
+            wrapper.classList.add('compact-mode');
+        } else {
+            wrapper.classList.remove('compact-mode');
+        }
+    });
+}
+
+
+function setupSystemMonitorMinimize() {
+    const widget = document.getElementById('system-monitor-widget');
+    const btn = document.getElementById('system-monitor-minimize');
+    const compactLine = document.getElementById('monitor-compact-line');
+    if (!widget || !btn) {
+        console.warn('[SYSTEM-MONITOR] Elements not found, skipping minimize setup');
+        return;
+    }
+
+    // Init from storage
+    let stored = null;
+    try { stored = localStorage.getItem('ui.systemMonitorMinimized'); } catch (_) {}
+    const minimized = stored === 'true';
+    appState.setState({ ui: { systemMonitorMinimized: minimized } }, 'system_monitor_init');
+    applySystemMonitorMinimized(widget, compactLine, minimized);
+
+    // Subscribe to state changes
+    appState.subscribeToProperty('ui.systemMonitorMinimized', (newVal) => {
+        applySystemMonitorMinimized(widget, compactLine, !!newVal);
+        try { localStorage.setItem('ui.systemMonitorMinimized', (!!newVal).toString()); } catch (_) {}
+    });
+
+    // Click on button to minimize
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const current = !!appState.getStateProperty('ui.systemMonitorMinimized');
+        appState.setState({ ui: { systemMonitorMinimized: !current } }, 'system_monitor_toggle');
+    });
+
+    // Click on widget restores when minimized
+    widget.addEventListener('click', () => {
+        const isMinimized = widget.classList.contains('minimized');
+        if (isMinimized) {
+            appState.setState({ ui: { systemMonitorMinimized: false } }, 'system_monitor_restore_click');
+        }
+    });
+}
+
+function applySystemMonitorMinimized(widget, compactLine, minimized) {
+    domBatcher.scheduleUpdate('system-monitor-minimized-toggle', () => {
+        if (minimized) {
+            widget.classList.add('minimized');
+            if (compactLine) {
+                compactLine.style.display = 'flex';
+                compactLine.setAttribute('aria-hidden', 'false');
+            }
+        } else {
+            widget.classList.remove('minimized');
+            if (compactLine) {
+                compactLine.style.display = 'none';
+                compactLine.setAttribute('aria-hidden', 'true');
+            }
+        }
+    });
+}
+
+function setupSettingsPanel() {
+    const toggle = dom.getSettingsToggle();
+    const panel = dom.getSettingsPanel();
+    if (!toggle || !panel) {
+        console.warn('[SETTINGS] Elements not found, skipping setup');
+        return;
+    }
+
+    // Init from storage (optional), then AppState
+    try {
+        const stored = localStorage.getItem('ui.settingsOpen');
+        if (stored !== null) {
+            appState.setState({ ui: { settingsOpen: stored === 'true' } }, 'settings_init_storage');
+        }
+    } catch (e) {
+        console.debug('[SETTINGS] localStorage not available', e);
+    }
+
+    // Apply initial state
+    const initialOpen = !!appState.getStateProperty('ui.settingsOpen');
+    applySettingsPanel(panel, toggle, initialOpen);
+
+    // Keep DOM in sync with state changes
+    appState.subscribeToProperty('ui.settingsOpen', (open) => {
+        applySettingsPanel(panel, toggle, !!open);
+    });
+
+    // Toggle handler
+    toggle.addEventListener('click', () => {
+        const next = !appState.getStateProperty('ui.settingsOpen');
+        appState.setState({ ui: { settingsOpen: next } }, 'settings_toggle');
+        try { localStorage.setItem('ui.settingsOpen', String(next)); } catch (_) {}
+    });
+}
+
+function applySettingsPanel(panel, toggle, open) {
+    domBatcher.scheduleUpdate('settings-panel-update', () => {
+        if (!panel || !toggle) return;
+        if (open) {
+            panel.classList.add('open');
+            panel.hidden = false;
+        } else {
+            panel.classList.remove('open');
+            panel.hidden = true;
+        }
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.setAttribute('aria-label', open ? 'Refermer les réglages' : 'Ouvrir les réglages');
+    });
+}
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Only handle shortcuts when not typing in inputs
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true')) {
+            return;
+        }
+
+        // Toggle Settings panel with 'S' key
+        if (e.key === 's' || e.key === 'S') {
+            e.preventDefault();
+            const toggle = dom.getSettingsToggle();
+            if (toggle) {
+                toggle.click();
+            }
+        }
+    });
+}
+```
+
+## File: static/domElements.js
+```javascript
+const _SAFE_STEP_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function byId(id) {
+    return document.getElementById(id);
+}
+
+function bySelectorAll(selector) {
+    return document.querySelectorAll(selector);
+}
+
+export const getWorkflowWrapper = () => byId('workflow-wrapper');
+export const getStepsColumn = () => byId('steps-column');
+export const getLogsColumnGlobal = () => byId('logs-column-global');
+export const getLogPanelTitle = () => byId('log-panel-title');
+export const getLogPanelSubheader = () => byId('log-panel-subheader');
+export const getLogPanelContextStep = () => byId('log-panel-context-step');
+export const getLogPanelContextStatus = () => byId('log-panel-context-status');
+export const getLogPanelContextTimer = () => byId('log-panel-context-timer');
+export const getLogPanelSpecificButtonsContainer = () => byId('log-panel-specific-buttons-container');
+export const getMainLogContainerPanel = () => byId('main-log-container-panel');
+export const getMainLogOutputPanel = () => byId('main-log-output-panel');
+export const getCurrentStepLogNamePanel = () => byId('current-step-log-name-panel');
+export const getSpecificLogContainerPanel = () => byId('specific-log-container-panel');
+export const getSpecificLogHeaderTextPanel = () => byId('specific-log-header-text-panel');
+export const getSpecificLogPathInfoPanel = () => byId('specific-log-path-info-panel');
+export const getSpecificLogOutputContentPanel = () => byId('specific-log-output-content-panel');
+export const getRunAllButton = () => byId('run-all-steps-button');
+export const getTopbarAffix = () => byId('topbar-affix');
+export const getTopbarControls = () => byId('topbar-controls');
+export const getGlobalProgressAffix = () => byId('global-progress-affix');
+export const getGlobalProgressContainer = () => byId('global-progress-container');
+export const getGlobalProgressBar = () => byId('global-progress-bar');
+export const getGlobalProgressText = () => byId('global-progress-text');
+export const getSequenceSummaryPopupOverlay = () => byId('sequence-summary-popup-overlay');
+export const getSequenceSummaryList = () => byId('sequence-summary-list');
+export const getCloseSummaryPopupButton = () => byId('close-summary-popup');
+export const getRunCustomSequenceButton = () => byId('run-custom-sequence-button');
+export const getClearCustomSequenceButton = () => byId('clear-custom-sequence-button');
+export const getCustomSequenceCheckboxes = () => bySelectorAll('.custom-sequence-checkbox');
+export const getCustomSequenceConfirmPopupOverlay = () => byId('custom-sequence-confirm-popup-overlay');
+export const getCustomSequenceConfirmList = () => byId('custom-sequence-confirm-list');
+export const getConfirmRunCustomSequenceButton = () => byId('confirm-run-custom-sequence-button');
+export const getCancelRunCustomSequenceButton = () => byId('cancel-run-custom-sequence-button');
+export const getNotificationsArea = () => byId('notifications-area');
+
+// Lazy DOM element getters to ensure elements are available when accessed
+export function getAllStepDivs() {
+    const elements = document.querySelectorAll('.step');
+    console.debug(`[DOM] getAllStepDivs found ${elements.length} elements`);
+    return elements;
+}
+
+export function getAllRunButtons() {
+    const elements = document.querySelectorAll('.run-button');
+    console.debug(`[DOM] getAllRunButtons found ${elements.length} elements`);
+    return elements;
+}
+
+export function getAllCancelButtons() {
+    const elements = document.querySelectorAll('.cancel-button');
+    console.debug(`[DOM] getAllCancelButtons found ${elements.length} elements`);
+    return elements;
+}
+
+export function getAllSpecificLogButtons() {
+    const elements = document.querySelectorAll('.specific-log-button');
+    console.debug(`[DOM] getAllSpecificLogButtons found ${elements.length} elements`);
+    return elements;
+}
+
+// Enhanced step element getter with validation
+export function getStepElement(stepKey) {
+    if (!stepKey) {
+        console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
+        return null;
+    }
+
+    if (!_SAFE_STEP_KEY_PATTERN.test(String(stepKey))) {
+        console.warn('[DOM] getStepElement called with unsafe stepKey (refusing to query by id):', stepKey);
+        return null;
+    }
+
+    const element = document.getElementById(`step-${stepKey}`);
+    if (!element) {
+        console.warn(`[DOM] Step element not found: step-${stepKey}`);
+        console.debug('[DOM] Available step elements:',
+            Array.from(document.querySelectorAll('[id^="step-"]')).map(el => el.id));
+    }
+
+    return element;
+}
+
+// Validate DOM structure for debugging
+export function validateDOMStructure() {
+    const results = {
+        stepElements: getAllStepDivs().length,
+        runButtons: getAllRunButtons().length,
+        cancelButtons: getAllCancelButtons().length,
+        workflowWrapper: !!getWorkflowWrapper(),
+        stepsColumn: !!getStepsColumn(),
+        issues: []
+    };
+
+    // Check for common issues
+    if (results.stepElements === 0) {
+        results.issues.push('No step elements found (.step)');
+    }
+
+    if (!results.workflowWrapper) {
+        results.issues.push('Workflow wrapper not found (#workflow-wrapper)');
+    }
+
+    if (!results.stepsColumn) {
+        results.issues.push('Steps column not found (#steps-column)');
+    }
+
+    console.debug('[DOM] Structure validation:', results);
+    return results;
+}
+
+// Legacy exports for backward compatibility (will be deprecated)
+export const allStepDivs = getAllStepDivs();
+export const allRunButtons = getAllRunButtons();
+export const allCancelButtons = getAllCancelButtons();
+export const allSpecificLogButtons = getAllSpecificLogButtons();
+export const closeLogPanelButton = document.getElementById('close-log-panel');
+
+export const localDownloadsList = document.getElementById('local-downloads-list');
+
+
+
+// ÉLÉMENTS POUR LE CONTRÔLE SONORE
+export const soundToggle = document.getElementById('sound-toggle');
+export const soundStatus = document.getElementById('sound-status');
+export const soundControlWidget = document.getElementById('sound-control-widget');
+
+
+// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
+export const settingsToggle = document.getElementById('settings-toggle');
+export const settingsPanel = document.getElementById('settings-panel');
+
+// New getter functions for lazy DOM access
+export const getCloseLogPanelButton = () => byId('close-log-panel');
+export const getLocalDownloadsList = () => byId('local-downloads-list');
+
+// ÉLÉMENTS POUR LE CONTRÔLE SONORE
+export const getSoundToggle = () => byId('sound-toggle');
+export const getSoundStatus = () => byId('sound-status');
+export const getSoundControlWidget = () => byId('sound-control-widget');
+
+// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
+export const getSettingsToggle = () => byId('settings-toggle');
+export const getSettingsPanel = () => byId('settings-panel');
+```
+
+## File: static/uiUpdater.js
+```javascript
+import { formatElapsedTime, showNotification } from './utils.js';
+import * as dom from './domElements.js';
+import { appState } from './state/AppState.js';
+import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
+
+const lastProgressTextByStep = {};
+
+const _lastAutoCenterTsByStep = {};
+const _AUTO_CENTER_THROTTLE_MS = 700;
+
+import { soundEvents } from './soundManager.js';
+import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
+import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
+
+let _stepDetailsPanelModulePromise = null;
+
+const STATUS_UI_MAP = {
+    running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
+    starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
+    initiated: { label: 'Initialisation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
+    completed: { label: 'Terminé', badgeClass: 'status-completed', chipClass: 'state-success', icon: '✅' },
+    success: { label: 'Terminé', badgeClass: 'status-success', chipClass: 'state-success', icon: '✅' },
+    failed: { label: 'Échec', badgeClass: 'status-failed', chipClass: 'state-error', icon: '❌' },
+    error: { label: 'Erreur', badgeClass: 'status-error', chipClass: 'state-error', icon: '⚠️' },
+    cancelled: { label: 'Annulé', badgeClass: 'status-cancelled', chipClass: 'state-error', icon: '⛔' },
+    warning: { label: 'Attention', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⚠️' },
+    paused: { label: 'En pause', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏸️' },
+    idle: { label: 'Prêt', badgeClass: 'status-idle', chipClass: 'state-idle', icon: '🕒' },
+    pending: { label: 'En attente', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏳' }
+};
+
+let STEPS_CONFIG_FROM_SERVER = {};
+export function setStepsConfig(config) {
+    STEPS_CONFIG_FROM_SERVER = config;
+}
+
+function getWorkflowWrapperElement() {
+    return typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
+}
+
+function getLogsColumnElement() {
+    return typeof dom.getLogsColumnGlobal === 'function' ? dom.getLogsColumnGlobal() : dom.logsColumnGlobal;
+}
+
+function resolveElement(getterFn, legacyValue = null) {
+    if (typeof getterFn === 'function') {
+        try {
+            return getterFn();
+        } catch (_) {
+            return legacyValue || null;
+        }
+    }
+    return legacyValue || null;
+}
+
+function getIsAnySequenceRunning() {
+    return !!appState.getStateProperty('isAnySequenceRunning');
+}
+
+function getActiveStepKeyForLogs() {
+    return appState.getStateProperty('activeStepKeyForLogsPanel');
+}
+
+function setActiveStepKeyForLogs(stepKey) {
+    appState.setState({ activeStepKeyForLogsPanel: stepKey }, 'setActiveStepKeyForLogs');
+}
+
+function getSelectedStepsOrder() {
+    return appState.getStateProperty('selectedStepsOrder') || [];
+}
+
+function getProcessInfo(stepKey) {
+    if (!stepKey) return null;
+    return appState.getStateProperty(`processInfo.${stepKey}`) || null;
+}
+
+function setProcessInfo(stepKey, info) {
+    if (!stepKey) return;
+    appState.setState({ processInfo: { [stepKey]: info } }, 'process_info_update');
+}
+
+function getStepTimers() {
+    return appState.getStateProperty('stepTimers') || {};
+}
+
+function getStepTimer(stepKey) {
+    return getStepTimers()[stepKey];
+}
+
+function setStepTimer(stepKey, timerData, source = 'setStepTimer') {
+    const timers = getStepTimers();
+    appState.setState({ stepTimers: { ...timers, [stepKey]: timerData } }, source);
+}
+
+function deleteStepTimer(stepKey) {
+    const timers = getStepTimers();
+    if (!timers || !Object.prototype.hasOwnProperty.call(timers, stepKey)) return;
+    const { [stepKey]: _removed, ...remaining } = timers;
+    appState.setState({ stepTimers: remaining }, 'deleteStepTimer');
+}
+
+function onWrapperTransitionEndOnce(callback, fallbackMs = 500) {
+    const el = getWorkflowWrapperElement();
+    if (!el) { callback(); return; }
+    let called = false;
+    const handler = (e) => {
+        if (called) return;
+        called = true;
+        el.removeEventListener('transitionend', handler);
+        callback();
+    };
+    el.addEventListener('transitionend', handler, { once: true });
+    setTimeout(() => {
+        if (called) return;
+        try { el.removeEventListener('transitionend', handler); } catch (_) {}
+        callback();
+    }, fallbackMs);
+}
+
+function hideNonActiveSteps(activeStepKey, hidden) {
+    try {
+        const stepDivs = dom.getAllStepDivs();
+        stepDivs.forEach(el => {
+            const isActive = activeStepKey && el.id === `step-${activeStepKey}`;
+            if (!isActive && hidden) {
+                el.classList.add('steps-hidden');
+            } else if (isActive && hidden) {
+                el.classList.remove('steps-hidden');
+            } else if (!hidden) {
+                el.classList.remove('steps-hidden');
+            }
+        });
+    } catch (e) {
+        console.warn('[UI] hideNonActiveSteps error', e);
+    }
+}
+
+let previousDownloadIds = new Set();
+export function getStepsConfig() {
+    return STEPS_CONFIG_FROM_SERVER;
+}
+
+function normalizeStatus(status) {
+    return typeof status === 'string' ? status.toLowerCase() : 'idle';
+}
+
+function getStatusMeta(status) {
+    const normalized = normalizeStatus(status);
+    return STATUS_UI_MAP[normalized] || STATUS_UI_MAP.idle;
+}
+
+function getStepDisplayNameForLogPanel(stepKey) {
+    if (!stepKey) return '';
+    const config = getStepsConfig();
+    const stepConfig = config ? config[stepKey] : null;
+    if (stepConfig && stepConfig.display_name) return stepConfig.display_name;
+
+    const stepEl = document.getElementById(`step-${stepKey}`);
+    const datasetName = stepEl && stepEl.dataset ? stepEl.dataset.stepName : null;
+    if (datasetName) return datasetName;
+
+    return stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function updateLogPanelContextUI(stepKey) {
+    const displayName = stepKey ? getStepDisplayNameForLogPanel(stepKey) : '';
+
+    const statusEl = stepKey ? document.getElementById(`status-${stepKey}`) : null;
+    const timerEl = stepKey ? document.getElementById(`timer-${stepKey}`) : null;
+
+    const contextStepEl = resolveElement(dom.getLogPanelContextStep, dom.logPanelContextStep);
+    const contextStatusEl = resolveElement(dom.getLogPanelContextStatus, dom.logPanelContextStatus);
+    const contextTimerEl = resolveElement(dom.getLogPanelContextTimer, dom.logPanelContextTimer);
+
+    if (contextStepEl) {
+        contextStepEl.textContent = stepKey ? displayName : 'Aucune étape active';
+    }
+    if (contextStatusEl) {
+        contextStatusEl.textContent = statusEl ? (statusEl.textContent || '') : '';
+    }
+    if (contextTimerEl) {
+        contextTimerEl.textContent = timerEl ? (timerEl.textContent || '') : '';
+    }
+}
+
+function clearLogPanelSpecificButtons() {
+    const container = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
+    if (!container) return;
+
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+}
+
+function positionLogsPanelNearActiveStep(stepKey) {
+    if (!stepKey) return;
+    const workflowWrapper = getWorkflowWrapperElement();
+    const logsColumn = getLogsColumnElement();
+    if (!workflowWrapper || !logsColumn) return;
+    if (!workflowWrapper.classList.contains('compact-mode')) return;
+
+    const activeStepElement = document.getElementById(`step-${stepKey}`);
+    if (!activeStepElement || typeof activeStepElement.getBoundingClientRect !== 'function') return;
+
+    const rect = activeStepElement.getBoundingClientRect();
+    const minTop = 120;
+    const minHeight = 280;
+    const bottomPadding = 20;
+
+    const maxTop = Math.max(minTop, (window.innerHeight || 800) - minHeight - bottomPadding);
+    const targetTop = Math.max(minTop, Math.min(Math.round(rect.top), maxTop));
+
+    logsColumn.style.top = `${targetTop}px`;
+    logsColumn.style.height = `${Math.max(minHeight, (window.innerHeight || 800) - targetTop - bottomPadding)}px`;
+}
+
+function updateStepStateChip(stepKey, status) {
+    const chip = document.getElementById(`state-chip-${stepKey}`);
+    if (!chip) return;
+    const meta = getStatusMeta(status);
+    chip.className = `step-state-chip ${meta.chipClass}`;
+    chip.textContent = `${meta.icon} ${meta.label}`;
+}
+
+export function startStepTimer(stepKey) {
+    const existingTimer = getStepTimer(stepKey);
+    if (existingTimer && existingTimer.intervalId) {
+        clearInterval(existingTimer.intervalId);
+    }
+
+    const startTime = Date.now();
+    setStepTimer(stepKey, {
+        startTime: startTime,
+        startTimeDate: new Date(startTime),
+        intervalId: null,
+        elapsedTimeFormatted: "0s"
+    }, 'startStepTimer');
+
+    if (stepKey !== 'clear_disk_cache') {
+        domBatcher.scheduleUpdate(`timer-init-${stepKey}`, () => {
+            const timerEl = document.getElementById(`timer-${stepKey}`);
+            if (timerEl) timerEl.textContent = "(0s)";
+        });
+    }
+
+    const newIntervalId = setInterval(() => {
+        const currentTimer = getStepTimer(stepKey);
+        if (!currentTimer || (!currentTimer.startTime && !currentTimer.startTimeDate)) {
+            if (currentTimer && currentTimer.intervalId) clearInterval(currentTimer.intervalId);
+            return;
+        }
+
+        const startTimeToUse = currentTimer.startTime ? new Date(currentTimer.startTime) : currentTimer.startTimeDate;
+        const elapsedTimeStr = formatElapsedTime(startTimeToUse);
+        setStepTimer(stepKey, { ...currentTimer, elapsedTimeFormatted: elapsedTimeStr }, 'timer_tick');
+
+        if (stepKey !== 'clear_disk_cache') {
+            domBatcher.scheduleUpdate(`timer-update-${stepKey}`, () => {
+                const timerEl = document.getElementById(`timer-${stepKey}`);
+                if (timerEl) timerEl.textContent = `(${elapsedTimeStr})`;
+            });
+        }
+    }, 1000);
+
+    const currentTimerData = getStepTimer(stepKey);
+    if (currentTimerData) {
+        setStepTimer(stepKey, { ...currentTimerData, intervalId: newIntervalId }, 'timer_interval_set');
+    }
+}
+
+export function stopStepTimer(stepKey) {
+    const timerData = getStepTimer(stepKey);
+    if (timerData && timerData.intervalId) {
+        clearInterval(timerData.intervalId);
+        setStepTimer(stepKey, { ...timerData, intervalId: null }, 'timer_interval_cleared');
+    }
+    const updatedTimerData = getStepTimer(stepKey);
+    if (updatedTimerData && (updatedTimerData.startTime || updatedTimerData.startTimeDate)) {
+        const startTimeToUse = updatedTimerData.startTime ? new Date(updatedTimerData.startTime) : updatedTimerData.startTimeDate;
+        const elapsedTimeStr = formatElapsedTime(startTimeToUse);
+        setStepTimer(stepKey, { ...updatedTimerData, elapsedTimeFormatted: elapsedTimeStr }, 'timer_stopped');
+        if (stepKey !== 'clear_disk_cache') {
+            const timerEl = document.getElementById(`timer-${stepKey}`);
+            if (timerEl) timerEl.textContent = `(Terminé en ${elapsedTimeStr})`;
+        }
+    }
+}
+
+export function resetStepTimerDisplay(stepKey) {
+    if (stepKey !== 'clear_disk_cache') {
+        const timerEl = document.getElementById(`timer-${stepKey}`);
+        if (timerEl) timerEl.textContent = "";
+    }
+    deleteStepTimer(stepKey);
+}
+
+export function updateGlobalUIForSequenceState(isRunning) {
+    const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+    const customSequenceCheckboxes = resolveElement(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes) || [];
+
+    if (runAllButton) runAllButton.disabled = isRunning;
+    if (runCustomSequenceButton) runCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+    if (clearCustomSequenceButton) clearCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+
+    customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
+
+    Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
+        const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
+        const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKeyConfig}"]`);
+        const stepInfo = getProcessInfo(stepKeyConfig);
+
+        if (runButton) runButton.disabled = isRunning;
+
+        if (cancelButton) {
+            if (stepInfo && ['running', 'starting', 'initiated'].includes(stepInfo.status)) {
+                cancelButton.disabled = false;
+            } else {
+                cancelButton.disabled = true;
+            }
+        }
+    });
+}
+
+export function setActiveStepForLogPanelUI(stepKey) {
+    console.log(`[UI] setActiveStepForLogPanelUI, new active step for logs: ${stepKey}`);
+    setActiveStepKeyForLogs(stepKey);
+
+    const allStepDivs = dom.getAllStepDivs();
+    allStepDivs.forEach(s => {
+        s.classList.remove('active-for-log-panel');
+    });
+    if (stepKey && stepKey !== 'clear_disk_cache') {
+        const activeStepElement = document.getElementById(`step-${stepKey}`);
+        if (activeStepElement) {
+            activeStepElement.classList.add('active-for-log-panel');
+
+            const workflowWrapper = getWorkflowWrapperElement();
+            const logsOpen = workflowWrapper && workflowWrapper.classList.contains('logs-active');
+            if (logsOpen) {
+                hideNonActiveSteps(stepKey, true);
+            }
+            if (isAutoScrollEnabled() && !logsOpen) {
+                console.log(`[UI] Auto-scrolling to active step: ${stepKey}`);
+                scrollToActiveStep(stepKey);
+            }
+        }
+    }
+
+    clearLogPanelSpecificButtons();
+
+    if (stepKey) {
+        const config = getStepsConfig();
+        const stepConfig = config ? config[stepKey] : null;
+        const displayName = stepConfig ? stepConfig.display_name : stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        console.log(`[UI] setActiveStepForLogPanelUI, displayName for logs: ${displayName}`);
+
+        const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
+        const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
+        if(logPanelTitle) logPanelTitle.textContent = `Logs: ${displayName}`;
+        if(currentStepLogName) currentStepLogName.textContent = displayName;
+        updateLogPanelContextUI(stepKey);
+
+        const buttonsContainer = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
+        if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && buttonsContainer) {
+            stepConfig.specific_logs.forEach((logConf, index) => {
+                const button = document.createElement('button');
+                button.className = 'specific-log-button';
+                button.textContent = logConf.name;
+                button.dataset.step = stepKey;
+                button.dataset.logIndex = index;
+                button.addEventListener('click', async () => {
+                    const apiModule = await import('./apiService.js');
+                    await apiModule.fetchSpecificLogAPI(stepKey, index, logConf.name);
+                });
+                buttonsContainer.appendChild(button);
+            });
+        }
+    } else {
+        const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
+        const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
+        if(logPanelTitle) logPanelTitle.textContent = "Logs";
+        if(currentStepLogName) currentStepLogName.textContent = "Aucune étape active";
+        updateLogPanelContextUI(null);
+    }
+}
+
+async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
+    console.log(`[UI] fetchAndDisplayLogsForPanel called for: ${stepKeyToFocus}. Current active log panel: ${getActiveStepKeyForLogs()}`);
+    if (!stepKeyToFocus) return;
+
+    const stepConfig = getStepsConfig()[stepKeyToFocus];
+    const displayName = stepConfig ? (stepConfig.display_name || stepKeyToFocus) : stepKeyToFocus;
+
+    const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+    const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+    const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+
+    if (mainLogOutputPanel) {
+        mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
+    }
+
+    if(mainLogContainer) mainLogContainer.style.display = 'flex';
+    if(specificLogContainer) specificLogContainer.style.display = 'none';
+
+    try {
+        const response = await fetch(`/status/${stepKeyToFocus}`);
+        if (!response.ok) {
+            console.error(`[UI] fetchAndDisplayLogsForPanel - fetch failed for ${stepKeyToFocus}: ${response.status}`);
+            throw new Error(`Erreur ${response.status} lors de la récupération des logs pour ${displayName}`);
+        }
+        const data = await response.json();
+        setProcessInfo(stepKeyToFocus, { ...(getProcessInfo(stepKeyToFocus) || {}), ...data });
+        console.log(`[UI] fetchAndDisplayLogsForPanel - response for: ${stepKeyToFocus}, Log content length: ${data.log ? data.log.length : 'N/A'}`);
+
+        if (getActiveStepKeyForLogs() === stepKeyToFocus && mainLogOutputPanel) {
+            console.log(`[UI] fetchAndDisplayLogsForPanel - Updating main log for ${stepKeyToFocus} with ${data.log ? data.log.length : 0} lines.`);
+            updateMainLogOutputUI(data.log.join(''));
+        } else {
+            console.log(`[UI] fetchAndDisplayLogsForPanel - Log focus changed. Current: ${getActiveStepKeyForLogs()}, Fetched for: ${stepKeyToFocus}. Not updating main log panel.`);
+        }
+    } catch (error) {
+        console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
+        const logPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+        if (getActiveStepKeyForLogs() === stepKeyToFocus && logPanel) {
+            logPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
+        }
+    }
+}
+
+export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
+    const workflowWrapper = getWorkflowWrapperElement();
+    if (!workflowWrapper) {
+        console.warn('[UI] openLogPanelUI aborted: workflow wrapper missing.');
+        return;
+    }
+
+    const currentActiveLogStep = getActiveStepKeyForLogs();
+    const isPanelOpen = workflowWrapper.classList.contains('logs-active');
+    console.log(`[UI] openLogPanelUI called for: ${stepKeyToFocus}, forceOpen: ${forceOpen}, currentActive: ${currentActiveLogStep}, isPanelOpen: ${isPanelOpen}`);
+
+    if (forceOpen) {
+        console.log(`[UI] Forcing panel open/update for ${stepKeyToFocus}`);
+        workflowWrapper.classList.add('logs-entering');
+        setActiveStepForLogPanelUI(stepKeyToFocus);
+        hideNonActiveSteps(stepKeyToFocus, true);
+        requestAnimationFrame(() => {
+            workflowWrapper.classList.add('logs-active');
+            onWrapperTransitionEndOnce(() => {
+                workflowWrapper.classList.remove('logs-entering');
+            }, 500);
+        });
+        positionLogsPanelNearActiveStep(stepKeyToFocus);
+        fetchAndDisplayLogsForPanel(stepKeyToFocus);
+        return;
+    }
+
+    if (isPanelOpen && currentActiveLogStep && currentActiveLogStep !== stepKeyToFocus) {
+        console.log(`[UI] Log panel already open for ${currentActiveLogStep}, switching to ${stepKeyToFocus}.`);
+        setActiveStepForLogPanelUI(stepKeyToFocus);
+        hideNonActiveSteps(stepKeyToFocus, true);
+        positionLogsPanelNearActiveStep(stepKeyToFocus);
+        fetchAndDisplayLogsForPanel(stepKeyToFocus);
+        return;
+    }
+
+    if (isPanelOpen && currentActiveLogStep === stepKeyToFocus) {
+        console.log(`[UI] Panel already open for ${stepKeyToFocus}. Refreshing its content.`);
+        fetchAndDisplayLogsForPanel(stepKeyToFocus);
+        return;
+    }
+
+    console.log(`[UI] Opening panel for ${stepKeyToFocus} (or was closed/open for null).`);
+    workflowWrapper.classList.add('logs-entering');
+    setActiveStepForLogPanelUI(stepKeyToFocus);
+    hideNonActiveSteps(stepKeyToFocus, true);
+    requestAnimationFrame(() => {
+        workflowWrapper.classList.add('logs-active');
+        onWrapperTransitionEndOnce(() => {
+            workflowWrapper.classList.remove('logs-entering');
+        }, 500);
+    });
+    positionLogsPanelNearActiveStep(stepKeyToFocus);
+    fetchAndDisplayLogsForPanel(stepKeyToFocus);
+}
+
+export function closeLogPanelUI() {
+    const workflowWrapper = getWorkflowWrapperElement();
+    if (!workflowWrapper) {
+        console.warn('[CLOSE_LOG] Workflow wrapper missing; aborting close sequence.');
+        setActiveStepForLogPanelUI(null);
+        const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+        const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+        if (mainLogOutputPanel) mainLogOutputPanel.textContent = "";
+        if (specificLogContainer) specificLogContainer.style.display = 'none';
+        const logsColumn = getLogsColumnElement();
+        if (logsColumn) {
+            logsColumn.style.removeProperty('top');
+            logsColumn.style.removeProperty('height');
+        }
+        clearLogPanelSpecificButtons();
+        return;
+    }
+
+    console.log('[CLOSE_LOG] Starting closeLogPanelUI, current classes:', workflowWrapper.className);
+    workflowWrapper.classList.add('logs-leaving');
+    console.log('[CLOSE_LOG] Added logs-leaving class, new classes:', workflowWrapper.className);
+
+    requestAnimationFrame(() => {
+        console.log('[CLOSE_LOG] In RAF, removing logs-active class, current classes:', workflowWrapper.className);
+        workflowWrapper.classList.remove('logs-active');
+
+        onWrapperTransitionEndOnce(() => {
+            console.log('[CLOSE_LOG] Cleanup - removing logs-leaving class, current classes:', workflowWrapper.className);
+            workflowWrapper.classList.remove('logs-leaving');
+            hideNonActiveSteps(null, false);
+        }, 500);
+    });
+
+    setActiveStepForLogPanelUI(null);
+    const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+    const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+    if(mainLogOutputPanel) mainLogOutputPanel.textContent = "";
+    if(specificLogContainer) specificLogContainer.style.display = 'none';
+
+    const logsColumn = getLogsColumnElement();
+    if (logsColumn) {
+        logsColumn.style.removeProperty('top');
+        logsColumn.style.removeProperty('height');
+    }
+    clearLogPanelSpecificButtons();
+}
+
+export function updateStepCardUI(stepKey, data) {
+    console.group(`[PROGRESS DEBUG] updateStepCardUI - ${stepKey}`);
+    console.log('Raw data received:', {
+        progress_current: data.progress_current,
+        progress_total: data.progress_total,
+        progress_current_fractional: data.progress_current_fractional,
+        status: data.status,
+        progress_text: data.progress_text,
+        timestamp: new Date().toISOString()
+    });
+
+    performanceOptimizer.measureDomUpdate(`updateStepCard-${stepKey}`, () => {
+        try {
+            const statusEl = document.getElementById(`status-${stepKey}`);
+            const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+            const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+            const workflowWrapper = getWorkflowWrapperElement();
+
+            const normalizedStatus = normalizeStatus(data.status || 'idle');
+            const statusMeta = getStatusMeta(normalizedStatus);
+
+            if (statusEl) {
+                statusEl.textContent = statusMeta.label;
+                statusEl.className = `status-badge ${statusMeta.badgeClass}`;
+            }
+
+            const stepCardEl = document.getElementById(`step-${stepKey}`);
+            if (stepCardEl) {
+                stepCardEl.setAttribute('data-status', normalizedStatus);
+            }
+
+            updateStepStateChip(stepKey, normalizedStatus);
+
+            if (runButton && cancelButton) {
+                const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                runButton.disabled = isCurrentlyRunningOrStarting || getIsAnySequenceRunning();
+                cancelButton.disabled = !isCurrentlyRunningOrStarting;
+            }
+
+            const logsOpen = workflowWrapper && workflowWrapper.classList.contains('logs-active');
+            if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                if (getActiveStepKeyForLogs() !== stepKey) {
+                    setActiveStepForLogPanelUI(stepKey);
+                    hideNonActiveSteps(stepKey, true);
+                }
+            }
+
+            if (logsOpen && getActiveStepKeyForLogs() === stepKey) {
+                updateLogPanelContextUI(stepKey);
+            }
+
+            if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && getStepTimer(stepKey))) {
+                stopStepTimer(stepKey);
+            } else if (normalizedStatus === 'idle' && !getStepTimer(stepKey)) {
+                resetStepTimerDisplay(stepKey);
+            } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !getStepTimer(stepKey)?.intervalId) {
+                // TODO: Implement proper timer resumption after page reload
+                // Date: 2026-01-19
+                // Owner: kidpixel
+                // Issue: startStepTimer doesn't resume from existing startTime
+                // Solution needed: Backend should provide duration_str for running steps
+            }
+
+            const progressContainer = document.getElementById(`progress-container-${stepKey}`);
+            const progressBar = document.getElementById(`progress-bar-${stepKey}`);
+            const progressTextEl = document.getElementById(`progress-text-${stepKey}`);
+
+            let percentage = 0;
+
+            if (progressContainer && progressBar && progressTextEl) {
+                if (data.progress_total > 0) {
+                    let currentProgress = data.progress_current_fractional || data.progress_current;
+
+                    if (data.progress_current_fractional === null && data.progress_text) {
+                        const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
+                        if (!isSpecialRunning) {
+                            const percentMatch = data.progress_text.match(/(\d+)%/);
+                            if (percentMatch) {
+                                const textPercent = parseInt(percentMatch[1]);
+                                currentProgress = (textPercent / 100) * data.progress_total;
+                                console.log(`[PROGRESS FALLBACK] ${stepKey}: Extracted ${textPercent}% from text, using fractional: ${currentProgress}`);
+                            }
+                        }
+                    }
+
+                    percentage = Math.round((currentProgress / data.progress_total) * 100);
+                    percentage = Math.min(percentage, 100);
+
+                    if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                        if (percentage >= 100) {
+                            percentage = 99;
+                        }
+                        if (data.progress_total > 0 && data.progress_current === data.progress_total) {
+                            percentage = Math.min(percentage, 99);
+                        }
+                    }
+
+                    console.log(`[PROGRESS CALC] ${stepKey}:`, {
+                        progress_current: data.progress_current,
+                        progress_current_fractional: data.progress_current_fractional,
+                        progress_total: data.progress_total,
+                        currentProgress: currentProgress,
+                        calculatedPercentage: (currentProgress / data.progress_total) * 100,
+                        finalPercentage: percentage,
+                        status: data.status,
+                        progress_text: data.progress_text
+                    });
+
+                    let displayCurrent = data.progress_current;
+                    if ((!displayCurrent || displayCurrent === 0) && typeof data.progress_current_fractional === 'number' && data.progress_current_fractional > 0) {
+                        const frac = Math.max(0, Math.min(data.progress_total, data.progress_current_fractional));
+                        displayCurrent = Math.min(data.progress_total, Math.floor(frac) + 1);
+                    }
+
+                    progressContainer.style.display = 'block';
+                    progressBar.style.backgroundColor = 'var(--blue)';
+                    progressBar.style.width = `${percentage}%`;
+                    progressBar.textContent = `${percentage}%`;
+                    progressBar.setAttribute('aria-valuenow', percentage);
+
+                    if (['running','starting','initiated'].includes(normalizedStatus)) {
+                        progressBar.setAttribute('data-active', 'true');
+                    } else {
+                        progressBar.removeAttribute('data-active');
+                    }
+
+                    const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
+                    if (data.progress_text && data.progress_text.trim()) {
+                        lastProgressTextByStep[stepKey] = data.progress_text;
+                    }
+                    const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
+                    progressTextEl.textContent = subText;
+
+                    const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                    if (shouldAutoCenter) {
+                        const logsOpenNow = workflowWrapper && workflowWrapper.classList.contains('logs-active');
+                        if (!logsOpenNow) {
+                            const now = performance.now();
+                            const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
+                            if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
+                                _lastAutoCenterTsByStep[stepKey] = now;
+                                requestAnimationFrame(() => {
+                                    scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
+                                });
+                            }
+                        }
+                    }
+
+                    if (candidateText && ['running','starting','initiated'].includes(data.status)) {
+                        progressTextEl.setAttribute('data-processing', 'true');
+                    } else {
+                        progressTextEl.removeAttribute('data-processing');
+                    }
+
+                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
+                    }
+                } else if (data.status === 'completed' && data.progress_total === 0) {
+                    percentage = 0;
+                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
+                } else if (data.status === 'completed' && data.progress_total > 0) {
+                    percentage = 100;
+                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
+                } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
+                    percentage = 0;
+                    console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
+                }
+            } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
+                progressContainer.style.display = 'block';
+                progressBar.style.backgroundColor = 'var(--blue)';
+                progressBar.setAttribute('data-active', 'true');
+                const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
+                if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
+                progressTextEl.textContent = runningText;
+
+                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                    const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
+                    try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
+                }
+
+                if (runningText && runningText.trim()) {
+                    progressTextEl.setAttribute('data-processing', 'true');
+                } else {
+                    progressTextEl.removeAttribute('data-processing');
+                }
+            } else if (data.status === 'completed') {
+                progressContainer.style.display = 'block';
+                progressBar.style.backgroundColor = 'var(--green)';
+                progressBar.removeAttribute('data-active');
+
+                if (data.progress_total === 0) {
+                    let noWorkText = "Aucun élément à traiter";
+                    if (data.progress_text && data.progress_text.trim() !== "") {
+                        noWorkText = data.progress_text;
+                    }
+                    progressTextEl.textContent = noWorkText;
+                    progressBar.style.width = '10%';
+                    progressBar.textContent = '✓';
+                } else {
+                    let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
+                    if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
+                        baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
+                    }
+                    const config = STEPS_CONFIG_FROM_SERVER[stepKey];
+                    if (config && config.post_completion_message_ui) {
+                        progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
+                    } else {
+                        progressTextEl.textContent = baseCompletionText;
+                    }
+
+                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
+                    }
+                    delete lastProgressTextByStep[stepKey];
+                }
+            } else if (data.status === 'failed') {
+                progressContainer.style.display = 'block';
+                progressBar.style.backgroundColor = 'var(--red)';
+                let failureText = `Échec`;
+                if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
+                if (data.progress_text) failureText += `: ${data.progress_text}`;
+                progressTextEl.textContent = failureText;
+                progressBar.removeAttribute('data-active');
+                progressTextEl.removeAttribute('data-processing');
+
+                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                    try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
+                }
+                delete lastProgressTextByStep[stepKey];
+            } else if (data.status === 'starting' || data.status === 'initiated') {
+                progressContainer.style.display = 'block';
+                progressBar.style.width = `0%`;
+                progressBar.textContent = `0%`;
+                progressBar.style.backgroundColor = 'var(--blue)';
+                progressBar.setAttribute('data-active', 'true');
+                progressTextEl.textContent = "Démarrage...";
+            } else {
+                progressContainer.style.display = 'none';
+                progressBar.setAttribute('aria-valuenow', 0);
+            }
+
+            const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
+            if (workflowWrapper) {
+                if (anyRunning) {
+                    workflowWrapper.classList.add('any-step-running');
+                    if (['running','starting','initiated'].includes(data.status)) {
+                        workflowWrapper.setAttribute('data-active-step', stepKey);
+                    } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
+                        workflowWrapper.removeAttribute('data-active-step');
+                    }
+                } else {
+                    workflowWrapper.classList.remove('any-step-running');
+                    workflowWrapper.removeAttribute('data-active-step');
+                }
+            }
+
+            try {
+                if (!_stepDetailsPanelModulePromise) {
+                    _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
+                }
+                _stepDetailsPanelModulePromise
+                    .then((mod) => {
+                        if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
+                            mod.refreshStepDetailsPanelIfOpen(stepKey);
+                        }
+                    })
+                    .catch((e) => {
+                        console.debug('[UI] Step details module not available:', e);
+                    });
+            } catch (_) {}
+        } catch (_) {}
+
+        console.groupEnd();
+    });
+}
+
+export function updateCustomSequenceButtonsUI() {
+    const hasSelection = getSelectedStepsOrder().length > 0;
+    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
+    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
+}
+
+export function updateGlobalProgressUI(text, percentage, isError = false) {
+    if(dom.globalProgressAffix) dom.globalProgressAffix.style.display = 'flex';
+    if(dom.globalProgressContainer) dom.globalProgressContainer.style.display = 'block';
+    if(dom.globalProgressText) {
+        dom.globalProgressText.style.display = 'block';
+        dom.globalProgressText.textContent = text;
+        dom.globalProgressText.style.color = isError ? 'var(--red)' : 'var(--text-secondary)';
+    }
+    if(dom.globalProgressBar) {
+        dom.globalProgressBar.style.width = `${percentage}%`;
+        dom.globalProgressBar.textContent = `${percentage}%`;
+        dom.globalProgressBar.setAttribute('aria-valuenow', percentage);
+        dom.globalProgressBar.style.backgroundColor = isError ? 'var(--red)' : 'var(--green)';
+    }
+}
+
+export function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
+    domBatcher.scheduleUpdate('specific-log-ui', () => {
+        const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
+        const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
+        const outputContent = resolveElement(dom.getSpecificLogOutputContentPanel, dom.specificLogOutputContentPanel);
+        const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+        const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+
+        if(headerText) headerText.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
+        if(pathInfo) pathInfo.textContent = path ? `(Source: ${path})` : "";
+        if (isError) {
+            if(outputContent) {
+                const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
+                outputContent.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
+            }
+        } else {
+            const styledContent = parseAndStyleLogContent(content);
+            if(outputContent) outputContent.innerHTML = styledContent;
+        }
+        if(specificLogContainer) specificLogContainer.style.display = 'flex';
+        if(mainLogContainer) mainLogContainer.style.display = 'none';
+        if(outputContent) outputContent.scrollTop = 0;
+    });
+}
+
+const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
+
+const _LOG_TIMESTAMP_PATTERN = /^(?:\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2})/;
+const _LOG_ERROR_PATTERN = /(?:erreur|error|échec|failed|exception|critical|fatal|crash)/i;
+const _LOG_WARNING_PATTERN = /(?:warning|attention|avertissement|warn|caution|deprecated)/i;
+const _LOG_SUCCESS_PATTERN = /(?:success|réussi|terminé|completed|finished|done|✓|✔|ok\b)/i;
+const _LOG_INFO_PATTERN = /(?:info|information|démarrage|starting|lancement|initiated|status)/i;
+const _LOG_DEBUG_PATTERN = /(?:debug|trace|verbose|détail)/i;
+const _LOG_COMMAND_PATTERN = /^(?:commande:|command:|executing:|exécution:|\$|>)/i;
+const _LOG_PROGRESS_PATTERN = /(?:\d+%|\d+\/\d+|progress|progression|chargement|loading|téléchargement|downloading)/i;
+
+const _LOG_PATTERNS = [
+    {
+        regex: _LOG_ERROR_PATTERN,
+        type: 'error'
+    },
+    {
+        regex: _LOG_WARNING_PATTERN,
+        type: 'warning'
+    },
+    {
+        regex: _LOG_SUCCESS_PATTERN,
+        type: 'success'
+    },
+    {
+        regex: _LOG_PROGRESS_PATTERN,
+        type: 'progress'
+    },
+    {
+        regex: _LOG_COMMAND_PATTERN,
+        type: 'command'
+    },
+    {
+        regex: _LOG_INFO_PATTERN,
+        type: 'info'
+    },
+    {
+        regex: _LOG_TIMESTAMP_PATTERN,
+        type: 'info'
+    },
+    {
+        regex: _LOG_DEBUG_PATTERN,
+        type: 'debug'
+    }
+];
+
+const _COMPILED_LOG_PATTERNS = _LOG_PATTERNS.map(p => ({
+    ...p,
+    regex: new RegExp(p.regex.source, p.regex.flags)
+}));
+
+/**
+ * Parse and style log content with CSS classes for different log types.
+ * Escapes all HTML to prevent XSS.
+ * 
+ * @param {string} rawContent - Raw log content
+ * @returns {string} - Styled HTML content
+ */
+export function parseAndStyleLogContent(rawContent) {
+    if (!rawContent || typeof rawContent !== 'string') {
+        return rawContent || '';
+    }
+
+const lines = rawContent.split('\n');
+    const styledLines = new Array(lines.length);
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line === '' || _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN.test(line)) {
+            styledLines[i] = line;
+            continue;
+        }
+
+        const escapedLine = DOMUpdateUtils.escapeHtml(line);
+
+        let logType = 'default';
+        for (let j = 0; j < _COMPILED_LOG_PATTERNS.length; j++) {
+            const pattern = _COMPILED_LOG_PATTERNS[j];
+            if (pattern.regex.test(line)) {
+                logType = pattern.type;
+                break;
+            }
+        }
+
+        styledLines[i] = logType !== 'default'
+            ? `<span class="log-line log-${logType}">${escapedLine}</span>`
+            : escapedLine;
+    }
+
+    return styledLines.join('\n');
+}
+
+export function updateMainLogOutputUI(htmlContent) {
+    if(dom.mainLogOutputPanel) {
+const styledContent = parseAndStyleLogContent(htmlContent);
+        dom.mainLogOutputPanel.innerHTML = styledContent;
+    }
+    if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.scrollTop = dom.mainLogOutputPanel.scrollHeight;
+
+    if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'flex';
+    if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
+}
+
+export function updateLocalDownloadsListUI(downloadsData) {
+    if (!dom.getLocalDownloadsList()) return;
+    dom.getLocalDownloadsList().innerHTML = '';
+    if (!downloadsData || downloadsData.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Aucune activité de téléchargement locale récente.';
+        li.classList.add('placeholder');
+        dom.getLocalDownloadsList().appendChild(li);
+        return;
+    }
+
+const currentDownloadIds = new Set();
+    downloadsData.forEach(download => {
+        if (download.id) {
+            currentDownloadIds.add(download.id);
+if (!previousDownloadIds.has(download.id) &&
+                (download.status === 'pending' || download.status === 'downloading')) {
+                console.log(`[SOUND] New CSV download detected: ${download.filename}`);
+                soundEvents.csvDownloadInitiation();
+
+const filename = download.filename && download.filename !== 'Détermination en cours...'
+                    ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
+                    : 'nouveau fichier';
+                showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
+            }
+        }
+    });
+
+previousDownloadIds = currentDownloadIds;
+
+    downloadsData.forEach(download => {
+        const li = document.createElement('li');
+        li.classList.add(`download-status-${download.status}`);
+
+        const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
+        const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
+        const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
+        const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
+
+        const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
+        const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
+        let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
+        let progressText = '';
+        if (download.status === 'downloading' && typeof download.progress === 'number') {
+            progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
+        }
+        if (download.message) {
+            const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
+            const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
+            statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
+        }
+        li.innerHTML = `${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}`;
+        dom.getLocalDownloadsList().appendChild(li);
+    });
+}
+
+export function updateClearCacheGlobalButtonState(status, message = '') {
+    if (!dom.clearCacheGlobalButton) return;
+
+    dom.clearCacheGlobalButton.classList.remove('idle', 'running', 'completed', 'failed');
+    const textSpan = dom.clearCacheGlobalButton.querySelector('.button-text');
+    const currentStepInfo = getProcessInfo('clear_disk_cache');
+
+const isOtherSequenceRunning = getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
+
+
+    switch (status) {
+        case 'idle':
+            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+            if (textSpan) textSpan.textContent = "Vider le Cache";
+            dom.clearCacheGlobalButton.classList.add('idle');
+            break;
+        case 'starting':
+        case 'initiated':
+            dom.clearCacheGlobalButton.disabled = true;
+            if (textSpan) textSpan.textContent = "Lancement...";
+            dom.clearCacheGlobalButton.classList.add('running');
+            break;
+        case 'running':
+            dom.clearCacheGlobalButton.disabled = true;
+            if (textSpan) textSpan.textContent = "Nettoyage...";
+            dom.clearCacheGlobalButton.classList.add('running');
+            break;
+        case 'completed':
+            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+            if (textSpan) textSpan.textContent = "Cache Vidé";
+            dom.clearCacheGlobalButton.classList.add('completed');
+            showNotification("Nettoyage du cache disque terminé avec succès.", "success");
+            setTimeout(() => updateClearCacheGlobalButtonState('idle'), 5000);
+            break;
+        case 'failed':
+            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+            if (textSpan) textSpan.textContent = "Échec Nettoyage";
+            dom.clearCacheGlobalButton.classList.add('failed');
+            let notifMessage = "Échec du nettoyage du cache disque.";
+            if (message && typeof message === 'string' && message.trim() !== '' && !message.startsWith('<')) {
+                notifMessage += ` Détail: ${message.substring(0,100)}`;
+            }
+            showNotification(notifMessage, "error");
+            setTimeout(() => updateClearCacheGlobalButtonState('idle'), 8000);
+            break;
+        default:
+            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+            if (textSpan) textSpan.textContent = "Vider le Cache";
+            dom.clearCacheGlobalButton.classList.add('idle');
+    }
+}
 ```

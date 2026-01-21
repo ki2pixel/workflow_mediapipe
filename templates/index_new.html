@@ -21,9 +21,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
-    <!-- Feature styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/features/cinematic-logs.css') }}?v={{ cache_buster }}">
-    
     <!-- Utilities and responsive (loaded last) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
@@ -66,18 +63,6 @@
                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
                                 <!-- Options populated by themeManager.js -->
                             </select>
-                        </div>
-
-                        <div class="cinematic-toggle-container settings-block">
-                            <input type="checkbox" id="cinematic-mode-toggle" aria-label="Activer le mode cinématique pour les logs">
-                            <label for="cinematic-mode-toggle" class="cinematic-toggle-label">Logs Cinématiques</label>
-                        </div>
-
-                        <div id="auto-scroll-widget" class="auto-scroll-widget settings-block">
-                            <label class="btn-like-switch" for="auto-scroll-toggle" aria-label="Activer/Désactiver le défilement auto">
-                                📜 Défilement Auto
-                                <input type="checkbox" id="auto-scroll-toggle" checked>
-                            </label>
                         </div>
 
                         <div id="sound-control-widget" class="sound-control-widget settings-block">
