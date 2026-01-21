@@ -88,6 +88,63 @@ WEBHOOK_CACHE_TTL=60          # secondes
 WEBHOOK_TIMEOUT=10            # secondes
 ```
 
+> 📌 **Référence complète** : toutes les variables sont définies et validées dans `config/settings.py`. Les sections ci-dessous regroupent les paramètres critiques par domaine pour faciliter l’onboarding.
+
+#### Paramètres cœur (serveur & sécurité)
+
+| Variable | Description | Défaut / Notes |
+| --- | --- | --- |
+| `FLASK_SECRET_KEY`, `INTERNAL_WORKER_COMMS_TOKEN`, `RENDER_REGISTER_TOKEN` | Tokens obligatoires pour Flask, API internes et enregistrement Render | Aucun (générer avant déploiement) |
+| `FLASK_HOST`, `FLASK_PORT`, `DEBUG` | Configuration réseau / mode debug | `0.0.0.0`, `5000`, `false` |
+| `VENV_BASE_DIR`, `PYTHON_VENV_EXE_ENV` | Chemins des environnements virtuels (auto-détection si vide) | Projet courant |
+| `PROJECTS_DIR`, `ARCHIVES_DIR`, `LOGS_DIR` | Emplacements des dossiers timeline, archives et logs | Calculés depuis `BASE_PATH_SCRIPTS` si non fournis |
+| `MAX_CPU_WORKERS`, `POLLING_INTERVAL`, `SYSTEM_MONITOR_POLLING_INTERVAL` | Limites CPU et intervalle de polling global | Ajuster selon la machine |
+
+#### Téléchargements, Webhook & SQLite
+
+| Variable | Description | Défaut / Notes |
+| --- | --- | --- |
+| `WEBHOOK_JSON_URL`, `WEBHOOK_TIMEOUT`, `WEBHOOK_CACHE_TTL`, `WEBHOOK_MONITOR_INTERVAL` | Source unique de monitoring + backoff | URL publique Kidpixel |
+| `CACHE_ROOT_DIR`, `LOCAL_DOWNLOADS_DIR` | Répertoire cache partagé + téléchargements locaux (poste opérateur) | `/mnt/cache`, `~/Téléchargements` |
+| `DOWNLOAD_HISTORY_DB_PATH`, `DOWNLOAD_HISTORY_SHARED_GROUP` | Base SQLite + groupe Unix pour partager les fichiers `.sqlite3`, `.wal`, `.shm` | Résolu automatiquement dans le projet si vide |
+| `DISABLE_EXPLORER_OPEN`, `ENABLE_EXPLORER_OPEN` | Garde-fous ouverture explorateur (désactivé en prod/headless) | `DISABLE` implicite, `ENABLE` = opt-in desktop |
+| `LOGS_DIR` | Répertoire logs normalisé (évite la création hors projet) | `<BASE_PATH_SCRIPTS>/logs` |
+
+#### STEP4 — Pyannote & Lemonfox
+
+| Variable | Description | Défaut / Notes |
+| --- | --- | --- |
+| `STEP4_USE_LEMONFOX` | Active le wrapper Lemonfox (fallback Pyannote automatique) | `0` |
+| `LEMONFOX_API_KEY`, `LEMONFOX_TIMEOUT_SEC`, `LEMONFOX_EU_DEFAULT` | Paramètres d’accès API | Timeout 300 s, zone EU optionnelle |
+| `LEMONFOX_DEFAULT_LANGUAGE`, `LEMONFOX_DEFAULT_PROMPT` | Préconfiguration des requêtes Lemonfox | Optionnels |
+| `LEMONFOX_SPEAKER_LABELS_DEFAULT`, `LEMONFOX_DEFAULT_MIN/MAX_SPEAKERS` | Contrôle du nombre de locuteurs détectés | Valeurs auto si non fournies |
+| `LEMONFOX_TIMESTAMP_GRANULARITIES`, `LEMONFOX_SPEECH_GAP_FILL_SEC`, `LEMONFOX_SPEECH_MIN_ON_SEC` | Smoothing parole & granularité des timestamps | `word`, `0.15 s`, `0 s` |
+| `LEMONFOX_MAX_UPLOAD_MB`, `LEMONFOX_ENABLE_TRANSCODE`, `LEMONFOX_TRANSCODE_AUDIO_CODEC`, `LEMONFOX_TRANSCODE_BITRATE_KBPS` | Gestion des uploads volumineux et transcodage audio | Activer selon vos quotas |
+| `AUDIO_DISABLE_GPU`, `AUDIO_CPU_WORKERS`, `AUDIO_PROFILE` | Forcer CPU, régler les workers et le profil Pyannote | GPU actif par défaut, profil `gpu_fp32` recommandé |
+
+#### STEP5 — Tracking & GPU InsightFace
+
+| Variable | Description | Défaut / Notes |
+| --- | --- | --- |
+| `TRACKING_DISABLE_GPU`, `TRACKING_CPU_WORKERS` | Mode CPU-only v4.1 (15 workers internes) | `TRACKING_DISABLE_GPU=1`, `TRACKING_CPU_WORKERS=15` |
+| `STEP5_TRACKING_ENGINE` | Moteurs : `mediapipe_landmarker`, `opencv_yunet`, `openseeface`, `eos`, `insightface`, etc. | `mediapipe_landmarker` |
+| `STEP5_ENABLE_GPU`, `STEP5_GPU_ENGINES`, `STEP5_GPU_MAX_VRAM_MB`, `STEP5_GPU_FALLBACK_AUTO` | GPU InsightFace (unique moteur autorisé) | GPU désactivé par défaut |
+| `STEP5_ENABLE_PROFILING`, `STEP5_BLENDSHAPES_THROTTLE_N`, `STEP5_YUNET_MAX_WIDTH`, `STEP5_MEDIAPIPE_MAX_WIDTH` | Optimisations de perfs + downscale/rescale | Valeurs documentées dans `config/settings.py` |
+| `STEP5_OBJECT_DETECTOR_MODEL`, `STEP5_OBJECT_DETECTOR_MODEL_PATH`, `STEP5_ENABLE_OBJECT_DETECTION` | Fallback object detector (EfficientDet Lite2 par défaut) | Object detection désactivée par défaut |
+| `STEP5_OPENSEEFACE_*`, `STEP5_EOS_*`, `STEP5_INSIGHTFACE_*` | Répertoires modèles, overrides d’interpréteurs, throttling et limites moteur | Voir `config/settings.py` pour le détail complet |
+
+#### Sécurité & scripts auxiliaires
+
+| Variable | Description | Défaut / Notes |
+| --- | --- | --- |
+| `INTERNAL_WORKER_COMMS_TOKEN` | Autorisation des appels backend (API internes, scripts CLI) | Obligatoire |
+| `RENDER_REGISTER_TOKEN` | Inscription Render (optionnel selon infra) | Vide par défaut |
+| `PYTHON_VENV_EXE_ENV` | Cheat-code pour pointer un python spécifique sans modifier `start_workflow.sh` | Résolu automatiquement sinon |
+| `ENABLE_GPU_MONITORING` | Active le widget GPU (via `pynvml`) | `true` |
+| `LOCAL_DOWNLOAD_POLLING_INTERVAL`, `SYSTEM_MONITOR_POLLING_INTERVAL` | Ajustent la fréquence des widgets frontend | Valeurs sûres par défaut |
+
+> 🔎 **Astuce** : après modification de `.env`, exécuter `python -c "from config.settings import config; config.validate(); print('Config OK')"` pour vérifier la cohérence des chemins et conversions booléennes.
+
 ### Fonctionnalités Supprimées (v4.2)
 
 Les fonctionnalités suivantes ont été retirées pour simplifier l'interface :
@@ -262,6 +319,13 @@ source env/bin/activate
 > ℹ️ `start_workflow.sh` détecte automatiquement `VENV_BASE_DIR` (ordre : valeur exportée > `.env` > dossier projet), exporte `PYTHON_VENV_EXE_ENV` pour Flask et garantit que `config.get_venv_python()` pointe vers les bons environnements (suivi vertical, `tracking_env`, `eos_env`, etc.). Aucun `env/bin/python` ne doit être codé en dur.
 > Lorsque `STEP5_ENABLE_GPU=1`, `workflow_scripts/step5/run_tracking_manager.py` valide l’état du GPU via `Config.check_gpu_availability()`, charge automatiquement l’interpréteur ONNXRuntime défini par `STEP5_INSIGHTFACE_ENV_PYTHON` (si présent) et injecte les chemins CUDA nécessaires dans les workers. En cas d’échec (VRAM insuffisante, ONNXRuntime CUDA indisponible…), un fallback CPU est appliqué si `STEP5_GPU_FALLBACK_AUTO=1`.
 
+#### Comprendre `start_workflow.sh` vs `app_new.py`
+
+- `start_workflow.sh` est le **wrapper recommandé** : il prépare l’environnement (`VENV_BASE_DIR`, `PYTHON_VENV_EXE_ENV`), appelle `python app_new.py` et relaie les variables nécessaires aux threads de polling.
+- `app_new.py` contient la logique d’entrée Flask : `init_app()` configure le logging, instancie les services puis démarre les threads (`RemoteWorkflowPoller`, `CSVMonitorService`) **une seule fois** avant d’exposer `APP_FLASK`.
+- Pour un démarrage manuel (debug, systemd, Gunicorn), il est possible d’exécuter `python app_new.py` ou d’importer `from app_new import init_app, APP_FLASK`; l’important est d’appeler `init_app()` exactement une fois avant de lancer le serveur.
+- **En production** : conserver l’usage de `start_workflow.sh` ou d’un service systemd qui réplique ces étapes (export variables → `python app_new.py`). Cette séquence garantit que les environnements virtuels spécialisés et les threads de polling sont prêts avant la première requête.
+
 #### Ouverture de l'explorateur (optionnel)
 
 - Par défaut, l’ouverture de dossiers via l’API `openCachePathInExplorerAPI()` est **désactivée** (`DISABLE_EXPLORER_OPEN=1` implicite) pour éviter toute exécution graphique sur des serveurs headless.
@@ -302,51 +366,39 @@ Ouvrir un navigateur et aller à : `http://localhost:5000`
 > - Les autres sources (FromSmash, SwissTransfer, externes, etc.) sont ignorées par le système de téléchargement automatique.
 > - Backend : `execute_csv_download_worker()` classe les URLs comme `dropbox` ou `proxy_php` pour les téléchargements automatiques.
 
-### Smart Upload (Téléversement Intelligent Simplifié)
+### Téléversements (mode manuel + monitoring Webhook)
 
-#### Architecture et Flux :
-- **Point d'entrée :** Bouton `#upload-button` déclenchant `openSmartUploadModal()`
-- **Chargement automatique :** `preloadTodayCacheFolders()` récupère les dossiers du jour via API
-- **Interface utilisateur :**
-  - Affichage avec badges numériques et horodatages
-  - États visuels : sélectionné/désactivé pour les éléments
-  - Gestion des erreurs via `ErrorHandler.js`
-- **Optimisations :**
-  - Utilisation de `DOMBatcher` pour les mises à jour groupées
-  - Pas de contrôles manuels (recherche, ouverture séparée)
-  - Fermeture automatique après sélection
+> ℹ️ La fonctionnalité « Smart Upload » a été retirée le 18 janvier 2026 pour alléger l’interface et supprimer les dépendances aux modales dédiées (voir `memory-bank/decisionLog.md` — suppression des features Supervision & Smart Upload).
 
-#### Fichiers clés modifiés :
-- `static/main.js` : Logique principale et gestion des événements
-- `templates/index_new.html` : Structure HTML de la modale simplifiée
-- `static/domElements.js` : Nettoyage des sélecteurs obsolètes
+1. **Préparer les fichiers localement** : extraire les archives dans `CACHE_ROOT_DIR` (ex. `/mnt/cache/projets_extraits/`), sous un dossier par projet.
+2. **Ouvrir les dossiers manuellement** : utiliser votre explorateur ou l’API `openCachePathInExplorerAPI()` si `ENABLE_EXPLORER_OPEN=1` (environnement desktop uniquement).
+3. **Surveiller le Webhook** : le module `RemoteWorkflowPoller` lit automatiquement `WEBHOOK_JSON_URL`. Tout nouveau lien Dropbox/R2 valide déclenche un téléchargement automatique (Politique Dropbox-only).
+4. **Vérifier la prise en charge** : la Timeline Connectée affiche l’état des étapes dès que les vidéos ont été détectées dans le cache. Aucune action UI supplémentaire n’est requise.
 
-#### API Endpoints utilisés :
-- `fetchTodayCacheFoldersAPI()` : Récupération des dossiers du jour
-- `openCachePathInExplorerAPI()` : Ouverture de l'explorateur avec présélection
+> ✅ Astuce : pour tester le monitoring sans téléchargement réel, positionner `DRY_RUN_DOWNLOADS=true` et publier un lien Dropbox dans la source Webhook.
 
-#### Changements UX :
-- **Avant :** Interface complexe avec recherche manuelle et boutons séparés
-- **Après :** Flux en un clic avec affichage automatique des dossiers du jour
-- **Impact :** Réduction de la complexité cognitive et accélération du workflow de sauvegarde
+### Diagnostics Système (API uniquement)
 
-### Diagnostics Système
+> ℹ️ Le bouton « 🩺 Diagnostics » de la topbar a été supprimé avec le nettoyage Supervision (18 janvier 2026). Les diagnostics restent disponibles via l’API instrumentée.
 
-L'interface inclut un outil de diagnostics rapide accessible via le bouton "🩺 Diagnostics" dans les contrôles unifiés.
+#### Endpoints disponibles
+- `GET /api/system/diagnostics` — informations système détaillées (versions Python/FFmpeg, GPU, flags actifs).
+- `GET /api/system_monitor` — métriques temps réel déjà utilisées par le widget (CPU/RAM/GPU, uptime).
 
-#### Accès :
-- Cliquer sur le bouton "🩺 Diagnostics" dans la barre de contrôles supérieure.
-- Une modale s'ouvre affichant les informations système.
+#### Utilisation type
+```bash
+# Depuis le poste opérateur
+curl http://localhost:5000/api/system/diagnostics | jq
 
-#### Informations affichées :
-- **Versions logicielles** : Python, FFmpeg
-- **GPU** : Disponibilité et nom du GPU NVIDIA (si détecté)
-- **Configuration** : Flags de configuration actifs (filtrés pour la sécurité)
+# Depuis un serveur distant
+INTERNAL_WORKER_COMMS_TOKEN=... \
+  curl -H "Authorization: Bearer $INTERNAL_WORKER_COMMS_TOKEN" \
+       https://workflow.example.com/api/system/diagnostics
+```
 
-#### Utilisation :
-- Utile pour le dépannage et la vérification de l'environnement avant l'exécution.
-- Les informations sont mises à jour en temps réel lors de l'ouverture de la modale.
- - Détails complets (backend + frontend) : voir [docs/workflow/features/DIAGNOSTICS_FEATURE.md](docs/workflow/features/DIAGNOSTICS_FEATURE.md)
+- Les réponses sont en JSON et prêtes à être archivées dans vos tickets de support.
+- Pour automatiser le contrôle avant chaque session, ajoutez l’appel API dans vos scripts d’exploitation (`scripts/diagnose_tests.sh` par exemple).
+- Documentation détaillée : [docs/workflow/features/DIAGNOSTICS_FEATURE.md](docs/workflow/features/DIAGNOSTICS_FEATURE.md) (API, schémas de réponse, scripts CLI).
 
 ### Dossiers de Travail
 
@@ -420,6 +472,17 @@ grep "STEP1" logs/app.log
 # STEP5 tracing : surveiller aussi logs/step5/manager_tracking_*.log et logs/step5/worker_* pour les tags
 # [Progression-MultiLine], [Gestionnaire] Succès/Échec, [WORKER-XXXX] (chunk boundaries, retries, profiling)
 ```
+
+#### Cinematic Log Mode (option visuelle)
+
+- **Activation** : toggle « Cinematic » dans les Settings (checkbox `#cinematic-mode-toggle`).
+- **Effet** : applique un habillage “Matrix-style” sur tous les panneaux de logs (`data-cinematic-mode="true"`, animations contrôlées par CSS).
+- **Persistance** : l’état est stocké dans `localStorage` (`workflow-cinematic-logs`) via `static/cinematicLogMode.js`.
+- **Réinitialisation** :
+  1. Désactiver le toggle dans l’UI **ou**
+  2. Vider la clé dans la console : `localStorage.removeItem('workflow-cinematic-logs');`
+- **Événements** : l’activation déclenche `window.dispatchEvent(new CustomEvent('cinematicModeChanged', { detail: { enabled: true/false } }))` permettant aux modules (Logs Panel, Step Details) d’ajuster leurs animations.
+- **Bonnes pratiques** : désactiver le mode lors de captures d’écran destinées à la documentation standard afin de limiter le bruit visuel.
 
 ### Gestion des Environnements
 

@@ -40,8 +40,8 @@ const PORTAL_CONFIG = {
         {
             section: "Fonctionnalités",
             items: [
-                { id: "SMART_UPLOAD_FEATURE", title: "Upload Intelligent", icon: "🚀" },
-                { id: "DIAGNOSTICS_FEATURE", title: "Diagnostics Système", icon: "🩺" }
+                { id: "DIAGNOSTICS_FEATURE", title: "Diagnostics Système", icon: "🩺" },
+                { id: "RESULTS_ARCHIVER_SERVICE", title: "Archiver Résultats", icon: "🗂️" }
             ]
         },
         {
@@ -68,8 +68,8 @@ const PORTAL_CONFIG = {
         'STEP5_SUIVI_VIDEO': 'Étape 5: Suivi Vidéo',
         'STEP6_REDUCTION_JSON': 'Étape 6: Réduction JSON',
         'STEP7_FINALISATION': 'Étape 7: Finalisation',
-        'SMART_UPLOAD_FEATURE': 'Upload Intelligent',
         'DIAGNOSTICS_FEATURE': 'Diagnostics Système',
+        'RESULTS_ARCHIVER_SERVICE': 'Service d\'Archivage',
         'SYSTEM_MONITORING_ENHANCEMENTS': 'Monitoring Système',
         'WEBHOOK_INTEGRATION': 'Integration Webhook',
         'TESTING_STRATEGY': 'Stratégie de Tests',
@@ -89,8 +89,8 @@ const PORTAL_CONFIG = {
         'STEP5_SUIVI_VIDEO': 'pipeline/STEP5_SUIVI_VIDEO.md',
         'STEP6_REDUCTION_JSON': 'pipeline/STEP6_REDUCTION_JSON.md',
         'STEP7_FINALISATION': 'pipeline/STEP7_FINALISATION.md',
-        'SMART_UPLOAD_FEATURE': 'features/SMART_UPLOAD_FEATURE.md',
         'DIAGNOSTICS_FEATURE': 'features/DIAGNOSTICS_FEATURE.md',
+        'RESULTS_ARCHIVER_SERVICE': 'features/RESULTS_ARCHIVER_SERVICE.md',
         'SYSTEM_MONITORING_ENHANCEMENTS': 'technical/SYSTEM_MONITORING_ENHANCEMENTS.md',
         'WEBHOOK_INTEGRATION': 'technical/WEBHOOK_INTEGRATION.md',
         'TESTING_STRATEGY': 'technical/TESTING_STRATEGY.md',

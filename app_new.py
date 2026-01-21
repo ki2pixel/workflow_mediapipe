@@ -220,6 +220,92 @@ def initialize_services():
         except Exception as e:
             logger.error(f"Service initialization failed: {e}")
 
+_app_initialized = False
+_app_init_lock = threading.Lock()
+
+def init_app():
+    global _app_initialized
+
+    with _app_init_lock:
+        if _app_initialized:
+            return APP_FLASK
+
+        APP_LOGGER.handlers.clear()
+
+        logs_dir = BASE_PATH_SCRIPTS / "logs"
+        logs_dir.mkdir(exist_ok=True)
+
+        log_file_path = logs_dir / "app.log"
+        file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
+        file_handler.setFormatter(file_formatter)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+
+        APP_LOGGER.addHandler(file_handler)
+        APP_LOGGER.addHandler(console_handler)
+        APP_LOGGER.propagate = False
+
+        is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
+        APP_LOGGER.setLevel(logging.DEBUG)
+
+        APP_LOGGER.info(f"=== COMPREHENSIVE LOGGING INITIALIZED ===")
+        APP_LOGGER.info(f"Log file: {log_file_path}")
+        APP_LOGGER.info(f"Debug mode: {is_debug_mode}")
+        APP_LOGGER.info(f"Logger level: {APP_LOGGER.level}")
+        APP_LOGGER.info(f"=== STARTING APPLICATION ===")
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        if not root_logger.handlers:
+            root_logger.addHandler(file_handler)
+            root_logger.addHandler(console_handler)
+
+        APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
+
+        APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
+        APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
+        APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
+        APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
+
+        os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
+
+        if not HF_AUTH_TOKEN_ENV:
+            APP_LOGGER.warning("HF_AUTH_TOKEN non défini. L'étape 4 (Analyse Audio) nécessitera cette variable d'environnement.")
+
+        if not INTERNAL_WORKER_COMMS_TOKEN_ENV:
+            APP_LOGGER.warning("INTERNAL_WORKER_COMMS_TOKEN non défini. API critiques INSECURES.")
+        else:
+            APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
+
+        if not RENDER_REGISTER_TOKEN_ENV:
+            APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
+        else:
+            APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
+
+        initialize_services()
+
+        if not getattr(APP_FLASK, "_polling_threads_started", False):
+            remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
+            remote_poll_thread.daemon = True
+            remote_poll_thread.start()
+
+            csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
+            csv_monitor_thread.daemon = True
+            csv_monitor_thread.start()
+
+            APP_FLASK._polling_threads_started = True
+
+        APP_LOGGER.info("WEBHOOK MONITOR: Système de monitoring activé et prêt (Webhook uniquement).")
+
+        _app_initialized = True
+        return APP_FLASK
+
 initialize_services()
 
 REMOTE_TRIGGER_URL = os.environ.get('REMOTE_TRIGGER_URL', "https://render-signal-server.onrender.com/api/check_trigger")
@@ -975,73 +1061,7 @@ def get_current_workflow_status_summary():
 
 
 if __name__ == '__main__':
-    APP_LOGGER.handlers.clear()
-
-    logs_dir = BASE_PATH_SCRIPTS / "logs"
-    logs_dir.mkdir(exist_ok=True)
-
-    log_file_path = logs_dir / "app.log"
-    file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
-    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
-    file_handler.setFormatter(file_formatter)
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
-    console_handler.setFormatter(console_formatter)
-
-    APP_LOGGER.addHandler(file_handler)
-    APP_LOGGER.addHandler(console_handler)
-    APP_LOGGER.propagate = False
-
-    is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
-    APP_LOGGER.setLevel(logging.DEBUG)
-
-    APP_LOGGER.info(f"=== COMPREHENSIVE LOGGING INITIALIZED ===")
-    APP_LOGGER.info(f"Log file: {log_file_path}")
-    APP_LOGGER.info(f"Debug mode: {is_debug_mode}")
-    APP_LOGGER.info(f"Logger level: {APP_LOGGER.level}")
-    APP_LOGGER.info(f"=== STARTING APPLICATION ===")
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    if not root_logger.handlers:
-        root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
-
-    APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
-
-    APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
-    APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
-    APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
-    APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
-    APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
-    APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
-    APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
-
-    os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
-    
-    if not HF_AUTH_TOKEN_ENV: 
-        APP_LOGGER.warning("HF_AUTH_TOKEN non défini. L'étape 4 (Analyse Audio) nécessitera cette variable d'environnement.")
-    
-    if not INTERNAL_WORKER_COMMS_TOKEN_ENV:
-        APP_LOGGER.warning("INTERNAL_WORKER_COMMS_TOKEN non défini. API critiques INSECURES.")
-    else:
-        APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
-
-    if not RENDER_REGISTER_TOKEN_ENV:
-        APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
-    else:
-        APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
-    
-    remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
-    remote_poll_thread.daemon = True
-    remote_poll_thread.start()
-
-    csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
-    csv_monitor_thread.daemon = True
-    csv_monitor_thread.start()
-
-    APP_LOGGER.info("WEBHOOK MONITOR: Système de monitoring activé et prêt (Webhook uniquement).")
+    init_app()
 
     APP_FLASK.run(
         debug=config.DEBUG,

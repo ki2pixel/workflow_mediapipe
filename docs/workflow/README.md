@@ -31,7 +31,7 @@ La documentation a été réorganisée thématiquement pour une navigation intui
 - **[SECURITY.md](technical/SECURITY.md)** — Sécurité
 
 ### 🚀 Features & Functionality
-- **[SMART_UPLOAD_FEATURE.md](features/SMART_UPLOAD_FEATURE.md)** — Upload intelligent
+- **Smart Upload** — *feature retirée le 18 janvier 2026, voir `memory-bank/decisionLog.md` et `legacy/SMART_UPLOAD_FEATURE.md` pour l’historique complet*
 - **[DIAGNOSTICS_FEATURE.md](features/DIAGNOSTICS_FEATURE.md)** — Diagnostics système
 - **[RESULTS_ARCHIVER_SERVICE.md](features/RESULTS_ARCHIVER_SERVICE.md)** — Service d'archivage
 
@@ -63,7 +63,7 @@ La documentation a été réorganisée thématiquement pour une navigation intui
 ## Par où commencer ?
 
 - Pour une vision globale de l'architecture, commencez par → **[ARCHITECTURE_COMPLETE_FR.md](core/ARCHITECTURE_COMPLETE_FR.md)**
-- Pour comprendre le widget d'upload intelligent → **[SMART_UPLOAD_FEATURE.md](features/SMART_UPLOAD_FEATURE.md)**
+- Pour comprendre l’historique de Smart Upload → **`legacy/SMART_UPLOAD_FEATURE.md`** (archive)
 - Pour les métriques système et l'instrumentation API → **[SYSTEM_MONITORING_ENHANCEMENTS.md](technical/SYSTEM_MONITORING_ENHANCEMENTS.md)**
 - Pour mettre en place/étendre les tests → **[TESTING_STRATEGY.md](technical/TESTING_STRATEGY.md)**
 - Pour les développeurs (raccourcis et patterns obligatoires) → **[REFERENCE_RAPIDE_DEVELOPPEURS.md](core/REFERENCE_RAPIDE_DEVELOPPEURS.md)**

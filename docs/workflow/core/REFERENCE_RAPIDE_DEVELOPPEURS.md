@@ -179,11 +179,11 @@ appState.subscribe('stepStatuses', callback);
 ```
 
 ### Références complémentaires
-- Smart Upload (UX simplifiée, A11y, XSS) → [SMART_UPLOAD_FEATURE.md](SMART_UPLOAD_FEATURE.md)
+- Smart Upload (feature retirée le 18 janvier 2026 — historique dans `memory-bank/decisionLog.md` et archives `docs/workflow/legacy/SMART_UPLOAD_FEATURE.md`)
 - Monitoring Système & Instrumentation API → [SYSTEM_MONITORING_ENHANCEMENTS.md](SYSTEM_MONITORING_ENHANCEMENTS.md)
 - Stratégie de tests (pytest + ESM/Node) → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
- - Diagnostics Système (modale + API) → [DIAGNOSTICS_FEATURE.md](DIAGNOSTICS_FEATURE.md)
- - Instrumentation des API (measure_api + PerformanceService) → [API_INSTRUMENTATION.md](API_INSTRUMENTATION.md)
+- Diagnostics Système (modale + API) → [DIAGNOSTICS_FEATURE.md](DIAGNOSTICS_FEATURE.md)
+- Instrumentation des API (measure_api + PerformanceService) → [API_INSTRUMENTATION.md](API_INSTRUMENTATION.md)
 
 ## API Endpoints
 

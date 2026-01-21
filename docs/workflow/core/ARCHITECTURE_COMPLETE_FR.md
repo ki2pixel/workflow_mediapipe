@@ -25,11 +25,13 @@ Le système de workflow MediaPipe est un pipeline de traitement vidéo conçu po
   - Optimisation des paramètres Dropbox avec gestion des doublons
   - Validation renforcée des URLs après normalisation
   - Réduction de 30% des entrées en double dans l'historique
-Intégration Source Webhook : Source de données JSON externe pour monitoring flexible
-  - Cache TTL configurable et retry automatique
-  - Classification automatique des URLs (Dropbox, proxy PHP)
-  - Source unique de données (pas de fallback MySQL/Airtable/CSV)
-  - Support proxy PHP pour sécurité en production
+Intégration Source Webhook + CSVService : chaîne de données unifiée
+  - **Webhook JSON** = unique point d’entrée (pas d’Airtable/MySQL/CSV legacy en production).
+  - `CSVService` orchestre toujours la lecture du Webhook, la déduplication et la persistance SQLite via `download_history_repository`.
+  - Cache TTL configurable et retry automatique pour éviter les trous d’exploitation.
+  - Classification automatique des URLs (Dropbox direct, proxy PHP) avant lancement des workers.
+  - Support proxy PHP pour sécurité en production (pas de connexions directes Dropbox depuis le serveur).
+  - Services historiques MySQL/Airtable déplacés dans `services/deprecated/` et conservés uniquement pour référence.
 - **Optimisations de Performance**
   - **Étape 2** : Compression non destructive avec support GPU/CPU
   - **Étape 5** : Mode CPU-only optimisé avec 15 workers internes
@@ -81,11 +83,11 @@ Intégration Source Webhook : Source de données JSON externe pour monitoring fl
   - Gestion efficace de l'espace disque
 
 ### Références complémentaires
-- Voir « Smart Upload » (UX simplifiée, A11y, XSS) : [SMART_UPLOAD_FEATURE.md](SMART_UPLOAD_FEATURE.md)
 - Voir « Monitoring Système & Instrumentation API » : [SYSTEM_MONITORING_ENHANCEMENTS.md](SYSTEM_MONITORING_ENHANCEMENTS.md)
 - Voir « Stratégie de tests (pytest + ESM/Node) » : [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
-- Voir « Diagnostics Système (modale + API) » : [DIAGNOSTICS_FEATURE.md](DIAGNOSTICS_FEATURE.md)
+- Voir « Diagnostics Système (API) » : [DIAGNOSTICS_FEATURE.md](DIAGNOSTICS_FEATURE.md)
 - Voir « Instrumentation des API (measure_api + PerformanceService) » : [API_INSTRUMENTATION.md](API_INSTRUMENTATION.md)
+- Voir `memory-bank/decisionLog.md` (18 janvier 2026) pour la suppression Smart Upload/Diagnostics UI.
 ### Pipeline de Traitement
 
 ```mermaid
@@ -285,7 +287,7 @@ Le backend suit une architecture modulaire stricte basée sur 5 services central
 - `WorkflowService` s’appuie sur `WorkflowState` pour la lecture/écriture de l’état, et dépend de `app_new` uniquement pour déclencher l’exécution (threads/subprocess)
 
 #### 2. WorkflowService (`services/workflow_service.py`) - ✅ Finalisé
-**Responsabilité** : Point d’entrée unique pour l’exécution des étapes, des séquences, des logs spécifiques et de la configuration runtime (chunk bounds STEP5).
+**Responsabilité** : Point d’entrée unique pour l’exécution des étapes, des séquences et des logs spécifiques (avec préparation STEP5, gestion des fichiers temporaires, etc.).
 
 ```python
 from services.workflow_service import WorkflowService
@@ -305,14 +307,15 @@ log_file = WorkflowService.get_step_log_file("STEP1", 0)
 - **Thin Controllers** : toutes les routes (`routes/api_routes.py`, `routes/workflow_routes.py`) délèguent la logique métier au service (zéro duplication de `COMMANDS_CONFIG`).
 - **Logs unifiés** : `get_step_log_file()` s’appuie sur `WorkflowCommandsConfig` pour les chemins et patterns, garantissant l’alignement avec les commandes exécutées.
 - **Gestion d’état centralisée** : chaque opération lit/écrit exclusivement via `WorkflowState` (statuts, durées, logs, process, séquences).
-- **Configuration dynamique** : `set_step5_chunk_bounds()` et helpers STEP5 (préparation tracking, fichiers temporaires) exposent des réglages runtime sûrs.
-- **Instrumentation native** : tous les endpoints liés (`/api/run_step/*`, `/api/get_specific_log/*`, `/api/step5/chunk_bounds`) sont décorés avec `@measure_api`.
+- **Instrumentation native** : tous les endpoints liés (`/api/run_step/*`, `/api/get_specific_log/*`) sont décorés avec `@measure_api`.
 
 **Bénéfices obtenus** :
 - Réduction de 63 % de la complexité de `execute_csv_download_worker()` (230 → 85 lignes) grâce aux helpers WorkflowService.
 - Suppression complète des reliques `PROCESS_INFO`, `COMMANDS_CONFIG`, `sequence_lock`, `LAST_SEQUENCE_OUTCOME`.
 - Tests unitaires et d’intégration couvrant les routes, la récupération de logs, l’exécution d’étapes/séquences et l’adaptive chunking STEP5.
 - Architecture maintenable et extensible : service stateless, état unique (`WorkflowState`), configuration unique (`WorkflowCommandsConfig`).
+
+> ℹ️ **Note (2026-01-18)** — La configuration dynamique des chunks STEP5 via `/api/step5/chunk_bounds` a été retirée. Les paragraphes ci-dessus décrivent l’état actuel (chunking adaptatif interne uniquement). Voir `memory-bank/decisionLog.md` pour la décision complète.
 
 **Statut** : ✅ Migration finalisée (janvier 2026). Voir `docs/workflow/MIGRATION_STATUS.md` pour l’historique détaillé.
 
@@ -693,6 +696,15 @@ domBatcher.batchUpdate(() => {
 - **RequestAnimationFrame** : Synchronisation avec le cycle de rendu
 - **Prévention des reflows** : Minimise les recalculs de layout
 - **Mesure de performance** : Métriques de temps d'exécution
+
+#### Cinematic Log Mode (`static/cinematicLogMode.js`)
+
+- **Objectif** : proposer un rendu “Matrix-style” optionnel pour les panneaux de logs (Logs Panel global, logs spécifiques, Step Details overlay) sans impacter la logique métier.
+- **Activation** : toggle « Cinematic » dans les Settings (checkbox `#cinematic-mode-toggle` au sein de `.cinematic-toggle-container`). L’état est stocké dans `localStorage` sous la clé `workflow-cinematic-logs`.
+- **Application** : à l’activation, tous les panneaux héritent de `class="log-panel"` et de l’attribut `data-cinematic-mode="true"` ; les effets visuels sont gérés dans `static/css/components/logs.css`.
+- **Événements** : le module publie `window.dispatchEvent(new CustomEvent('cinematicModeChanged', { detail: { enabled } }))` afin que les autres modules (Logs Panel Phase 2, StepDetailsPanel) puissent s’adapter (densité, animations).
+- **Réinitialisation** : désactiver le toggle ou exécuter `localStorage.removeItem('workflow-cinematic-logs')`.
+- **Accessibilité** : respecte `prefers-reduced-motion`; pour les captures officielles, désactiver ce mode afin de conserver le rendu standard.
 
 #### Cache-busting CSS (v4.1)
 

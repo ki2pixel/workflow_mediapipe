@@ -87,6 +87,12 @@ projets_extraits/
 - CPU-only reste recommandé pour les batchs massifs (10+ vidéos) et demeure le mode par défaut (`TRACKING_DISABLE_GPU=1`).
 - `STEP5_GPU_PROFILING=1` journalise l’usage VRAM et les timings toutes les 20 frames pour InsightFace.
 
+#### Chunking adaptatif (depuis 2026-01-18)
+- Le chunking adaptatif est désormais entièrement géré côté backend avec des **bornes internes par défaut** (≈20 chunks min, ≈400 chunks max) afin de saturer les workers CPU tout en évitant la fragmentation.
+- **Plus aucune configuration dynamique** n’est exposée : l’API `/api/step5/chunk_bounds`, les variables `TRACKING_CHUNK_MIN/MAX` et les contrôles UI associés ont été retirés.
+- Lorsqu’un worker multiprocessing se lance, il journalise toujours `Adaptive chunking enabled ... selected_chunk_size=XXX` pour vérifier l’application automatique de ces bornes.
+- Pour les scénarios spéciaux, la recommandation officielle est d’ajuster le nombre de workers (`TRACKING_CPU_WORKERS`) ou de basculer en mode GPU InsightFace (séquentiel) plutôt que de modifier la taille des chunks.
+
 ## Moteurs de Détection Faciale
 
 ### Moteurs Disponibles
@@ -143,6 +149,19 @@ projets_extraits/
    - `workflow_scripts/step5/process_video_worker_multiprocessing.py` charge `.env` côté worker pour propager l'ensemble de ces variables à chaque sous-processus.
 
    > 💤 **Lazy import MediaPipe** : `process_video_worker.py` dispose de `_ensure_mediapipe_loaded(required=False)` afin d’éviter l’import du module tant que le moteur MediaPipe/objets n’est pas sollicité. Les moteurs OpenCV/EOS l’appellent en mode `required=False`, ce qui supprime les crashs TensorFlow lorsque seules les dépendances OpenCV sont installées. Quand MediaPipe est indispensable (`required=True`), l’erreur est loggée puis relancée pour guider l’utilisateur.
+
+7. **InsightFace (GPU séquentiel)**
+   - Moteur ONNX Runtime réservé au mode GPU (`STEP5_TRACKING_ENGINE=insightface`).
+   - Requiert l’environnement `insightface_env` et un GPU NVIDIA compatible CUDA ≥ 12 (≥ 2 Go VRAM libres, 4 Go recommandés).
+   - Les variables `STEP5_ENABLE_GPU`, `STEP5_GPU_ENGINES=insightface` et `STEP5_INSIGHTFACE_*` (chemins modèles, throttling, overrides Python) se valident via `config/settings.py` @docs/workflow/core/GUIDE_DEMARRAGE_RAPIDE.md#125-189.
+   - Respecte la décision du 27 décembre 2025 : **aucun autre moteur n’est autorisé sur GPU** (@memory-bank/decisionLog.md).
+   - Profil recommandé : 1 worker GPU séquentiel, chunking automatique + fallback CPU (`STEP5_GPU_FALLBACK_AUTO=1`).
+
+8. **Maxine (NVIDIA AR SDK)**
+   - Moteur expérimental accessible via `STEP5_TRACKING_ENGINE=maxine` lorsque les bibliothèques Maxine sont installées (non distribuées dans le dépôt).
+   - Doit être explicitement listé dans `STEP5_GPU_ENGINES` pour activer les optimisations CUDA des filtres Maxine ; sinon il fonctionne en mode CPU.
+   - `STEP5_MAXINE_ENV_PYTHON` (optionnel) permet de pointer vers un environnement spécialisé basé sur les exemples NVIDIA Maxine.
+   - Destiné aux installations avancées (studios) : vérifier les licences Maxine et mettre à jour `config/settings.py` pour renseigner les binaires.
 
 ### Optimisations récentes (Décembre 2025)
 

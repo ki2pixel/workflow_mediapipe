@@ -3857,369 +3857,6 @@ class DownloadService:
         return callback
 ```
 
-## File: services/filesystem_service.py
-```python
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-FilesystemService
-
-Service layer responsible for safe filesystem-related operations required by the
-frontend (searching cache folders and opening them locally on the host).
-
-All business logic is centralized here per project standards.
-"""
-from __future__ import annotations
-
-import logging
-import os
-import re
-import shlex
-import subprocess
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional, Tuple, Dict
-from datetime import datetime, date
-
-from config.settings import config
-
-logger = logging.getLogger(__name__)
-
-CACHE_ROOT = Path(config.CACHE_ROOT_DIR)
-
-
-@dataclass
-class CacheSearchResult:
-    """Result for a cache folder search.
-
-    Attributes:
-        number: The numeric identifier searched (as string to preserve formatting)
-        matches: List of absolute paths to matching folders
-        best_match: The best match path if determinable, else None
-    """
-    number: str
-    matches: List[str]
-    best_match: Optional[str]
-
-
-class FilesystemService:
-    """Service providing safe filesystem utilities for the app.
-
-    This class intentionally restricts operations to known safe directories and
-    validates inputs to prevent path traversal or unintended access.
-    """
-
-    @staticmethod
-    def _ensure_cache_root() -> None:
-        """Ensure the cache root exists, log a warning if not."""
-        if not CACHE_ROOT.exists():
-            logger.warning("CACHE_ROOT does not exist: %s", CACHE_ROOT)
-
-    @staticmethod
-    def find_cache_folder_by_number(number: str) -> CacheSearchResult:
-        """Search for folders inside /mnt/cache that start with the given number.
-
-        The expected folder format is for example: "115 Camille". We will match
-        case-insensitively any directory whose basename starts with "{number}" and
-        is followed by optional separators/spaces and text.
-
-        Args:
-            number: Numeric string provided by the user (e.g., "115"). Non-digits are ignored.
-
-        Returns:
-            CacheSearchResult with all matches and the best_match if exactly one clear match exists.
-        """
-        FilesystemService._ensure_cache_root()
-
-        sanitized = re.sub(r"\D+", "", number or "")
-        if not sanitized:
-            logger.debug("Invalid number provided for cache search: %r", number)
-            return CacheSearchResult(number=number or "", matches=[], best_match=None)
-
-        if not CACHE_ROOT.exists() or not CACHE_ROOT.is_dir():
-            return CacheSearchResult(number=sanitized, matches=[], best_match=None)
-
-        regex = re.compile(rf"^{re.escape(sanitized)}[\s_-]?.*", re.IGNORECASE)
-
-        matches: List[str] = []
-        try:
-            for entry in CACHE_ROOT.iterdir():
-                try:
-                    if entry.is_dir() and regex.match(entry.name):
-                        matches.append(str(entry.resolve()))
-                except PermissionError:
-                    continue
-        except Exception as e:
-            logger.error("Error while scanning cache root: %s", e)
-            return CacheSearchResult(number=sanitized, matches=[], best_match=None)
-
-        best: Optional[str] = None
-        if len(matches) == 1:
-            best = matches[0]
-        else:
-            exact_regex = re.compile(rf"^{re.escape(sanitized)}\b.*", re.IGNORECASE)
-            exact_matches = [m for m in matches if exact_regex.search(Path(m).name)]
-            if len(exact_matches) >= 1:
-                exact_matches.sort(key=lambda p: (len(Path(p).name), Path(p).name.lower()))
-                best = exact_matches[0]
-
-        return CacheSearchResult(number=sanitized, matches=matches, best_match=best)
-
-    @staticmethod
-    def open_path_in_explorer(abs_path: str, select_parent: bool = False) -> Tuple[bool, str]:
-        """Open a given absolute path in the system's file explorer (server-side).
-
-        IMPORTANT: This runs on the server where Flask is hosted. It assumes a desktop
-        environment is available (e.g., the app is used locally). On headless servers,
-        this will likely fail; we handle and return a clear error message.
-
-        Args:
-            abs_path: Absolute path to open.
-            select_parent: If True, open the parent directory and try to preselect the target
-                folder in the file manager when supported (nautilus/dolphin/thunar/nemo). If not
-                supported, fall back to opening the parent directory.
-
-        Returns:
-            (success, message) tuple.
-        """
-        if config.DISABLE_EXPLORER_OPEN:
-            logger.info("Explorer opening is disabled by configuration")
-            return False, "Ouverture explorateur désactivée par configuration."
-        if not config.DEBUG and not config.ENABLE_EXPLORER_OPEN:
-            logger.info("Explorer opening is disabled in production/headless mode")
-            return False, "Ouverture explorateur désactivée en production/headless."
-
-        is_headless = not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
-        if is_headless and not config.ENABLE_EXPLORER_OPEN:
-            logger.info("Explorer opening is disabled in headless mode")
-            return False, "Ouverture explorateur désactivée en mode headless."
-        try:
-            path = Path(abs_path).resolve()
-        except Exception:
-            return False, "Chemin invalide."
-
-        try:
-            path.relative_to(CACHE_ROOT)
-        except ValueError:
-            return False, f"Chemin en dehors de {str(CACHE_ROOT)} non autorisé."
-
-        if not path.exists():
-            return False, "Le dossier n'existe pas."
-        if not path.is_dir():
-            return False, "Le chemin n'est pas un dossier."
-
-        candidates: List[List[str]] = []
-
-        if select_parent:
-            parent = path.parent if path.parent.exists() else CACHE_ROOT
-            candidates.extend([
-                ["nautilus", "--no-desktop", "--browser", "--select", str(path)],
-                ["nemo", "--no-desktop", "--browser", "--select", str(path)],
-                ["dolphin", "--select", str(path)],
-                ["thunar", "--select", str(path)],
-                ["xdg-open", str(parent)],
-                ["gio", "open", str(parent)],
-                ["nautilus", str(parent)],
-                ["nemo", str(parent)],
-                ["thunar", str(parent)],
-                ["dolphin", str(parent)],
-            ])
-        else:
-            candidates.extend([
-                ["xdg-open", str(path)],
-                ["gio", "open", str(path)],
-                ["nautilus", str(path)],
-                ["nemo", str(path)],
-                ["thunar", str(path)],
-                ["dolphin", str(path)],
-            ])
-
-        last_error: Optional[str] = None
-        for cmd in candidates:
-            try:
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                logger.info(
-                    "Opened path in explorer using %s (select_parent=%s): %s",
-                    cmd[0], select_parent, str(path)
-                )
-                return True, "Dossier ouvert dans l'explorateur."
-            except FileNotFoundError:
-                last_error = f"Commande introuvable: {cmd[0]}"
-                continue
-            except Exception as e:
-                last_error = str(e)
-                continue
-
-        return False, last_error or "Impossible d'ouvrir l'explorateur sur ce système."
-
-    @staticmethod
-    def list_today_cache_folders() -> List[Dict[str, Optional[str]]]:
-        """List folders created/modified today under CACHE_ROOT with extracted numeric prefix.
-
-        We use the folder's modification time (mtime) to approximate creation date across platforms,
-        and filter only directories whose mtime date equals today's local date. For each folder, we
-        extract a leading numeric sequence if present (e.g., "115 Camille" -> "115").
-
-        Returns:
-            A list of dicts with keys: {"path": str, "name": str, "number": Optional[str], "mtime": str}
-            where mtime is ISO 8601 string for display/logging purposes.
-        """
-        FilesystemService._ensure_cache_root()
-
-        results: List[Dict[str, Optional[str]]] = []
-        if not CACHE_ROOT.exists() or not CACHE_ROOT.is_dir():
-            return results
-
-        today = date.today()
-        number_regex = re.compile(r"^(\d+)")
-
-        try:
-            for entry in CACHE_ROOT.iterdir():
-                try:
-                    if not entry.is_dir():
-                        continue
-                    stat = entry.stat()
-                    mtime_dt = datetime.fromtimestamp(stat.st_mtime)
-                    if mtime_dt.date() != today:
-                        continue
-                    name = entry.name
-                    m = number_regex.match(name)
-                    number = m.group(1) if m else None
-                    if number:
-                        results.append({
-                            "path": str(entry.resolve()),
-                            "name": name,
-                            "number": number,
-                            "mtime": mtime_dt.isoformat()
-                        })
-                except PermissionError:
-                    continue
-                except Exception as e:
-                    logger.warning("Skipping entry due to error: %s", e)
-                    continue
-        except Exception as e:
-            logger.error("Error while listing today's cache folders: %s", e)
-            return []
-
-        results.sort(key=lambda x: x.get("mtime", ""), reverse=True)
-        return results
-
-    @staticmethod
-    def sanitize_filename(filename_str: Optional[str], max_length: int = 230) -> str:
-        """Sanitize filename for safe filesystem use.
-
-        Args:
-            filename_str: Original filename string (can be None)
-            max_length: Maximum filename length (default: 230)
-
-        Returns:
-            Sanitized filename string
-        """
-        if filename_str is None:
-            logger.warning("sanitize_filename: filename_str was None, using default 'fichier_nom_absent'.")
-            filename_str = "fichier_nom_absent"
-        
-        s = str(filename_str).strip().replace(' ', '_')
-        s = re.sub(r'(?u)[^-\w.]', '', s)
-        
-        if not s:
-            s = "fichier_sans_nom_valide"
-            logger.warning(f"sanitize_filename: Sanitized filename was empty for input '{filename_str}', using '{s}'.")
-        
-        if len(s) > max_length:
-            original_full_name_for_log = s
-            name_part, ext_part = os.path.splitext(s)
-            max_name_len = max_length - len(ext_part) - (1 if ext_part else 0)
-            if max_name_len < 1:
-                s = s[:max_length]
-            else:
-                s = name_part[:max_name_len] + ext_part
-            logger.info(f"sanitize_filename: Filename '{original_full_name_for_log}' truncated to '{s}' (max_length: {max_length}).")
-        
-        return s
-
-    @staticmethod
-    def format_bytes_human(n_bytes: int) -> str:
-        """Return a human readable size string for bytes.
-
-        Args:
-            n_bytes: Number of bytes
-
-        Returns:
-            Formatted size string (e.g., '213.0KB', '151.5MB')
-        """
-        try:
-            if n_bytes is None or n_bytes < 0:
-                return "0B"
-            if n_bytes < 1024:
-                return f"{n_bytes}B"
-            kb = n_bytes / 1024.0
-            if kb < 1024.0:
-                return f"{kb:.1f}KB"
-            mb = kb / 1024.0
-            return f"{mb:.1f}MB"
-        except Exception:
-            return f"{n_bytes}B"
-
-    @staticmethod
-    def find_videos_for_tracking(base_path: Path, keyword: str = None, subdir: str = None) -> List[str]:
-        """Find video files that don't have corresponding JSON tracking results.
-
-        Robust scan under 'projets_extraits/' for common video extensions.
-        A video is considered already processed ONLY if an exact sibling JSON
-        with the same stem exists (e.g., 'video.mp4' -> 'video.json').
-        Files like '*_audio.json' are ignored for this check.
-
-        Args:
-            base_path: Base path to search under (typically BASE_PATH_SCRIPTS / 'projets_extraits')
-            keyword: Optional keyword filter (informational, not enforced)
-            subdir: Optional subdirectory filter (informational, not enforced)
-
-        Returns:
-            List of absolute paths to video files needing tracking
-        """
-        search_base = Path(base_path) / "projets_extraits" if "projets_extraits" not in str(base_path) else Path(base_path)
-        logger.info(
-            f"Searching for videos for tracking in {search_base} (filter info: keyword='{keyword}', subdir='{subdir}')"
-        )
-        
-        videos_to_process = []
-        video_extensions = (".mp4", ".avi", ".mov", ".mkv", ".webm")
-
-        found_videos = 0
-        already_processed = 0
-        
-        try:
-            for video_file in search_base.rglob("*"):
-                if not video_file.is_file():
-                    continue
-                if video_file.suffix.lower() not in video_extensions:
-                    continue
-                
-                found_videos += 1
-                json_file = video_file.with_suffix('.json')
-                
-                if json_file.exists():
-                    already_processed += 1
-                    continue
-                
-                videos_to_process.append(str(video_file.resolve()))
-                logger.debug(f"Video to process found: {video_file}")
-
-            logger.info(
-                f"Videos detected: {found_videos}, already processed (exact JSON sibling): {already_processed}, to process: {len(videos_to_process)}"
-            )
-            
-            if len(videos_to_process) == 0 and found_videos > 0 and already_processed == 0:
-                logger.warning(
-                    "No <stem>.json found but videos exist. Check write permissions and Step5 output paths."
-                )
-        except Exception as e:
-            logger.error(f"Error scanning for videos: {e}")
-        
-        return videos_to_process
-```
-
 ## File: services/lemonfox_audio_service.py
 ```python
 """
@@ -27588,664 +27225,6 @@ class PyFeatBlendshapeExtractor:
             return None
 ```
 
-## File: workflow_scripts/step5/run_tracking_manager.py
-```python
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-import os, sys, json, argparse, subprocess, threading, time, logging
-from pathlib import Path
-from collections import OrderedDict, deque
-from datetime import datetime
-from typing import Mapping, Optional
-
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
-
-
-class _EnvConfig:
-    def __init__(self, environ: Mapping[str, str]):
-        self._environ = environ
-
-    def get_optional_str(self, key: str) -> Optional[str]:
-        raw = self._environ.get(key)
-        if raw is None:
-            return None
-        value = str(raw).strip()
-        return value if value else None
-
-    def get_str(self, key: str, default: str = "") -> str:
-        value = self.get_optional_str(key)
-        return value if value is not None else default
-
-    def get_int(self, key: str, default: int) -> int:
-        raw = self._environ.get(key)
-        if raw is None:
-            return default
-        try:
-            return int(str(raw).strip())
-        except Exception:
-            return default
-
-    def get_bool(self, key: str, default: bool) -> bool:
-        raw = self._environ.get(key)
-        if raw is None:
-            return default
-
-        normalized = str(raw).strip().lower()
-        if normalized in {"1", "true", "yes", "y", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "n", "off"}:
-            return False
-        return default
-
-    def get_csv_list(self, key: str) -> list[str]:
-        raw = self.get_str(key, default="").strip().lower()
-        return [p.strip() for p in raw.split(",") if p.strip()]
-
-    def snapshot(self, keys: list[str]) -> dict[str, Optional[str]]:
-        return {k: self.get_optional_str(k) for k in keys}
-
-
-def _load_env_file():
-    """Load the project .env even if python-dotenv is unavailable."""
-    env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-    if not env_path.exists():
-        return
-    if load_dotenv:
-        load_dotenv(env_path)
-        return
-
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
-        cleaned = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, cleaned)
-
-
-_load_env_file()
-
-
-ENV = _EnvConfig(os.environ)
-step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
-
-def _log_env_snapshot():
-    relevant_keys = [
-        "STEP5_ENABLE_GPU",
-        "STEP5_GPU_ENGINES",
-        "STEP5_TRACKING_ENGINE",
-        "TRACKING_DISABLE_GPU",
-        "TRACKING_CPU_WORKERS",
-        "STEP5_GPU_FALLBACK_AUTO",
-        "STEP5_ENABLE_OBJECT_DETECTION",
-        "INSIGHTFACE_HOME",
-    ]
-    snapshot = ENV.snapshot(relevant_keys)
-    logging.info(f"[EnvSnapshot] {snapshot}")
-
-
-# --- CONFIGURATIONS GLOBALES ---
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-
-try:
-    sys.path.insert(0, str(BASE_DIR))
-    from config.settings import config as app_config
-    TRACKING_ENV_PYTHON = app_config.get_venv_python("tracking_env")
-    EOS_ENV_PYTHON = app_config.get_venv_python("eos_env")
-    INSIGHTFACE_ENV_PYTHON = app_config.get_venv_python("insightface_env")
-except (ImportError, AttributeError):
-    TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
-    EOS_ENV_PYTHON = BASE_DIR / "eos_env" / "bin" / "python"
-    INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
-
-TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
-EOS_ENV_PYTHON = Path(EOS_ENV_PYTHON)
-INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
-
-WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
-
-TRACKING_ENGINE = None
-
-TF_GPU_ENV_PYTHON = ENV.get_str("STEP5_TF_GPU_ENV_PYTHON", "").strip()
-if TF_GPU_ENV_PYTHON:
-    TF_GPU_ENV_PYTHON = Path(TF_GPU_ENV_PYTHON)
-
-CUDA_LIB_SUBDIRS = [
-    "cublas/lib",
-    "cuda_runtime/lib",
-    "cuda_nvrtc/lib",
-    "cufft/lib",
-    "curand/lib",
-    "cusolver/lib",
-    "cusparse/lib",
-    "cudnn/lib",
-    "nvjitlink/lib",
-]
-
-SYSTEM_CUDA_DEFAULTS = [
-    "/usr/local/cuda-12.4",
-    "/usr/local/cuda-12",
-    "/usr/local/cuda-11.8",
-    "/usr/local/cuda",
-]
-
-
-def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
-    """Return CUDA library directories bundled in a venv (for ONNX Runtime CUDA provider)."""
-    try:
-        venv_dir = Path(python_exe).expanduser().parent.parent
-    except Exception:
-        return []
-
-    python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-    site_packages = venv_dir / "lib" / python_version / "site-packages"
-    nvidia_dir = site_packages / "nvidia"
-    if not nvidia_dir.exists():
-        return []
-
-    paths = []
-    for sub in CUDA_LIB_SUBDIRS:
-        candidate = nvidia_dir / sub
-        if candidate.exists():
-            paths.append(str(candidate))
-    return paths
-
-
-def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
-    """
-    Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
-    Priority order:
-      1. Explicit STEP5_CUDA_LIB_PATH (colon-separated).
-      2. STEP5_CUDA_HOME / CUDA_HOME lib64 folders.
-      3. Common /usr/local/cuda-* lib64 folders.
-      4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
-    """
-    explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
-    if explicit_paths:
-        resolved = [
-            str(Path(p.strip()).expanduser())
-            for p in explicit_paths.split(":")
-            if p.strip() and Path(p.strip()).expanduser().exists()
-        ]
-        if resolved:
-            return resolved
-
-    candidates: list[Path] = []
-    for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
-        value = env.get_str(env_var, "").strip()
-        if value:
-            candidates.append(Path(value).expanduser())
-    for default_path in SYSTEM_CUDA_DEFAULTS:
-        candidates.append(Path(default_path))
-
-    discovered: list[str] = []
-    for base_dir in candidates:
-        if not base_dir.exists():
-            continue
-        for sub in ("lib64", "targets/x86_64-linux/lib"):
-            candidate = base_dir / sub
-            if candidate.exists():
-                discovered.append(str(candidate))
-    debian_cuda = Path("/usr/lib/x86_64-linux-gnu")
-    if debian_cuda.exists():
-        expected = ["libcufft.so.11", "libcublas.so.12"]
-        if all((debian_cuda / lib_name).exists() for lib_name in expected):
-            discovered.append(str(debian_cuda))
-    return discovered
-
-
-# --- CONFIGURATION DU LOGGER ---
-LOG_DIR = BASE_DIR / "logs" / "step5"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-log_file = LOG_DIR / f"manager_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [MANAGER] - %(message)s',
-                    handlers=[logging.FileHandler(log_file, 'w', 'utf-8'), logging.StreamHandler(sys.stdout)])
-
-WORKER_CONFIG_TEMPLATE = {
-    "mp_landmarker_num_faces": 5, "mp_landmarker_min_face_detection_confidence": 0.5,
-    "mp_landmarker_min_face_presence_confidence": 0.3, "mp_landmarker_min_tracking_confidence": 0.5,
-    "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
-    "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
-    "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
-    "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
-    "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
-}
-
-CPU_OPTIMIZED_CONFIG = {
-    "mp_landmarker_min_face_detection_confidence": 0.3,
-    "mp_landmarker_min_face_presence_confidence": 0.2,
-    "mp_landmarker_min_tracking_confidence": 0.3,
-    "object_score_threshold": 0.4,
-    "mp_max_distance_tracking": 80,
-}
-
-
-_DEFAULT_SUBPROCESS_ENV: dict[str, str] = {
-    'OMP_NUM_THREADS': '1',
-    'OPENBLAS_NUM_THREADS': '1',
-    'MKL_NUM_THREADS': '1',
-    'NUMEXPR_NUM_THREADS': '1',
-    'TF_CPP_MIN_LOG_LEVEL': '2',
-    'GLOG_minloglevel': '2',
-    'ABSL_LOGGING_MIN_LOG_LEVEL': '2',
-}
-
-
-def _collect_cuda_lib_paths(worker_python: Path, engine_norm: str) -> list[str]:
-    cuda_paths: list[str] = []
-    cuda_paths_worker = _build_venv_cuda_paths(worker_python)
-    cuda_paths_tracking = _build_venv_cuda_paths(TRACKING_ENV_PYTHON)
-    if cuda_paths_worker:
-        cuda_paths.extend(cuda_paths_worker)
-    elif cuda_paths_tracking:
-        cuda_paths.extend(cuda_paths_tracking)
-
-    if engine_norm == "insightface":
-        system_cuda_paths = _discover_system_cuda_lib_paths(ENV)
-        for path in system_cuda_paths:
-            if path not in cuda_paths:
-                cuda_paths.append(path)
-    return cuda_paths
-
-
-def _apply_ld_library_path(env: dict[str, str], extra_paths: list[str]) -> None:
-    if not extra_paths:
-        return
-    extra_ld_path = ":".join(extra_paths)
-    existing_ld_path = env.get("LD_LIBRARY_PATH", "")
-    env["LD_LIBRARY_PATH"] = (
-        f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
-    )
-
-
-def _build_subprocess_env(worker_python: Path, engine_norm: str) -> dict[str, str]:
-    env = os.environ.copy()
-    cuda_paths = _collect_cuda_lib_paths(worker_python, engine_norm)
-    if cuda_paths:
-        _apply_ld_library_path(env, cuda_paths)
-        logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
-
-    for key, value in _DEFAULT_SUBPROCESS_ENV.items():
-        env.setdefault(key, value)
-    return env
-
-
-def log_reader_thread(process, video_name, progress_map, lock):
-    if process.stdout:
-        for line in iter(process.stdout.readline, ''):
-            line = line.strip()
-            logging.info(f"[{video_name}] {line}")
-            if line.startswith("[Progression]|"):
-                try:
-                    _, percent, _, _ = line.split('|')
-                    with lock:
-                        progress_map[video_name] = f"{int(percent)}%"
-                    try:
-                        print(f"{video_name}: {int(percent)}%", flush=True)
-                    except Exception:
-                        pass
-                except:
-                    pass
-        process.stdout.close()
-
-
-def monitor_progress(processes, progress_map, lock, total_jobs_to_run):
-    while len(processes) < total_jobs_to_run or any(p.poll() is None for p in processes.values()):
-        time.sleep(1)
-        with lock:
-            progress_copy = progress_map.copy()
-        progress_parts = [f"{name}: {status}" for name, status in sorted(progress_copy.items())]
-        if progress_parts: print(f"[Progression-MultiLine]{' || '.join(progress_parts)}", flush=True)
-    time.sleep(1)
-
-
-def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engine=None):
-    video_name = Path(video_path).name
-    worker_type_log = "GPU" if use_gpu else f"CPU (x{internal_workers})"
-    logging.info(f"Préparation du job {worker_type_log} pour: {video_name}")
-
-    config = WORKER_CONFIG_TEMPLATE.copy()
-
-    engine_norm = (str(tracking_engine).strip().lower() if tracking_engine is not None else "")
-    if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
-        engine_norm = ""
-
-    gpu_capable_engines = {"openseeface", "opencv_yunet_pyfeat", "insightface"}
-    
-    if engine_norm and engine_norm not in gpu_capable_engines:
-        if use_gpu:
-            logging.info(f"Engine {engine_norm} not GPU-capable, forcing CPU mode")
-        use_gpu = False
-
-    if not use_gpu:
-        config.update(CPU_OPTIMIZED_CONFIG)
-        config["mp_num_workers_internal"] = internal_workers
-
-        if internal_workers > 1:
-            worker_script = "process_video_worker_multiprocessing.py"
-            logging.info(f"Using multiprocessing worker with {internal_workers} processes")
-        else:
-            worker_script = "process_video_worker.py"
-            logging.info("Using single-threaded CPU worker")
-
-        logging.info(f"Applied CPU optimizations: lower confidence thresholds for better detection rate")
-    else:
-        worker_script = "process_video_worker.py"
-        logging.info("Using GPU worker with sequential processing")
-        if step5_enable_object_detection and internal_workers > 1:
-            config["mp_num_workers_internal"] = internal_workers
-
-    models_dir_path = Path(__file__).resolve().parent / "models"
-    worker_script_path = Path(__file__).resolve().parent / worker_script
-
-    worker_python_override_eos = ENV.get_optional_str("STEP5_EOS_ENV_PYTHON")
-    worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
-    worker_python = TRACKING_ENV_PYTHON
-    
-    if engine_norm == "eos":
-        worker_python = Path(worker_python_override_eos) if worker_python_override_eos else EOS_ENV_PYTHON
-        if not worker_python.exists():
-            raise RuntimeError(
-                f"EOS engine selected but python interpreter not found: {worker_python}. "
-                "Create eos_env or set STEP5_EOS_ENV_PYTHON to the eos_env python path."
-            )
-    elif engine_norm == "insightface":
-        if not use_gpu:
-            raise RuntimeError(
-                "InsightFace engine is GPU-only. Enable STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
-            )
-
-        worker_python = (
-            Path(worker_python_override_insightface)
-            if worker_python_override_insightface
-            else INSIGHTFACE_ENV_PYTHON
-        )
-        if not worker_python.exists():
-            raise RuntimeError(
-                f"InsightFace engine selected but python interpreter not found: {worker_python}. "
-                "Create insightface_env or set STEP5_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
-            )
-    elif use_gpu and not engine_norm:
-        if TF_GPU_ENV_PYTHON and isinstance(TF_GPU_ENV_PYTHON, Path):
-            if TF_GPU_ENV_PYTHON.exists():
-                worker_python = TF_GPU_ENV_PYTHON
-                logging.info(f"Using TensorFlow GPU interpreter for MediaPipe: {worker_python}")
-            else:
-                logging.warning(
-                    "STEP5_TF_GPU_ENV_PYTHON is set but the interpreter was not found "
-                    f"({TF_GPU_ENV_PYTHON}). Falling back to tracking_env."
-                )
-
-    command_args = [str(worker_python), str(worker_script_path), video_path, "--models_dir", str(models_dir_path)]
-    if use_gpu: command_args.append("--use_gpu")
-
-    if engine_norm:
-        command_args.extend(["--tracking_engine", engine_norm])
-
-    for key, value in config.items():
-        if key == "mp_num_workers_internal" and use_gpu and not (step5_enable_object_detection and internal_workers > 1):
-            continue
-        if isinstance(value, bool):
-            if value:
-                command_args.append(f"--{key}")
-            continue
-        if value is not None:
-            command_args.extend([f"--{key}", str(value)])
-
-    if (not use_gpu) and internal_workers > 1:
-        command_args.extend(["--chunk_size", "0"])  # 0 = adaptive in worker
-
-    try:
-        env = _build_subprocess_env(Path(worker_python), engine_norm)
-
-        p = subprocess.Popen(
-            command_args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            env=env,
-        )
-        return p
-    except Exception as e:
-        logging.error(f"ERREUR LANCEMENT de {video_name}: {e}")
-        return None
-
-
-def run_job_and_monitor(job_info, processes, progress_map, lock):
-    video_path = job_info['path']
-    video_name = Path(video_path).name
-    internal_workers = job_info.get('cpu_internal_workers', 15) if (not job_info['use_gpu'] or step5_enable_object_detection) else 1
-    tracking_engine = job_info.get('tracking_engine')
-    p = launch_worker_process(video_path, job_info['use_gpu'], internal_workers, tracking_engine=tracking_engine)
-
-    if p:
-        with lock:
-            processes[video_name] = p
-            progress_map[video_name] = "Démarrage..."
-
-        reader_thread = threading.Thread(target=log_reader_thread, args=(p, video_name, progress_map, lock),
-                                         daemon=True)
-        reader_thread.start()
-        p.wait()
-        reader_thread.join(timeout=1)
-
-        try:
-            if p.returncode == 0:
-                print(f"[Gestionnaire] Succès pour {video_name}", flush=True)
-            else:
-                print(f"[Gestionnaire] Échec pour {video_name}", flush=True)
-        except Exception:
-            pass
-
-
-
-def resource_worker_loop(resource_name, use_gpu, videos_deque, deque_lock, processes, progress_map, lock):
-    """Continuously pull videos from the shared deque and process them on the given resource.
-
-    Args:
-        resource_name (str): Human-readable resource label (e.g., 'GPU' or 'CPU').
-        use_gpu (bool): Whether to use GPU for the worker process.
-        videos_deque (collections.deque): Shared queue of video paths to process.
-        deque_lock (threading.Lock): Lock protecting access to the shared deque.
-        processes (OrderedDict): Shared mapping of video_name -> subprocess.Popen.
-        progress_map (OrderedDict): Shared mapping of video_name -> progress string.
-        lock (threading.Lock): Lock protecting shared maps.
-    """
-    while True:
-        with deque_lock:
-            if videos_deque:
-                video_path = videos_deque.popleft()
-            else:
-                break
-        video_name = Path(video_path).name
-        logging.info(f"[Scheduler] Assigning {video_name} to {resource_name}")
-        run_job_and_monitor(
-            {
-                'path': video_path,
-                'use_gpu': use_gpu,
-                'cpu_internal_workers': CPU_INTERNAL_WORKERS,
-                'tracking_engine': TRACKING_ENGINE,
-            },
-            processes,
-            progress_map,
-            lock,
-        )
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Gestionnaire de tracking parallèle intelligent.")
-    parser.add_argument("--videos_json_path", required=True, help="Chemin JSON des vidéos.")
-    parser.add_argument("--disable_gpu", action="store_true", help="Désactiver le worker GPU et utiliser uniquement le CPU")
-    parser.add_argument("--cpu_internal_workers", type=int, default=15, help="Nombre de workers internes CPU par vidéo")
-    parser.add_argument(
-        "--tracking_engine",
-        default=None,
-        help="Moteur de tracking: mediapipe_landmarker (défaut), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface, eos, insightface",
-    )
-    args = parser.parse_args()
-    try:
-        if ENV.get_bool('TRACKING_DISABLE_GPU', default=False):
-            args.disable_gpu = True
-
-        args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
-
-        if args.tracking_engine is None:
-            raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
-            if raw_engine:
-                args.tracking_engine = raw_engine
-    except Exception:
-        pass
-
-    _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
-    
-    gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
-    gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
-    gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
-    _log_env_snapshot()
-    
-    engine_normalized = _engine_norm if _engine_norm else "mediapipe_landmarker"
-    if engine_normalized in {"mediapipe", "mediapipe_landmarker"}:
-        engine_normalized = "mediapipe_landmarker"
-    
-    engine_supports_gpu = False
-    if gpu_enabled_global and not args.disable_gpu:
-        if engine_normalized == "insightface":
-            if engine_normalized in gpu_engines or 'all' in gpu_engines:
-                engine_supports_gpu = True
-                logging.info(f"GPU mode requested for engine: {engine_normalized}")
-                
-                try:
-                    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-                    from config.settings import Config
-                    gpu_status = Config.check_gpu_availability()
-                    
-                    if not gpu_status['available']:
-                        logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
-                        fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
-                        if fallback_auto:
-                            logging.info("Auto-fallback to CPU enabled")
-                            args.disable_gpu = True
-                            engine_supports_gpu = False
-                        else:
-                            logging.error("GPU fallback disabled, aborting")
-                            raise RuntimeError(f"GPU unavailable: {gpu_status['reason']}")
-                    else:
-                        logging.info(f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}")
-                except ImportError as e:
-                    logging.error(f"Failed to import config.settings: {e}")
-                    args.disable_gpu = True
-                    engine_supports_gpu = False
-                except Exception as e:
-                    logging.error(f"GPU validation failed: {e}")
-                    args.disable_gpu = True
-                    engine_supports_gpu = False
-            else:
-                logging.warning(f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode")
-                args.disable_gpu = True
-        else:
-            logging.info(f"GPU mode is reserved for InsightFace only. Engine '{engine_normalized}' will run in CPU-only mode.")
-            args.disable_gpu = True
-    
-    if _engine_norm in {"opencv_haar", "opencv_yunet", "eos"}:
-        if not args.disable_gpu:
-            args.disable_gpu = True
-            logging.info(f"Engine {_engine_norm} does not support GPU, forcing CPU-only mode")
-    
-    if not args.disable_gpu and engine_supports_gpu:
-        logging.info(f"✓ GPU mode ENABLED for {_engine_norm or 'mediapipe_landmarker'}")
-    else:
-        logging.info(f"CPU-only mode (GPU disabled or not supported for this engine)")
-
-    if _engine_norm == "insightface" and (args.disable_gpu or not engine_supports_gpu):
-        logging.error(
-            "InsightFace engine is GPU-only, but GPU mode is disabled or not authorized. "
-            "Set STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
-        )
-        sys.exit(1)
-
-    with open(args.videos_json_path, 'r') as f:
-        data = json.load(f)
-    
-    if isinstance(data, list):
-        videos_list = data
-    elif isinstance(data, dict) and 'videos' in data:
-        logging.info("Legacy videos JSON schema detected; using 'videos' key.")
-        videos_list = data['videos']
-    else:
-        logging.error(f"Invalid JSON format in {args.videos_json_path}. Expected a list or object with 'videos' key.")
-        sys.exit(1)
-    
-    videos_to_process = deque(videos_list)
-    if not videos_to_process: logging.info("Aucune vidéo à traiter."); return
-
-    logging.info(f"--- DÉMARRAGE DU GESTIONNAIRE DE TRACKING (Planificateur Dynamique GPU/CPU) ---")
-    total_jobs = len(videos_to_process)
-    logging.info(f"Vidéos à traiter: {total_jobs}")
-    global CPU_INTERNAL_WORKERS
-    CPU_INTERNAL_WORKERS = max(1, int(args.cpu_internal_workers))
-
-    global TRACKING_ENGINE
-    TRACKING_ENGINE = args.tracking_engine
-    if args.disable_gpu:
-        logging.info("Mode FULL CPU activé: le worker GPU est désactivé")
-
-    processes, video_progress_map, progress_lock = OrderedDict(), OrderedDict(), threading.Lock()
-
-    monitor_thread = threading.Thread(target=monitor_progress,
-                                      args=(processes, video_progress_map, progress_lock, total_jobs), daemon=True)
-    monitor_thread.start()
-
-    deque_lock = threading.Lock()
-
-    threads = []
-    if not args.disable_gpu:
-        gpu_thread = threading.Thread(
-            target=resource_worker_loop,
-            args=("GPU", True, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
-            daemon=True,
-        )
-        threads.append(gpu_thread)
-    if _engine_norm != "insightface":
-        cpu_thread = threading.Thread(
-            target=resource_worker_loop,
-            args=("CPU", False, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
-            daemon=True,
-        )
-        threads.append(cpu_thread)
-    else:
-        logging.info("InsightFace is GPU-only: CPU worker thread disabled")
-
-    if args.disable_gpu:
-        workers_label = "CPU seul"
-    else:
-        workers_label = "GPU seul" if _engine_norm == "insightface" else "GPU et CPU"
-    logging.info("Lancement des workers: " + workers_label)
-    for t in threads:
-        t.start()
-
-    for t in threads:
-        t.join()
-
-    monitor_thread.join(timeout=2)
-
-    success_count = sum(1 for p in processes.values() if p.returncode == 0)
-    logging.info(f"--- FIN DU GESTIONNAIRE ---")
-    logging.info(f"Traitement terminé. {success_count}/{total_jobs} jobs réussis.")
-    if success_count < total_jobs: sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
-```
-
 ## File: workflow_scripts/step6/json_reducer.py
 ```python
 import os
@@ -29142,6 +28121,92 @@ def initialize_services():
         except Exception as e:
             logger.error(f"Service initialization failed: {e}")
 
+_app_initialized = False
+_app_init_lock = threading.Lock()
+
+def init_app():
+    global _app_initialized
+
+    with _app_init_lock:
+        if _app_initialized:
+            return APP_FLASK
+
+        APP_LOGGER.handlers.clear()
+
+        logs_dir = BASE_PATH_SCRIPTS / "logs"
+        logs_dir.mkdir(exist_ok=True)
+
+        log_file_path = logs_dir / "app.log"
+        file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
+        file_handler.setFormatter(file_formatter)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+
+        APP_LOGGER.addHandler(file_handler)
+        APP_LOGGER.addHandler(console_handler)
+        APP_LOGGER.propagate = False
+
+        is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
+        APP_LOGGER.setLevel(logging.DEBUG)
+
+        APP_LOGGER.info(f"=== COMPREHENSIVE LOGGING INITIALIZED ===")
+        APP_LOGGER.info(f"Log file: {log_file_path}")
+        APP_LOGGER.info(f"Debug mode: {is_debug_mode}")
+        APP_LOGGER.info(f"Logger level: {APP_LOGGER.level}")
+        APP_LOGGER.info(f"=== STARTING APPLICATION ===")
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        if not root_logger.handlers:
+            root_logger.addHandler(file_handler)
+            root_logger.addHandler(console_handler)
+
+        APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
+
+        APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
+        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
+        APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
+        APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
+        APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
+
+        os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
+
+        if not HF_AUTH_TOKEN_ENV:
+            APP_LOGGER.warning("HF_AUTH_TOKEN non défini. L'étape 4 (Analyse Audio) nécessitera cette variable d'environnement.")
+
+        if not INTERNAL_WORKER_COMMS_TOKEN_ENV:
+            APP_LOGGER.warning("INTERNAL_WORKER_COMMS_TOKEN non défini. API critiques INSECURES.")
+        else:
+            APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
+
+        if not RENDER_REGISTER_TOKEN_ENV:
+            APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
+        else:
+            APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
+
+        initialize_services()
+
+        if not getattr(APP_FLASK, "_polling_threads_started", False):
+            remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
+            remote_poll_thread.daemon = True
+            remote_poll_thread.start()
+
+            csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
+            csv_monitor_thread.daemon = True
+            csv_monitor_thread.start()
+
+            APP_FLASK._polling_threads_started = True
+
+        APP_LOGGER.info("WEBHOOK MONITOR: Système de monitoring activé et prêt (Webhook uniquement).")
+
+        _app_initialized = True
+        return APP_FLASK
+
 initialize_services()
 
 REMOTE_TRIGGER_URL = os.environ.get('REMOTE_TRIGGER_URL', "https://render-signal-server.onrender.com/api/check_trigger")
@@ -29897,73 +28962,7 @@ def get_current_workflow_status_summary():
 
 
 if __name__ == '__main__':
-    APP_LOGGER.handlers.clear()
-
-    logs_dir = BASE_PATH_SCRIPTS / "logs"
-    logs_dir.mkdir(exist_ok=True)
-
-    log_file_path = logs_dir / "app.log"
-    file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
-    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
-    file_handler.setFormatter(file_formatter)
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
-    console_handler.setFormatter(console_formatter)
-
-    APP_LOGGER.addHandler(file_handler)
-    APP_LOGGER.addHandler(console_handler)
-    APP_LOGGER.propagate = False
-
-    is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
-    APP_LOGGER.setLevel(logging.DEBUG)
-
-    APP_LOGGER.info(f"=== COMPREHENSIVE LOGGING INITIALIZED ===")
-    APP_LOGGER.info(f"Log file: {log_file_path}")
-    APP_LOGGER.info(f"Debug mode: {is_debug_mode}")
-    APP_LOGGER.info(f"Logger level: {APP_LOGGER.level}")
-    APP_LOGGER.info(f"=== STARTING APPLICATION ===")
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    if not root_logger.handlers:
-        root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
-
-    APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
-
-    APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
-    APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
-    APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
-    APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
-    APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
-    APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
-    APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
-
-    os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
-    
-    if not HF_AUTH_TOKEN_ENV: 
-        APP_LOGGER.warning("HF_AUTH_TOKEN non défini. L'étape 4 (Analyse Audio) nécessitera cette variable d'environnement.")
-    
-    if not INTERNAL_WORKER_COMMS_TOKEN_ENV:
-        APP_LOGGER.warning("INTERNAL_WORKER_COMMS_TOKEN non défini. API critiques INSECURES.")
-    else:
-        APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
-
-    if not RENDER_REGISTER_TOKEN_ENV:
-        APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
-    else:
-        APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
-    
-    remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
-    remote_poll_thread.daemon = True
-    remote_poll_thread.start()
-
-    csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
-    csv_monitor_thread.daemon = True
-    csv_monitor_thread.start()
-
-    APP_LOGGER.info("WEBHOOK MONITOR: Système de monitoring activé et prêt (Webhook uniquement).")
+    init_app()
 
     APP_FLASK.run(
         debug=config.DEBUG,
@@ -29972,612 +28971,6 @@ if __name__ == '__main__':
         threaded=True,
         use_reloader=False
     )
-```
-
-## File: config/settings.py
-```python
-"""
-Centralized configuration management for workflow_mediapipe.
-
-This module provides environment-based configuration management
-following the project's development guidelines.
-"""
-
-import os
-import logging
-import subprocess
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional, List
-
-logger = logging.getLogger(__name__)
-
-
-def _parse_bool(raw: Optional[str], default: bool) -> bool:
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
-def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
-    if raw is None:
-        return None
-    raw = raw.strip()
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except Exception:
-        return None
-
-
-def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
-    value = _parse_optional_int(raw)
-    if value is None:
-        return None
-    if value <= 0:
-        return None
-    return value
-
-
-def _parse_csv_list(raw: Optional[str]) -> List[str]:
-    if raw is None:
-        return []
-    parts = [p.strip() for p in raw.split(",")]
-    return [p for p in parts if p]
-
-
-@dataclass
-class Config:
-    """
-    Centralized configuration class for the workflow_mediapipe application.
-    
-    All configuration values are loaded from environment variables with
-    sensible defaults to maintain backward compatibility.
-    """
-    
-    # Flask Application Settings
-    SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
-    DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
-    HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
-    PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
-    
-    # Security Tokens (loaded from environment)
-    INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
-    RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
-    
-    # Webhook JSON Source (single data source for monitoring)
-    WEBHOOK_JSON_URL: str = os.environ.get(
-        'WEBHOOK_JSON_URL',
-        'https://webhook.kidpixel.fr/data/webhook_links.json'
-    )
-    WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
-    WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
-    WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
-    
-    # Directory Configuration
-    BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
-        'BASE_PATH_SCRIPTS_ENV', 
-        os.path.dirname(os.path.abspath(__file__ + '/../'))
-    ))
-    CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
-    LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
-        'LOCAL_DOWNLOADS_DIR', 
-        Path.home() / 'Téléchargements'
-    ))
-    DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
-    ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
-    DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
-    DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
-    # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
-    # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
-    LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
-    # Virtual environments base directory (defaults to project root if not set)
-    VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
-    # Projects directory for visualization/timeline features
-    PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
-    # Archives directory for persistent analysis results (timeline)
-    ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
-    
-    # Python Environment Configuration
-    PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
-    
-    # Processing Configuration
-    MAX_CPU_WORKERS: int = int(os.environ.get(
-        'MAX_CPU_WORKERS', 
-        str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
-    ))
-    
-    # Polling Intervals (in milliseconds for frontend, seconds for backend)
-    POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
-    LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
-
-    SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
-    
-    # MediaPipe Configuration
-    MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
-        'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
-    ))
-    MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
-        'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
-    ))
-    
-    # GPU Configuration
-    ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
-    
-    # Lemonfox API Configuration (STEP4 alternative)
-    LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
-    LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
-    LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
-
-    LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
-    LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
-    LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
-        os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
-        default=True,
-    )
-    LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
-        os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
-    )
-    LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
-        os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
-    )
-    LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
-        default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
-    )
-    LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
-    LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
-    LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
-        os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
-    )
-    LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
-        os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
-        default=False,
-    )
-    LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
-    LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
-
-    STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
-    
-    # STEP5 Object Detection Configuration
-    # Model selection for fallback object detection when face detection fails (MediaPipe only)
-    STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
-        'STEP5_OBJECT_DETECTOR_MODEL',
-        'efficientdet_lite2'  # Default: current baseline, backward compatible
-    )
-    STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
-    STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
-    
-    # STEP5 Performance Optimizations (opencv_yunet_pyfeat)
-    STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
-    STEP5_ONNX_INTRA_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTRA_OP_THREADS', '2'))
-    STEP5_ONNX_INTER_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTER_OP_THREADS', '1'))
-    STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
-    STEP5_YUNET_MAX_WIDTH: int = int(os.environ.get('STEP5_YUNET_MAX_WIDTH', '640'))  # Max width for YuNet detection (coordinates rescaled)
-
-    STEP5_OPENCV_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_OPENCV_MAX_FACES')
-    )
-    STEP5_OPENCV_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE', '1.0'))
-
-    STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
-    )
-    STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
-    STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
-    )
-
-    # STEP5 OpenSeeFace Engine Configuration
-    # Lightweight CPU tracking via ONNX Runtime (OpenSeeFace-style models)
-    STEP5_OPENSEEFACE_MODELS_DIR: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')
-    STEP5_OPENSEEFACE_MODEL_ID: int = int(os.environ.get('STEP5_OPENSEEFACE_MODEL_ID', '1'))
-    STEP5_OPENSEEFACE_DETECTION_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')
-    STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')
-    STEP5_OPENSEEFACE_DETECT_EVERY_N: int = int(os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N', '1'))
-    STEP5_OPENSEEFACE_MAX_WIDTH: int = int(
-        os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH')
-        or os.environ.get('STEP5_YUNET_MAX_WIDTH', '640')
-    )
-    STEP5_OPENSEEFACE_DETECTION_THRESHOLD: float = float(os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD', '0.6'))
-    STEP5_OPENSEEFACE_MAX_FACES: int = int(os.environ.get('STEP5_OPENSEEFACE_MAX_FACES', '1'))
-    STEP5_OPENSEEFACE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE', '1.0'))
-
-    STEP5_EOS_ENV_PYTHON: Optional[str] = os.environ.get('STEP5_EOS_ENV_PYTHON')
-    STEP5_EOS_MODELS_DIR: Optional[str] = os.environ.get('STEP5_EOS_MODELS_DIR')
-    STEP5_EOS_SFM_MODEL_PATH: Optional[str] = os.environ.get('STEP5_EOS_SFM_MODEL_PATH')
-    STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH: Optional[str] = os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH')
-    STEP5_EOS_LANDMARK_MAPPER_PATH: Optional[str] = os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH')
-    STEP5_EOS_EDGE_TOPOLOGY_PATH: Optional[str] = os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH')
-    STEP5_EOS_MODEL_CONTOUR_PATH: Optional[str] = os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH')
-    STEP5_EOS_CONTOUR_LANDMARKS_PATH: Optional[str] = os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH')
-    STEP5_EOS_FIT_EVERY_N: int = int(os.environ.get('STEP5_EOS_FIT_EVERY_N', '1'))
-    STEP5_EOS_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_EOS_MAX_FACES')
-    )
-    STEP5_EOS_MAX_WIDTH: int = int(os.environ.get('STEP5_EOS_MAX_WIDTH', '1280'))
-    STEP5_EOS_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_EOS_JAWOPEN_SCALE', '1.0'))
-    
-    def __post_init__(self):
-        """Post-initialization to ensure paths are Path objects and create directories."""
-        # Ensure all path attributes are Path objects
-        if isinstance(self.BASE_PATH_SCRIPTS, str):
-            self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
-        if isinstance(self.CACHE_ROOT_DIR, str):
-            self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
-        if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
-            self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
-        if isinstance(self.LOGS_DIR, str):
-            self.LOGS_DIR = Path(self.LOGS_DIR)
-
-        if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
-            self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
-        
-        # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
-        if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
-            self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
-        elif isinstance(self.VENV_BASE_DIR, str):
-            self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
-
-        # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
-        # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
-        if not self.PYTHON_VENV_EXE:
-            self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
-        else:
-            python_exe_path = Path(self.PYTHON_VENV_EXE)
-            if not python_exe_path.is_absolute():
-                self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
-        
-        # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
-        # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
-        # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
-        # like 'projets_extraits/logs' when steps run with a different CWD.
-        if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
-            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
-        elif not self.LOGS_DIR.is_absolute():
-            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
-
-        if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
-            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
-        elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
-            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
-
-        if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
-            self.CACHE_ROOT_DIR = Path('/mnt/cache')
-        elif not self.CACHE_ROOT_DIR.is_absolute():
-            self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
-        else:
-            self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
-
-        # Default PROJECTS_DIR if not set
-        if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
-            self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
-        elif isinstance(self.PROJECTS_DIR, str):
-            self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
-        # Default ARCHIVES_DIR if not set
-        if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
-            self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
-        elif isinstance(self.ARCHIVES_DIR, str):
-            self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
-            
-        # Create necessary directories
-        self._create_directories()
-    
-    def _create_directories(self) -> None:
-        """Create necessary directories if they don't exist."""
-        directories_to_create = [
-            self.LOGS_DIR,
-            self.LOGS_DIR / 'step1',
-            self.LOGS_DIR / 'step2',
-            self.LOGS_DIR / 'step3',
-            self.LOGS_DIR / 'step4',
-            self.LOGS_DIR / 'step5',
-            self.LOGS_DIR / 'step6',
-            self.LOGS_DIR / 'step7',
-            # Ensure projects directory exists by default to avoid confusion
-            self.PROJECTS_DIR,
-            # Ensure archives directory exists
-            self.ARCHIVES_DIR,
-        ]
-        
-        for directory in directories_to_create:
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-                logger.debug(f"Ensured directory exists: {directory}")
-            except Exception as e:
-                logger.error(f"Failed to create directory {directory}: {e}")
-    
-    def validate(self, strict: bool = None) -> bool:
-        """
-        Validate the configuration and ensure all required settings are present.
-
-        Args:
-            strict: If None, uses DEBUG mode to determine strictness.
-                   If True, raises errors. If False, logs warnings.
-
-        Returns:
-            bool: True if configuration is valid
-
-        Raises:
-            ValueError: If required configuration is missing or invalid and strict=True
-        """
-        if strict is None:
-            strict = not self.DEBUG  # Strict in production, lenient in development
-
-        errors = []
-        warnings = []
-
-        # Security validation
-        if not self.INTERNAL_WORKER_TOKEN:
-            msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-                # Set development default
-                self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-
-        if not self.RENDER_REGISTER_TOKEN:
-            msg = "RENDER_REGISTER_TOKEN environment variable is required"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-                # Set development default
-                self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
-
-        # Production security checks
-        if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
-            errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
-
-        # Webhook validation (single data source)
-        if not self.WEBHOOK_JSON_URL:
-            msg = "WEBHOOK_JSON_URL must be set"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-        if self.WEBHOOK_TIMEOUT <= 0:
-            warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
-        if self.WEBHOOK_CACHE_TTL < 0:
-            warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
-        
-        # Path validation
-        if not self.BASE_PATH_SCRIPTS.exists():
-            warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
-        
-        if not self.LOCAL_DOWNLOADS_DIR.exists():
-            warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
-        
-        # Python executable validation
-        python_exe_path = Path(self.PYTHON_VENV_EXE)
-        if not python_exe_path.exists():
-            warnings.append(f"Python executable not found: {python_exe_path}")
-        
-        # Log warnings
-        for warning in warnings:
-            logger.warning(warning)
-        
-        # Log warnings
-        if warnings:
-            for warning in warnings:
-                logger.warning(f"Configuration warning: {warning}")
-            if not strict:
-                logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
-
-        # Raise errors if any
-        if errors:
-            error_msg = f"Configuration validation failed: {'; '.join(errors)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        if warnings and not strict:
-            logger.info("Configuration validation completed with warnings (development mode)")
-        else:
-            logger.info("Configuration validation successful")
-        return True
-    
-    def get_venv_path(self, venv_name: str) -> Path:
-        """
-        Get the path to a virtual environment.
-        
-        Args:
-            venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
-            
-        Returns:
-            Path object to the virtual environment directory
-        """
-        return self.VENV_BASE_DIR / venv_name
-    
-    def get_venv_python(self, venv_name: str) -> Path:
-        """
-        Get the path to the Python executable in a virtual environment.
-        
-        Args:
-            venv_name: Name of the virtual environment
-            
-        Returns:
-            Path object to the Python executable
-        """
-        return self.get_venv_path(venv_name) / "bin" / "python"
-    
-    def get_allowed_base_paths(self) -> List[Path]:
-        """
-        Get list of allowed base paths for file operations.
-        
-        Returns:
-            List of Path objects representing allowed base directories
-        """
-        return [
-            self.BASE_PATH_SCRIPTS,
-            self.LOCAL_DOWNLOADS_DIR,
-            self.LOGS_DIR,
-            self.BASE_PATH_SCRIPTS / 'workflow_scripts',
-            self.BASE_PATH_SCRIPTS / 'static',
-            self.BASE_PATH_SCRIPTS / 'templates',
-            self.BASE_PATH_SCRIPTS / 'utils',
-        ]
-    
-    def to_dict(self) -> dict:
-        """
-        Convert configuration to dictionary for serialization.
-        
-        Returns:
-            Dictionary representation of configuration (excluding sensitive data)
-        """
-        config_dict = {}
-        for key, value in self.__dict__.items():
-            # Exclude sensitive information
-            if 'TOKEN' in key or 'SECRET' in key:
-                config_dict[key] = '***HIDDEN***' if value else None
-            elif isinstance(value, Path):
-                config_dict[key] = str(value)
-            else:
-                config_dict[key] = value
-        
-        return config_dict
-    
-    @staticmethod
-    def check_gpu_availability() -> dict:
-        """
-        Vérifier la disponibilité GPU pour STEP5 (MediaPipe + OpenSeeFace).
-        
-        Returns:
-            dict: {
-                'available': bool,
-                'reason': str (si non disponible),
-                'vram_total_gb': float (si disponible),
-                'vram_free_gb': float (si disponible),
-                'cuda_version': str (si disponible),
-                'onnx_cuda': bool,
-                'tensorflow_gpu': bool
-            }
-        """
-        result = {
-            'available': False,
-            'reason': '',
-            'onnx_cuda': False,
-            'tensorflow_gpu': False
-        }
-        
-        # Check PyTorch CUDA (indicateur général)
-        try:
-            import torch
-            if not torch.cuda.is_available():
-                result['reason'] = 'CUDA not available (PyTorch check)'
-                return result
-            
-            # Vérifier VRAM
-            vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Go
-            vram_free = (torch.cuda.mem_get_info()[0]) / (1024**3)  # Go
-            
-            result['vram_total_gb'] = round(vram_total, 2)
-            result['vram_free_gb'] = round(vram_free, 2)
-            result['cuda_version'] = torch.version.cuda
-            
-            # Vérifier VRAM minimale (2 Go libres recommandés)
-            if vram_free < 1.5:
-                result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
-                return result
-        
-        except ImportError:
-            result['reason'] = 'PyTorch not installed in tracking_env'
-            return result
-        except Exception as e:
-            result['reason'] = f'PyTorch CUDA check failed: {e}'
-            return result
-        
-        # Check ONNXRuntime CUDA provider (requis pour OpenSeeFace / InsightFace)
-        try:
-            import onnxruntime as ort
-            if 'CUDAExecutionProvider' in ort.get_available_providers():
-                result['onnx_cuda'] = True
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning(f"ONNXRuntime check failed: {e}")
-
-        # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
-        if not result.get('onnx_cuda'):
-            ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
-            if ort_gpu_python:
-                try:
-                    ort_check_code = (
-                        "import sys\n"
-                        "import onnxruntime as ort\n"
-                        "providers = ort.get_available_providers()\n"
-                        "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
-                    )
-                    completed = subprocess.run(
-                        [ort_gpu_python, "-c", ort_check_code],
-                        capture_output=True,
-                        text=True,
-                        timeout=15,
-                    )
-                    if completed.returncode == 0:
-                        result['onnx_cuda'] = completed.stdout.strip() == "1"
-                    else:
-                        logger.warning(
-                            "ONNXRuntime GPU check failed (external env returned code %s): %s",
-                            completed.returncode,
-                            completed.stderr.strip(),
-                        )
-                except FileNotFoundError:
-                    logger.warning(
-                        "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
-                        ort_gpu_python,
-                    )
-                except subprocess.TimeoutExpired:
-                    logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
-                except Exception as exc:
-                    logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
-        
-        # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
-        if result['onnx_cuda']:
-            result['available'] = True
-        else:
-            result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
-        
-        return result
-    
-    @staticmethod
-    def is_step5_gpu_enabled() -> bool:
-        """
-        Vérifier si le mode GPU STEP5 est activé via configuration.
-        
-        Returns:
-            bool: True si STEP5_ENABLE_GPU=1
-        """
-        return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
-    
-    @staticmethod
-    def get_step5_gpu_engines() -> List[str]:
-        """
-        Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
-        
-        Returns:
-            List[str]: ['mediapipe_landmarker', 'openseeface', ...]
-        """
-        engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
-        engines = _parse_csv_list(engines_str)
-        # Normaliser les noms
-        return [e.strip().lower() for e in engines if e.strip()]
-    
-    @staticmethod
-    def get_step5_gpu_max_vram_mb() -> int:
-        """
-        Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
-        
-        Returns:
-            int: Limite en Mo (défaut: 2048)
-        """
-        return _parse_optional_positive_int(
-            os.environ.get('STEP5_GPU_MAX_VRAM_MB')
-        ) or 2048
-
-
-# Global configuration instance
-config = Config()
 ```
 
 ## File: services/csv_service.py
@@ -31530,6 +29923,369 @@ class CSVService:
             "monitor_status": monitor_status["csv_monitor"]["status"],
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+```
+
+## File: services/filesystem_service.py
+```python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+FilesystemService
+
+Service layer responsible for safe filesystem-related operations required by the
+frontend (searching cache folders and opening them locally on the host).
+
+All business logic is centralized here per project standards.
+"""
+from __future__ import annotations
+
+import logging
+import os
+import re
+import shlex
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional, Tuple, Dict
+from datetime import datetime, date
+
+from config.settings import config
+
+logger = logging.getLogger(__name__)
+
+CACHE_ROOT = Path(config.CACHE_ROOT_DIR)
+
+
+@dataclass
+class CacheSearchResult:
+    """Result for a cache folder search.
+
+    Attributes:
+        number: The numeric identifier searched (as string to preserve formatting)
+        matches: List of absolute paths to matching folders
+        best_match: The best match path if determinable, else None
+    """
+    number: str
+    matches: List[str]
+    best_match: Optional[str]
+
+
+class FilesystemService:
+    """Service providing safe filesystem utilities for the app.
+
+    This class intentionally restricts operations to known safe directories and
+    validates inputs to prevent path traversal or unintended access.
+    """
+
+    @staticmethod
+    def _ensure_cache_root() -> None:
+        """Ensure the cache root exists, log a warning if not."""
+        if not CACHE_ROOT.exists():
+            logger.warning("CACHE_ROOT does not exist: %s", CACHE_ROOT)
+
+    @staticmethod
+    def find_cache_folder_by_number(number: str) -> CacheSearchResult:
+        """Search for folders inside /mnt/cache that start with the given number.
+
+        The expected folder format is for example: "115 Camille". We will match
+        case-insensitively any directory whose basename starts with "{number}" and
+        is followed by optional separators/spaces and text.
+
+        Args:
+            number: Numeric string provided by the user (e.g., "115"). Non-digits are ignored.
+
+        Returns:
+            CacheSearchResult with all matches and the best_match if exactly one clear match exists.
+        """
+        FilesystemService._ensure_cache_root()
+
+        sanitized = re.sub(r"\D+", "", number or "")
+        if not sanitized:
+            logger.debug("Invalid number provided for cache search: %r", number)
+            return CacheSearchResult(number=number or "", matches=[], best_match=None)
+
+        if not CACHE_ROOT.exists() or not CACHE_ROOT.is_dir():
+            return CacheSearchResult(number=sanitized, matches=[], best_match=None)
+
+        regex = re.compile(rf"^{re.escape(sanitized)}[\s_-]?.*", re.IGNORECASE)
+
+        matches: List[str] = []
+        try:
+            for entry in CACHE_ROOT.iterdir():
+                try:
+                    if entry.is_dir() and regex.match(entry.name):
+                        matches.append(str(entry.resolve()))
+                except PermissionError:
+                    continue
+        except Exception as e:
+            logger.error("Error while scanning cache root: %s", e)
+            return CacheSearchResult(number=sanitized, matches=[], best_match=None)
+
+        best: Optional[str] = None
+        if len(matches) == 1:
+            best = matches[0]
+        else:
+            exact_regex = re.compile(rf"^{re.escape(sanitized)}\b.*", re.IGNORECASE)
+            exact_matches = [m for m in matches if exact_regex.search(Path(m).name)]
+            if len(exact_matches) >= 1:
+                exact_matches.sort(key=lambda p: (len(Path(p).name), Path(p).name.lower()))
+                best = exact_matches[0]
+
+        return CacheSearchResult(number=sanitized, matches=matches, best_match=best)
+
+    @staticmethod
+    def open_path_in_explorer(abs_path: str, select_parent: bool = False) -> Tuple[bool, str]:
+        """Open a given absolute path in the system's file explorer (server-side).
+
+        IMPORTANT: This runs on the server where Flask is hosted. It assumes a desktop
+        environment is available (e.g., the app is used locally). On headless servers,
+        this will likely fail; we handle and return a clear error message.
+
+        Args:
+            abs_path: Absolute path to open.
+            select_parent: If True, open the parent directory and try to preselect the target
+                folder in the file manager when supported (nautilus/dolphin/thunar/nemo). If not
+                supported, fall back to opening the parent directory.
+
+        Returns:
+            (success, message) tuple.
+        """
+        if config.DISABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled by configuration")
+            return False, "Ouverture explorateur désactivée par configuration."
+        if not config.DEBUG and not config.ENABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled in production/headless mode")
+            return False, "Ouverture explorateur désactivée en production/headless."
+
+        is_headless = not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+        if is_headless and not config.ENABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled in headless mode")
+            return False, "Ouverture explorateur désactivée en mode headless."
+        try:
+            path = Path(abs_path).resolve()
+        except Exception:
+            return False, "Chemin invalide."
+
+        try:
+            path.relative_to(CACHE_ROOT)
+        except ValueError:
+            return False, f"Chemin en dehors de {str(CACHE_ROOT)} non autorisé."
+
+        if not path.exists():
+            return False, "Le dossier n'existe pas."
+        if not path.is_dir():
+            return False, "Le chemin n'est pas un dossier."
+
+        candidates: List[List[str]] = []
+
+        if select_parent:
+            parent = path.parent if path.parent.exists() else CACHE_ROOT
+            candidates.extend([
+                ["nautilus", "--no-desktop", "--browser", "--select", str(path)],
+                ["nemo", "--no-desktop", "--browser", "--select", str(path)],
+                ["dolphin", "--select", str(path)],
+                ["thunar", "--select", str(path)],
+                ["xdg-open", str(parent)],
+                ["gio", "open", str(parent)],
+                ["nautilus", str(parent)],
+                ["nemo", str(parent)],
+                ["thunar", str(parent)],
+                ["dolphin", str(parent)],
+            ])
+        else:
+            candidates.extend([
+                ["xdg-open", str(path)],
+                ["gio", "open", str(path)],
+                ["nautilus", str(path)],
+                ["nemo", str(path)],
+                ["thunar", str(path)],
+                ["dolphin", str(path)],
+            ])
+
+        last_error: Optional[str] = None
+        for cmd in candidates:
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                logger.info(
+                    "Opened path in explorer using %s (select_parent=%s): %s",
+                    cmd[0], select_parent, str(path)
+                )
+                return True, "Dossier ouvert dans l'explorateur."
+            except FileNotFoundError:
+                last_error = f"Commande introuvable: {cmd[0]}"
+                continue
+            except Exception as e:
+                last_error = str(e)
+                continue
+
+        return False, last_error or "Impossible d'ouvrir l'explorateur sur ce système."
+
+    @staticmethod
+    def list_today_cache_folders() -> List[Dict[str, Optional[str]]]:
+        """List folders created/modified today under CACHE_ROOT with extracted numeric prefix.
+
+        We use the folder's modification time (mtime) to approximate creation date across platforms,
+        and filter only directories whose mtime date equals today's local date. For each folder, we
+        extract a leading numeric sequence if present (e.g., "115 Camille" -> "115").
+
+        Returns:
+            A list of dicts with keys: {"path": str, "name": str, "number": Optional[str], "mtime": str}
+            where mtime is ISO 8601 string for display/logging purposes.
+        """
+        FilesystemService._ensure_cache_root()
+
+        results: List[Dict[str, Optional[str]]] = []
+        if not CACHE_ROOT.exists() or not CACHE_ROOT.is_dir():
+            return results
+
+        today = date.today()
+        number_regex = re.compile(r"^(\d+)")
+
+        try:
+            for entry in CACHE_ROOT.iterdir():
+                try:
+                    if not entry.is_dir():
+                        continue
+                    stat = entry.stat()
+                    mtime_dt = datetime.fromtimestamp(stat.st_mtime)
+                    if mtime_dt.date() != today:
+                        continue
+                    name = entry.name
+                    m = number_regex.match(name)
+                    number = m.group(1) if m else None
+                    if number:
+                        results.append({
+                            "path": str(entry.resolve()),
+                            "name": name,
+                            "number": number,
+                            "mtime": mtime_dt.isoformat()
+                        })
+                except PermissionError:
+                    continue
+                except Exception as e:
+                    logger.warning("Skipping entry due to error: %s", e)
+                    continue
+        except Exception as e:
+            logger.error("Error while listing today's cache folders: %s", e)
+            return []
+
+        results.sort(key=lambda x: x.get("mtime", ""), reverse=True)
+        return results
+
+    @staticmethod
+    def sanitize_filename(filename_str: Optional[str], max_length: int = 230) -> str:
+        """Sanitize filename for safe filesystem use.
+
+        Args:
+            filename_str: Original filename string (can be None)
+            max_length: Maximum filename length (default: 230)
+
+        Returns:
+            Sanitized filename string
+        """
+        if filename_str is None:
+            logger.warning("sanitize_filename: filename_str was None, using default 'fichier_nom_absent'.")
+            filename_str = "fichier_nom_absent"
+        
+        s = str(filename_str).strip().replace(' ', '_')
+        s = re.sub(r'(?u)[^-\w.]', '', s)
+        
+        if not s:
+            s = "fichier_sans_nom_valide"
+            logger.warning(f"sanitize_filename: Sanitized filename was empty for input '{filename_str}', using '{s}'.")
+        
+        if len(s) > max_length:
+            original_full_name_for_log = s
+            name_part, ext_part = os.path.splitext(s)
+            max_name_len = max_length - len(ext_part) - (1 if ext_part else 0)
+            if max_name_len < 1:
+                s = s[:max_length]
+            else:
+                s = name_part[:max_name_len] + ext_part
+            logger.info(f"sanitize_filename: Filename '{original_full_name_for_log}' truncated to '{s}' (max_length: {max_length}).")
+        
+        return s
+
+    @staticmethod
+    def format_bytes_human(n_bytes: int) -> str:
+        """Return a human readable size string for bytes.
+
+        Args:
+            n_bytes: Number of bytes
+
+        Returns:
+            Formatted size string (e.g., '213.0KB', '151.5MB')
+        """
+        try:
+            if n_bytes is None or n_bytes < 0:
+                return "0B"
+            if n_bytes < 1024:
+                return f"{n_bytes}B"
+            kb = n_bytes / 1024.0
+            if kb < 1024.0:
+                return f"{kb:.1f}KB"
+            mb = kb / 1024.0
+            return f"{mb:.1f}MB"
+        except Exception:
+            return f"{n_bytes}B"
+
+    @staticmethod
+    def find_videos_for_tracking(base_path: Path, keyword: str = None, subdir: str = None) -> List[str]:
+        """Find video files that don't have corresponding JSON tracking results.
+
+        Robust scan under 'projets_extraits/' for common video extensions.
+        A video is considered already processed ONLY if an exact sibling JSON
+        with the same stem exists (e.g., 'video.mp4' -> 'video.json').
+        Files like '*_audio.json' are ignored for this check.
+
+        Args:
+            base_path: Base path to search under (typically BASE_PATH_SCRIPTS / 'projets_extraits')
+            keyword: Optional keyword filter (informational, not enforced)
+            subdir: Optional subdirectory filter (informational, not enforced)
+
+        Returns:
+            List of absolute paths to video files needing tracking
+        """
+        search_base = Path(base_path) / "projets_extraits" if "projets_extraits" not in str(base_path) else Path(base_path)
+        logger.info(
+            f"Searching for videos for tracking in {search_base} (filter info: keyword='{keyword}', subdir='{subdir}')"
+        )
+        
+        videos_to_process = []
+        video_extensions = (".mp4", ".avi", ".mov", ".mkv", ".webm")
+
+        found_videos = 0
+        already_processed = 0
+        
+        try:
+            for video_file in search_base.rglob("*"):
+                if not video_file.is_file():
+                    continue
+                if video_file.suffix.lower() not in video_extensions:
+                    continue
+                
+                found_videos += 1
+                json_file = video_file.with_suffix('.json')
+                
+                if json_file.exists():
+                    already_processed += 1
+                    continue
+                
+                videos_to_process.append(str(video_file.resolve()))
+                logger.debug(f"Video to process found: {video_file}")
+
+            logger.info(
+                f"Videos detected: {found_videos}, already processed (exact JSON sibling): {already_processed}, to process: {len(videos_to_process)}"
+            )
+            
+            if len(videos_to_process) == 0 and found_videos > 0 and already_processed == 0:
+                logger.warning(
+                    "No <stem>.json found but videos exist. Check write permissions and Step5 output paths."
+                )
+        except Exception as e:
+            logger.error(f"Error scanning for videos: {e}")
+        
+        return videos_to_process
 ```
 
 ## File: static/css/components/controls.css
@@ -34632,6 +33388,1270 @@ function waitForStepCompletionInSequence(stepKey) {
             }, POLLING_INTERVAL / 2);
     });
 }
+```
+
+## File: workflow_scripts/step5/run_tracking_manager.py
+```python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import os, sys, json, argparse, subprocess, threading, time, logging
+from pathlib import Path
+from collections import OrderedDict, deque
+from datetime import datetime
+from typing import Mapping, Optional
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+
+class _EnvConfig:
+    def __init__(self, environ: Mapping[str, str]):
+        self._environ = environ
+
+    def get_optional_str(self, key: str) -> Optional[str]:
+        raw = self._environ.get(key)
+        if raw is None:
+            return None
+        value = str(raw).strip()
+        return value if value else None
+
+    def get_str(self, key: str, default: str = "") -> str:
+        value = self.get_optional_str(key)
+        return value if value is not None else default
+
+    def get_int(self, key: str, default: int) -> int:
+        raw = self._environ.get(key)
+        if raw is None:
+            return default
+        try:
+            return int(str(raw).strip())
+        except Exception:
+            return default
+
+    def get_bool(self, key: str, default: bool) -> bool:
+        raw = self._environ.get(key)
+        if raw is None:
+            return default
+
+        normalized = str(raw).strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+        return default
+
+    def get_csv_list(self, key: str) -> list[str]:
+        raw = self.get_str(key, default="").strip().lower()
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def snapshot(self, keys: list[str]) -> dict[str, Optional[str]]:
+        return {k: self.get_optional_str(k) for k in keys}
+
+
+def _load_env_file():
+    """Load the project .env even if python-dotenv is unavailable."""
+    env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    if not env_path.exists():
+        return
+    if load_dotenv:
+        load_dotenv(env_path)
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        cleaned = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, cleaned)
+
+
+_load_env_file()
+
+
+ENV = _EnvConfig(os.environ)
+step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
+
+def _log_env_snapshot():
+    relevant_keys = [
+        "STEP5_ENABLE_GPU",
+        "STEP5_GPU_ENGINES",
+        "STEP5_TRACKING_ENGINE",
+        "TRACKING_DISABLE_GPU",
+        "TRACKING_CPU_WORKERS",
+        "STEP5_GPU_FALLBACK_AUTO",
+        "STEP5_ENABLE_OBJECT_DETECTION",
+        "INSIGHTFACE_HOME",
+    ]
+    snapshot = ENV.snapshot(relevant_keys)
+    logging.info(f"[EnvSnapshot] {snapshot}")
+
+
+# --- CONFIGURATIONS GLOBALES ---
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+try:
+    sys.path.insert(0, str(BASE_DIR))
+    from config.settings import config as app_config
+    TRACKING_ENV_PYTHON = app_config.get_venv_python("tracking_env")
+    EOS_ENV_PYTHON = app_config.get_venv_python("eos_env")
+    INSIGHTFACE_ENV_PYTHON = app_config.get_venv_python("insightface_env")
+except (ImportError, AttributeError):
+    TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
+    EOS_ENV_PYTHON = BASE_DIR / "eos_env" / "bin" / "python"
+    INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
+
+TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
+EOS_ENV_PYTHON = Path(EOS_ENV_PYTHON)
+INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
+
+WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
+
+TRACKING_ENGINE = None
+
+TF_GPU_ENV_PYTHON = ENV.get_str("STEP5_TF_GPU_ENV_PYTHON", "").strip()
+if TF_GPU_ENV_PYTHON:
+    TF_GPU_ENV_PYTHON = Path(TF_GPU_ENV_PYTHON)
+
+CUDA_LIB_SUBDIRS = [
+    "cublas/lib",
+    "cuda_runtime/lib",
+    "cuda_nvrtc/lib",
+    "cufft/lib",
+    "curand/lib",
+    "cusolver/lib",
+    "cusparse/lib",
+    "cudnn/lib",
+    "nvjitlink/lib",
+]
+
+SYSTEM_CUDA_DEFAULTS = [
+    "/usr/local/cuda-12.4",
+    "/usr/local/cuda-12",
+    "/usr/local/cuda-11.8",
+    "/usr/local/cuda",
+]
+
+
+def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
+    """Return CUDA library directories bundled in a venv (for ONNX Runtime CUDA provider)."""
+    try:
+        venv_dir = Path(python_exe).expanduser().parent.parent
+    except Exception:
+        return []
+
+    python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    site_packages = venv_dir / "lib" / python_version / "site-packages"
+    nvidia_dir = site_packages / "nvidia"
+    if not nvidia_dir.exists():
+        return []
+
+    paths = []
+    for sub in CUDA_LIB_SUBDIRS:
+        candidate = nvidia_dir / sub
+        if candidate.exists():
+            paths.append(str(candidate))
+    return paths
+
+
+def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
+    """
+    Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
+    Priority order:
+      1. Explicit STEP5_CUDA_LIB_PATH (colon-separated).
+      2. STEP5_CUDA_HOME / CUDA_HOME lib64 folders.
+      3. Common /usr/local/cuda-* lib64 folders.
+      4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
+    """
+    explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
+    if explicit_paths:
+        resolved = [
+            str(Path(p.strip()).expanduser())
+            for p in explicit_paths.split(":")
+            if p.strip() and Path(p.strip()).expanduser().exists()
+        ]
+        if resolved:
+            return resolved
+
+    candidates: list[Path] = []
+    for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
+        value = env.get_str(env_var, "").strip()
+        if value:
+            candidates.append(Path(value).expanduser())
+    for default_path in SYSTEM_CUDA_DEFAULTS:
+        candidates.append(Path(default_path))
+
+    discovered: list[str] = []
+    for base_dir in candidates:
+        if not base_dir.exists():
+            continue
+        for sub in ("lib64", "targets/x86_64-linux/lib"):
+            candidate = base_dir / sub
+            if candidate.exists():
+                discovered.append(str(candidate))
+    debian_cuda = Path("/usr/lib/x86_64-linux-gnu")
+    if debian_cuda.exists():
+        expected = ["libcufft.so.11", "libcublas.so.12"]
+        if all((debian_cuda / lib_name).exists() for lib_name in expected):
+            discovered.append(str(debian_cuda))
+    return discovered
+
+
+# --- CONFIGURATION DU LOGGER ---
+LOG_DIR = BASE_DIR / "logs" / "step5"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+log_file = LOG_DIR / f"manager_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [MANAGER] - %(message)s',
+                    handlers=[logging.FileHandler(log_file, 'w', 'utf-8'), logging.StreamHandler(sys.stdout)])
+
+WORKER_CONFIG_TEMPLATE = {
+    "mp_landmarker_num_faces": 5, "mp_landmarker_min_face_detection_confidence": 0.5,
+    "mp_landmarker_min_face_presence_confidence": 0.3, "mp_landmarker_min_tracking_confidence": 0.5,
+    "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
+    "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
+    "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
+    "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
+    "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
+}
+
+CPU_OPTIMIZED_CONFIG = {
+    "mp_landmarker_min_face_detection_confidence": 0.3,
+    "mp_landmarker_min_face_presence_confidence": 0.2,
+    "mp_landmarker_min_tracking_confidence": 0.3,
+    "object_score_threshold": 0.4,
+    "mp_max_distance_tracking": 80,
+}
+
+
+_DEFAULT_SUBPROCESS_ENV: dict[str, str] = {
+    'OMP_NUM_THREADS': '1',
+    'OPENBLAS_NUM_THREADS': '1',
+    'MKL_NUM_THREADS': '1',
+    'NUMEXPR_NUM_THREADS': '1',
+    'TF_CPP_MIN_LOG_LEVEL': '2',
+    'GLOG_minloglevel': '2',
+    'ABSL_LOGGING_MIN_LOG_LEVEL': '2',
+}
+
+
+def _collect_cuda_lib_paths(worker_python: Path, engine_norm: str) -> list[str]:
+    cuda_paths: list[str] = []
+    cuda_paths_worker = _build_venv_cuda_paths(worker_python)
+    cuda_paths_tracking = _build_venv_cuda_paths(TRACKING_ENV_PYTHON)
+    if cuda_paths_worker:
+        cuda_paths.extend(cuda_paths_worker)
+    elif cuda_paths_tracking:
+        cuda_paths.extend(cuda_paths_tracking)
+
+    if engine_norm == "insightface":
+        system_cuda_paths = _discover_system_cuda_lib_paths(ENV)
+        for path in system_cuda_paths:
+            if path not in cuda_paths:
+                cuda_paths.append(path)
+    return cuda_paths
+
+
+def _apply_ld_library_path(env: dict[str, str], extra_paths: list[str]) -> None:
+    if not extra_paths:
+        return
+    extra_ld_path = ":".join(extra_paths)
+    existing_ld_path = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = (
+        f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
+    )
+
+
+def _build_subprocess_env(worker_python: Path, engine_norm: str) -> dict[str, str]:
+    env = os.environ.copy()
+    cuda_paths = _collect_cuda_lib_paths(worker_python, engine_norm)
+    if cuda_paths:
+        _apply_ld_library_path(env, cuda_paths)
+        logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
+
+    for key, value in _DEFAULT_SUBPROCESS_ENV.items():
+        env.setdefault(key, value)
+    return env
+
+
+def log_reader_thread(process, video_name, progress_map, lock):
+    if process.stdout:
+        for line in iter(process.stdout.readline, ''):
+            line = line.strip()
+            logging.info(f"[{video_name}] {line}")
+            if line.startswith("[Progression]|"):
+                try:
+                    _, percent, _, _ = line.split('|')
+                    with lock:
+                        progress_map[video_name] = f"{int(percent)}%"
+                    try:
+                        print(f"{video_name}: {int(percent)}%", flush=True)
+                    except Exception:
+                        pass
+                except:
+                    pass
+        process.stdout.close()
+
+
+def monitor_progress(processes, progress_map, lock, total_jobs_to_run):
+    while len(processes) < total_jobs_to_run or any(p.poll() is None for p in processes.values()):
+        time.sleep(1)
+        with lock:
+            progress_copy = progress_map.copy()
+        progress_parts = [f"{name}: {status}" for name, status in sorted(progress_copy.items())]
+        if progress_parts: print(f"[Progression-MultiLine]{' || '.join(progress_parts)}", flush=True)
+    time.sleep(1)
+
+
+def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engine=None):
+    video_name = Path(video_path).name
+    worker_type_log = "GPU" if use_gpu else f"CPU (x{internal_workers})"
+    logging.info(f"Préparation du job {worker_type_log} pour: {video_name}")
+
+    config = WORKER_CONFIG_TEMPLATE.copy()
+
+    engine_norm = (str(tracking_engine).strip().lower() if tracking_engine is not None else "")
+    if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+        engine_norm = ""
+
+    gpu_capable_engines = {"openseeface", "opencv_yunet_pyfeat", "insightface"}
+    
+    if engine_norm and engine_norm not in gpu_capable_engines:
+        if use_gpu:
+            logging.info(f"Engine {engine_norm} not GPU-capable, forcing CPU mode")
+        use_gpu = False
+
+    if not use_gpu:
+        config.update(CPU_OPTIMIZED_CONFIG)
+        config["mp_num_workers_internal"] = internal_workers
+
+        if internal_workers > 1:
+            worker_script = "process_video_worker_multiprocessing.py"
+            logging.info(f"Using multiprocessing worker with {internal_workers} processes")
+        else:
+            worker_script = "process_video_worker.py"
+            logging.info("Using single-threaded CPU worker")
+
+        logging.info(f"Applied CPU optimizations: lower confidence thresholds for better detection rate")
+    else:
+        worker_script = "process_video_worker.py"
+        logging.info("Using GPU worker with sequential processing")
+        if step5_enable_object_detection and internal_workers > 1:
+            config["mp_num_workers_internal"] = internal_workers
+
+    models_dir_path = Path(__file__).resolve().parent / "models"
+    worker_script_path = Path(__file__).resolve().parent / worker_script
+
+    worker_python_override_eos = ENV.get_optional_str("STEP5_EOS_ENV_PYTHON")
+    worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
+    worker_python = TRACKING_ENV_PYTHON
+    
+    if engine_norm == "eos":
+        worker_python = Path(worker_python_override_eos) if worker_python_override_eos else EOS_ENV_PYTHON
+        if not worker_python.exists():
+            raise RuntimeError(
+                f"EOS engine selected but python interpreter not found: {worker_python}. "
+                "Create eos_env or set STEP5_EOS_ENV_PYTHON to the eos_env python path."
+            )
+    elif engine_norm == "insightface":
+        if not use_gpu:
+            raise RuntimeError(
+                "InsightFace engine is GPU-only. Enable STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
+            )
+
+        worker_python = (
+            Path(worker_python_override_insightface)
+            if worker_python_override_insightface
+            else INSIGHTFACE_ENV_PYTHON
+        )
+        if not worker_python.exists():
+            raise RuntimeError(
+                f"InsightFace engine selected but python interpreter not found: {worker_python}. "
+                "Create insightface_env or set STEP5_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
+            )
+    elif use_gpu and not engine_norm:
+        if TF_GPU_ENV_PYTHON and isinstance(TF_GPU_ENV_PYTHON, Path):
+            if TF_GPU_ENV_PYTHON.exists():
+                worker_python = TF_GPU_ENV_PYTHON
+                logging.info(f"Using TensorFlow GPU interpreter for MediaPipe: {worker_python}")
+            else:
+                logging.warning(
+                    "STEP5_TF_GPU_ENV_PYTHON is set but the interpreter was not found "
+                    f"({TF_GPU_ENV_PYTHON}). Falling back to tracking_env."
+                )
+
+    command_args = [str(worker_python), str(worker_script_path), video_path, "--models_dir", str(models_dir_path)]
+    if use_gpu: command_args.append("--use_gpu")
+
+    if engine_norm:
+        command_args.extend(["--tracking_engine", engine_norm])
+
+    for key, value in config.items():
+        if key == "mp_num_workers_internal" and use_gpu and not (step5_enable_object_detection and internal_workers > 1):
+            continue
+        if isinstance(value, bool):
+            if value:
+                command_args.append(f"--{key}")
+            continue
+        if value is not None:
+            command_args.extend([f"--{key}", str(value)])
+
+    if (not use_gpu) and internal_workers > 1:
+        command_args.extend(["--chunk_size", "0"])  # 0 = adaptive in worker
+
+    try:
+        env = _build_subprocess_env(Path(worker_python), engine_norm)
+
+        p = subprocess.Popen(
+            command_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            env=env,
+        )
+        return p
+    except Exception as e:
+        logging.error(f"ERREUR LANCEMENT de {video_name}: {e}")
+        return None
+
+
+def run_job_and_monitor(job_info, processes, progress_map, lock):
+    video_path = job_info['path']
+    video_name = Path(video_path).name
+    internal_workers = job_info.get('cpu_internal_workers', 15) if (not job_info['use_gpu'] or step5_enable_object_detection) else 1
+    tracking_engine = job_info.get('tracking_engine')
+    p = launch_worker_process(video_path, job_info['use_gpu'], internal_workers, tracking_engine=tracking_engine)
+
+    if p:
+        with lock:
+            processes[video_name] = p
+            progress_map[video_name] = "Démarrage..."
+
+        reader_thread = threading.Thread(target=log_reader_thread, args=(p, video_name, progress_map, lock),
+                                         daemon=True)
+        reader_thread.start()
+        p.wait()
+        reader_thread.join(timeout=1)
+
+        try:
+            if p.returncode == 0:
+                print(f"[Gestionnaire] Succès pour {video_name}", flush=True)
+            else:
+                print(f"[Gestionnaire] Échec pour {video_name}", flush=True)
+        except Exception:
+            pass
+
+
+
+def resource_worker_loop(resource_name, use_gpu, videos_deque, deque_lock, processes, progress_map, lock):
+    """Continuously pull videos from the shared deque and process them on the given resource.
+
+    Args:
+        resource_name (str): Human-readable resource label (e.g., 'GPU' or 'CPU').
+        use_gpu (bool): Whether to use GPU for the worker process.
+        videos_deque (collections.deque): Shared queue of video paths to process.
+        deque_lock (threading.Lock): Lock protecting access to the shared deque.
+        processes (OrderedDict): Shared mapping of video_name -> subprocess.Popen.
+        progress_map (OrderedDict): Shared mapping of video_name -> progress string.
+        lock (threading.Lock): Lock protecting shared maps.
+    """
+    while True:
+        with deque_lock:
+            if videos_deque:
+                video_path = videos_deque.popleft()
+            else:
+                break
+        video_name = Path(video_path).name
+        logging.info(f"[Scheduler] Assigning {video_name} to {resource_name}")
+        run_job_and_monitor(
+            {
+                'path': video_path,
+                'use_gpu': use_gpu,
+                'cpu_internal_workers': CPU_INTERNAL_WORKERS,
+                'tracking_engine': TRACKING_ENGINE,
+            },
+            processes,
+            progress_map,
+            lock,
+        )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Gestionnaire de tracking parallèle intelligent.")
+    parser.add_argument("--videos_json_path", required=True, help="Chemin JSON des vidéos.")
+    parser.add_argument("--disable_gpu", action="store_true", help="Désactiver le worker GPU et utiliser uniquement le CPU")
+    parser.add_argument("--cpu_internal_workers", type=int, default=15, help="Nombre de workers internes CPU par vidéo")
+    parser.add_argument(
+        "--tracking_engine",
+        default=None,
+        help="Moteur de tracking: mediapipe_landmarker (défaut), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface, eos, insightface",
+    )
+    args = parser.parse_args()
+    try:
+        if ENV.get_bool('TRACKING_DISABLE_GPU', default=False):
+            args.disable_gpu = True
+
+        args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
+
+        if args.tracking_engine is None:
+            raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
+            if raw_engine:
+                args.tracking_engine = raw_engine
+    except Exception:
+        pass
+
+    _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
+    
+    gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
+    gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
+    gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
+    _log_env_snapshot()
+    
+    engine_normalized = _engine_norm if _engine_norm else "mediapipe_landmarker"
+    if engine_normalized in {"mediapipe", "mediapipe_landmarker"}:
+        engine_normalized = "mediapipe_landmarker"
+    
+    engine_supports_gpu = False
+    if gpu_enabled_global and not args.disable_gpu:
+        if engine_normalized == "insightface":
+            if engine_normalized in gpu_engines or 'all' in gpu_engines:
+                engine_supports_gpu = True
+                logging.info(f"GPU mode requested for engine: {engine_normalized}")
+                
+                try:
+                    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+                    from config.settings import Config
+                    gpu_status = Config.check_gpu_availability()
+                    
+                    if not gpu_status['available']:
+                        logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
+                        fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
+                        if fallback_auto:
+                            logging.info("Auto-fallback to CPU enabled")
+                            args.disable_gpu = True
+                            engine_supports_gpu = False
+                        else:
+                            logging.error("GPU fallback disabled, aborting")
+                            raise RuntimeError(f"GPU unavailable: {gpu_status['reason']}")
+                    else:
+                        logging.info(f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}")
+                except ImportError as e:
+                    logging.error(f"Failed to import config.settings: {e}")
+                    args.disable_gpu = True
+                    engine_supports_gpu = False
+                except Exception as e:
+                    logging.error(f"GPU validation failed: {e}")
+                    args.disable_gpu = True
+                    engine_supports_gpu = False
+            else:
+                logging.warning(f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode")
+                args.disable_gpu = True
+        else:
+            logging.info(f"GPU mode is reserved for InsightFace only. Engine '{engine_normalized}' will run in CPU-only mode.")
+            args.disable_gpu = True
+    
+    if _engine_norm in {"opencv_haar", "opencv_yunet", "eos"}:
+        if not args.disable_gpu:
+            args.disable_gpu = True
+            logging.info(f"Engine {_engine_norm} does not support GPU, forcing CPU-only mode")
+    
+    if not args.disable_gpu and engine_supports_gpu:
+        logging.info(f"✓ GPU mode ENABLED for {_engine_norm or 'mediapipe_landmarker'}")
+    else:
+        logging.info(f"CPU-only mode (GPU disabled or not supported for this engine)")
+
+    if _engine_norm == "insightface" and (args.disable_gpu or not engine_supports_gpu):
+        logging.error(
+            "InsightFace engine is GPU-only, but GPU mode is disabled or not authorized. "
+            "Set STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
+        )
+        sys.exit(1)
+
+    with open(args.videos_json_path, 'r') as f:
+        data = json.load(f)
+    
+    if isinstance(data, list):
+        videos_list = data
+    elif isinstance(data, dict) and 'videos' in data:
+        logging.info("Legacy videos JSON schema detected; using 'videos' key.")
+        videos_list = data['videos']
+    else:
+        logging.error(f"Invalid JSON format in {args.videos_json_path}. Expected a list or object with 'videos' key.")
+        sys.exit(1)
+    
+    videos_to_process = deque(videos_list)
+    if not videos_to_process: logging.info("Aucune vidéo à traiter."); return
+
+    logging.info(f"--- DÉMARRAGE DU GESTIONNAIRE DE TRACKING (Planificateur Dynamique GPU/CPU) ---")
+    total_jobs = len(videos_to_process)
+    logging.info(f"Vidéos à traiter: {total_jobs}")
+    global CPU_INTERNAL_WORKERS
+    CPU_INTERNAL_WORKERS = max(1, int(args.cpu_internal_workers))
+
+    global TRACKING_ENGINE
+    TRACKING_ENGINE = args.tracking_engine
+    if args.disable_gpu:
+        logging.info("Mode FULL CPU activé: le worker GPU est désactivé")
+
+    processes, video_progress_map, progress_lock = OrderedDict(), OrderedDict(), threading.Lock()
+
+    monitor_thread = threading.Thread(target=monitor_progress,
+                                      args=(processes, video_progress_map, progress_lock, total_jobs), daemon=True)
+    monitor_thread.start()
+
+    deque_lock = threading.Lock()
+
+    threads = []
+    if not args.disable_gpu:
+        gpu_thread = threading.Thread(
+            target=resource_worker_loop,
+            args=("GPU", True, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
+            daemon=True,
+        )
+        threads.append(gpu_thread)
+    if _engine_norm != "insightface":
+        cpu_thread = threading.Thread(
+            target=resource_worker_loop,
+            args=("CPU", False, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
+            daemon=True,
+        )
+        threads.append(cpu_thread)
+    else:
+        logging.info("InsightFace is GPU-only: CPU worker thread disabled")
+
+    if args.disable_gpu:
+        workers_label = "CPU seul"
+    else:
+        workers_label = "GPU seul" if _engine_norm == "insightface" else "GPU et CPU"
+    logging.info("Lancement des workers: " + workers_label)
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    monitor_thread.join(timeout=2)
+
+    success_count = sum(1 for p in processes.values() if p.returncode == 0)
+    logging.info(f"--- FIN DU GESTIONNAIRE ---")
+    logging.info(f"Traitement terminé. {success_count}/{total_jobs} jobs réussis.")
+    if success_count < total_jobs: sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## File: config/settings.py
+```python
+"""
+Centralized configuration management for workflow_mediapipe.
+
+This module provides environment-based configuration management
+following the project's development guidelines.
+"""
+
+import os
+import logging
+import subprocess
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, List
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_bool(raw: Optional[str], default: bool) -> bool:
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
+def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
+    value = _parse_optional_int(raw)
+    if value is None:
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
+def _parse_csv_list(raw: Optional[str]) -> List[str]:
+    if raw is None:
+        return []
+    parts = [p.strip() for p in raw.split(",")]
+    return [p for p in parts if p]
+
+
+@dataclass
+class Config:
+    """
+    Centralized configuration class for the workflow_mediapipe application.
+    
+    All configuration values are loaded from environment variables with
+    sensible defaults to maintain backward compatibility.
+    """
+    
+    # Flask Application Settings
+    SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
+    DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
+    HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
+    PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
+    
+    # Security Tokens (loaded from environment)
+    INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
+    RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
+    
+    # Webhook JSON Source (single data source for monitoring)
+    WEBHOOK_JSON_URL: str = os.environ.get(
+        'WEBHOOK_JSON_URL',
+        'https://webhook.kidpixel.fr/data/webhook_links.json'
+    )
+    WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
+    WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
+    WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
+    
+    # Directory Configuration
+    BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
+        'BASE_PATH_SCRIPTS_ENV', 
+        os.path.dirname(os.path.abspath(__file__ + '/../'))
+    ))
+    CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
+    LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
+        'LOCAL_DOWNLOADS_DIR', 
+        Path.home() / 'Téléchargements'
+    ))
+    DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
+    ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
+    DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
+    DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
+    # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
+    # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
+    LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
+    # Virtual environments base directory (defaults to project root if not set)
+    VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
+    # Projects directory for visualization/timeline features
+    PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
+    # Archives directory for persistent analysis results (timeline)
+    ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
+    
+    # Python Environment Configuration
+    PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
+    
+    # Processing Configuration
+    MAX_CPU_WORKERS: int = int(os.environ.get(
+        'MAX_CPU_WORKERS', 
+        str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
+    ))
+    
+    # Polling Intervals (in milliseconds for frontend, seconds for backend)
+    POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
+    LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
+
+    SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+    
+    # MediaPipe Configuration
+    MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
+        'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
+    ))
+    MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
+        'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
+    ))
+    
+    # GPU Configuration
+    ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
+    
+    # Lemonfox API Configuration (STEP4 alternative)
+    LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
+    LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
+    LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
+
+    LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
+    LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
+    LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
+        os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
+        default=True,
+    )
+    LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
+        os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
+    )
+    LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
+        os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
+    )
+    LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
+        default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
+    )
+    LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
+    LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
+    LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
+        os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
+    )
+    LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
+        os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
+        default=False,
+    )
+    LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
+    LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
+
+    STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+    
+    # STEP5 Object Detection Configuration
+    # Model selection for fallback object detection when face detection fails (MediaPipe only)
+    STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
+        'STEP5_OBJECT_DETECTOR_MODEL',
+        'efficientdet_lite2'  # Default: current baseline, backward compatible
+    )
+    STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+    STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
+    
+    # STEP5 Performance Optimizations (opencv_yunet_pyfeat)
+    STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
+    STEP5_ONNX_INTRA_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTRA_OP_THREADS', '2'))
+    STEP5_ONNX_INTER_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTER_OP_THREADS', '1'))
+    STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
+    STEP5_YUNET_MAX_WIDTH: int = int(os.environ.get('STEP5_YUNET_MAX_WIDTH', '640'))  # Max width for YuNet detection (coordinates rescaled)
+
+    STEP5_OPENCV_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_OPENCV_MAX_FACES')
+    )
+    STEP5_OPENCV_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE', '1.0'))
+
+    STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
+    )
+    STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+    STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+    )
+
+    # STEP5 OpenSeeFace Engine Configuration
+    # Lightweight CPU tracking via ONNX Runtime (OpenSeeFace-style models)
+    STEP5_OPENSEEFACE_MODELS_DIR: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')
+    STEP5_OPENSEEFACE_MODEL_ID: int = int(os.environ.get('STEP5_OPENSEEFACE_MODEL_ID', '1'))
+    STEP5_OPENSEEFACE_DETECTION_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')
+    STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')
+    STEP5_OPENSEEFACE_DETECT_EVERY_N: int = int(os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N', '1'))
+    STEP5_OPENSEEFACE_MAX_WIDTH: int = int(
+        os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH')
+        or os.environ.get('STEP5_YUNET_MAX_WIDTH', '640')
+    )
+    STEP5_OPENSEEFACE_DETECTION_THRESHOLD: float = float(os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD', '0.6'))
+    STEP5_OPENSEEFACE_MAX_FACES: int = int(os.environ.get('STEP5_OPENSEEFACE_MAX_FACES', '1'))
+    STEP5_OPENSEEFACE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE', '1.0'))
+
+    STEP5_EOS_ENV_PYTHON: Optional[str] = os.environ.get('STEP5_EOS_ENV_PYTHON')
+    STEP5_EOS_MODELS_DIR: Optional[str] = os.environ.get('STEP5_EOS_MODELS_DIR')
+    STEP5_EOS_SFM_MODEL_PATH: Optional[str] = os.environ.get('STEP5_EOS_SFM_MODEL_PATH')
+    STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH: Optional[str] = os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH')
+    STEP5_EOS_LANDMARK_MAPPER_PATH: Optional[str] = os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH')
+    STEP5_EOS_EDGE_TOPOLOGY_PATH: Optional[str] = os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH')
+    STEP5_EOS_MODEL_CONTOUR_PATH: Optional[str] = os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH')
+    STEP5_EOS_CONTOUR_LANDMARKS_PATH: Optional[str] = os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH')
+    STEP5_EOS_FIT_EVERY_N: int = int(os.environ.get('STEP5_EOS_FIT_EVERY_N', '1'))
+    STEP5_EOS_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_EOS_MAX_FACES')
+    )
+    STEP5_EOS_MAX_WIDTH: int = int(os.environ.get('STEP5_EOS_MAX_WIDTH', '1280'))
+    STEP5_EOS_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_EOS_JAWOPEN_SCALE', '1.0'))
+    
+    def __post_init__(self):
+        """Post-initialization to ensure paths are Path objects and create directories."""
+        # Ensure all path attributes are Path objects
+        if isinstance(self.BASE_PATH_SCRIPTS, str):
+            self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
+        if isinstance(self.CACHE_ROOT_DIR, str):
+            self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
+        if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
+            self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
+        if isinstance(self.LOGS_DIR, str):
+            self.LOGS_DIR = Path(self.LOGS_DIR)
+
+        if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
+            self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
+        
+        # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
+        if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
+            self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
+        elif isinstance(self.VENV_BASE_DIR, str):
+            self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
+
+        # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
+        # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
+        if not self.PYTHON_VENV_EXE:
+            self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
+        else:
+            python_exe_path = Path(self.PYTHON_VENV_EXE)
+            if not python_exe_path.is_absolute():
+                self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
+        
+        # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
+        # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
+        # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
+        # like 'projets_extraits/logs' when steps run with a different CWD.
+        if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
+            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
+        elif not self.LOGS_DIR.is_absolute():
+            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
+
+        if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
+            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
+        elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
+            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
+
+        if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
+            self.CACHE_ROOT_DIR = Path('/mnt/cache')
+        elif not self.CACHE_ROOT_DIR.is_absolute():
+            self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
+        else:
+            self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
+
+        # Default PROJECTS_DIR if not set
+        if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
+            self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
+        elif isinstance(self.PROJECTS_DIR, str):
+            self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
+        # Default ARCHIVES_DIR if not set
+        if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
+            self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
+        elif isinstance(self.ARCHIVES_DIR, str):
+            self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
+            
+        # Create necessary directories
+        self._create_directories()
+    
+    def _create_directories(self) -> None:
+        """Create necessary directories if they don't exist."""
+        directories_to_create = [
+            self.LOGS_DIR,
+            self.LOGS_DIR / 'step1',
+            self.LOGS_DIR / 'step2',
+            self.LOGS_DIR / 'step3',
+            self.LOGS_DIR / 'step4',
+            self.LOGS_DIR / 'step5',
+            self.LOGS_DIR / 'step6',
+            self.LOGS_DIR / 'step7',
+            # Ensure projects directory exists by default to avoid confusion
+            self.PROJECTS_DIR,
+            # Ensure archives directory exists
+            self.ARCHIVES_DIR,
+        ]
+        
+        for directory in directories_to_create:
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"Ensured directory exists: {directory}")
+            except Exception as e:
+                logger.error(f"Failed to create directory {directory}: {e}")
+    
+    def validate(self, strict: bool = None) -> bool:
+        """
+        Validate the configuration and ensure all required settings are present.
+
+        Args:
+            strict: If None, uses DEBUG mode to determine strictness.
+                   If True, raises errors. If False, logs warnings.
+
+        Returns:
+            bool: True if configuration is valid
+
+        Raises:
+            ValueError: If required configuration is missing or invalid and strict=True
+        """
+        if strict is None:
+            strict = not self.DEBUG  # Strict in production, lenient in development
+
+        errors = []
+        warnings = []
+
+        # Security validation
+        if not self.INTERNAL_WORKER_TOKEN:
+            msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
+                # Set development default
+                self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
+
+        if not self.RENDER_REGISTER_TOKEN:
+            msg = "RENDER_REGISTER_TOKEN environment variable is required"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
+                # Set development default
+                self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
+
+        # Production security checks
+        if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
+            errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
+
+        # Webhook validation (single data source)
+        if not self.WEBHOOK_JSON_URL:
+            msg = "WEBHOOK_JSON_URL must be set"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
+        if self.WEBHOOK_TIMEOUT <= 0:
+            warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
+        if self.WEBHOOK_CACHE_TTL < 0:
+            warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
+        
+        # Path validation
+        if not self.BASE_PATH_SCRIPTS.exists():
+            warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
+        
+        if not self.LOCAL_DOWNLOADS_DIR.exists():
+            warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
+        
+        # Python executable validation
+        python_exe_path = Path(self.PYTHON_VENV_EXE)
+        if not python_exe_path.exists():
+            warnings.append(f"Python executable not found: {python_exe_path}")
+        
+        # Log warnings
+        for warning in warnings:
+            logger.warning(warning)
+        
+        # Log warnings
+        if warnings:
+            for warning in warnings:
+                logger.warning(f"Configuration warning: {warning}")
+            if not strict:
+                logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
+
+        # Raise errors if any
+        if errors:
+            error_msg = f"Configuration validation failed: {'; '.join(errors)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        if warnings and not strict:
+            logger.info("Configuration validation completed with warnings (development mode)")
+        else:
+            logger.info("Configuration validation successful")
+        return True
+    
+    def get_venv_path(self, venv_name: str) -> Path:
+        """
+        Get the path to a virtual environment.
+        
+        Args:
+            venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
+            
+        Returns:
+            Path object to the virtual environment directory
+        """
+        return self.VENV_BASE_DIR / venv_name
+    
+    def get_venv_python(self, venv_name: str) -> Path:
+        """
+        Get the path to the Python executable in a virtual environment.
+        
+        Args:
+            venv_name: Name of the virtual environment
+            
+        Returns:
+            Path object to the Python executable
+        """
+        return self.get_venv_path(venv_name) / "bin" / "python"
+    
+    def get_allowed_base_paths(self) -> List[Path]:
+        """
+        Get list of allowed base paths for file operations.
+        
+        Returns:
+            List of Path objects representing allowed base directories
+        """
+        return [
+            self.BASE_PATH_SCRIPTS,
+            self.LOCAL_DOWNLOADS_DIR,
+            self.LOGS_DIR,
+            self.BASE_PATH_SCRIPTS / 'workflow_scripts',
+            self.BASE_PATH_SCRIPTS / 'static',
+            self.BASE_PATH_SCRIPTS / 'templates',
+            self.BASE_PATH_SCRIPTS / 'utils',
+        ]
+    
+    def to_dict(self) -> dict:
+        """
+        Convert configuration to dictionary for serialization.
+        
+        Returns:
+            Dictionary representation of configuration (excluding sensitive data)
+        """
+        config_dict = {}
+        for key, value in self.__dict__.items():
+            # Exclude sensitive information
+            if 'TOKEN' in key or 'SECRET' in key:
+                config_dict[key] = '***HIDDEN***' if value else None
+            elif isinstance(value, Path):
+                config_dict[key] = str(value)
+            else:
+                config_dict[key] = value
+        
+        return config_dict
+    
+    @staticmethod
+    def check_gpu_availability() -> dict:
+        """
+        Vérifier la disponibilité GPU pour STEP5 (MediaPipe + OpenSeeFace).
+        
+        Returns:
+            dict: {
+                'available': bool,
+                'reason': str (si non disponible),
+                'vram_total_gb': float (si disponible),
+                'vram_free_gb': float (si disponible),
+                'cuda_version': str (si disponible),
+                'onnx_cuda': bool,
+                'tensorflow_gpu': bool
+            }
+        """
+        result = {
+            'available': False,
+            'reason': '',
+            'onnx_cuda': False,
+            'tensorflow_gpu': False
+        }
+        
+        # Check PyTorch CUDA (indicateur général)
+        try:
+            import torch
+            if not torch.cuda.is_available():
+                result['reason'] = 'CUDA not available (PyTorch check)'
+                return result
+            
+            # Vérifier VRAM
+            vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Go
+            vram_free = (torch.cuda.mem_get_info()[0]) / (1024**3)  # Go
+            
+            result['vram_total_gb'] = round(vram_total, 2)
+            result['vram_free_gb'] = round(vram_free, 2)
+            result['cuda_version'] = torch.version.cuda
+            
+            # Vérifier VRAM minimale (2 Go libres recommandés)
+            if vram_free < 1.5:
+                result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+                return result
+        
+        except ImportError:
+            result['reason'] = 'PyTorch not installed in tracking_env'
+            return result
+        except Exception as e:
+            result['reason'] = f'PyTorch CUDA check failed: {e}'
+            return result
+        
+        # Check ONNXRuntime CUDA provider (requis pour OpenSeeFace / InsightFace)
+        try:
+            import onnxruntime as ort
+            if 'CUDAExecutionProvider' in ort.get_available_providers():
+                result['onnx_cuda'] = True
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"ONNXRuntime check failed: {e}")
+
+        # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
+        if not result.get('onnx_cuda'):
+            ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
+            if ort_gpu_python:
+                try:
+                    ort_check_code = (
+                        "import sys\n"
+                        "import onnxruntime as ort\n"
+                        "providers = ort.get_available_providers()\n"
+                        "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
+                    )
+                    completed = subprocess.run(
+                        [ort_gpu_python, "-c", ort_check_code],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if completed.returncode == 0:
+                        result['onnx_cuda'] = completed.stdout.strip() == "1"
+                    else:
+                        logger.warning(
+                            "ONNXRuntime GPU check failed (external env returned code %s): %s",
+                            completed.returncode,
+                            completed.stderr.strip(),
+                        )
+                except FileNotFoundError:
+                    logger.warning(
+                        "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
+                        ort_gpu_python,
+                    )
+                except subprocess.TimeoutExpired:
+                    logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
+                except Exception as exc:
+                    logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
+        
+        # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
+        if result['onnx_cuda']:
+            result['available'] = True
+        else:
+            result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
+        
+        return result
+    
+    @staticmethod
+    def is_step5_gpu_enabled() -> bool:
+        """
+        Vérifier si le mode GPU STEP5 est activé via configuration.
+        
+        Returns:
+            bool: True si STEP5_ENABLE_GPU=1
+        """
+        return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
+    
+    @staticmethod
+    def get_step5_gpu_engines() -> List[str]:
+        """
+        Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
+        
+        Returns:
+            List[str]: ['mediapipe_landmarker', 'openseeface', ...]
+        """
+        engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
+        engines = _parse_csv_list(engines_str)
+        # Normaliser les noms
+        return [e.strip().lower() for e in engines if e.strip()]
+    
+    @staticmethod
+    def get_step5_gpu_max_vram_mb() -> int:
+        """
+        Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
+        
+        Returns:
+            int: Limite en Mo (défaut: 2048)
+        """
+        return _parse_optional_positive_int(
+            os.environ.get('STEP5_GPU_MAX_VRAM_MB')
+        ) or 2048
+
+
+# Global configuration instance
+config = Config()
 ```
 
 ## File: static/css/layout.css

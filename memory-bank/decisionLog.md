@@ -10,6 +10,16 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-21 14:36:00+01:00: Audit Backend — init_app() pour threads de polling
+- **Décision** : Déplacer l’initialisation des threads de polling (`RemoteWorkflowPoller`, `CSVMonitorService`) depuis le bloc `__main__` de `app_new.py` vers une fonction `init_app()` idempotente, responsable également de la configuration du logging.
+- **Raison** : L’audit backend recommandait de regrouper le démarrage des threads pour éviter les duplications lors des imports (Gunicorn, tests) et renforcer la maintenabilité de l’entrée d’application.
+- **Implémentation** :
+  - Ajout d’un verrou `_app_init_lock` + flag `_app_initialized` dans `app_new.py`.
+  - `init_app()` configure désormais les handlers de logging, appelle `initialize_services()` puis démarre les threads de polling une seule fois via `APP_FLASK._polling_threads_started`.
+  - Le bloc `if __name__ == "__main__":` se contente d’appeler `init_app()` avant `APP_FLASK.run(...)`.
+- **Validation** : `python3 -m py_compile app_new.py`.
+- **Impact** : Entrée Flask stable et compatible WSGI, pas de threads multiples lors des rechargements, conformité avec la recommandation d’audit.
+
 ## 2026-01-21 13:38:00+01:00: Audit Backend — Cache root configurable + ouverture explorateur désactivée en prod/headless
 - **Décision** : Rendre le répertoire cache configurable via `CACHE_ROOT_DIR` (ENV) et désactiver par défaut l'ouverture explorateur côté serveur en prod/headless.
 - **Raison** : Éviter les chemins hardcodés (`/mnt/cache`) et réduire la surface de risque (subprocess explorateur) sur des environnements non locaux / headless.

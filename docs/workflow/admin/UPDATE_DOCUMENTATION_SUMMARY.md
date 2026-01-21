@@ -135,8 +135,10 @@ Ce document résume les mises à jour apportées à la documentation pour reflé
 - `GUIDE_DEMARRAGE_RAPIDE.md` — procédures d'installation et configuration `.env` (Webhook-only, STEP5 CPU par défaut)
 - `REFERENCE_RAPIDE_DEVELOPPEURS.md` — conventions obligatoires (measure_api, WorkflowState, DOMBatcher, etc.)
 - `WEBHOOK_INTEGRATION.md`, `CSV_DOWNLOADS_MANAGEMENT.md`, `MONITORING_TELECHARGEMENTS_SOURCES.md` — source de vérité pour le monitoring
+- Features actives : `DIAGNOSTICS_FEATURE.md`, `RESULTS_ARCHIVER_SERVICE.md` (Smart Upload est désormais archivé, voir ci-dessous)
 
-### Documentation historique (consultation uniquement)
+- ### Documentation historique (consultation uniquement)
+- `legacy/SMART_UPLOAD_FEATURE.md` — flux Smart Upload (supprimé le 18 janvier 2026, décision consignée dans `memory-bank/decisionLog.md`)
 - `legacy/INTEGRATION_AIRTABLE.md` — ancien guide Airtable/MySQL/CSV (déplacé le 2026-01-13 depuis la racine pour éviter toute confusion)
 - Annexes Airtable/CSV dans `legacy/ARCHITECTURE_COMPLETE_FR_AIRTABLE.md`, `legacy/GUIDE_DEMARRAGE_RAPIDE_AIRTABLE.md`, `legacy/REFERENCE_RAPIDE_DEVELOPPEURS_AIRTABLE.md` (copies automatiques à conserver pour traçabilité)
 - Toute mention d'API `/api/airtable_*`, variables `USE_AIRTABLE`, `CSV_MONITOR_URL`, `manual_open` appartient désormais à cette archive.

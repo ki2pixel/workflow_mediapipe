@@ -57,6 +57,20 @@ PYANNOTE_BATCH_SIZE=auto  # Ajustement automatique selon la mémoire disponible
 - Support natif du français et d'autres langues
 - Détection automatique du nombre de locuteurs
 
+#### Synthèse des variables `LEMONFOX_*`
+
+| Domaine | Variables principales | Description |
+| --- | --- | --- |
+| Activation & API | `STEP4_USE_LEMONFOX`, `LEMONFOX_API_KEY`, `LEMONFOX_TIMEOUT_SEC`, `LEMONFOX_EU_DEFAULT` | Active l’intégration Lemonfox, configure la clé API et choisit l’endpoint (EU/global). |
+| Paramètres linguistiques | `LEMONFOX_DEFAULT_LANGUAGE`, `LEMONFOX_DEFAULT_PROMPT`, `LEMONFOX_DETECT_LANGUAGE`, `LEMONFOX_LANGUAGE` | Détermine la langue par défaut, le prompt et la détection automatique. |
+| Diarisation / locuteurs | `LEMONFOX_SPEAKER_LABELS_DEFAULT`, `LEMONFOX_DEFAULT_MIN_SPEAKERS`, `LEMONFOX_DEFAULT_MAX_SPEAKERS`, `LEMONFOX_ENABLE_DIARIZATION`, `LEMONFOX_MIN_SPEAKERS`, `LEMONFOX_MAX_SPEAKERS` | Contrôle le nombre de locuteurs détectés et la labellisation automatique. |
+| Upload & transcodage | `LEMONFOX_MAX_UPLOAD_MB`, `LEMONFOX_ENABLE_TRANSCODE`, `LEMONFOX_TRANSCODE_AUDIO_CODEC`, `LEMONFOX_TRANSCODE_BITRATE_KBPS` | Limite d’upload et fallback audio-only (mono 16 kHz) déclenché automatiquement. |
+| Performance & modèle | `LEMONFOX_BATCH_SIZE`, `LEMONFOX_CHUNK_LENGTH`, `LEMONFOX_NUM_WORKERS`, `LEMONFOX_MODEL`, `LEMONFOX_TEMPERATURE`, `LEMONFOX_COMPRESSION_RATIO` | Réglages Throughput/Whisper, chunking, compression. |
+| Smoothing timeline | `LEMONFOX_SPEECH_GAP_FILL_SEC`, `LEMONFOX_SPEECH_MIN_ON_SEC`, `LEMONFOX_TIMESTAMP_GRANULARITIES` | Stabilise `is_speech_present` et les timestamps exportés. |
+| VAD & fiabilité | `LEMONFOX_VAD_FILTER`, `LEMONFOX_VAD_THRESHOLD`, `LEMONFOX_VAD_MIN_SILENCE_DURATION`, `LEMONFOX_RETRY_ATTEMPTS`, `LEMONFOX_RETRY_DELAY`, `LEMONFOX_DEBUG`, `LEMONFOX_VERBOSE` | Filtrage VAD et stratégie de retry/logging. |
+
+> ℹ️ Toutes les variables sont définies dans `config/settings.py`. Valider la configuration via `python -c "from config.settings import config; config.validate(); print('Config OK')"` avant de lancer STEP4.
+
 **Configuration requise** :
 ```bash
 # Activation de Lemonfox (1=activé, 0=désactivé)
@@ -137,6 +151,8 @@ LEMONFOX_SPEECH_MIN_ON_SEC=0.0     # Durée minimum des îlots de parole
    - Si le preset échoue (incompatibilité selon version Pyannote), un fallback minimal est appliqué puis journalisé
 
 > **Important** : Les scripts `workflow_scripts/step4/run_audio_analysis.py` et `run_audio_analysis_lemonfox.py` résolvent les services via `importlib` au lieu d’importer le package `services`. Cela évite de charger `flask_caching` dans `audio_env` et rend les workers Lemonfox autonomes.
+>
+> **Recommandation** : conserver l’environnement Pyannote opérationnel même lorsque Lemonfox est activé afin de garantir un fallback immédiat (voir `memory-bank/decisionLog.md`, entrée du 13 janvier 2026).
 
 #### Optimisations de Performance et Fiabilité (2025-10-06 15:29:19+02:00)
 
