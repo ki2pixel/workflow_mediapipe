@@ -15,6 +15,16 @@ Le monitoring des liens de téléchargement repose sur une **source unique** : u
 
 Objectif sécurité : réduire la surface d’attaque (moins de connecteurs, moins de secrets, moins de flux parallèles) et centraliser la validation.
 
+### Ouverture explorateur (CACHE_ROOT_DIR uniquement)
+
+- Fonction `FilesystemService.open_path_in_explorer()` n’est plus utilisable par défaut hors environnement bureau contrôlé.
+- Gardes d’activation :
+  - `DISABLE_EXPLORER_OPEN=1` force le blocage, quelle que soit la configuration.
+  - `ENABLE_EXPLORER_OPEN=1` (à activer **explicitement** pour un poste local) autorise l’ouverture même hors DEBUG, tant que l’environnement n’est pas headless.
+  - En production/headless (`DISPLAY` et `WAYLAND_DISPLAY` absents), l’ouverture est refusée sauf opt-in clair (`ENABLE_EXPLORER_OPEN=1`).
+- Confinement : tout chemin doit appartenir à `CACHE_ROOT_DIR` (issu de `config.settings.Config`), sinon l’opération échoue.
+- Journalisation : chaque tentative réussie/échouée est loggée pour audit, les tests `tests/unit/test_filesystem_service.py` valident les garde-fous.
+
 ## Validation des entrées
 
 ### STEP1 — Sanitisation des noms de fichiers (archives)

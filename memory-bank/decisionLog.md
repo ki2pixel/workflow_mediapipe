@@ -10,6 +10,17 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-21 13:38:00+01:00: Audit Backend — Cache root configurable + ouverture explorateur désactivée en prod/headless
+- **Décision** : Rendre le répertoire cache configurable via `CACHE_ROOT_DIR` (ENV) et désactiver par défaut l'ouverture explorateur côté serveur en prod/headless.
+- **Raison** : Éviter les chemins hardcodés (`/mnt/cache`) et réduire la surface de risque (subprocess explorateur) sur des environnements non locaux / headless.
+- **Implémentation** :
+  - Ajout `CACHE_ROOT_DIR` dans `config.settings.config` (default `/mnt/cache`).
+  - Ajout des garde-fous `DISABLE_EXPLORER_OPEN` (hard-disable) et `ENABLE_EXPLORER_OPEN` (opt-in) dans la config.
+  - Mise à jour `services/filesystem_service.py` pour utiliser `config.CACHE_ROOT_DIR` et bloquer `open_path_in_explorer()` en prod/headless par défaut.
+  - Tests unitaires dédiés (`tests/unit/test_filesystem_service.py`).
+- **Validation** : `pytest -q tests/unit/test_filesystem_service.py`.
+- **Impact** : Déploiements plus sûrs (pas d'ouverture explorateur en prod/headless), et chemin cache relocalisable sans modification de code.
+
 ## 2026-01-21 13:10:00+01:00: Migration download_history → SQLite (multi-workers)
 - **Décision** : Remplacer la persistance JSON (`download_history.json` + RLock) par une base SQLite gérée par `download_history_repository` et fournir un script CLI de migration.
 - **Raison** : L’audit backend 2026-01-21 signalait que le verrou fichier n’était pas inter-process et exposait des corruptions lors des déploiements multi-workers (Gunicorn). SQLite offre un verrouillage natif, reste léger et garantit l’intégrité.

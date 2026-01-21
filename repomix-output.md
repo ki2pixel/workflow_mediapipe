@@ -169,164 +169,6 @@ app_new.py
 
 # Files
 
-## File: services/download_history_repository.py
-```python
-import logging
-import os
-import shutil
-import sqlite3
-from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Set, Tuple
-
-from config.settings import config
-
-logger = logging.getLogger(__name__)
-
-
-class DownloadHistoryRepository:
-    def __init__(
-        self,
-        db_path: Path,
-        shared_group: Optional[str],
-        shared_file_mode: int = 0o664,
-    ):
-        self._db_path = Path(db_path)
-        self._shared_group = shared_group
-        self._shared_file_mode = shared_file_mode
-
-    @property
-    def db_path(self) -> Path:
-        return self._db_path
-
-    def initialize(self) -> None:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS download_history (url TEXT PRIMARY KEY, timestamp TEXT NOT NULL DEFAULT '')"
-            )
-        self._ensure_shared_permissions(self._db_path)
-        self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-wal"))
-        self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-shm"))
-
-    def count(self) -> int:
-        self.initialize()
-        with self._connect() as conn:
-            row = conn.execute("SELECT COUNT(*) FROM download_history").fetchone()
-        if not row:
-            return 0
-        return int(row[0] or 0)
-
-    def get_urls(self) -> Set[str]:
-        self.initialize()
-        with self._connect() as conn:
-            rows = conn.execute("SELECT url FROM download_history").fetchall()
-        return {str(r[0]) for r in rows if r and r[0]}
-
-    def get_ts_by_url(self) -> Dict[str, str]:
-        self.initialize()
-        with self._connect() as conn:
-            rows = conn.execute("SELECT url, timestamp FROM download_history").fetchall()
-        result: Dict[str, str] = {}
-        for row in rows:
-            if not row or not row[0]:
-                continue
-            result[str(row[0])] = str(row[1] or "")
-        return result
-
-    def upsert(self, url: str, timestamp: str) -> None:
-        self.initialize()
-        url = str(url)
-        ts = str(timestamp or "")
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO download_history(url, timestamp)
-                VALUES (?, ?)
-                ON CONFLICT(url) DO UPDATE SET
-                  timestamp =
-                    CASE
-                      WHEN download_history.timestamp IS NULL OR download_history.timestamp = '' THEN excluded.timestamp
-                      WHEN excluded.timestamp IS NULL OR excluded.timestamp = '' THEN download_history.timestamp
-                      ELSE MIN(download_history.timestamp, excluded.timestamp)
-                    END
-                """,
-                (url, ts),
-            )
-
-    def upsert_many(self, entries: Iterable[Tuple[str, str]]) -> None:
-        self.initialize()
-        entries_list = [(str(u), str(t or "")) for (u, t) in entries if u]
-        if not entries_list:
-            return
-        with self._connect() as conn:
-            conn.executemany(
-                """
-                INSERT INTO download_history(url, timestamp)
-                VALUES (?, ?)
-                ON CONFLICT(url) DO UPDATE SET
-                  timestamp =
-                    CASE
-                      WHEN download_history.timestamp IS NULL OR download_history.timestamp = '' THEN excluded.timestamp
-                      WHEN excluded.timestamp IS NULL OR excluded.timestamp = '' THEN download_history.timestamp
-                      ELSE MIN(download_history.timestamp, excluded.timestamp)
-                    END
-                """,
-                entries_list,
-            )
-
-    def delete_all(self) -> None:
-        self.initialize()
-        with self._connect() as conn:
-            conn.execute("DELETE FROM download_history")
-
-    def replace_all(self, entries: Sequence[Tuple[str, str]]) -> None:
-        self.initialize()
-        normalized = [(str(u), str(t or "")) for (u, t) in entries if u]
-        with self._connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                conn.execute("DELETE FROM download_history")
-                if normalized:
-                    conn.executemany(
-                        "INSERT INTO download_history(url, timestamp) VALUES(?, ?)",
-                        normalized,
-                    )
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
-
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(
-            str(self._db_path),
-            timeout=30,
-            isolation_level=None,
-        )
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
-
-    def _ensure_shared_permissions(self, target: Path) -> None:
-        if not target or not target.exists():
-            return
-        if self._shared_group:
-            try:
-                shutil.chown(target, group=self._shared_group)
-            except Exception as e:
-                logger.warning(f"Unable to assign shared group '{self._shared_group}' to {target}: {e}")
-        try:
-            os.chmod(target, self._shared_file_mode)
-        except Exception as e:
-            logger.warning(f"Unable to set shared permissions on {target}: {e}")
-
-
-download_history_repository = DownloadHistoryRepository(
-    db_path=config.DOWNLOAD_HISTORY_DB_PATH,
-    shared_group=config.DOWNLOAD_HISTORY_SHARED_GROUP,
-)
-```
-
 ## File: config/__init__.py
 ```python
 """Config package marker for pytest/package imports."""
@@ -541,600 +383,6 @@ def validate_file_path(file_path: str, allowed_base_paths: list) -> bool:
     except Exception as e:
         logger.error(f"Error validating file path {file_path}: {e}")
         return False
-```
-
-## File: config/settings.py
-```python
-"""
-Centralized configuration management for workflow_mediapipe.
-
-This module provides environment-based configuration management
-following the project's development guidelines.
-"""
-
-import os
-import logging
-import subprocess
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional, List
-
-logger = logging.getLogger(__name__)
-
-
-def _parse_bool(raw: Optional[str], default: bool) -> bool:
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
-def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
-    if raw is None:
-        return None
-    raw = raw.strip()
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except Exception:
-        return None
-
-
-def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
-    value = _parse_optional_int(raw)
-    if value is None:
-        return None
-    if value <= 0:
-        return None
-    return value
-
-
-def _parse_csv_list(raw: Optional[str]) -> List[str]:
-    if raw is None:
-        return []
-    parts = [p.strip() for p in raw.split(",")]
-    return [p for p in parts if p]
-
-
-@dataclass
-class Config:
-    """
-    Centralized configuration class for the workflow_mediapipe application.
-    
-    All configuration values are loaded from environment variables with
-    sensible defaults to maintain backward compatibility.
-    """
-    
-    # Flask Application Settings
-    SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
-    DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
-    HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
-    PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
-    
-    # Security Tokens (loaded from environment)
-    INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
-    RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
-    
-    # Webhook JSON Source (single data source for monitoring)
-    WEBHOOK_JSON_URL: str = os.environ.get(
-        'WEBHOOK_JSON_URL',
-        'https://webhook.kidpixel.fr/data/webhook_links.json'
-    )
-    WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
-    WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
-    WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
-    
-    # Directory Configuration
-    BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
-        'BASE_PATH_SCRIPTS_ENV', 
-        os.path.dirname(os.path.abspath(__file__ + '/../'))
-    ))
-    LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
-        'LOCAL_DOWNLOADS_DIR', 
-        Path.home() / 'Téléchargements'
-    ))
-    DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
-    DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
-    # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
-    # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
-    LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
-    # Virtual environments base directory (defaults to project root if not set)
-    VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
-    # Projects directory for visualization/timeline features
-    PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
-    # Archives directory for persistent analysis results (timeline)
-    ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
-    
-    # Python Environment Configuration
-    PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
-    
-    # Processing Configuration
-    MAX_CPU_WORKERS: int = int(os.environ.get(
-        'MAX_CPU_WORKERS', 
-        str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
-    ))
-    
-    # Polling Intervals (in milliseconds for frontend, seconds for backend)
-    POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
-    LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
-
-    SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
-    
-    # MediaPipe Configuration
-    MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
-        'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
-    ))
-    MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
-        'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
-    ))
-    
-    # GPU Configuration
-    ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
-    
-    # Lemonfox API Configuration (STEP4 alternative)
-    LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
-    LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
-    LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
-
-    LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
-    LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
-    LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
-        os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
-        default=True,
-    )
-    LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
-        os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
-    )
-    LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
-        os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
-    )
-    LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
-        default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
-    )
-    LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
-    LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
-    LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
-        os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
-    )
-    LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
-        os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
-        default=False,
-    )
-    LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
-    LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
-
-    STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
-    
-    # STEP5 Object Detection Configuration
-    # Model selection for fallback object detection when face detection fails (MediaPipe only)
-    STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
-        'STEP5_OBJECT_DETECTOR_MODEL',
-        'efficientdet_lite2'  # Default: current baseline, backward compatible
-    )
-    STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
-    STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
-    
-    # STEP5 Performance Optimizations (opencv_yunet_pyfeat)
-    STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
-    STEP5_ONNX_INTRA_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTRA_OP_THREADS', '2'))
-    STEP5_ONNX_INTER_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTER_OP_THREADS', '1'))
-    STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
-    STEP5_YUNET_MAX_WIDTH: int = int(os.environ.get('STEP5_YUNET_MAX_WIDTH', '640'))  # Max width for YuNet detection (coordinates rescaled)
-
-    STEP5_OPENCV_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_OPENCV_MAX_FACES')
-    )
-    STEP5_OPENCV_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE', '1.0'))
-
-    STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
-    )
-    STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
-    STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
-    )
-
-    # STEP5 OpenSeeFace Engine Configuration
-    # Lightweight CPU tracking via ONNX Runtime (OpenSeeFace-style models)
-    STEP5_OPENSEEFACE_MODELS_DIR: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')
-    STEP5_OPENSEEFACE_MODEL_ID: int = int(os.environ.get('STEP5_OPENSEEFACE_MODEL_ID', '1'))
-    STEP5_OPENSEEFACE_DETECTION_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')
-    STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')
-    STEP5_OPENSEEFACE_DETECT_EVERY_N: int = int(os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N', '1'))
-    STEP5_OPENSEEFACE_MAX_WIDTH: int = int(
-        os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH')
-        or os.environ.get('STEP5_YUNET_MAX_WIDTH', '640')
-    )
-    STEP5_OPENSEEFACE_DETECTION_THRESHOLD: float = float(os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD', '0.6'))
-    STEP5_OPENSEEFACE_MAX_FACES: int = int(os.environ.get('STEP5_OPENSEEFACE_MAX_FACES', '1'))
-    STEP5_OPENSEEFACE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE', '1.0'))
-
-    STEP5_EOS_ENV_PYTHON: Optional[str] = os.environ.get('STEP5_EOS_ENV_PYTHON')
-    STEP5_EOS_MODELS_DIR: Optional[str] = os.environ.get('STEP5_EOS_MODELS_DIR')
-    STEP5_EOS_SFM_MODEL_PATH: Optional[str] = os.environ.get('STEP5_EOS_SFM_MODEL_PATH')
-    STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH: Optional[str] = os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH')
-    STEP5_EOS_LANDMARK_MAPPER_PATH: Optional[str] = os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH')
-    STEP5_EOS_EDGE_TOPOLOGY_PATH: Optional[str] = os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH')
-    STEP5_EOS_MODEL_CONTOUR_PATH: Optional[str] = os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH')
-    STEP5_EOS_CONTOUR_LANDMARKS_PATH: Optional[str] = os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH')
-    STEP5_EOS_FIT_EVERY_N: int = int(os.environ.get('STEP5_EOS_FIT_EVERY_N', '1'))
-    STEP5_EOS_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_EOS_MAX_FACES')
-    )
-    STEP5_EOS_MAX_WIDTH: int = int(os.environ.get('STEP5_EOS_MAX_WIDTH', '1280'))
-    STEP5_EOS_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_EOS_JAWOPEN_SCALE', '1.0'))
-    
-    def __post_init__(self):
-        """Post-initialization to ensure paths are Path objects and create directories."""
-        # Ensure all path attributes are Path objects
-        if isinstance(self.BASE_PATH_SCRIPTS, str):
-            self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
-        if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
-            self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
-        if isinstance(self.LOGS_DIR, str):
-            self.LOGS_DIR = Path(self.LOGS_DIR)
-
-        if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
-            self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
-        
-        # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
-        if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
-            self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
-        elif isinstance(self.VENV_BASE_DIR, str):
-            self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
-
-        # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
-        # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
-        if not self.PYTHON_VENV_EXE:
-            self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
-        else:
-            python_exe_path = Path(self.PYTHON_VENV_EXE)
-            if not python_exe_path.is_absolute():
-                self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
-        
-        # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
-        # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
-        # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
-        # like 'projets_extraits/logs' when steps run with a different CWD.
-        if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
-            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
-        elif not self.LOGS_DIR.is_absolute():
-            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
-
-        if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
-            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
-        elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
-            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
-
-        # Default PROJECTS_DIR if not set
-        if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
-            self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
-        elif isinstance(self.PROJECTS_DIR, str):
-            self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
-        # Default ARCHIVES_DIR if not set
-        if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
-            self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
-        elif isinstance(self.ARCHIVES_DIR, str):
-            self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
-            
-        # Create necessary directories
-        self._create_directories()
-    
-    def _create_directories(self) -> None:
-        """Create necessary directories if they don't exist."""
-        directories_to_create = [
-            self.LOGS_DIR,
-            self.LOGS_DIR / 'step1',
-            self.LOGS_DIR / 'step2',
-            self.LOGS_DIR / 'step3',
-            self.LOGS_DIR / 'step4',
-            self.LOGS_DIR / 'step5',
-            self.LOGS_DIR / 'step6',
-            self.LOGS_DIR / 'step7',
-            # Ensure projects directory exists by default to avoid confusion
-            self.PROJECTS_DIR,
-            # Ensure archives directory exists
-            self.ARCHIVES_DIR,
-        ]
-        
-        for directory in directories_to_create:
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-                logger.debug(f"Ensured directory exists: {directory}")
-            except Exception as e:
-                logger.error(f"Failed to create directory {directory}: {e}")
-    
-    def validate(self, strict: bool = None) -> bool:
-        """
-        Validate the configuration and ensure all required settings are present.
-
-        Args:
-            strict: If None, uses DEBUG mode to determine strictness.
-                   If True, raises errors. If False, logs warnings.
-
-        Returns:
-            bool: True if configuration is valid
-
-        Raises:
-            ValueError: If required configuration is missing or invalid and strict=True
-        """
-        if strict is None:
-            strict = not self.DEBUG  # Strict in production, lenient in development
-
-        errors = []
-        warnings = []
-
-        # Security validation
-        if not self.INTERNAL_WORKER_TOKEN:
-            msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-                # Set development default
-                self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-
-        if not self.RENDER_REGISTER_TOKEN:
-            msg = "RENDER_REGISTER_TOKEN environment variable is required"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-                # Set development default
-                self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
-
-        # Production security checks
-        if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
-            errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
-
-        # Webhook validation (single data source)
-        if not self.WEBHOOK_JSON_URL:
-            msg = "WEBHOOK_JSON_URL must be set"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-        if self.WEBHOOK_TIMEOUT <= 0:
-            warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
-        if self.WEBHOOK_CACHE_TTL < 0:
-            warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
-        
-        # Path validation
-        if not self.BASE_PATH_SCRIPTS.exists():
-            warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
-        
-        if not self.LOCAL_DOWNLOADS_DIR.exists():
-            warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
-        
-        # Python executable validation
-        python_exe_path = Path(self.PYTHON_VENV_EXE)
-        if not python_exe_path.exists():
-            warnings.append(f"Python executable not found: {python_exe_path}")
-        
-        # Log warnings
-        for warning in warnings:
-            logger.warning(warning)
-        
-        # Log warnings
-        if warnings:
-            for warning in warnings:
-                logger.warning(f"Configuration warning: {warning}")
-            if not strict:
-                logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
-
-        # Raise errors if any
-        if errors:
-            error_msg = f"Configuration validation failed: {'; '.join(errors)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        if warnings and not strict:
-            logger.info("Configuration validation completed with warnings (development mode)")
-        else:
-            logger.info("Configuration validation successful")
-        return True
-    
-    def get_venv_path(self, venv_name: str) -> Path:
-        """
-        Get the path to a virtual environment.
-        
-        Args:
-            venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
-            
-        Returns:
-            Path object to the virtual environment directory
-        """
-        return self.VENV_BASE_DIR / venv_name
-    
-    def get_venv_python(self, venv_name: str) -> Path:
-        """
-        Get the path to the Python executable in a virtual environment.
-        
-        Args:
-            venv_name: Name of the virtual environment
-            
-        Returns:
-            Path object to the Python executable
-        """
-        return self.get_venv_path(venv_name) / "bin" / "python"
-    
-    def get_allowed_base_paths(self) -> List[Path]:
-        """
-        Get list of allowed base paths for file operations.
-        
-        Returns:
-            List of Path objects representing allowed base directories
-        """
-        return [
-            self.BASE_PATH_SCRIPTS,
-            self.LOCAL_DOWNLOADS_DIR,
-            self.LOGS_DIR,
-            self.BASE_PATH_SCRIPTS / 'workflow_scripts',
-            self.BASE_PATH_SCRIPTS / 'static',
-            self.BASE_PATH_SCRIPTS / 'templates',
-            self.BASE_PATH_SCRIPTS / 'utils',
-        ]
-    
-    def to_dict(self) -> dict:
-        """
-        Convert configuration to dictionary for serialization.
-        
-        Returns:
-            Dictionary representation of configuration (excluding sensitive data)
-        """
-        config_dict = {}
-        for key, value in self.__dict__.items():
-            # Exclude sensitive information
-            if 'TOKEN' in key or 'SECRET' in key:
-                config_dict[key] = '***HIDDEN***' if value else None
-            elif isinstance(value, Path):
-                config_dict[key] = str(value)
-            else:
-                config_dict[key] = value
-        
-        return config_dict
-    
-    @staticmethod
-    def check_gpu_availability() -> dict:
-        """
-        Vérifier la disponibilité GPU pour STEP5 (MediaPipe + OpenSeeFace).
-        
-        Returns:
-            dict: {
-                'available': bool,
-                'reason': str (si non disponible),
-                'vram_total_gb': float (si disponible),
-                'vram_free_gb': float (si disponible),
-                'cuda_version': str (si disponible),
-                'onnx_cuda': bool,
-                'tensorflow_gpu': bool
-            }
-        """
-        result = {
-            'available': False,
-            'reason': '',
-            'onnx_cuda': False,
-            'tensorflow_gpu': False
-        }
-        
-        # Check PyTorch CUDA (indicateur général)
-        try:
-            import torch
-            if not torch.cuda.is_available():
-                result['reason'] = 'CUDA not available (PyTorch check)'
-                return result
-            
-            # Vérifier VRAM
-            vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Go
-            vram_free = (torch.cuda.mem_get_info()[0]) / (1024**3)  # Go
-            
-            result['vram_total_gb'] = round(vram_total, 2)
-            result['vram_free_gb'] = round(vram_free, 2)
-            result['cuda_version'] = torch.version.cuda
-            
-            # Vérifier VRAM minimale (2 Go libres recommandés)
-            if vram_free < 1.5:
-                result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
-                return result
-        
-        except ImportError:
-            result['reason'] = 'PyTorch not installed in tracking_env'
-            return result
-        except Exception as e:
-            result['reason'] = f'PyTorch CUDA check failed: {e}'
-            return result
-        
-        # Check ONNXRuntime CUDA provider (requis pour OpenSeeFace / InsightFace)
-        try:
-            import onnxruntime as ort
-            if 'CUDAExecutionProvider' in ort.get_available_providers():
-                result['onnx_cuda'] = True
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning(f"ONNXRuntime check failed: {e}")
-
-        # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
-        if not result.get('onnx_cuda'):
-            ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
-            if ort_gpu_python:
-                try:
-                    ort_check_code = (
-                        "import sys\n"
-                        "import onnxruntime as ort\n"
-                        "providers = ort.get_available_providers()\n"
-                        "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
-                    )
-                    completed = subprocess.run(
-                        [ort_gpu_python, "-c", ort_check_code],
-                        capture_output=True,
-                        text=True,
-                        timeout=15,
-                    )
-                    if completed.returncode == 0:
-                        result['onnx_cuda'] = completed.stdout.strip() == "1"
-                    else:
-                        logger.warning(
-                            "ONNXRuntime GPU check failed (external env returned code %s): %s",
-                            completed.returncode,
-                            completed.stderr.strip(),
-                        )
-                except FileNotFoundError:
-                    logger.warning(
-                        "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
-                        ort_gpu_python,
-                    )
-                except subprocess.TimeoutExpired:
-                    logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
-                except Exception as exc:
-                    logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
-        
-        # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
-        if result['onnx_cuda']:
-            result['available'] = True
-        else:
-            result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
-        
-        return result
-    
-    @staticmethod
-    def is_step5_gpu_enabled() -> bool:
-        """
-        Vérifier si le mode GPU STEP5 est activé via configuration.
-        
-        Returns:
-            bool: True si STEP5_ENABLE_GPU=1
-        """
-        return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
-    
-    @staticmethod
-    def get_step5_gpu_engines() -> List[str]:
-        """
-        Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
-        
-        Returns:
-            List[str]: ['mediapipe_landmarker', 'openseeface', ...]
-        """
-        engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
-        engines = _parse_csv_list(engines_str)
-        # Normaliser les noms
-        return [e.strip().lower() for e in engines if e.strip()]
-    
-    @staticmethod
-    def get_step5_gpu_max_vram_mb() -> int:
-        """
-        Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
-        
-        Returns:
-            int: Limite en Mo (défaut: 2048)
-        """
-        return _parse_optional_positive_int(
-            os.environ.get('STEP5_GPU_MAX_VRAM_MB')
-        ) or 2048
-
-
-# Global configuration instance
-config = Config()
 ```
 
 ## File: config/step3_transnet.json
@@ -4019,956 +3267,162 @@ class CacheService:
             }
 ```
 
-## File: services/csv_service.py
+## File: services/download_history_repository.py
 ```python
-"""
-CSV Service
-Centralized service for CSV monitoring functionality.
-"""
-
 import logging
 import os
-import json
-import re
-from datetime import datetime, timezone
-from typing import Dict, Any, Set, Optional, List
 import shutil
-import urllib.parse
-import html
+import sqlite3
+from pathlib import Path
+from typing import Dict, Iterable, Optional, Sequence, Set, Tuple
+
 from config.settings import config
-from services.download_history_repository import download_history_repository
 
 logger = logging.getLogger(__name__)
 
-# Import WebhookService for external JSON source
-try:
-    from services.webhook_service import fetch_records as webhook_fetch_records, get_service_status as webhook_status
-    WEBHOOK_SERVICE_AVAILABLE = True
-except Exception:
-    WEBHOOK_SERVICE_AVAILABLE = False
-    def webhook_status():
-        return {"available": False, "error": "WebhookService not available"}
 
-# Note: CSV monitoring state and downloads tracking are now managed in app_new.py
-# This service acts as an interface to those global variables
+class DownloadHistoryRepository:
+    def __init__(
+        self,
+        db_path: Path,
+        shared_group: Optional[str],
+        shared_file_mode: int = 0o664,
+    ):
+        self._db_path = Path(db_path)
+        self._shared_group = shared_group
+        self._shared_file_mode = shared_file_mode
 
-LEGACY_DOWNLOAD_HISTORY_FILE = config.BASE_PATH_SCRIPTS / "download_history.json"
-_SHARED_GROUP = config.DOWNLOAD_HISTORY_SHARED_GROUP
-_SHARED_FILE_MODE = 0o664
+    @property
+    def db_path(self) -> Path:
+        return self._db_path
 
-# Optional in-memory cache for last known good history set to avoid bursts on transient read errors
-_LAST_KNOWN_HISTORY_SET: Set[str] = set()
+    def initialize(self) -> None:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS download_history (url TEXT PRIMARY KEY, timestamp TEXT NOT NULL DEFAULT '')"
+            )
+        self._ensure_shared_permissions(self._db_path)
+        self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-wal"))
+        self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-shm"))
 
+    def count(self) -> int:
+        self.initialize()
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM download_history").fetchone()
+        if not row:
+            return 0
+        return int(row[0] or 0)
 
-def _is_dropbox_url(url: str) -> bool:
-    """Return True if the URL belongs to Dropbox domains.
+    def get_urls(self) -> Set[str]:
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute("SELECT url FROM download_history").fetchall()
+        return {str(r[0]) for r in rows if r and r[0]}
 
-    Args:
-        url: URL string
+    def get_ts_by_url(self) -> Dict[str, str]:
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute("SELECT url, timestamp FROM download_history").fetchall()
+        result: Dict[str, str] = {}
+        for row in rows:
+            if not row or not row[0]:
+                continue
+            result[str(row[0])] = str(row[1] or "")
+        return result
 
-    Returns:
-        bool: True if hostname matches known Dropbox hostnames
-    """
-    try:
-        from urllib.parse import urlparse
-        parsed = urlparse((url or "").strip())
-        host = (parsed.hostname or "").lower()
-        # Known Dropbox hostnames
-        return host in {"dropbox.com", "www.dropbox.com", "dl.dropboxusercontent.com"}
-    except Exception:
-        return False
+    def upsert(self, url: str, timestamp: str) -> None:
+        self.initialize()
+        url = str(url)
+        ts = str(timestamp or "")
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO download_history(url, timestamp)
+                VALUES (?, ?)
+                ON CONFLICT(url) DO UPDATE SET
+                  timestamp =
+                    CASE
+                      WHEN download_history.timestamp IS NULL OR download_history.timestamp = '' THEN excluded.timestamp
+                      WHEN excluded.timestamp IS NULL OR excluded.timestamp = '' THEN download_history.timestamp
+                      ELSE MIN(download_history.timestamp, excluded.timestamp)
+                    END
+                """,
+                (url, ts),
+            )
 
+    def upsert_many(self, entries: Iterable[Tuple[str, str]]) -> None:
+        self.initialize()
+        entries_list = [(str(u), str(t or "")) for (u, t) in entries if u]
+        if not entries_list:
+            return
+        with self._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO download_history(url, timestamp)
+                VALUES (?, ?)
+                ON CONFLICT(url) DO UPDATE SET
+                  timestamp =
+                    CASE
+                      WHEN download_history.timestamp IS NULL OR download_history.timestamp = '' THEN excluded.timestamp
+                      WHEN excluded.timestamp IS NULL OR excluded.timestamp = '' THEN download_history.timestamp
+                      ELSE MIN(download_history.timestamp, excluded.timestamp)
+                    END
+                """,
+                entries_list,
+            )
 
-def _is_dropbox_proxy_url(url: str) -> bool:
-    """Return True if the URL looks like a worker/R2 proxy for Dropbox downloads."""
-    try:
-        u = (url or "").strip().lower()
-        return "/dropbox/" in u and ("workers.dev" in u or "worker" in u)
-    except Exception:
-        return False
+    def delete_all(self) -> None:
+        self.initialize()
+        with self._connect() as conn:
+            conn.execute("DELETE FROM download_history")
 
-
-def _looks_like_archive_download(url: Optional[str], original_filename: Optional[str]) -> bool:
-    """Heuristic to avoid auto-downloading non-archive Dropbox links (e.g. png previews)."""
-    u = (url or "").strip().lower()
-    fn = (original_filename or "").strip().lower()
-    if fn.endswith('.zip'):
-        return True
-    if '/scl/fo/' in u:
-        return True
-    if u.endswith('.zip') or '.zip?' in u:
-        return True
-    return False
-
-
-class CSVService:
-    """
-    Centralized service for CSV monitoring functionality.
-    Handles CSV file monitoring and download tracking.
-    """
-    
-    _initialized = False
-
-    @staticmethod
-    def initialize() -> None:
-        """Initialize the CSV service."""
-        if not CSVService._initialized:
-            CSVService._initialized = True
-            logger.info("CSV service initialized")
+    def replace_all(self, entries: Sequence[Tuple[str, str]]) -> None:
+        self.initialize()
+        normalized = [(str(u), str(t or "")) for (u, t) in entries if u]
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             try:
-                download_history_repository.initialize()
-            except Exception as e:
-                logger.warning(f"History DB initialization failed: {e}")
-
-            try:
-                CSVService._migrate_legacy_history_json_to_sqlite_if_needed()
-            except Exception as e:
-                logger.warning(f"Legacy history migration skipped due to error: {e}")
-
-    @staticmethod
-    def _migrate_legacy_history_json_to_sqlite_if_needed() -> Dict[str, Any]:
-        try:
-            if not LEGACY_DOWNLOAD_HISTORY_FILE.exists():
-                return {"status": "noop", "reason": "legacy_missing"}
-            if download_history_repository.count() > 0:
-                return {"status": "noop", "reason": "db_not_empty"}
-
-            items = CSVService._load_structured_history()
-            if not items:
-                return {"status": "noop", "reason": "legacy_empty"}
-
-            def _normalize_ts_for_db(ts: str) -> str:
-                if not ts:
-                    return ""
-                raw = str(ts).strip()
-                if not raw:
-                    return ""
-                try:
-                    dt = datetime.fromisoformat(raw.replace('Z', '+00:00'))
-                    if dt.tzinfo:
-                        return dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')
-                except Exception:
-                    pass
-                return raw
-
-            entries = []
-            for item in items:
-                url = item.get('url')
-                ts = item.get('timestamp') or ''
-                if not url:
-                    continue
-                entries.append((url, _normalize_ts_for_db(ts)))
-
-            download_history_repository.upsert_many(entries)
-            return {"status": "success", "total": len(entries)}
-        except Exception as e:
-            logger.warning(f"Legacy history migration failed: {e}")
-            return {"status": "error", "message": str(e)}
-    
-    @staticmethod
-    def get_monitor_status() -> Dict[str, Any]:
-        """
-        Get monitoring service status (CSV or Airtable).
-
-        Returns:
-            Monitor status dictionary with both CSV and Airtable information
-        """
-        # Import WorkflowState singleton
-        from services.workflow_state import get_workflow_state
-        
-        workflow_state = get_workflow_state()
-        monitor_status = workflow_state.get_csv_monitor_status()
-
-        # Webhook is the single data source
-        status = {
-            "csv_monitor": monitor_status,
-            "data_source": "webhook",
-            "monitor_interval": config.WEBHOOK_MONITOR_INTERVAL,
-            "webhook": webhook_status()
-        }
-
-        return status
-    
-
-    
-    @staticmethod
-    def get_download_history() -> Set[str]:
-        """
-        Load download history from file as a set of URLs (backward compatible).
-
-        The underlying file may be:
-        - A list of strings: ["url1", "url2", ...]
-        - A list of objects: [{"url": "...", "timestamp": "YYYY-MM-DD HH:MM:SS"}, ...]
-
-        Returns:
-            Set[str]: URLs present in history
-        """
-        try:
-            CSVService.initialize()
-            global _LAST_KNOWN_HISTORY_SET
-            urls = download_history_repository.get_urls()
-            _LAST_KNOWN_HISTORY_SET = set(urls)
-            return set(urls)
-        except Exception as e:
-            logger.error(f"Error loading download history: {e}")
-            return set(_LAST_KNOWN_HISTORY_SET)
-
-    @staticmethod
-    def _parse_history_to_set(data: Any) -> Set[str]:
-        """Convert history JSON content to a set of URLs supporting both formats."""
-        if not isinstance(data, list):
-            return set()
-        if data and isinstance(data[0], dict):
-            return {CSVService._normalize_url(str(item.get('url'))) for item in data if isinstance(item, dict) and item.get('url')}
-        return {CSVService._normalize_url(str(u)) for u in data if isinstance(u, str)}
-
-    @staticmethod
-    def _normalize_url(url: str) -> str:
-        """Normalize URLs to prevent duplicates due to minor variations.
-
-        Rules:
-        - Trim whitespace
-        - Unescape HTML entities (e.g., '&amp;' -> '&')
-        - Recursively decode double-encoded sequences (e.g., amp%3Bdl=0 -> &dl=0)
-        - Lowercase scheme and hostname
-        - Remove default ports (80 for http, 443 for https)
-        - Sort query parameters by key and value
-        - Remove empty query parameters
-        - For Dropbox links, ensure a single dl=1 param and collapse duplicates
-        - Remove trailing slashes for non-root paths
-        - Percent-decode path and then re-encode safely
-        """
-        if not url:
-            return ""
-        try:
-            raw = url.strip()
-            # First, unescape HTML entities that may come from CSV/HTML sources
-            # Example: '...&amp;dl=0' -> '...&dl=0'
-            try:
-                raw = html.unescape(raw)
+                conn.execute("DELETE FROM download_history")
+                if normalized:
+                    conn.executemany(
+                        "INSERT INTO download_history(url, timestamp) VALUES(?, ?)",
+                        normalized,
+                    )
+                conn.execute("COMMIT")
             except Exception:
-                pass
-            
-            # Pre-process: recursively decode double-encoded sequences that may cause parsing issues
-            # Example: "amp%3Bdl=0&dl=1" becomes "&dl=0&dl=1", which is then properly parsed
-            prev_url = None
-            max_decode_iterations = 3
-            iteration = 0
-            while prev_url != raw and iteration < max_decode_iterations:
-                prev_url = raw
-                # Decode common double-encoded patterns (HTML entity codes)
-                if 'amp%3B' in raw or 'amp%3b' in raw:
-                    raw = raw.replace('amp%3B', '&').replace('amp%3b', '&')
-                # Detect and clean malformed ampersands that appear before valid params
-                # Pattern: "?amp%3Bdl=0&dl=1" -> "?dl=1"
-                if '%3B' in raw or '%3b' in raw:
-                    # Try URL decode once to catch other double-encoded params
-                    try:
-                        decoded = urllib.parse.unquote(raw)
-                        # Only accept if it still looks like a valid URL
-                        if '://' in decoded:
-                            raw = decoded
-                    except Exception:
-                        pass
-                iteration += 1
-            
-            parsed = urllib.parse.urlsplit(raw)
-            scheme = (parsed.scheme or '').lower()
-            netloc = (parsed.hostname or '').lower()
-            port = parsed.port
-            # Preserve username/password if any
-            if parsed.username or parsed.password:
-                auth = ''
-                if parsed.username:
-                    auth += urllib.parse.quote(parsed.username)
-                if parsed.password:
-                    auth += f":{urllib.parse.quote(parsed.password)}"
-                netloc = f"{auth}@{netloc}" if auth else netloc
+                conn.execute("ROLLBACK")
+                raise
 
-            # Drop default ports
-            if port and not (
-                (scheme == 'http' and port == 80) or (scheme == 'https' and port == 443)
-            ):
-                netloc = f"{netloc}:{port}"
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(
+            str(self._db_path),
+            timeout=30,
+            isolation_level=None,
+        )
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
 
-            # Normalize path: decode, strip, remove duplicate slashes
-            path = urllib.parse.unquote(parsed.path or '')
-            if '//' in path:
-                while '//' in path:
-                    path = path.replace('//', '/')
-            # Remove trailing slash unless root
-            if path.endswith('/') and path != '/':
-                path = path[:-1]
-            # Re-encode path safely
-            path = urllib.parse.quote(path, safe='/-._~')
-
-            # Normalize query params
-            q = urllib.parse.parse_qsl(parsed.query or '', keep_blank_values=False)
-            # Special handling for Dropbox: force dl=1
-            host_lower = (parsed.hostname or '').lower() if parsed.hostname else ''
-            is_dropbox = host_lower.endswith('dropbox.com') or host_lower == 'dl.dropboxusercontent.com'
-            filtered = []
-            seen = set()
-            for k, v in q:
-                key = k.strip()
-                val = v.strip()
-                # Skip completely empty params
-                if not key:
-                    continue
-                # Skip params with empty values (except legitimate ones like rlkey)
-                if not val and key.lower() not in ('rlkey',):
-                    # For Dropbox dl param, empty value is invalid
-                    if is_dropbox and key.lower() == 'dl':
-                        continue
-                # collapse duplicates
-                tup = (key, val)
-                if tup in seen:
-                    continue
-                seen.add(tup)
-                # We will handle dl param below for Dropbox
-                if is_dropbox and key.lower() == 'dl':
-                    continue
-                filtered.append((key, val))
-
-            if is_dropbox:
-                filtered.append(('dl', '1'))
-
-            # Sort for determinism
-            filtered.sort(key=lambda kv: (kv[0].lower(), kv[1]))
-            query = urllib.parse.urlencode(filtered, doseq=True)
-
-            # Fragment is not relevant for downloads; drop it
-            normalized = urllib.parse.urlunsplit((scheme, netloc, path, query, ''))
-            return normalized
-        except Exception:
-            return url.strip()
-
-    @staticmethod
-    def _load_structured_history() -> List[Dict[str, str]]:
-        """Load the history as a list of {url, timestamp} objects (best-effort).
-
-        Returns:
-            List[Dict[str, str]]: Each item contains 'url' and 'timestamp' (string)
-        """
-        try:
-            if not LEGACY_DOWNLOAD_HISTORY_FILE.exists():
-                return []
-            with open(LEGACY_DOWNLOAD_HISTORY_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            if not isinstance(data, list):
-                return []
-            # If already structured
-            if data and isinstance(data[0], dict):
-                result: List[Dict[str, str]] = []
-                for item in data:
-                    if isinstance(item, dict) and item.get('url'):
-                        ts = str(item.get('timestamp')) if item.get('timestamp') else None
-                        result.append({
-                            'url': CSVService._normalize_url(str(item.get('url'))),
-                            'timestamp': ts if ts else ''
-                        })
-                return result
-            # Flat list of URLs -> convert to objects with empty timestamp
-            result = []
-            for u in data:
-                if isinstance(u, str) and u:
-                    result.append({'url': CSVService._normalize_url(u), 'timestamp': ''})
-            return result
-        except Exception as e:
-            logger.error(f"Error loading structured download history: {e}")
-            return []
-
-    @staticmethod
-    def _now_ts_str() -> str:
-        """Return current timestamp as 'YYYY-MM-DD HH:MM:SS' in LOCAL time."""
-        # Use system local timezone
-        return datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')
-
-    @staticmethod
-    def migrate_history_to_local_time() -> Dict[str, Any]:
-        """
-        Convert existing download_history.json timestamps from UTC to local time.
-
-        Assumes stored timestamps are in 'YYYY-MM-DD HH:MM:SS' and represent UTC.
-        For each, convert to local timezone and re-save chronologically.
-
-        Returns:
-            dict with migration summary
-        """
-        try:
-            items = CSVService._load_structured_history()
-            if not items:
-                return {"status": "noop", "updated": 0}
-
-            updated = 0
-            converted: List[Dict[str, str]] = []
-            for item in items:
-                url = item.get('url')
-                ts = item.get('timestamp') or ''
-                new_ts = ts
-                if ts:
-                    try:
-                        # Parse as UTC naive and set tzinfo=UTC, then convert to local
-                        dt_utc = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-                        dt_local = dt_utc.astimezone()  # system local tz
-                        new_ts = dt_local.strftime('%Y-%m-%d %H:%M:%S')
-                        if new_ts != ts:
-                            updated += 1
-                    except Exception:
-                        # Best-effort: try ISO parse
-                        try:
-                            dt_any = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                            dt_local = (dt_any if dt_any.tzinfo else dt_any.replace(tzinfo=timezone.utc)).astimezone()
-                            new_ts = dt_local.strftime('%Y-%m-%d %H:%M:%S')
-                            if new_ts != ts:
-                                updated += 1
-                        except Exception:
-                            # Leave as is if unparseable
-                            new_ts = ts
-                converted.append({'url': url, 'timestamp': new_ts})
-
-            # Sort chronologically, then by URL
-            def _sort_key(item: Dict[str, str]):
-                ts = item.get('timestamp') or '9999-12-31 23:59:59'
-                return (ts, item.get('url') or '')
-
-            converted.sort(key=_sort_key)
-
-            with open(LEGACY_DOWNLOAD_HISTORY_FILE, 'w', encoding='utf-8') as f:
-                json.dump(converted, f, indent=2, ensure_ascii=False)
-
-            return {"status": "success", "updated": updated, "total": len(converted)}
-        except Exception as e:
-            logger.error(f"Error migrating history to local time: {e}")
-            return {"status": "error", "message": str(e)}
-    
-    @staticmethod
-    def _ensure_shared_permissions(target):
-        """
-        Apply shared group/permission settings to the target file if configured.
-        """
+    def _ensure_shared_permissions(self, target: Path) -> None:
         if not target or not target.exists():
             return
-        if _SHARED_GROUP:
+        if self._shared_group:
             try:
-                shutil.chown(target, group=_SHARED_GROUP)
-            except Exception as chown_err:
-                logger.warning(f"Unable to assign shared group '{_SHARED_GROUP}' to {target}: {chown_err}")
+                shutil.chown(target, group=self._shared_group)
+            except Exception as e:
+                logger.warning(f"Unable to assign shared group '{self._shared_group}' to {target}: {e}")
         try:
-            os.chmod(target, _SHARED_FILE_MODE)
-        except Exception as chmod_err:
-            logger.warning(f"Unable to set shared permissions on {target}: {chmod_err}")
-
-    @staticmethod
-    def save_download_history(history_set: Set[str]) -> None:
-        """
-        Save download history to file, as a chronologically sorted list of
-        objects {url, timestamp}. Backward compatible with callers passing a set.
-
-        Rules:
-        - Preserve existing timestamps for URLs already present.
-        - Assign current timestamp to new URLs.
-        - Only persist URLs present in history_set (reflects clear/overwrite).
-        - Sort by timestamp ASC, then URL for deterministic order.
-        """
-        try:
-            ts_by_url = download_history_repository.get_ts_by_url()
-            normalized_set = {CSVService._normalize_url(u) for u in history_set}
-
-            entries = []
-            for url in sorted(normalized_set):
-                ts = ts_by_url.get(url) or CSVService._now_ts_str()
-                entries.append((url, ts))
-
-            def _sort_key(item):
-                ts = item[1] or '9999-12-31 23:59:59'
-                return (ts, item[0] or '')
-
-            entries.sort(key=_sort_key)
-            download_history_repository.replace_all(entries)
-
-            global _LAST_KNOWN_HISTORY_SET
-            _LAST_KNOWN_HISTORY_SET = set(normalized_set)
+            os.chmod(target, self._shared_file_mode)
         except Exception as e:
-            logger.error(f"Error saving download history: {e}")
-    
-    @staticmethod
-    def add_to_download_history(url: str) -> bool:
-        """
-        Add URL to download history.
-        
-        Args:
-            url: URL to add to history
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        return CSVService.add_to_download_history_with_timestamp(url, None)
+            logger.warning(f"Unable to set shared permissions on {target}: {e}")
 
-    @staticmethod
-    def add_to_download_history_with_timestamp(url: str, timestamp_str: Optional[str]) -> bool:
-        """
-        Add URL to download history with a provided timestamp (if any).
 
-        Preserves the earliest timestamp seen for a URL. If no valid timestamp is
-        provided, uses current time.
-
-        Args:
-            url: URL to add
-            timestamp_str: Optional timestamp string 'YYYY-MM-DD HH:MM:SS' or ISO; best-effort parsed
-
-        Returns:
-            True if persisted successfully, else False
-        """
-        try:
-            ts_norm = None
-            if timestamp_str:
-                try:
-                    dt = datetime.fromisoformat(str(timestamp_str).replace('Z', '+00:00'))
-                    ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
-                except Exception:
-                    try:
-                        dt = datetime.strptime(str(timestamp_str), '%Y-%m-%d %H:%M:%S')
-                        ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
-                    except Exception:
-                        ts_norm = str(timestamp_str)
-            if not ts_norm:
-                ts_norm = CSVService._now_ts_str()
-
-            norm_url = CSVService._normalize_url(url)
-            download_history_repository.upsert(norm_url, ts_norm)
-
-            global _LAST_KNOWN_HISTORY_SET
-            _LAST_KNOWN_HISTORY_SET.add(norm_url)
-            return True
-        except Exception as e:
-            logger.error(f"Error adding to download history with timestamp: {e}")
-            return False
-    
-    @staticmethod
-    def is_url_downloaded(url: str) -> bool:
-        """
-        Check if URL has been downloaded before.
-        
-        Args:
-            url: URL to check
-            
-        Returns:
-            True if URL was previously downloaded
-        """
-        history = CSVService.get_download_history()
-        return CSVService._normalize_url(url) in history
-    
-    @staticmethod
-    def get_csv_downloads_status() -> Dict[str, Any]:
-        """
-        Get status of CSV downloads.
-
-        Returns:
-            CSV downloads status dictionary
-        """
-        # Import WorkflowState singleton
-        from services.workflow_state import get_workflow_state
-        
-        workflow_state = get_workflow_state()
-        active_downloads = workflow_state.get_active_csv_downloads_dict()
-        recent_statuses = workflow_state.get_kept_csv_downloads_list()
-
-        return {
-            "active_downloads": active_downloads,
-            "recent_statuses": recent_statuses,
-            "total_active": len(active_downloads),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    
-    @staticmethod
-    def add_csv_download(download_id: str, download_info: Dict[str, Any]) -> None:
-        """
-        Add a CSV download to tracking.
-
-        Args:
-            download_id: Unique download identifier
-            download_info: Download information dictionary
-        """
-        # Import WorkflowState singleton
-        from services.workflow_state import get_workflow_state
-        
-        workflow_state = get_workflow_state()
-        download_data = {
-            **download_info,
-            "start_time": datetime.now(timezone.utc).isoformat()
-        }
-        workflow_state.add_csv_download(download_id, download_data)
-
-        logger.info(f"CSV download added: {download_id}")
-    
-    @staticmethod
-    def update_csv_download(download_id: str, status: str, **kwargs) -> None:
-        """
-        Update CSV download status.
-
-        Args:
-            download_id: Download identifier
-            status: New status
-            **kwargs: Additional fields to update
-        """
-        # Import WorkflowState singleton
-        from services.workflow_state import get_workflow_state
-        
-        workflow_state = get_workflow_state()
-        
-        # Update download status with individual parameters
-        progress = kwargs.get('progress')
-        message = kwargs.get('message')
-        filename = kwargs.get('filename')
-        
-        workflow_state.update_csv_download(
-            download_id=download_id,
-            status=status,
-            progress=progress,
-            message=message,
-            filename=filename
-        )
-
-        # If download completed, move to history
-        if status in ["completed", "failed", "cancelled", "unknown_error"]:
-            workflow_state.move_csv_download_to_history(download_id)
-
-        logger.debug(f"CSV download updated: {download_id} -> {status}")
-    
-    @staticmethod
-    def remove_csv_download(download_id: str) -> None:
-        """
-        Remove CSV download from tracking.
-
-        Args:
-            download_id: Download identifier
-        """
-        # Import WorkflowState singleton
-        from services.workflow_state import get_workflow_state
-        
-        workflow_state = get_workflow_state()
-        workflow_state.remove_csv_download(download_id)
-
-        logger.info(f"CSV download removed: {download_id}")
-    
-    @staticmethod
-    def rewrite_dropbox_to_dl_host(url_str: str) -> str:
-        """Rewrite a www.dropbox.com URL to dl.dropboxusercontent.com preserving path/query.
-
-        Example:
-        https://www.dropbox.com/scl/fo/<id>?rlkey=...&dl=1 ->
-        https://dl.dropboxusercontent.com/scl/fo/<id>?rlkey=...&dl=1
-
-        Args:
-            url_str: Original Dropbox URL
-
-        Returns:
-            Rewritten URL string
-        """
-        try:
-            parsed = urllib.parse.urlsplit(url_str)
-            host = parsed.hostname or ""
-            # Do NOT rewrite folder share links ('/scl/fo/') which are not served by dl.dropboxusercontent.com
-            if (host.endswith("dropbox.com") and host != "dl.dropboxusercontent.com"
-                    and not (parsed.path or '').lower().startswith('/scl/fo/')):
-                new_netloc = "dl.dropboxusercontent.com"
-                # preserve port if any (rare)
-                if parsed.port and parsed.port not in (80, 443):
-                    new_netloc = f"{new_netloc}:{parsed.port}"
-                return urllib.parse.urlunsplit((parsed.scheme or "https", new_netloc, parsed.path, parsed.query, ""))
-            return url_str
-        except Exception:
-            return url_str
-
-    @staticmethod
-    def _check_csv_for_downloads() -> None:
-        """
-        Check for new downloads using Webhook as the single data source.
-        """
-        try:
-            # Import here to avoid circular imports
-            from app_new import execute_csv_download_worker
-            from services.workflow_state import get_workflow_state
-            import threading
-            import os
-
-            # Fetch data from Webhook (single data source)
-            if not WEBHOOK_SERVICE_AVAILABLE:
-                logger.error("WebhookService not available - monitoring disabled")
-                return
-
-            logger.debug("Fetching data from Webhook")
-            data_rows = webhook_fetch_records()
-            source_type = "WEBHOOK"
-
-            if data_rows is None:
-                logger.warning(f"Could not fetch data from {source_type}")
-                return
-
-            # Get current download history (normalized URLs)
-            download_history = CSVService.get_download_history()
-
-            workflow_state = get_workflow_state()
-            active_downloads = workflow_state.get_active_csv_downloads_dict()
-            kept_downloads = workflow_state.get_kept_csv_downloads_list()
-
-            tracked_urls: Set[str] = set()
-            try:
-                candidates = list(active_downloads.values()) + list(kept_downloads)
-                for download in candidates:
-                    if not isinstance(download, dict):
-                        continue
-                    status = str(download.get('status') or '').strip().lower()
-                    if status in ('failed', 'cancelled', 'unknown_error'):
-                        continue
-                    raw_url = (download.get('original_url') or download.get('url') or '').strip()
-                    if not raw_url:
-                        continue
-                    norm_existing = CSVService._normalize_url(raw_url)
-                    if norm_existing:
-                        tracked_urls.add(norm_existing)
-            except Exception:
-                tracked_urls = set()
-
-            def _is_url_already_tracked(norm_primary: Optional[str], norm_fallback: Optional[str]) -> bool:
-                if norm_primary and norm_primary in tracked_urls:
-                    return True
-                if norm_fallback and norm_fallback in tracked_urls:
-                    return True
-                return False
-
-            total_rows = len(data_rows)
-            skipped_missing_url = 0
-            skipped_already_in_history = 0
-            skipped_already_tracked = 0
-
-            # Check for new URLs
-            new_downloads = 0
-            # Optional dry-run to avoid real downloads (useful for tests/CI):
-            dry_run = os.environ.get('DRY_RUN_DOWNLOADS', 'false').lower() in ('true', '1')
-
-            handled_in_this_pass: Set[str] = set()
-
-            for row in data_rows:
-                url = row.get('url')
-                fallback_url = row.get('fallback_url')
-                original_filename = row.get('original_filename')
-                provider = row.get('provider')
-                timestamp_str = row.get('timestamp')
-
-                norm_url = CSVService._normalize_url(url) if url else None
-                norm_fallback_url = CSVService._normalize_url(fallback_url) if fallback_url else None
-
-                if norm_url and norm_url in handled_in_this_pass:
-                    continue
-                if norm_fallback_url and norm_fallback_url in handled_in_this_pass:
-                    continue
-
-                already_in_history = (
-                    (norm_url and norm_url in download_history)
-                    or (norm_fallback_url and norm_fallback_url in download_history)
-                )
-                if not norm_url:
-                    skipped_missing_url += 1
-                    continue
-                if _is_url_already_tracked(norm_url, norm_fallback_url):
-                    skipped_already_tracked += 1
-                    handled_in_this_pass.add(norm_url)
-                    if norm_fallback_url:
-                        handled_in_this_pass.add(norm_fallback_url)
-                    continue
-                if already_in_history:
-                    skipped_already_in_history += 1
-                    # Common case: preferred URL removed from history, but fallback URL still present.
-                    # This is expected behavior to prevent re-downloads across URL variants.
-                    if (
-                        norm_fallback_url
-                        and norm_fallback_url in download_history
-                        and norm_url not in download_history
-                    ):
-                        logger.debug(
-                            f"{source_type} MONITOR: Skipping URL because fallback is already in download history "
-                            f"(preferred={norm_url}, fallback={norm_fallback_url})"
-                        )
-                    continue
-
-                try:
-                    parsed_primary = urllib.parse.urlsplit(url or '')
-                    scheme_primary = (parsed_primary.scheme or '').lower()
-                    if scheme_primary and scheme_primary not in ('http', 'https'):
-                        logger.debug(
-                            f"{source_type} MONITOR: Ignoring unsupported URL scheme '{scheme_primary}': {url}"
-                        )
-                        handled_in_this_pass.add(norm_url)
-                        if norm_fallback_url:
-                            handled_in_this_pass.add(norm_fallback_url)
-                        continue
-                except Exception:
-                    # If URL parsing fails, treat it as non-eligible.
-                    logger.debug(
-                        f"{source_type} MONITOR: Ignoring invalid URL (parse error): {url}"
-                    )
-                    handled_in_this_pass.add(norm_url)
-                    if norm_fallback_url:
-                        handled_in_this_pass.add(norm_fallback_url)
-                    continue
-
-                url_lower = (url or '').lower()
-                provider_lower = str(provider or '').strip().lower()
-
-                # Determine URL type for UI hints / routing
-                url_type = (
-                    str(row.get('url_type') or '').strip().lower()
-                    or (
-                        'fromsmash' if 'fromsmash.com' in url_lower else (
-                            'swisstransfer' if 'swisstransfer.com' in url_lower else (
-                                'dropbox' if (_is_dropbox_url(url) or _is_dropbox_proxy_url(url) or provider_lower == 'dropbox') else 'external'
-                            )
-                        )
-                    )
-                )
-
-                is_dropbox_like = (
-                    url_type == 'dropbox'
-                    or provider_lower == 'dropbox'
-                    or _is_dropbox_url(url)
-                    or _is_dropbox_proxy_url(url)
-                )
-
-                # Auto-download is intentionally restricted:
-                # - Prevents large backlog downloads from legacy entries.
-                # - Focuses on the new webhook schema (original_filename / fallback_url) and R2 proxy URLs.
-                has_new_schema_hints = bool(
-                    (original_filename and str(original_filename).strip())
-                    or (fallback_url and str(fallback_url).strip())
-                    or _is_dropbox_proxy_url(url)
-                )
-                auto_download_allowed = (
-                    is_dropbox_like
-                    and _looks_like_archive_download(url, original_filename)
-                    and has_new_schema_hints
-                )
-
-                if auto_download_allowed:
-                    logger.info(
-                        f"{source_type} MONITOR: New eligible URL detected: {url} (timestamp: {timestamp_str}) [type={url_type}]"
-                    )
-                    # Dropbox-like: proceed with auto-download (unless dry-run)
-                    if dry_run:
-                        logger.info(
-                            f"[DRY RUN] Would start Dropbox download for URL: {url} (timestamp: {timestamp_str})"
-                        )
-                        CSVService.add_to_download_history_with_timestamp(norm_url, timestamp_str)
-                        download_history.add(norm_url)
-                        handled_in_this_pass.add(norm_url)
-                        if norm_fallback_url:
-                            CSVService.add_to_download_history_with_timestamp(norm_fallback_url, timestamp_str)
-                            download_history.add(norm_fallback_url)
-                            handled_in_this_pass.add(norm_fallback_url)
-                        new_downloads += 1
-                    else:
-                        download_thread = threading.Thread(
-                            target=execute_csv_download_worker,
-                            args=(url, timestamp_str, fallback_url, original_filename),
-                            name=f"Download-{str(timestamp_str).replace('/', '').replace(' ', '_').replace(':', '')}"
-                        )
-                        download_thread.daemon = True
-                        download_thread.start()
-                        handled_in_this_pass.add(norm_url)
-                        if norm_fallback_url:
-                            handled_in_this_pass.add(norm_fallback_url)
-                        new_downloads += 1
-                else:
-                    # Non-eligible link: ignore it (no UI entry, no history write) to keep auto-download Dropbox-only.
-                    logger.debug(
-                        f"{source_type} MONITOR: Ignoring non-eligible URL (auto-download disabled): {url} "
-                        f"(timestamp: {timestamp_str}) [type={url_type}]"
-                    )
-                    handled_in_this_pass.add(norm_url)
-                    if norm_fallback_url:
-                        handled_in_this_pass.add(norm_fallback_url)
-
-            if new_downloads > 0:
-                logger.info(f"{source_type} MONITOR: {new_downloads} new download(s) started")
-            if new_downloads == 0:
-                logger.debug(
-                    f"{source_type} MONITOR: No new items (rows={total_rows}, "
-                    f"skipped_in_history={skipped_already_in_history}, skipped_tracked={skipped_already_tracked}, "
-                    f"skipped_missing_url={skipped_missing_url})"
-                )
-
-        except Exception as e:
-            logger.error(f"Error checking for downloads: {e}", exc_info=True)
-
-    @staticmethod
-    def _normalize_and_deduplicate_history() -> None:
-        """Normalize and deduplicate the persisted history file.
-
-        Preserves earliest timestamp per logical URL.
-        """
-        try:
-            existing = CSVService._load_structured_history()
-            if not existing:
-                return
-            # Build minimal map url->timestamp keeping earliest timestamp (lexicographically smaller)
-            ts_by_url: Dict[str, str] = {}
-            for item in existing:
-                url = CSVService._normalize_url(item.get('url') or '')
-                ts = item.get('timestamp') or ''
-                if not url:
-                    continue
-                if url in ts_by_url:
-                    prev = ts_by_url[url]
-                    ts_by_url[url] = min(prev or ts, ts or prev)
-                else:
-                    ts_by_url[url] = ts
-            CSVService.save_download_history(set(ts_by_url.keys()))
-        except Exception as e:
-            logger.warning(f"Failed to normalize/deduplicate history: {e}")
-
-    @staticmethod
-    def clear_download_history() -> Dict[str, str]:
-        """
-        Clear download history.
-        
-        Returns:
-            Result dictionary with status and message
-        """
-        try:
-            CSVService.initialize()
-            download_history_repository.delete_all()
-            global _LAST_KNOWN_HISTORY_SET
-            _LAST_KNOWN_HISTORY_SET = set()
-            return {
-                "status": "success",
-                "message": "Download history cleared"
-            }
-        except Exception as e:
-            logger.error(f"Error clearing download history: {e}")
-            return {
-                "status": "error",
-                "message": f"Failed to clear download history: {str(e)}"
-            }
-    
-    @staticmethod
-    def get_statistics() -> Dict[str, Any]:
-        """
-        Get CSV service statistics.
-        
-        Returns:
-            Statistics dictionary
-        """
-        history = CSVService.get_download_history()
-        downloads_status = CSVService.get_csv_downloads_status()
-        monitor_status = CSVService.get_monitor_status()
-
-        return {
-            "download_history_count": len(history),
-            "active_downloads": downloads_status["total_active"],
-            "monitor_status": monitor_status["csv_monitor"]["status"],
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+download_history_repository = DownloadHistoryRepository(
+    db_path=config.DOWNLOAD_HISTORY_DB_PATH,
+    shared_group=config.DOWNLOAD_HISTORY_SHARED_GROUP,
+)
 ```
 
 ## File: services/download_service.py
@@ -5431,7 +3885,7 @@ from config.settings import config
 
 logger = logging.getLogger(__name__)
 
-CACHE_ROOT = Path("/mnt/cache")
+CACHE_ROOT = Path(config.CACHE_ROOT_DIR)
 
 
 @dataclass
@@ -5528,6 +3982,17 @@ class FilesystemService:
         Returns:
             (success, message) tuple.
         """
+        if config.DISABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled by configuration")
+            return False, "Ouverture explorateur désactivée par configuration."
+        if not config.DEBUG and not config.ENABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled in production/headless mode")
+            return False, "Ouverture explorateur désactivée en production/headless."
+
+        is_headless = not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+        if is_headless and not config.ENABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled in headless mode")
+            return False, "Ouverture explorateur désactivée en mode headless."
         try:
             path = Path(abs_path).resolve()
         except Exception:
@@ -5536,7 +4001,7 @@ class FilesystemService:
         try:
             path.relative_to(CACHE_ROOT)
         except ValueError:
-            return False, "Chemin en dehors de /mnt/cache non autorisé."
+            return False, f"Chemin en dehors de {str(CACHE_ROOT)} non autorisé."
 
         if not path.exists():
             return False, "Le dossier n'existe pas."
@@ -11802,375 +10267,6 @@ def reset_workflow_state() -> None:
     border-color: var(--red, #dc3545);
     color: var(--red, #dc3545);
 }
-```
-
-## File: static/css/components/logs.css
-```css
-.logs-column {
-    position: relative;
-    background: color-mix(in oklab, var(--bg-card) 92%, transparent);
-    border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
-    border-radius: var(--pipeline-card-radius);
-    box-shadow:
-        0 10px 26px rgba(0,0,0,0.22),
-        0 0 0 1px rgb(var(--accent-primary-rgb) / 0.12);
-}
-
-.logs-column > * {
-    position: relative;
-    z-index: 1;
-}
-
-.logs-column::before {
-    content: '';
-    position: absolute;
-    left: 12px;
-    top: 0;
-    bottom: 0;
-    width: var(--pipeline-axis-width);
-    background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
-    border-radius: 999px;
-    opacity: 0.9;
-    pointer-events: none;
-}
-
-.logs-column::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 36px;
-    background: radial-gradient(
-        circle at 12px 30%,
-        rgb(var(--accent-primary-rgb) / 0.22) 0%,
-        rgb(var(--accent-primary-rgb) / 0.10) 40%,
-        rgb(var(--accent-primary-rgb) / 0.00) 70%
-    );
-    pointer-events: none;
-}
-
-.log-panel-header {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-    color: var(--accent-primary);
-    font-size: 1.3em;
-    font-weight: 500;
-    flex-shrink: 0;
-    transition: color var(--motion-duration-medium) var(--motion-ease-standard);
-}
-
-.log-panel-header-main {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-}
-
-.log-panel-subheader {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 10px;
-    font-size: 0.85em;
-    color: var(--text-secondary);
-}
-
-#log-panel-context-step {
-    color: var(--text-primary);
-    font-weight: 500;
-}
-
-.log-panel-specific-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.log-panel-specific-buttons .specific-log-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border-radius: 999px;
-    padding: 10px 18px;
-    background: color-mix(in oklab, var(--bg-card) 80%, transparent);
-    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition:
-        color var(--motion-duration-fast) var(--motion-ease-standard),
-        background var(--motion-duration-fast) var(--motion-ease-standard),
-        border-color var(--motion-duration-fast) var(--motion-ease-standard),
-        transform var(--motion-duration-fast) var(--motion-ease-standard);
-}
-
-.log-panel-specific-buttons .specific-log-button:hover {
-    color: var(--text-primary);
-    background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-    border-color: rgb(var(--accent-primary-rgb) / 0.35);
-}
-
-.log-panel-specific-buttons .specific-log-button:active {
-    transform: scale(0.98);
-}
-
-#close-log-panel {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    background: color-mix(in oklab, var(--bg-card) 80%, transparent);
-    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-    border-radius: 999px;
-    color: var(--text-secondary);
-    font-size: 1.45em;
-    cursor: pointer;
-    transition:
-        color var(--motion-duration-fast) var(--motion-ease-standard),
-        background var(--motion-duration-fast) var(--motion-ease-standard),
-        border-color var(--motion-duration-fast) var(--motion-ease-standard),
-        transform var(--motion-duration-fast) var(--motion-ease-standard);
-}
-
-#close-log-panel:hover {
-    color: var(--text-primary);
-    background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-    border-color: rgb(var(--accent-primary-rgb) / 0.35);
-}
-
-#close-log-panel:active {
-    transform: scale(0.96);
-}
-
-.log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
-.log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
-
-.log-output,
-.specific-log-output {
-    background-color: var(--log-bg);
-    color: var(--text-bright);
-    padding: 15px;
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-    font-size: 1em;
-    line-height: 1.45;
-    max-height: 300px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    border-radius: 0 0 8px 8px;
-    flex-grow: 1;
-}
-
-/* Enhanced Log Styling - Different log types */
-.log-line {
-    display: block;
-    margin: 2px 0;
-    padding: 2px 6px;
-    border-radius: 3px;
-    position: relative;
-}
-
-.log-line.log-success {
-    background-color: rgb(var(--status-success-rgb) / 0.12);
-    border-left: 3px solid var(--status-success);
-    color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
-}
-
-.log-line.log-warning {
-    background-color: rgb(var(--status-warning-rgb) / 0.12);
-    border-left: 3px solid var(--status-warning);
-    color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
-}
-
-.log-line.log-error {
-    background-color: rgb(var(--status-error-rgb) / 0.12);
-    border-left: 3px solid var(--status-error);
-    color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
-    font-weight: 500;
-}
-
-.log-line.log-info {
-    background-color: rgb(var(--status-running-rgb) / 0.12);
-    border-left: 3px solid var(--status-running);
-    color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
-}
-
-.log-line.log-debug {
-    background-color: rgba(158, 158, 158, 0.1);
-    border-left: 3px solid #9e9e9e;
-    color: #616161;
-    font-size: 0.85em;
-}
-
-.log-line.log-command {
-    background-color: rgba(156, 39, 176, 0.1);
-    border-left: 3px solid #9c27b0;
-    color: #7b1fa2;
-    font-weight: 500;
-}
-
-.log-line.log-progress {
-    background-color: rgb(var(--accent-primary-rgb) / 0.10);
-    border-left: 3px solid var(--accent-primary);
-    color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-}
-
-/* Log icons for better visual distinction */
-.log-line::before {
-    content: '';
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    margin-right: 8px;
-    border-radius: 50%;
-    vertical-align: middle;
-}
-
-.log-line.log-success::before {
-    background-color: var(--status-success);
-    content: '✓';
-    color: white;
-    font-size: 8px;
-    text-align: center;
-    line-height: 12px;
-    font-weight: bold;
-}
-
-.log-line.log-warning::before {
-    background-color: var(--status-warning);
-    content: '⚠';
-    color: white;
-    font-size: 8px;
-    text-align: center;
-    line-height: 12px;
-}
-
-.log-line.log-error::before {
-    background-color: var(--status-error);
-    content: '✕';
-    color: white;
-    font-size: 8px;
-    text-align: center;
-    line-height: 12px;
-    font-weight: bold;
-}
-
-.log-line.log-info::before {
-    background-color: var(--status-running);
-    content: 'ℹ';
-    color: white;
-    font-size: 8px;
-    text-align: center;
-    line-height: 12px;
-}
-
-.log-line.log-debug::before {
-    background-color: #9e9e9e;
-    content: '•';
-    color: white;
-    font-size: 10px;
-    text-align: center;
-    line-height: 12px;
-}
-
-.log-line.log-command::before {
-    background-color: #9c27b0;
-    content: '$';
-    color: white;
-    font-size: 8px;
-    text-align: center;
-    line-height: 12px;
-    font-weight: bold;
-}
-
-.log-line.log-progress::before {
-    background-color: var(--accent-primary);
-    content: '⟳';
-    color: white;
-    font-size: 8px;
-    text-align: center;
-    line-height: 12px;
-}
-
-/* Dark mode adjustments for log styling */
-@media (prefers-color-scheme: dark) {
-    .log-line.log-success {
-        background-color: rgb(var(--status-success-rgb) / 0.15);
-        color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
-    }
-
-    .log-line.log-warning {
-        background-color: rgb(var(--status-warning-rgb) / 0.15);
-        color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
-    }
-
-    .log-line.log-error {
-        background-color: rgb(var(--status-error-rgb) / 0.15);
-        color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
-    }
-
-    .log-line.log-info {
-        background-color: rgb(var(--status-running-rgb) / 0.15);
-        color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
-    }
-
-    .log-line.log-debug {
-        background-color: rgba(158, 158, 158, 0.15);
-        color: #bdbdbd;
-    }
-
-    .log-line.log-command {
-        background-color: rgba(156, 39, 176, 0.15);
-        color: #ba68c8;
-    }
-
-    .log-line.log-progress {
-        background-color: rgb(var(--accent-primary-rgb) / 0.15);
-        color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-    }
-}
-
-/* Hover effects for better interactivity */
-.log-line:hover {
-    background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
-    transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
-}
-
-/* Improved spacing and readability */
-.log-output .log-line:first-child {
-    margin-top: 0;
-}
-
-.log-output .log-line:last-child {
-    margin-bottom: 0;
-}
-.log-output:empty:before {
-    content: "En attente de logs...";
-    color: var(--text-secondary);
-    font-style: italic;
-}
-.specific-log-output:empty:before {
-    content: "Aucun log spécifique chargé.";
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-.specific-log-controls-wrapper { margin-top: 15px; }
-.specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
-
-.specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
-
-.log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
-.log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
-.log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
-.log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
 ```
 
 ## File: static/css/components/notifications.css
@@ -29500,11 +27596,56 @@ import os, sys, json, argparse, subprocess, threading, time, logging
 from pathlib import Path
 from collections import OrderedDict, deque
 from datetime import datetime
+from typing import Mapping, Optional
 
 try:
     from dotenv import load_dotenv
 except ImportError:
     load_dotenv = None
+
+
+class _EnvConfig:
+    def __init__(self, environ: Mapping[str, str]):
+        self._environ = environ
+
+    def get_optional_str(self, key: str) -> Optional[str]:
+        raw = self._environ.get(key)
+        if raw is None:
+            return None
+        value = str(raw).strip()
+        return value if value else None
+
+    def get_str(self, key: str, default: str = "") -> str:
+        value = self.get_optional_str(key)
+        return value if value is not None else default
+
+    def get_int(self, key: str, default: int) -> int:
+        raw = self._environ.get(key)
+        if raw is None:
+            return default
+        try:
+            return int(str(raw).strip())
+        except Exception:
+            return default
+
+    def get_bool(self, key: str, default: bool) -> bool:
+        raw = self._environ.get(key)
+        if raw is None:
+            return default
+
+        normalized = str(raw).strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+        return default
+
+    def get_csv_list(self, key: str) -> list[str]:
+        raw = self.get_str(key, default="").strip().lower()
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def snapshot(self, keys: list[str]) -> dict[str, Optional[str]]:
+        return {k: self.get_optional_str(k) for k in keys}
 
 
 def _load_env_file():
@@ -29531,20 +27672,8 @@ def _load_env_file():
 _load_env_file()
 
 
-def _read_env_bool(key: str, default: bool) -> bool:
-    raw = os.environ.get(key)
-    if raw is None:
-        return default
-
-    normalized = str(raw).strip().lower()
-    if normalized in {"1", "true", "yes", "y", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "n", "off"}:
-        return False
-    return default
-
-
-step5_enable_object_detection = _read_env_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
+ENV = _EnvConfig(os.environ)
+step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
 
 def _log_env_snapshot():
     relevant_keys = [
@@ -29557,7 +27686,7 @@ def _log_env_snapshot():
         "STEP5_ENABLE_OBJECT_DETECTION",
         "INSIGHTFACE_HOME",
     ]
-    snapshot = {k: os.environ.get(k) for k in relevant_keys}
+    snapshot = ENV.snapshot(relevant_keys)
     logging.info(f"[EnvSnapshot] {snapshot}")
 
 
@@ -29574,12 +27703,16 @@ except (ImportError, AttributeError):
     TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
     EOS_ENV_PYTHON = BASE_DIR / "eos_env" / "bin" / "python"
     INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
-    
+
+TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
+EOS_ENV_PYTHON = Path(EOS_ENV_PYTHON)
+INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
+
 WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
 
 TRACKING_ENGINE = None
 
-TF_GPU_ENV_PYTHON = os.environ.get("STEP5_TF_GPU_ENV_PYTHON", "").strip()
+TF_GPU_ENV_PYTHON = ENV.get_str("STEP5_TF_GPU_ENV_PYTHON", "").strip()
 if TF_GPU_ENV_PYTHON:
     TF_GPU_ENV_PYTHON = Path(TF_GPU_ENV_PYTHON)
 
@@ -29602,6 +27735,7 @@ SYSTEM_CUDA_DEFAULTS = [
     "/usr/local/cuda",
 ]
 
+
 def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
     """Return CUDA library directories bundled in a venv (for ONNX Runtime CUDA provider)."""
     try:
@@ -29623,7 +27757,7 @@ def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
     return paths
 
 
-def _discover_system_cuda_lib_paths() -> list[str]:
+def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
     """
     Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
     Priority order:
@@ -29632,7 +27766,7 @@ def _discover_system_cuda_lib_paths() -> list[str]:
       3. Common /usr/local/cuda-* lib64 folders.
       4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
     """
-    explicit_paths = os.environ.get("STEP5_CUDA_LIB_PATH", "").strip()
+    explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
     if explicit_paths:
         resolved = [
             str(Path(p.strip()).expanduser())
@@ -29644,7 +27778,7 @@ def _discover_system_cuda_lib_paths() -> list[str]:
 
     candidates: list[Path] = []
     for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
-        value = os.environ.get(env_var, "").strip()
+        value = env.get_str(env_var, "").strip()
         if value:
             candidates.append(Path(value).expanduser())
     for default_path in SYSTEM_CUDA_DEFAULTS:
@@ -29665,6 +27799,7 @@ def _discover_system_cuda_lib_paths() -> list[str]:
             discovered.append(str(debian_cuda))
     return discovered
 
+
 # --- CONFIGURATION DU LOGGER ---
 LOG_DIR = BASE_DIR / "logs" / "step5"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -29678,8 +27813,8 @@ WORKER_CONFIG_TEMPLATE = {
     "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
     "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
     "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
-    "object_detector_model": os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
-    "object_detector_model_path": os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
+    "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
+    "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
 }
 
 CPU_OPTIMIZED_CONFIG = {
@@ -29689,6 +27824,56 @@ CPU_OPTIMIZED_CONFIG = {
     "object_score_threshold": 0.4,
     "mp_max_distance_tracking": 80,
 }
+
+
+_DEFAULT_SUBPROCESS_ENV: dict[str, str] = {
+    'OMP_NUM_THREADS': '1',
+    'OPENBLAS_NUM_THREADS': '1',
+    'MKL_NUM_THREADS': '1',
+    'NUMEXPR_NUM_THREADS': '1',
+    'TF_CPP_MIN_LOG_LEVEL': '2',
+    'GLOG_minloglevel': '2',
+    'ABSL_LOGGING_MIN_LOG_LEVEL': '2',
+}
+
+
+def _collect_cuda_lib_paths(worker_python: Path, engine_norm: str) -> list[str]:
+    cuda_paths: list[str] = []
+    cuda_paths_worker = _build_venv_cuda_paths(worker_python)
+    cuda_paths_tracking = _build_venv_cuda_paths(TRACKING_ENV_PYTHON)
+    if cuda_paths_worker:
+        cuda_paths.extend(cuda_paths_worker)
+    elif cuda_paths_tracking:
+        cuda_paths.extend(cuda_paths_tracking)
+
+    if engine_norm == "insightface":
+        system_cuda_paths = _discover_system_cuda_lib_paths(ENV)
+        for path in system_cuda_paths:
+            if path not in cuda_paths:
+                cuda_paths.append(path)
+    return cuda_paths
+
+
+def _apply_ld_library_path(env: dict[str, str], extra_paths: list[str]) -> None:
+    if not extra_paths:
+        return
+    extra_ld_path = ":".join(extra_paths)
+    existing_ld_path = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = (
+        f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
+    )
+
+
+def _build_subprocess_env(worker_python: Path, engine_norm: str) -> dict[str, str]:
+    env = os.environ.copy()
+    cuda_paths = _collect_cuda_lib_paths(worker_python, engine_norm)
+    if cuda_paths:
+        _apply_ld_library_path(env, cuda_paths)
+        logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
+
+    for key, value in _DEFAULT_SUBPROCESS_ENV.items():
+        env.setdefault(key, value)
+    return env
 
 
 def log_reader_thread(process, video_name, progress_map, lock):
@@ -29759,8 +27944,8 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
     models_dir_path = Path(__file__).resolve().parent / "models"
     worker_script_path = Path(__file__).resolve().parent / worker_script
 
-    worker_python_override_eos = os.environ.get("STEP5_EOS_ENV_PYTHON")
-    worker_python_override_insightface = os.environ.get("STEP5_INSIGHTFACE_ENV_PYTHON")
+    worker_python_override_eos = ENV.get_optional_str("STEP5_EOS_ENV_PYTHON")
+    worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
     worker_python = TRACKING_ENV_PYTHON
     
     if engine_norm == "eos":
@@ -29817,35 +28002,7 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
         command_args.extend(["--chunk_size", "0"])  # 0 = adaptive in worker
 
     try:
-        env = os.environ.copy()
-        cuda_paths: list[str] = []
-        cuda_paths_worker = _build_venv_cuda_paths(Path(worker_python))
-        cuda_paths_tracking = _build_venv_cuda_paths(Path(TRACKING_ENV_PYTHON))
-        if cuda_paths_worker:
-            cuda_paths.extend(cuda_paths_worker)
-        elif cuda_paths_tracking:
-            cuda_paths.extend(cuda_paths_tracking)
-
-        if engine_norm == "insightface":
-            system_cuda_paths = _discover_system_cuda_lib_paths()
-            for path in system_cuda_paths:
-                if path not in cuda_paths:
-                    cuda_paths.append(path)
-
-        if cuda_paths:
-            extra_ld_path = ":".join(cuda_paths)
-            existing_ld_path = env.get("LD_LIBRARY_PATH", "")
-            env["LD_LIBRARY_PATH"] = (
-                f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
-            )
-            logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
-        env.setdefault('OMP_NUM_THREADS', '1')
-        env.setdefault('OPENBLAS_NUM_THREADS', '1')
-        env.setdefault('MKL_NUM_THREADS', '1')
-        env.setdefault('NUMEXPR_NUM_THREADS', '1')
-        env.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
-        env.setdefault('GLOG_minloglevel', '2')
-        env.setdefault('ABSL_LOGGING_MIN_LOG_LEVEL', '2')
+        env = _build_subprocess_env(Path(worker_python), engine_norm)
 
         p = subprocess.Popen(
             command_args,
@@ -29935,17 +28092,13 @@ def main():
     )
     args = parser.parse_args()
     try:
-        import os as _os
-        if _os.environ.get('TRACKING_DISABLE_GPU', '').strip() in {'1','true','TRUE','yes','YES'}:
+        if ENV.get_bool('TRACKING_DISABLE_GPU', default=False):
             args.disable_gpu = True
-        if 'TRACKING_CPU_WORKERS' in _os.environ:
-            try:
-                args.cpu_internal_workers = int(_os.environ['TRACKING_CPU_WORKERS'])
-            except ValueError:
-                pass
 
-        if args.tracking_engine is None and 'STEP5_TRACKING_ENGINE' in _os.environ:
-            raw_engine = str(_os.environ.get('STEP5_TRACKING_ENGINE', '')).strip()
+        args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
+
+        if args.tracking_engine is None:
+            raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
             if raw_engine:
                 args.tracking_engine = raw_engine
     except Exception:
@@ -29953,8 +28106,8 @@ def main():
 
     _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
     
-    gpu_enabled_global = _os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
-    gpu_engines_str = _os.environ.get('STEP5_GPU_ENGINES', '').strip().lower()
+    gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
+    gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
     gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
     _log_env_snapshot()
     
@@ -29976,7 +28129,7 @@ def main():
                     
                     if not gpu_status['available']:
                         logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
-                        fallback_auto = _os.environ.get('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
+                        fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
                         if fallback_auto:
                             logging.info("Auto-fallback to CPU enabled")
                             args.disable_gpu = True
@@ -31821,6 +29974,1564 @@ if __name__ == '__main__':
     )
 ```
 
+## File: config/settings.py
+```python
+"""
+Centralized configuration management for workflow_mediapipe.
+
+This module provides environment-based configuration management
+following the project's development guidelines.
+"""
+
+import os
+import logging
+import subprocess
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, List
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_bool(raw: Optional[str], default: bool) -> bool:
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
+def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
+    value = _parse_optional_int(raw)
+    if value is None:
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
+def _parse_csv_list(raw: Optional[str]) -> List[str]:
+    if raw is None:
+        return []
+    parts = [p.strip() for p in raw.split(",")]
+    return [p for p in parts if p]
+
+
+@dataclass
+class Config:
+    """
+    Centralized configuration class for the workflow_mediapipe application.
+    
+    All configuration values are loaded from environment variables with
+    sensible defaults to maintain backward compatibility.
+    """
+    
+    # Flask Application Settings
+    SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
+    DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
+    HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
+    PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
+    
+    # Security Tokens (loaded from environment)
+    INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
+    RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
+    
+    # Webhook JSON Source (single data source for monitoring)
+    WEBHOOK_JSON_URL: str = os.environ.get(
+        'WEBHOOK_JSON_URL',
+        'https://webhook.kidpixel.fr/data/webhook_links.json'
+    )
+    WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
+    WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
+    WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
+    
+    # Directory Configuration
+    BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
+        'BASE_PATH_SCRIPTS_ENV', 
+        os.path.dirname(os.path.abspath(__file__ + '/../'))
+    ))
+    CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
+    LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
+        'LOCAL_DOWNLOADS_DIR', 
+        Path.home() / 'Téléchargements'
+    ))
+    DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
+    ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
+    DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
+    DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
+    # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
+    # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
+    LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
+    # Virtual environments base directory (defaults to project root if not set)
+    VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
+    # Projects directory for visualization/timeline features
+    PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
+    # Archives directory for persistent analysis results (timeline)
+    ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
+    
+    # Python Environment Configuration
+    PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
+    
+    # Processing Configuration
+    MAX_CPU_WORKERS: int = int(os.environ.get(
+        'MAX_CPU_WORKERS', 
+        str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
+    ))
+    
+    # Polling Intervals (in milliseconds for frontend, seconds for backend)
+    POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
+    LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
+
+    SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+    
+    # MediaPipe Configuration
+    MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
+        'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
+    ))
+    MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
+        'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
+    ))
+    
+    # GPU Configuration
+    ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
+    
+    # Lemonfox API Configuration (STEP4 alternative)
+    LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
+    LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
+    LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
+
+    LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
+    LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
+    LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
+        os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
+        default=True,
+    )
+    LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
+        os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
+    )
+    LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
+        os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
+    )
+    LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
+        default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
+    )
+    LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
+    LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
+    LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
+        os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
+    )
+    LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
+        os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
+        default=False,
+    )
+    LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
+    LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
+
+    STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+    
+    # STEP5 Object Detection Configuration
+    # Model selection for fallback object detection when face detection fails (MediaPipe only)
+    STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
+        'STEP5_OBJECT_DETECTOR_MODEL',
+        'efficientdet_lite2'  # Default: current baseline, backward compatible
+    )
+    STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+    STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
+    
+    # STEP5 Performance Optimizations (opencv_yunet_pyfeat)
+    STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
+    STEP5_ONNX_INTRA_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTRA_OP_THREADS', '2'))
+    STEP5_ONNX_INTER_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTER_OP_THREADS', '1'))
+    STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
+    STEP5_YUNET_MAX_WIDTH: int = int(os.environ.get('STEP5_YUNET_MAX_WIDTH', '640'))  # Max width for YuNet detection (coordinates rescaled)
+
+    STEP5_OPENCV_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_OPENCV_MAX_FACES')
+    )
+    STEP5_OPENCV_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE', '1.0'))
+
+    STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
+    )
+    STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+    STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+    )
+
+    # STEP5 OpenSeeFace Engine Configuration
+    # Lightweight CPU tracking via ONNX Runtime (OpenSeeFace-style models)
+    STEP5_OPENSEEFACE_MODELS_DIR: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')
+    STEP5_OPENSEEFACE_MODEL_ID: int = int(os.environ.get('STEP5_OPENSEEFACE_MODEL_ID', '1'))
+    STEP5_OPENSEEFACE_DETECTION_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')
+    STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')
+    STEP5_OPENSEEFACE_DETECT_EVERY_N: int = int(os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N', '1'))
+    STEP5_OPENSEEFACE_MAX_WIDTH: int = int(
+        os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH')
+        or os.environ.get('STEP5_YUNET_MAX_WIDTH', '640')
+    )
+    STEP5_OPENSEEFACE_DETECTION_THRESHOLD: float = float(os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD', '0.6'))
+    STEP5_OPENSEEFACE_MAX_FACES: int = int(os.environ.get('STEP5_OPENSEEFACE_MAX_FACES', '1'))
+    STEP5_OPENSEEFACE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE', '1.0'))
+
+    STEP5_EOS_ENV_PYTHON: Optional[str] = os.environ.get('STEP5_EOS_ENV_PYTHON')
+    STEP5_EOS_MODELS_DIR: Optional[str] = os.environ.get('STEP5_EOS_MODELS_DIR')
+    STEP5_EOS_SFM_MODEL_PATH: Optional[str] = os.environ.get('STEP5_EOS_SFM_MODEL_PATH')
+    STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH: Optional[str] = os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH')
+    STEP5_EOS_LANDMARK_MAPPER_PATH: Optional[str] = os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH')
+    STEP5_EOS_EDGE_TOPOLOGY_PATH: Optional[str] = os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH')
+    STEP5_EOS_MODEL_CONTOUR_PATH: Optional[str] = os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH')
+    STEP5_EOS_CONTOUR_LANDMARKS_PATH: Optional[str] = os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH')
+    STEP5_EOS_FIT_EVERY_N: int = int(os.environ.get('STEP5_EOS_FIT_EVERY_N', '1'))
+    STEP5_EOS_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP5_EOS_MAX_FACES')
+    )
+    STEP5_EOS_MAX_WIDTH: int = int(os.environ.get('STEP5_EOS_MAX_WIDTH', '1280'))
+    STEP5_EOS_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_EOS_JAWOPEN_SCALE', '1.0'))
+    
+    def __post_init__(self):
+        """Post-initialization to ensure paths are Path objects and create directories."""
+        # Ensure all path attributes are Path objects
+        if isinstance(self.BASE_PATH_SCRIPTS, str):
+            self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
+        if isinstance(self.CACHE_ROOT_DIR, str):
+            self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
+        if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
+            self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
+        if isinstance(self.LOGS_DIR, str):
+            self.LOGS_DIR = Path(self.LOGS_DIR)
+
+        if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
+            self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
+        
+        # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
+        if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
+            self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
+        elif isinstance(self.VENV_BASE_DIR, str):
+            self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
+
+        # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
+        # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
+        if not self.PYTHON_VENV_EXE:
+            self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
+        else:
+            python_exe_path = Path(self.PYTHON_VENV_EXE)
+            if not python_exe_path.is_absolute():
+                self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
+        
+        # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
+        # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
+        # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
+        # like 'projets_extraits/logs' when steps run with a different CWD.
+        if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
+            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
+        elif not self.LOGS_DIR.is_absolute():
+            self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
+
+        if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
+            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
+        elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
+            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
+
+        if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
+            self.CACHE_ROOT_DIR = Path('/mnt/cache')
+        elif not self.CACHE_ROOT_DIR.is_absolute():
+            self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
+        else:
+            self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
+
+        # Default PROJECTS_DIR if not set
+        if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
+            self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
+        elif isinstance(self.PROJECTS_DIR, str):
+            self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
+        # Default ARCHIVES_DIR if not set
+        if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
+            self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
+        elif isinstance(self.ARCHIVES_DIR, str):
+            self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
+            
+        # Create necessary directories
+        self._create_directories()
+    
+    def _create_directories(self) -> None:
+        """Create necessary directories if they don't exist."""
+        directories_to_create = [
+            self.LOGS_DIR,
+            self.LOGS_DIR / 'step1',
+            self.LOGS_DIR / 'step2',
+            self.LOGS_DIR / 'step3',
+            self.LOGS_DIR / 'step4',
+            self.LOGS_DIR / 'step5',
+            self.LOGS_DIR / 'step6',
+            self.LOGS_DIR / 'step7',
+            # Ensure projects directory exists by default to avoid confusion
+            self.PROJECTS_DIR,
+            # Ensure archives directory exists
+            self.ARCHIVES_DIR,
+        ]
+        
+        for directory in directories_to_create:
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"Ensured directory exists: {directory}")
+            except Exception as e:
+                logger.error(f"Failed to create directory {directory}: {e}")
+    
+    def validate(self, strict: bool = None) -> bool:
+        """
+        Validate the configuration and ensure all required settings are present.
+
+        Args:
+            strict: If None, uses DEBUG mode to determine strictness.
+                   If True, raises errors. If False, logs warnings.
+
+        Returns:
+            bool: True if configuration is valid
+
+        Raises:
+            ValueError: If required configuration is missing or invalid and strict=True
+        """
+        if strict is None:
+            strict = not self.DEBUG  # Strict in production, lenient in development
+
+        errors = []
+        warnings = []
+
+        # Security validation
+        if not self.INTERNAL_WORKER_TOKEN:
+            msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
+                # Set development default
+                self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
+
+        if not self.RENDER_REGISTER_TOKEN:
+            msg = "RENDER_REGISTER_TOKEN environment variable is required"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
+                # Set development default
+                self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
+
+        # Production security checks
+        if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
+            errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
+
+        # Webhook validation (single data source)
+        if not self.WEBHOOK_JSON_URL:
+            msg = "WEBHOOK_JSON_URL must be set"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
+        if self.WEBHOOK_TIMEOUT <= 0:
+            warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
+        if self.WEBHOOK_CACHE_TTL < 0:
+            warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
+        
+        # Path validation
+        if not self.BASE_PATH_SCRIPTS.exists():
+            warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
+        
+        if not self.LOCAL_DOWNLOADS_DIR.exists():
+            warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
+        
+        # Python executable validation
+        python_exe_path = Path(self.PYTHON_VENV_EXE)
+        if not python_exe_path.exists():
+            warnings.append(f"Python executable not found: {python_exe_path}")
+        
+        # Log warnings
+        for warning in warnings:
+            logger.warning(warning)
+        
+        # Log warnings
+        if warnings:
+            for warning in warnings:
+                logger.warning(f"Configuration warning: {warning}")
+            if not strict:
+                logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
+
+        # Raise errors if any
+        if errors:
+            error_msg = f"Configuration validation failed: {'; '.join(errors)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        if warnings and not strict:
+            logger.info("Configuration validation completed with warnings (development mode)")
+        else:
+            logger.info("Configuration validation successful")
+        return True
+    
+    def get_venv_path(self, venv_name: str) -> Path:
+        """
+        Get the path to a virtual environment.
+        
+        Args:
+            venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
+            
+        Returns:
+            Path object to the virtual environment directory
+        """
+        return self.VENV_BASE_DIR / venv_name
+    
+    def get_venv_python(self, venv_name: str) -> Path:
+        """
+        Get the path to the Python executable in a virtual environment.
+        
+        Args:
+            venv_name: Name of the virtual environment
+            
+        Returns:
+            Path object to the Python executable
+        """
+        return self.get_venv_path(venv_name) / "bin" / "python"
+    
+    def get_allowed_base_paths(self) -> List[Path]:
+        """
+        Get list of allowed base paths for file operations.
+        
+        Returns:
+            List of Path objects representing allowed base directories
+        """
+        return [
+            self.BASE_PATH_SCRIPTS,
+            self.LOCAL_DOWNLOADS_DIR,
+            self.LOGS_DIR,
+            self.BASE_PATH_SCRIPTS / 'workflow_scripts',
+            self.BASE_PATH_SCRIPTS / 'static',
+            self.BASE_PATH_SCRIPTS / 'templates',
+            self.BASE_PATH_SCRIPTS / 'utils',
+        ]
+    
+    def to_dict(self) -> dict:
+        """
+        Convert configuration to dictionary for serialization.
+        
+        Returns:
+            Dictionary representation of configuration (excluding sensitive data)
+        """
+        config_dict = {}
+        for key, value in self.__dict__.items():
+            # Exclude sensitive information
+            if 'TOKEN' in key or 'SECRET' in key:
+                config_dict[key] = '***HIDDEN***' if value else None
+            elif isinstance(value, Path):
+                config_dict[key] = str(value)
+            else:
+                config_dict[key] = value
+        
+        return config_dict
+    
+    @staticmethod
+    def check_gpu_availability() -> dict:
+        """
+        Vérifier la disponibilité GPU pour STEP5 (MediaPipe + OpenSeeFace).
+        
+        Returns:
+            dict: {
+                'available': bool,
+                'reason': str (si non disponible),
+                'vram_total_gb': float (si disponible),
+                'vram_free_gb': float (si disponible),
+                'cuda_version': str (si disponible),
+                'onnx_cuda': bool,
+                'tensorflow_gpu': bool
+            }
+        """
+        result = {
+            'available': False,
+            'reason': '',
+            'onnx_cuda': False,
+            'tensorflow_gpu': False
+        }
+        
+        # Check PyTorch CUDA (indicateur général)
+        try:
+            import torch
+            if not torch.cuda.is_available():
+                result['reason'] = 'CUDA not available (PyTorch check)'
+                return result
+            
+            # Vérifier VRAM
+            vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Go
+            vram_free = (torch.cuda.mem_get_info()[0]) / (1024**3)  # Go
+            
+            result['vram_total_gb'] = round(vram_total, 2)
+            result['vram_free_gb'] = round(vram_free, 2)
+            result['cuda_version'] = torch.version.cuda
+            
+            # Vérifier VRAM minimale (2 Go libres recommandés)
+            if vram_free < 1.5:
+                result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+                return result
+        
+        except ImportError:
+            result['reason'] = 'PyTorch not installed in tracking_env'
+            return result
+        except Exception as e:
+            result['reason'] = f'PyTorch CUDA check failed: {e}'
+            return result
+        
+        # Check ONNXRuntime CUDA provider (requis pour OpenSeeFace / InsightFace)
+        try:
+            import onnxruntime as ort
+            if 'CUDAExecutionProvider' in ort.get_available_providers():
+                result['onnx_cuda'] = True
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"ONNXRuntime check failed: {e}")
+
+        # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
+        if not result.get('onnx_cuda'):
+            ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
+            if ort_gpu_python:
+                try:
+                    ort_check_code = (
+                        "import sys\n"
+                        "import onnxruntime as ort\n"
+                        "providers = ort.get_available_providers()\n"
+                        "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
+                    )
+                    completed = subprocess.run(
+                        [ort_gpu_python, "-c", ort_check_code],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if completed.returncode == 0:
+                        result['onnx_cuda'] = completed.stdout.strip() == "1"
+                    else:
+                        logger.warning(
+                            "ONNXRuntime GPU check failed (external env returned code %s): %s",
+                            completed.returncode,
+                            completed.stderr.strip(),
+                        )
+                except FileNotFoundError:
+                    logger.warning(
+                        "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
+                        ort_gpu_python,
+                    )
+                except subprocess.TimeoutExpired:
+                    logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
+                except Exception as exc:
+                    logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
+        
+        # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
+        if result['onnx_cuda']:
+            result['available'] = True
+        else:
+            result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
+        
+        return result
+    
+    @staticmethod
+    def is_step5_gpu_enabled() -> bool:
+        """
+        Vérifier si le mode GPU STEP5 est activé via configuration.
+        
+        Returns:
+            bool: True si STEP5_ENABLE_GPU=1
+        """
+        return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
+    
+    @staticmethod
+    def get_step5_gpu_engines() -> List[str]:
+        """
+        Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
+        
+        Returns:
+            List[str]: ['mediapipe_landmarker', 'openseeface', ...]
+        """
+        engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
+        engines = _parse_csv_list(engines_str)
+        # Normaliser les noms
+        return [e.strip().lower() for e in engines if e.strip()]
+    
+    @staticmethod
+    def get_step5_gpu_max_vram_mb() -> int:
+        """
+        Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
+        
+        Returns:
+            int: Limite en Mo (défaut: 2048)
+        """
+        return _parse_optional_positive_int(
+            os.environ.get('STEP5_GPU_MAX_VRAM_MB')
+        ) or 2048
+
+
+# Global configuration instance
+config = Config()
+```
+
+## File: services/csv_service.py
+```python
+"""
+CSV Service
+Centralized service for CSV monitoring functionality.
+"""
+
+import logging
+import os
+import json
+import re
+from datetime import datetime, timezone
+from typing import Dict, Any, Set, Optional, List
+import shutil
+import urllib.parse
+import html
+from config.settings import config
+from services.download_history_repository import download_history_repository
+
+logger = logging.getLogger(__name__)
+
+# Import WebhookService for external JSON source
+try:
+    from services.webhook_service import fetch_records as webhook_fetch_records, get_service_status as webhook_status
+    WEBHOOK_SERVICE_AVAILABLE = True
+except Exception:
+    WEBHOOK_SERVICE_AVAILABLE = False
+    def webhook_status():
+        return {"available": False, "error": "WebhookService not available"}
+
+# Note: CSV monitoring state and downloads tracking are now managed in app_new.py
+# This service acts as an interface to those global variables
+
+LEGACY_DOWNLOAD_HISTORY_FILE = config.BASE_PATH_SCRIPTS / "download_history.json"
+_SHARED_GROUP = config.DOWNLOAD_HISTORY_SHARED_GROUP
+_SHARED_FILE_MODE = 0o664
+
+# Optional in-memory cache for last known good history set to avoid bursts on transient read errors
+_LAST_KNOWN_HISTORY_SET: Set[str] = set()
+
+
+def _is_dropbox_url(url: str) -> bool:
+    """Return True if the URL belongs to Dropbox domains.
+
+    Args:
+        url: URL string
+
+    Returns:
+        bool: True if hostname matches known Dropbox hostnames
+    """
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse((url or "").strip())
+        host = (parsed.hostname or "").lower()
+        # Known Dropbox hostnames
+        return host in {"dropbox.com", "www.dropbox.com", "dl.dropboxusercontent.com"}
+    except Exception:
+        return False
+
+
+def _is_dropbox_proxy_url(url: str) -> bool:
+    """Return True if the URL looks like a worker/R2 proxy for Dropbox downloads."""
+    try:
+        u = (url or "").strip().lower()
+        return "/dropbox/" in u and ("workers.dev" in u or "worker" in u)
+    except Exception:
+        return False
+
+
+def _looks_like_archive_download(url: Optional[str], original_filename: Optional[str]) -> bool:
+    """Heuristic to avoid auto-downloading non-archive Dropbox links (e.g. png previews)."""
+    u = (url or "").strip().lower()
+    fn = (original_filename or "").strip().lower()
+    if fn.endswith('.zip'):
+        return True
+    if '/scl/fo/' in u:
+        return True
+    if u.endswith('.zip') or '.zip?' in u:
+        return True
+    return False
+
+
+class CSVService:
+    """
+    Centralized service for CSV monitoring functionality.
+    Handles CSV file monitoring and download tracking.
+    """
+    
+    _initialized = False
+
+    @staticmethod
+    def initialize() -> None:
+        """Initialize the CSV service."""
+        if not CSVService._initialized:
+            CSVService._initialized = True
+            logger.info("CSV service initialized")
+            try:
+                download_history_repository.initialize()
+            except Exception as e:
+                logger.warning(f"History DB initialization failed: {e}")
+
+            try:
+                CSVService._migrate_legacy_history_json_to_sqlite_if_needed()
+            except Exception as e:
+                logger.warning(f"Legacy history migration skipped due to error: {e}")
+
+    @staticmethod
+    def _migrate_legacy_history_json_to_sqlite_if_needed() -> Dict[str, Any]:
+        try:
+            if not LEGACY_DOWNLOAD_HISTORY_FILE.exists():
+                return {"status": "noop", "reason": "legacy_missing"}
+            if download_history_repository.count() > 0:
+                return {"status": "noop", "reason": "db_not_empty"}
+
+            items = CSVService._load_structured_history()
+            if not items:
+                return {"status": "noop", "reason": "legacy_empty"}
+
+            def _normalize_ts_for_db(ts: str) -> str:
+                if not ts:
+                    return ""
+                raw = str(ts).strip()
+                if not raw:
+                    return ""
+                try:
+                    dt = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+                    if dt.tzinfo:
+                        return dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    pass
+                return raw
+
+            entries = []
+            for item in items:
+                url = item.get('url')
+                ts = item.get('timestamp') or ''
+                if not url:
+                    continue
+                entries.append((url, _normalize_ts_for_db(ts)))
+
+            download_history_repository.upsert_many(entries)
+            return {"status": "success", "total": len(entries)}
+        except Exception as e:
+            logger.warning(f"Legacy history migration failed: {e}")
+            return {"status": "error", "message": str(e)}
+    
+    @staticmethod
+    def get_monitor_status() -> Dict[str, Any]:
+        """
+        Get monitoring service status (CSV or Airtable).
+
+        Returns:
+            Monitor status dictionary with both CSV and Airtable information
+        """
+        # Import WorkflowState singleton
+        from services.workflow_state import get_workflow_state
+        
+        workflow_state = get_workflow_state()
+        monitor_status = workflow_state.get_csv_monitor_status()
+
+        # Webhook is the single data source
+        status = {
+            "csv_monitor": monitor_status,
+            "data_source": "webhook",
+            "monitor_interval": config.WEBHOOK_MONITOR_INTERVAL,
+            "webhook": webhook_status()
+        }
+
+        return status
+    
+
+    
+    @staticmethod
+    def get_download_history() -> Set[str]:
+        """
+        Load download history from file as a set of URLs (backward compatible).
+
+        The underlying file may be:
+        - A list of strings: ["url1", "url2", ...]
+        - A list of objects: [{"url": "...", "timestamp": "YYYY-MM-DD HH:MM:SS"}, ...]
+
+        Returns:
+            Set[str]: URLs present in history
+        """
+        try:
+            CSVService.initialize()
+            global _LAST_KNOWN_HISTORY_SET
+            urls = download_history_repository.get_urls()
+            _LAST_KNOWN_HISTORY_SET = set(urls)
+            return set(urls)
+        except Exception as e:
+            logger.error(f"Error loading download history: {e}")
+            return set(_LAST_KNOWN_HISTORY_SET)
+
+    @staticmethod
+    def _parse_history_to_set(data: Any) -> Set[str]:
+        """Convert history JSON content to a set of URLs supporting both formats."""
+        if not isinstance(data, list):
+            return set()
+        if data and isinstance(data[0], dict):
+            return {CSVService._normalize_url(str(item.get('url'))) for item in data if isinstance(item, dict) and item.get('url')}
+        return {CSVService._normalize_url(str(u)) for u in data if isinstance(u, str)}
+
+    @staticmethod
+    def _normalize_url(url: str) -> str:
+        """Normalize URLs to prevent duplicates due to minor variations.
+
+        Rules:
+        - Trim whitespace
+        - Unescape HTML entities (e.g., '&amp;' -> '&')
+        - Recursively decode double-encoded sequences (e.g., amp%3Bdl=0 -> &dl=0)
+        - Lowercase scheme and hostname
+        - Remove default ports (80 for http, 443 for https)
+        - Sort query parameters by key and value
+        - Remove empty query parameters
+        - For Dropbox links, ensure a single dl=1 param and collapse duplicates
+        - Remove trailing slashes for non-root paths
+        - Percent-decode path and then re-encode safely
+        """
+        if not url:
+            return ""
+        try:
+            raw = url.strip()
+            # First, unescape HTML entities that may come from CSV/HTML sources
+            # Example: '...&amp;dl=0' -> '...&dl=0'
+            try:
+                raw = html.unescape(raw)
+            except Exception:
+                pass
+            
+            # Pre-process: recursively decode double-encoded sequences that may cause parsing issues
+            # Example: "amp%3Bdl=0&dl=1" becomes "&dl=0&dl=1", which is then properly parsed
+            prev_url = None
+            max_decode_iterations = 3
+            iteration = 0
+            while prev_url != raw and iteration < max_decode_iterations:
+                prev_url = raw
+                # Decode common double-encoded patterns (HTML entity codes)
+                if 'amp%3B' in raw or 'amp%3b' in raw:
+                    raw = raw.replace('amp%3B', '&').replace('amp%3b', '&')
+                # Detect and clean malformed ampersands that appear before valid params
+                # Pattern: "?amp%3Bdl=0&dl=1" -> "?dl=1"
+                if '%3B' in raw or '%3b' in raw:
+                    # Try URL decode once to catch other double-encoded params
+                    try:
+                        decoded = urllib.parse.unquote(raw)
+                        # Only accept if it still looks like a valid URL
+                        if '://' in decoded:
+                            raw = decoded
+                    except Exception:
+                        pass
+                iteration += 1
+            
+            parsed = urllib.parse.urlsplit(raw)
+            scheme = (parsed.scheme or '').lower()
+            netloc = (parsed.hostname or '').lower()
+            port = parsed.port
+            # Preserve username/password if any
+            if parsed.username or parsed.password:
+                auth = ''
+                if parsed.username:
+                    auth += urllib.parse.quote(parsed.username)
+                if parsed.password:
+                    auth += f":{urllib.parse.quote(parsed.password)}"
+                netloc = f"{auth}@{netloc}" if auth else netloc
+
+            # Drop default ports
+            if port and not (
+                (scheme == 'http' and port == 80) or (scheme == 'https' and port == 443)
+            ):
+                netloc = f"{netloc}:{port}"
+
+            # Normalize path: decode, strip, remove duplicate slashes
+            path = urllib.parse.unquote(parsed.path or '')
+            if '//' in path:
+                while '//' in path:
+                    path = path.replace('//', '/')
+            # Remove trailing slash unless root
+            if path.endswith('/') and path != '/':
+                path = path[:-1]
+            # Re-encode path safely
+            path = urllib.parse.quote(path, safe='/-._~')
+
+            # Normalize query params
+            q = urllib.parse.parse_qsl(parsed.query or '', keep_blank_values=False)
+            # Special handling for Dropbox: force dl=1
+            host_lower = (parsed.hostname or '').lower() if parsed.hostname else ''
+            is_dropbox = host_lower.endswith('dropbox.com') or host_lower == 'dl.dropboxusercontent.com'
+            filtered = []
+            seen = set()
+            for k, v in q:
+                key = k.strip()
+                val = v.strip()
+                # Skip completely empty params
+                if not key:
+                    continue
+                # Skip params with empty values (except legitimate ones like rlkey)
+                if not val and key.lower() not in ('rlkey',):
+                    # For Dropbox dl param, empty value is invalid
+                    if is_dropbox and key.lower() == 'dl':
+                        continue
+                # collapse duplicates
+                tup = (key, val)
+                if tup in seen:
+                    continue
+                seen.add(tup)
+                # We will handle dl param below for Dropbox
+                if is_dropbox and key.lower() == 'dl':
+                    continue
+                filtered.append((key, val))
+
+            if is_dropbox:
+                filtered.append(('dl', '1'))
+
+            # Sort for determinism
+            filtered.sort(key=lambda kv: (kv[0].lower(), kv[1]))
+            query = urllib.parse.urlencode(filtered, doseq=True)
+
+            # Fragment is not relevant for downloads; drop it
+            normalized = urllib.parse.urlunsplit((scheme, netloc, path, query, ''))
+            return normalized
+        except Exception:
+            return url.strip()
+
+    @staticmethod
+    def _load_structured_history() -> List[Dict[str, str]]:
+        """Load the history as a list of {url, timestamp} objects (best-effort).
+
+        Returns:
+            List[Dict[str, str]]: Each item contains 'url' and 'timestamp' (string)
+        """
+        try:
+            if not LEGACY_DOWNLOAD_HISTORY_FILE.exists():
+                return []
+            with open(LEGACY_DOWNLOAD_HISTORY_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                return []
+            # If already structured
+            if data and isinstance(data[0], dict):
+                result: List[Dict[str, str]] = []
+                for item in data:
+                    if isinstance(item, dict) and item.get('url'):
+                        ts = str(item.get('timestamp')) if item.get('timestamp') else None
+                        result.append({
+                            'url': CSVService._normalize_url(str(item.get('url'))),
+                            'timestamp': ts if ts else ''
+                        })
+                return result
+            # Flat list of URLs -> convert to objects with empty timestamp
+            result = []
+            for u in data:
+                if isinstance(u, str) and u:
+                    result.append({'url': CSVService._normalize_url(u), 'timestamp': ''})
+            return result
+        except Exception as e:
+            logger.error(f"Error loading structured download history: {e}")
+            return []
+
+    @staticmethod
+    def _now_ts_str() -> str:
+        """Return current timestamp as 'YYYY-MM-DD HH:MM:SS' in LOCAL time."""
+        # Use system local timezone
+        return datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')
+
+    @staticmethod
+    def migrate_history_to_local_time() -> Dict[str, Any]:
+        """
+        Convert existing download_history.json timestamps from UTC to local time.
+
+        Assumes stored timestamps are in 'YYYY-MM-DD HH:MM:SS' and represent UTC.
+        For each, convert to local timezone and re-save chronologically.
+
+        Returns:
+            dict with migration summary
+        """
+        try:
+            items = CSVService._load_structured_history()
+            if not items:
+                return {"status": "noop", "updated": 0}
+
+            updated = 0
+            converted: List[Dict[str, str]] = []
+            for item in items:
+                url = item.get('url')
+                ts = item.get('timestamp') or ''
+                new_ts = ts
+                if ts:
+                    try:
+                        # Parse as UTC naive and set tzinfo=UTC, then convert to local
+                        dt_utc = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                        dt_local = dt_utc.astimezone()  # system local tz
+                        new_ts = dt_local.strftime('%Y-%m-%d %H:%M:%S')
+                        if new_ts != ts:
+                            updated += 1
+                    except Exception:
+                        # Best-effort: try ISO parse
+                        try:
+                            dt_any = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                            dt_local = (dt_any if dt_any.tzinfo else dt_any.replace(tzinfo=timezone.utc)).astimezone()
+                            new_ts = dt_local.strftime('%Y-%m-%d %H:%M:%S')
+                            if new_ts != ts:
+                                updated += 1
+                        except Exception:
+                            # Leave as is if unparseable
+                            new_ts = ts
+                converted.append({'url': url, 'timestamp': new_ts})
+
+            # Sort chronologically, then by URL
+            def _sort_key(item: Dict[str, str]):
+                ts = item.get('timestamp') or '9999-12-31 23:59:59'
+                return (ts, item.get('url') or '')
+
+            converted.sort(key=_sort_key)
+
+            with open(LEGACY_DOWNLOAD_HISTORY_FILE, 'w', encoding='utf-8') as f:
+                json.dump(converted, f, indent=2, ensure_ascii=False)
+
+            return {"status": "success", "updated": updated, "total": len(converted)}
+        except Exception as e:
+            logger.error(f"Error migrating history to local time: {e}")
+            return {"status": "error", "message": str(e)}
+    
+    @staticmethod
+    def _ensure_shared_permissions(target):
+        """
+        Apply shared group/permission settings to the target file if configured.
+        """
+        if not target or not target.exists():
+            return
+        if _SHARED_GROUP:
+            try:
+                shutil.chown(target, group=_SHARED_GROUP)
+            except Exception as chown_err:
+                logger.warning(f"Unable to assign shared group '{_SHARED_GROUP}' to {target}: {chown_err}")
+        try:
+            os.chmod(target, _SHARED_FILE_MODE)
+        except Exception as chmod_err:
+            logger.warning(f"Unable to set shared permissions on {target}: {chmod_err}")
+
+    @staticmethod
+    def save_download_history(history_set: Set[str]) -> None:
+        """
+        Save download history to file, as a chronologically sorted list of
+        objects {url, timestamp}. Backward compatible with callers passing a set.
+
+        Rules:
+        - Preserve existing timestamps for URLs already present.
+        - Assign current timestamp to new URLs.
+        - Only persist URLs present in history_set (reflects clear/overwrite).
+        - Sort by timestamp ASC, then URL for deterministic order.
+        """
+        try:
+            ts_by_url = download_history_repository.get_ts_by_url()
+            normalized_set = {CSVService._normalize_url(u) for u in history_set}
+
+            entries = []
+            for url in sorted(normalized_set):
+                ts = ts_by_url.get(url) or CSVService._now_ts_str()
+                entries.append((url, ts))
+
+            def _sort_key(item):
+                ts = item[1] or '9999-12-31 23:59:59'
+                return (ts, item[0] or '')
+
+            entries.sort(key=_sort_key)
+            download_history_repository.replace_all(entries)
+
+            global _LAST_KNOWN_HISTORY_SET
+            _LAST_KNOWN_HISTORY_SET = set(normalized_set)
+        except Exception as e:
+            logger.error(f"Error saving download history: {e}")
+    
+    @staticmethod
+    def add_to_download_history(url: str) -> bool:
+        """
+        Add URL to download history.
+        
+        Args:
+            url: URL to add to history
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return CSVService.add_to_download_history_with_timestamp(url, None)
+
+    @staticmethod
+    def add_to_download_history_with_timestamp(url: str, timestamp_str: Optional[str]) -> bool:
+        """
+        Add URL to download history with a provided timestamp (if any).
+
+        Preserves the earliest timestamp seen for a URL. If no valid timestamp is
+        provided, uses current time.
+
+        Args:
+            url: URL to add
+            timestamp_str: Optional timestamp string 'YYYY-MM-DD HH:MM:SS' or ISO; best-effort parsed
+
+        Returns:
+            True if persisted successfully, else False
+        """
+        try:
+            ts_norm = None
+            if timestamp_str:
+                try:
+                    dt = datetime.fromisoformat(str(timestamp_str).replace('Z', '+00:00'))
+                    ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    try:
+                        dt = datetime.strptime(str(timestamp_str), '%Y-%m-%d %H:%M:%S')
+                        ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    except Exception:
+                        ts_norm = str(timestamp_str)
+            if not ts_norm:
+                ts_norm = CSVService._now_ts_str()
+
+            norm_url = CSVService._normalize_url(url)
+            download_history_repository.upsert(norm_url, ts_norm)
+
+            global _LAST_KNOWN_HISTORY_SET
+            _LAST_KNOWN_HISTORY_SET.add(norm_url)
+            return True
+        except Exception as e:
+            logger.error(f"Error adding to download history with timestamp: {e}")
+            return False
+    
+    @staticmethod
+    def is_url_downloaded(url: str) -> bool:
+        """
+        Check if URL has been downloaded before.
+        
+        Args:
+            url: URL to check
+            
+        Returns:
+            True if URL was previously downloaded
+        """
+        history = CSVService.get_download_history()
+        return CSVService._normalize_url(url) in history
+    
+    @staticmethod
+    def get_csv_downloads_status() -> Dict[str, Any]:
+        """
+        Get status of CSV downloads.
+
+        Returns:
+            CSV downloads status dictionary
+        """
+        # Import WorkflowState singleton
+        from services.workflow_state import get_workflow_state
+        
+        workflow_state = get_workflow_state()
+        active_downloads = workflow_state.get_active_csv_downloads_dict()
+        recent_statuses = workflow_state.get_kept_csv_downloads_list()
+
+        return {
+            "active_downloads": active_downloads,
+            "recent_statuses": recent_statuses,
+            "total_active": len(active_downloads),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    @staticmethod
+    def add_csv_download(download_id: str, download_info: Dict[str, Any]) -> None:
+        """
+        Add a CSV download to tracking.
+
+        Args:
+            download_id: Unique download identifier
+            download_info: Download information dictionary
+        """
+        # Import WorkflowState singleton
+        from services.workflow_state import get_workflow_state
+        
+        workflow_state = get_workflow_state()
+        download_data = {
+            **download_info,
+            "start_time": datetime.now(timezone.utc).isoformat()
+        }
+        workflow_state.add_csv_download(download_id, download_data)
+
+        logger.info(f"CSV download added: {download_id}")
+    
+    @staticmethod
+    def update_csv_download(download_id: str, status: str, **kwargs) -> None:
+        """
+        Update CSV download status.
+
+        Args:
+            download_id: Download identifier
+            status: New status
+            **kwargs: Additional fields to update
+        """
+        # Import WorkflowState singleton
+        from services.workflow_state import get_workflow_state
+        
+        workflow_state = get_workflow_state()
+        
+        # Update download status with individual parameters
+        progress = kwargs.get('progress')
+        message = kwargs.get('message')
+        filename = kwargs.get('filename')
+        
+        workflow_state.update_csv_download(
+            download_id=download_id,
+            status=status,
+            progress=progress,
+            message=message,
+            filename=filename
+        )
+
+        # If download completed, move to history
+        if status in ["completed", "failed", "cancelled", "unknown_error"]:
+            workflow_state.move_csv_download_to_history(download_id)
+
+        logger.debug(f"CSV download updated: {download_id} -> {status}")
+    
+    @staticmethod
+    def remove_csv_download(download_id: str) -> None:
+        """
+        Remove CSV download from tracking.
+
+        Args:
+            download_id: Download identifier
+        """
+        # Import WorkflowState singleton
+        from services.workflow_state import get_workflow_state
+        
+        workflow_state = get_workflow_state()
+        workflow_state.remove_csv_download(download_id)
+
+        logger.info(f"CSV download removed: {download_id}")
+    
+    @staticmethod
+    def rewrite_dropbox_to_dl_host(url_str: str) -> str:
+        """Rewrite a www.dropbox.com URL to dl.dropboxusercontent.com preserving path/query.
+
+        Example:
+        https://www.dropbox.com/scl/fo/<id>?rlkey=...&dl=1 ->
+        https://dl.dropboxusercontent.com/scl/fo/<id>?rlkey=...&dl=1
+
+        Args:
+            url_str: Original Dropbox URL
+
+        Returns:
+            Rewritten URL string
+        """
+        try:
+            parsed = urllib.parse.urlsplit(url_str)
+            host = parsed.hostname or ""
+            # Do NOT rewrite folder share links ('/scl/fo/') which are not served by dl.dropboxusercontent.com
+            if (host.endswith("dropbox.com") and host != "dl.dropboxusercontent.com"
+                    and not (parsed.path or '').lower().startswith('/scl/fo/')):
+                new_netloc = "dl.dropboxusercontent.com"
+                # preserve port if any (rare)
+                if parsed.port and parsed.port not in (80, 443):
+                    new_netloc = f"{new_netloc}:{parsed.port}"
+                return urllib.parse.urlunsplit((parsed.scheme or "https", new_netloc, parsed.path, parsed.query, ""))
+            return url_str
+        except Exception:
+            return url_str
+
+    @staticmethod
+    def _check_csv_for_downloads() -> None:
+        """
+        Check for new downloads using Webhook as the single data source.
+        """
+        try:
+            # Import here to avoid circular imports
+            from app_new import execute_csv_download_worker
+            from services.workflow_state import get_workflow_state
+            import threading
+            import os
+
+            # Fetch data from Webhook (single data source)
+            if not WEBHOOK_SERVICE_AVAILABLE:
+                logger.error("WebhookService not available - monitoring disabled")
+                return
+
+            logger.debug("Fetching data from Webhook")
+            data_rows = webhook_fetch_records()
+            source_type = "WEBHOOK"
+
+            if data_rows is None:
+                logger.warning(f"Could not fetch data from {source_type}")
+                return
+
+            # Get current download history (normalized URLs)
+            download_history = CSVService.get_download_history()
+
+            workflow_state = get_workflow_state()
+            active_downloads = workflow_state.get_active_csv_downloads_dict()
+            kept_downloads = workflow_state.get_kept_csv_downloads_list()
+
+            tracked_urls: Set[str] = set()
+            try:
+                candidates = list(active_downloads.values()) + list(kept_downloads)
+                for download in candidates:
+                    if not isinstance(download, dict):
+                        continue
+                    status = str(download.get('status') or '').strip().lower()
+                    if status in ('failed', 'cancelled', 'unknown_error'):
+                        continue
+                    raw_url = (download.get('original_url') or download.get('url') or '').strip()
+                    if not raw_url:
+                        continue
+                    norm_existing = CSVService._normalize_url(raw_url)
+                    if norm_existing:
+                        tracked_urls.add(norm_existing)
+            except Exception:
+                tracked_urls = set()
+
+            def _is_url_already_tracked(norm_primary: Optional[str], norm_fallback: Optional[str]) -> bool:
+                if norm_primary and norm_primary in tracked_urls:
+                    return True
+                if norm_fallback and norm_fallback in tracked_urls:
+                    return True
+                return False
+
+            total_rows = len(data_rows)
+            skipped_missing_url = 0
+            skipped_already_in_history = 0
+            skipped_already_tracked = 0
+
+            # Check for new URLs
+            new_downloads = 0
+            # Optional dry-run to avoid real downloads (useful for tests/CI):
+            dry_run = os.environ.get('DRY_RUN_DOWNLOADS', 'false').lower() in ('true', '1')
+
+            handled_in_this_pass: Set[str] = set()
+
+            for row in data_rows:
+                url = row.get('url')
+                fallback_url = row.get('fallback_url')
+                original_filename = row.get('original_filename')
+                provider = row.get('provider')
+                timestamp_str = row.get('timestamp')
+
+                norm_url = CSVService._normalize_url(url) if url else None
+                norm_fallback_url = CSVService._normalize_url(fallback_url) if fallback_url else None
+
+                if norm_url and norm_url in handled_in_this_pass:
+                    continue
+                if norm_fallback_url and norm_fallback_url in handled_in_this_pass:
+                    continue
+
+                already_in_history = (
+                    (norm_url and norm_url in download_history)
+                    or (norm_fallback_url and norm_fallback_url in download_history)
+                )
+                if not norm_url:
+                    skipped_missing_url += 1
+                    continue
+                if _is_url_already_tracked(norm_url, norm_fallback_url):
+                    skipped_already_tracked += 1
+                    handled_in_this_pass.add(norm_url)
+                    if norm_fallback_url:
+                        handled_in_this_pass.add(norm_fallback_url)
+                    continue
+                if already_in_history:
+                    skipped_already_in_history += 1
+                    # Common case: preferred URL removed from history, but fallback URL still present.
+                    # This is expected behavior to prevent re-downloads across URL variants.
+                    if (
+                        norm_fallback_url
+                        and norm_fallback_url in download_history
+                        and norm_url not in download_history
+                    ):
+                        logger.debug(
+                            f"{source_type} MONITOR: Skipping URL because fallback is already in download history "
+                            f"(preferred={norm_url}, fallback={norm_fallback_url})"
+                        )
+                    continue
+
+                try:
+                    parsed_primary = urllib.parse.urlsplit(url or '')
+                    scheme_primary = (parsed_primary.scheme or '').lower()
+                    if scheme_primary and scheme_primary not in ('http', 'https'):
+                        logger.debug(
+                            f"{source_type} MONITOR: Ignoring unsupported URL scheme '{scheme_primary}': {url}"
+                        )
+                        handled_in_this_pass.add(norm_url)
+                        if norm_fallback_url:
+                            handled_in_this_pass.add(norm_fallback_url)
+                        continue
+                except Exception:
+                    # If URL parsing fails, treat it as non-eligible.
+                    logger.debug(
+                        f"{source_type} MONITOR: Ignoring invalid URL (parse error): {url}"
+                    )
+                    handled_in_this_pass.add(norm_url)
+                    if norm_fallback_url:
+                        handled_in_this_pass.add(norm_fallback_url)
+                    continue
+
+                url_lower = (url or '').lower()
+                provider_lower = str(provider or '').strip().lower()
+
+                # Determine URL type for UI hints / routing
+                url_type = (
+                    str(row.get('url_type') or '').strip().lower()
+                    or (
+                        'fromsmash' if 'fromsmash.com' in url_lower else (
+                            'swisstransfer' if 'swisstransfer.com' in url_lower else (
+                                'dropbox' if (_is_dropbox_url(url) or _is_dropbox_proxy_url(url) or provider_lower == 'dropbox') else 'external'
+                            )
+                        )
+                    )
+                )
+
+                is_dropbox_like = (
+                    url_type == 'dropbox'
+                    or provider_lower == 'dropbox'
+                    or _is_dropbox_url(url)
+                    or _is_dropbox_proxy_url(url)
+                )
+
+                # Auto-download is intentionally restricted:
+                # - Prevents large backlog downloads from legacy entries.
+                # - Focuses on the new webhook schema (original_filename / fallback_url) and R2 proxy URLs.
+                has_new_schema_hints = bool(
+                    (original_filename and str(original_filename).strip())
+                    or (fallback_url and str(fallback_url).strip())
+                    or _is_dropbox_proxy_url(url)
+                )
+                auto_download_allowed = (
+                    is_dropbox_like
+                    and _looks_like_archive_download(url, original_filename)
+                    and has_new_schema_hints
+                )
+
+                if auto_download_allowed:
+                    logger.info(
+                        f"{source_type} MONITOR: New eligible URL detected: {url} (timestamp: {timestamp_str}) [type={url_type}]"
+                    )
+                    # Dropbox-like: proceed with auto-download (unless dry-run)
+                    if dry_run:
+                        logger.info(
+                            f"[DRY RUN] Would start Dropbox download for URL: {url} (timestamp: {timestamp_str})"
+                        )
+                        CSVService.add_to_download_history_with_timestamp(norm_url, timestamp_str)
+                        download_history.add(norm_url)
+                        handled_in_this_pass.add(norm_url)
+                        if norm_fallback_url:
+                            CSVService.add_to_download_history_with_timestamp(norm_fallback_url, timestamp_str)
+                            download_history.add(norm_fallback_url)
+                            handled_in_this_pass.add(norm_fallback_url)
+                        new_downloads += 1
+                    else:
+                        download_thread = threading.Thread(
+                            target=execute_csv_download_worker,
+                            args=(url, timestamp_str, fallback_url, original_filename),
+                            name=f"Download-{str(timestamp_str).replace('/', '').replace(' ', '_').replace(':', '')}"
+                        )
+                        download_thread.daemon = True
+                        download_thread.start()
+                        handled_in_this_pass.add(norm_url)
+                        if norm_fallback_url:
+                            handled_in_this_pass.add(norm_fallback_url)
+                        new_downloads += 1
+                else:
+                    # Non-eligible link: ignore it (no UI entry, no history write) to keep auto-download Dropbox-only.
+                    logger.debug(
+                        f"{source_type} MONITOR: Ignoring non-eligible URL (auto-download disabled): {url} "
+                        f"(timestamp: {timestamp_str}) [type={url_type}]"
+                    )
+                    handled_in_this_pass.add(norm_url)
+                    if norm_fallback_url:
+                        handled_in_this_pass.add(norm_fallback_url)
+
+            if new_downloads > 0:
+                logger.info(f"{source_type} MONITOR: {new_downloads} new download(s) started")
+            if new_downloads == 0:
+                logger.debug(
+                    f"{source_type} MONITOR: No new items (rows={total_rows}, "
+                    f"skipped_in_history={skipped_already_in_history}, skipped_tracked={skipped_already_tracked}, "
+                    f"skipped_missing_url={skipped_missing_url})"
+                )
+
+        except Exception as e:
+            logger.error(f"Error checking for downloads: {e}", exc_info=True)
+
+    @staticmethod
+    def _normalize_and_deduplicate_history() -> None:
+        """Normalize and deduplicate the persisted history file.
+
+        Preserves earliest timestamp per logical URL.
+        """
+        try:
+            existing = CSVService._load_structured_history()
+            if not existing:
+                return
+            # Build minimal map url->timestamp keeping earliest timestamp (lexicographically smaller)
+            ts_by_url: Dict[str, str] = {}
+            for item in existing:
+                url = CSVService._normalize_url(item.get('url') or '')
+                ts = item.get('timestamp') or ''
+                if not url:
+                    continue
+                if url in ts_by_url:
+                    prev = ts_by_url[url]
+                    ts_by_url[url] = min(prev or ts, ts or prev)
+                else:
+                    ts_by_url[url] = ts
+            CSVService.save_download_history(set(ts_by_url.keys()))
+        except Exception as e:
+            logger.warning(f"Failed to normalize/deduplicate history: {e}")
+
+    @staticmethod
+    def clear_download_history() -> Dict[str, str]:
+        """
+        Clear download history.
+        
+        Returns:
+            Result dictionary with status and message
+        """
+        try:
+            CSVService.initialize()
+            download_history_repository.delete_all()
+            global _LAST_KNOWN_HISTORY_SET
+            _LAST_KNOWN_HISTORY_SET = set()
+            return {
+                "status": "success",
+                "message": "Download history cleared"
+            }
+        except Exception as e:
+            logger.error(f"Error clearing download history: {e}")
+            return {
+                "status": "error",
+                "message": f"Failed to clear download history: {str(e)}"
+            }
+    
+    @staticmethod
+    def get_statistics() -> Dict[str, Any]:
+        """
+        Get CSV service statistics.
+        
+        Returns:
+            Statistics dictionary
+        """
+        history = CSVService.get_download_history()
+        downloads_status = CSVService.get_csv_downloads_status()
+        monitor_status = CSVService.get_monitor_status()
+
+        return {
+            "download_history_count": len(history),
+            "active_downloads": downloads_status["total_active"],
+            "monitor_status": monitor_status["csv_monitor"]["status"],
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+```
+
 ## File: static/css/components/controls.css
 ```css
 /* ===== UNIFIED CONTROLS SECTION ===== */
@@ -32211,6 +31922,375 @@ if __name__ == '__main__':
     align-items: stretch;
   }
 }
+```
+
+## File: static/css/components/logs.css
+```css
+.logs-column {
+    position: relative;
+    background: color-mix(in oklab, var(--bg-card) 92%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
+    border-radius: var(--pipeline-card-radius);
+    box-shadow:
+        0 10px 26px rgba(0,0,0,0.22),
+        0 0 0 1px rgb(var(--accent-primary-rgb) / 0.12);
+}
+
+.logs-column > * {
+    position: relative;
+    z-index: 1;
+}
+
+.logs-column::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: var(--pipeline-axis-width);
+    background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
+    border-radius: 999px;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.logs-column::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 36px;
+    background: radial-gradient(
+        circle at 12px 30%,
+        rgb(var(--accent-primary-rgb) / 0.22) 0%,
+        rgb(var(--accent-primary-rgb) / 0.10) 40%,
+        rgb(var(--accent-primary-rgb) / 0.00) 70%
+    );
+    pointer-events: none;
+}
+
+.log-panel-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    color: var(--accent-primary);
+    font-size: 1.3em;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: color var(--motion-duration-medium) var(--motion-ease-standard);
+}
+
+.log-panel-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.log-panel-subheader {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+#log-panel-context-step {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.log-panel-specific-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.log-panel-specific-buttons .specific-log-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 10px 18px;
+    background: color-mix(in oklab, var(--bg-card) 80%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+        color var(--motion-duration-fast) var(--motion-ease-standard),
+        background var(--motion-duration-fast) var(--motion-ease-standard),
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.log-panel-specific-buttons .specific-log-button:hover {
+    color: var(--text-primary);
+    background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
+    border-color: rgb(var(--accent-primary-rgb) / 0.35);
+}
+
+.log-panel-specific-buttons .specific-log-button:active {
+    transform: scale(0.98);
+}
+
+#close-log-panel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: color-mix(in oklab, var(--bg-card) 80%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: 1.45em;
+    cursor: pointer;
+    transition:
+        color var(--motion-duration-fast) var(--motion-ease-standard),
+        background var(--motion-duration-fast) var(--motion-ease-standard),
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+#close-log-panel:hover {
+    color: var(--text-primary);
+    background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
+    border-color: rgb(var(--accent-primary-rgb) / 0.35);
+}
+
+#close-log-panel:active {
+    transform: scale(0.96);
+}
+
+.log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
+.log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
+
+.log-output,
+.specific-log-output {
+    background-color: var(--log-bg);
+    color: var(--text-bright);
+    padding: 15px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 1em;
+    line-height: 1.45;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border-radius: 0 0 8px 8px;
+    flex-grow: 1;
+}
+
+/* Enhanced Log Styling - Different log types */
+.log-line {
+    display: block;
+    margin: 2px 0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    position: relative;
+}
+
+.log-line.log-success {
+    background-color: rgb(var(--status-success-rgb) / 0.12);
+    border-left: 3px solid var(--status-success);
+    color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
+}
+
+.log-line.log-warning {
+    background-color: rgb(var(--status-warning-rgb) / 0.12);
+    border-left: 3px solid var(--status-warning);
+    color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
+}
+
+.log-line.log-error {
+    background-color: rgb(var(--status-error-rgb) / 0.12);
+    border-left: 3px solid var(--status-error);
+    color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
+    font-weight: 500;
+}
+
+.log-line.log-info {
+    background-color: rgb(var(--status-running-rgb) / 0.12);
+    border-left: 3px solid var(--status-running);
+    color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
+}
+
+.log-line.log-debug {
+    background-color: rgba(158, 158, 158, 0.1);
+    border-left: 3px solid #9e9e9e;
+    color: #616161;
+    font-size: 0.85em;
+}
+
+.log-line.log-command {
+    background-color: rgba(156, 39, 176, 0.1);
+    border-left: 3px solid #9c27b0;
+    color: #7b1fa2;
+    font-weight: 500;
+}
+
+.log-line.log-progress {
+    background-color: rgb(var(--accent-primary-rgb) / 0.10);
+    border-left: 3px solid var(--accent-primary);
+    color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+}
+
+/* Log icons for better visual distinction */
+.log-line::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.log-line.log-success::before {
+    background-color: var(--status-success);
+    content: '✓';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+    font-weight: bold;
+}
+
+.log-line.log-warning::before {
+    background-color: var(--status-warning);
+    content: '⚠';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+}
+
+.log-line.log-error::before {
+    background-color: var(--status-error);
+    content: '✕';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+    font-weight: bold;
+}
+
+.log-line.log-info::before {
+    background-color: var(--status-running);
+    content: 'ℹ';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+}
+
+.log-line.log-debug::before {
+    background-color: #9e9e9e;
+    content: '•';
+    color: white;
+    font-size: 10px;
+    text-align: center;
+    line-height: 12px;
+}
+
+.log-line.log-command::before {
+    background-color: #9c27b0;
+    content: '$';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+    font-weight: bold;
+}
+
+.log-line.log-progress::before {
+    background-color: var(--accent-primary);
+    content: '⟳';
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    line-height: 12px;
+}
+
+/* Dark mode adjustments for log styling */
+@media (prefers-color-scheme: dark) {
+    .log-line.log-success {
+        background-color: rgb(var(--status-success-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
+    }
+
+    .log-line.log-warning {
+        background-color: rgb(var(--status-warning-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
+    }
+
+    .log-line.log-error {
+        background-color: rgb(var(--status-error-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
+    }
+
+    .log-line.log-info {
+        background-color: rgb(var(--status-running-rgb) / 0.15);
+        color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
+    }
+
+    .log-line.log-debug {
+        background-color: rgba(158, 158, 158, 0.15);
+        color: #bdbdbd;
+    }
+
+    .log-line.log-command {
+        background-color: rgba(156, 39, 176, 0.15);
+        color: #ba68c8;
+    }
+
+    .log-line.log-progress {
+        background-color: rgb(var(--accent-primary-rgb) / 0.15);
+        color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+    }
+}
+
+/* Hover effects for better interactivity */
+.log-line:hover {
+    background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
+    transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+/* Improved spacing and readability */
+.log-output .log-line:first-child {
+    margin-top: 0;
+}
+
+.log-output .log-line:last-child {
+    margin-bottom: 0;
+}
+.log-output:empty:before {
+    content: "En attente de logs...";
+    color: var(--text-secondary);
+    font-style: italic;
+}
+.specific-log-output:empty:before {
+    content: "Aucun log spécifique chargé.";
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.specific-log-controls-wrapper { margin-top: 15px; }
+.specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
+
+.specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
+
+.log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
+.log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
+.log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
+.log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
 ```
 
 ## File: static/css/components/steps.css
@@ -33227,211 +33307,6 @@ input[type="radio"]:disabled {
 }
 ```
 
-## File: static/css/layout.css
-```css
-.workflow-wrapper {
-    display: flex;
-    width: 100%;
-    max-width: 1600px;
-    flex-grow: 1;
-}
-
-/* Local Downloads panel animation (class-based for max browser compatibility) */
-.local-downloads-section {
-    opacity: 0;
-    transform: translateX(30px) scale(0.98);
-    transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.local-downloads-section.downloads-visible {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .local-downloads-section { transition: none !important; transform: none !important; }
-}
-
-/* Keep vertical scrollbar always present to avoid layout jank during height changes */
-html, body { overflow-y: scroll; }
-
-.steps-column {
-    flex: 1 1 100%;
-    padding: 10px 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
-    opacity: 1;
-    scroll-margin-top: 0;
-}
-
-/* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
-.workflow-wrapper.compact-mode .steps-column {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
-    gap: 16px 16px; /* row gap, column gap */
-    align-items: start; /* cards height adapt to content by default */
-    align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
-    justify-items: center; /* center cards if column wider than minmax */
-    padding: 10px 20px;
-    transition: opacity 0.5s ease-in-out;
-}
-
-/* Desktop optimization: uniformize row heights to avoid subtle misalignment */
-@media (min-width: 1200px) {
-  .workflow-wrapper.compact-mode .steps-column {
-    align-items: start;
-  }
-}
-
-/* (removed flex-specific sizing for steps; grid handles column widths) */
-
-.workflow-wrapper.logs-active .steps-column {
-    flex-basis: 48%;
-    align-items: stretch;
-    opacity: 1;
-}
-
-/* COMPACT MODE: Overlay logs panel to avoid grid reflow and saccades */
-.workflow-wrapper.compact-mode .logs-column {
-    position: fixed;
-    right: 16px;
-    /* Align approximately below unified controls; adjust if needed */
-    top: 120px;
-    width: min(50vw, 800px);
-    height: calc(100vh - 140px);
-    z-index: 20;
-    box-shadow: -5px 0 15px rgba(0,0,0,0.25);
-}
-.workflow-wrapper.compact-mode .logs-column {
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.workflow-wrapper.compact-mode:not(.logs-active) .logs-column {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(30px);
-}
-.workflow-wrapper.compact-mode.logs-active .logs-column {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateX(0);
-}
-
-/* In compact mode, keep steps column width unchanged when logs open (no flex-basis change) */
-.workflow-wrapper.compact-mode.logs-active .steps-column {
-    flex-basis: auto;
-    /* Reserve space for the fixed logs panel so steps never go underneath it */
-    margin-right: min(50vw, 800px);
-    padding-right: 16px; /* small gutter between steps and logs */
-    min-height: calc(100vh - 140px); /* ensure sticky active card has space */
-    /* Subtle parallax/brightness for depth while logs overlay is visible */
-    transform: scale(0.985);
-    filter: brightness(0.95);
-    transition: transform 0.35s ease, filter 0.35s ease;
-}
-
-/* Keep the active step visually pinned relative to the logs panel (consistent vertical position) */
-.workflow-wrapper.compact-mode.logs-active .steps-column .step.active-for-log-panel {
-    position: sticky;
-    top: 120px; /* align with .logs-column top for visual consistency */
-    z-index: 1; /* ensure above siblings during transitions */
-    /* Span full width across grid */
-    grid-column: 1 / -1;
-}
-
-/* Entering phase: hide non-active steps to avoid saccade before panel is fully active */
-.workflow-wrapper.compact-mode.logs-entering .steps-column .step:not(.active-for-log-panel) {
-    opacity: 0 !important;
-    transform: translateY(8px) scale(0.97) !important;
-}
-.workflow-wrapper.compact-mode.logs-active .steps-column .step:not(.active-for-log-panel) {
-    display: none !important; /* fully remove from layout to keep stable height/scrollbar */
-}
-.workflow-wrapper.logs-active .steps-column .step.active-for-log-panel {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-}
-
-/* Ensure explicit visible state when logs panel is closed */
-.workflow-wrapper:not(.logs-active) .steps-column .step {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
-}
-
-.logs-column {
-    flex: 0 0 0%;
-    width: 0%;
-    opacity: 0;
-    transform: translateX(30px);
-    background-color: var(--bg-card);
-    border-left: 1px solid var(--border-color);
-    padding: 0;
-    overflow-y: auto;
-    transition: flex-basis 0.5s ease-in-out, width 0.5s ease-in-out, opacity 0.4s 0.1s ease-in-out, transform 0.5s ease-in-out, padding 0.5s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    box-shadow: -5px 0 15px rgba(0,0,0,0.2);
-    max-height: calc(100vh - 40px);
-}
-
-.workflow-wrapper.logs-active .logs-column {
-    flex-basis: 50%;
-    width: 50%;
-    opacity: 1;
-    transform: translateX(0);
-    padding: 20px 20px 20px 52px;
- }
-
-.workflow-wrapper.compact-mode .step-details-panel {
-    position: fixed;
-    right: 16px;
-    top: 120px;
-    width: min(30vw, 420px);
-    height: calc(100vh - 140px);
-    z-index: 19;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(30px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
- }
-
-.workflow-wrapper.compact-mode.details-active .step-details-panel {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateX(0);
- }
-
-.workflow-wrapper.compact-mode.details-active .steps-column {
-    margin-right: min(30vw, 420px);
-    padding-right: 16px;
- }
-
-.workflow-wrapper.compact-mode.logs-active.details-active .steps-column {
-    margin-right: min(50vw, 800px);
-    padding-right: 16px;
- }
-
-.workflow-wrapper.compact-mode.logs-active .step-details-panel {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(30px);
- }
-
-/* Unified controls section compatibility with slideshow mode */
-.workflow-wrapper.slideshow-mode ~ .unified-controls-section,
-.unified-controls-section + .workflow-wrapper.slideshow-mode {
-    /* Ensure proper spacing and visibility during slideshow */
-    z-index: 1;
-    position: relative;
- }
-```
-
 ## File: static/css/variables.css
 ```css
 :root {
@@ -33509,140 +33384,6 @@ html, body { overflow-y: scroll; }
     --pipeline-color-success: var(--status-success);
     --pipeline-color-error: var(--status-error);
 }
-```
-
-## File: static/domElements.js
-```javascript
-export const workflowWrapper = document.getElementById('workflow-wrapper');
-export const stepsColumn = document.getElementById('steps-column');
-export const logsColumnGlobal = document.getElementById('logs-column-global');
-export const logPanelTitle = document.getElementById('log-panel-title');
-export const logPanelSubheader = document.getElementById('log-panel-subheader');
-export const logPanelContextStep = document.getElementById('log-panel-context-step');
-export const logPanelContextStatus = document.getElementById('log-panel-context-status');
-export const logPanelContextTimer = document.getElementById('log-panel-context-timer');
-export const logPanelSpecificButtonsContainer = document.getElementById('log-panel-specific-buttons-container');
-export const mainLogContainerPanel = document.getElementById('main-log-container-panel');
-export const mainLogOutputPanel = document.getElementById('main-log-output-panel');
-export const currentStepLogNamePanel = document.getElementById('current-step-log-name-panel');
-export const specificLogContainerPanel = document.getElementById('specific-log-container-panel');
-export const specificLogHeaderTextPanel = document.getElementById('specific-log-header-text-panel');
-export const specificLogPathInfoPanel = document.getElementById('specific-log-path-info-panel');
-export const specificLogOutputContentPanel = document.getElementById('specific-log-output-content-panel');
-export const runAllButton = document.getElementById('run-all-steps-button');
-export const topbarAffix = document.getElementById('topbar-affix');
-export const topbarControls = document.getElementById('topbar-controls');
-export const globalProgressAffix = document.getElementById('global-progress-affix');
-export const globalProgressContainer = document.getElementById('global-progress-container');
-export const globalProgressBar = document.getElementById('global-progress-bar');
-export const globalProgressText = document.getElementById('global-progress-text');
-export const sequenceSummaryPopupOverlay = document.getElementById('sequence-summary-popup-overlay');
-export const sequenceSummaryList = document.getElementById('sequence-summary-list');
-export const closeSummaryPopupButton = document.getElementById('close-summary-popup');
-export const runCustomSequenceButton = document.getElementById('run-custom-sequence-button');
-export const clearCustomSequenceButton = document.getElementById('clear-custom-sequence-button');
-export const customSequenceCheckboxes = document.querySelectorAll('.custom-sequence-checkbox');
-export const customSequenceConfirmPopupOverlay = document.getElementById('custom-sequence-confirm-popup-overlay');
-export const customSequenceConfirmList = document.getElementById('custom-sequence-confirm-list');
-export const confirmRunCustomSequenceButton = document.getElementById('confirm-run-custom-sequence-button');
-export const cancelRunCustomSequenceButton = document.getElementById('cancel-run-custom-sequence-button');
-export const notificationsArea = document.getElementById('notifications-area');
-
-// Lazy DOM element getters to ensure elements are available when accessed
-export function getAllStepDivs() {
-    const elements = document.querySelectorAll('.step');
-    console.debug(`[DOM] getAllStepDivs found ${elements.length} elements`);
-    return elements;
-}
-
-export function getAllRunButtons() {
-    const elements = document.querySelectorAll('.run-button');
-    console.debug(`[DOM] getAllRunButtons found ${elements.length} elements`);
-    return elements;
-}
-
-export function getAllCancelButtons() {
-    const elements = document.querySelectorAll('.cancel-button');
-    console.debug(`[DOM] getAllCancelButtons found ${elements.length} elements`);
-    return elements;
-}
-
-export function getAllSpecificLogButtons() {
-    const elements = document.querySelectorAll('.specific-log-button');
-    console.debug(`[DOM] getAllSpecificLogButtons found ${elements.length} elements`);
-    return elements;
-}
-
-// Enhanced step element getter with validation
-export function getStepElement(stepKey) {
-    if (!stepKey) {
-        console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
-        return null;
-    }
-
-    const element = document.getElementById(`step-${stepKey}`);
-    if (!element) {
-        console.warn(`[DOM] Step element not found: step-${stepKey}`);
-        console.debug('[DOM] Available step elements:',
-            Array.from(document.querySelectorAll('[id^="step-"]')).map(el => el.id));
-    }
-
-    return element;
-}
-
-// Validate DOM structure for debugging
-export function validateDOMStructure() {
-    const results = {
-        stepElements: getAllStepDivs().length,
-        runButtons: getAllRunButtons().length,
-        cancelButtons: getAllCancelButtons().length,
-        workflowWrapper: !!workflowWrapper,
-        stepsColumn: !!stepsColumn,
-        issues: []
-    };
-
-    // Check for common issues
-    if (results.stepElements === 0) {
-        results.issues.push('No step elements found (.step)');
-    }
-
-    if (!results.workflowWrapper) {
-        results.issues.push('Workflow wrapper not found (#workflow-wrapper)');
-    }
-
-    if (!results.stepsColumn) {
-        results.issues.push('Steps column not found (#steps-column)');
-    }
-
-    console.debug('[DOM] Structure validation:', results);
-    return results;
-}
-
-// Legacy exports for backward compatibility (will be deprecated)
-export const allStepDivs = getAllStepDivs();
-export const allRunButtons = getAllRunButtons();
-export const allCancelButtons = getAllCancelButtons();
-export const allSpecificLogButtons = getAllSpecificLogButtons();
-export const closeLogPanelButton = document.getElementById('close-log-panel');
-
-export const localDownloadsList = document.getElementById('local-downloads-list');
-
-
-
-// ÉLÉMENTS POUR LE CONTRÔLE AUTO-SCROLL
-export const autoScrollToggle = document.getElementById('auto-scroll-toggle');
-export const autoScrollStatus = document.getElementById('auto-scroll-status');
-export const autoScrollWidget = document.getElementById('auto-scroll-widget');
-
-// ÉLÉMENTS POUR LE CONTRÔLE SONORE
-export const soundToggle = document.getElementById('sound-toggle');
-export const soundStatus = document.getElementById('sound-status');
-export const soundControlWidget = document.getElementById('sound-control-widget');
-
-
-// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
-export const settingsToggle = document.getElementById('settings-toggle');
-export const settingsPanel = document.getElementById('settings-panel');
 ```
 
 ## File: static/main.js
@@ -34891,6 +34632,345 @@ function waitForStepCompletionInSequence(stepKey) {
             }, POLLING_INTERVAL / 2);
     });
 }
+```
+
+## File: static/css/layout.css
+```css
+.workflow-wrapper {
+    display: flex;
+    width: 100%;
+    max-width: 1600px;
+    flex-grow: 1;
+}
+
+/* Local Downloads panel animation (class-based for max browser compatibility) */
+.local-downloads-section {
+    opacity: 0;
+    transform: translateX(30px) scale(0.98);
+    transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.local-downloads-section.downloads-visible {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .local-downloads-section { transition: none !important; transform: none !important; }
+}
+
+/* Keep vertical scrollbar always present to avoid layout jank during height changes */
+html, body { overflow-y: scroll; }
+
+.steps-column {
+    flex: 1 1 100%;
+    padding: 10px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+    opacity: 1;
+    scroll-margin-top: 0;
+}
+
+/* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
+.workflow-wrapper.compact-mode .steps-column {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
+    gap: 16px 16px; /* row gap, column gap */
+    align-items: start; /* cards height adapt to content by default */
+    align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
+    justify-items: center; /* center cards if column wider than minmax */
+    padding: 10px 20px;
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Desktop optimization: uniformize row heights to avoid subtle misalignment */
+@media (min-width: 1200px) {
+  .workflow-wrapper.compact-mode .steps-column {
+    align-items: start;
+  }
+}
+
+/* (removed flex-specific sizing for steps; grid handles column widths) */
+
+.workflow-wrapper.logs-active .steps-column {
+    flex-basis: 48%;
+    align-items: stretch;
+    opacity: 1;
+}
+
+/* COMPACT MODE: Overlay logs panel to avoid grid reflow and saccades */
+.workflow-wrapper.compact-mode .logs-column {
+    position: fixed;
+    right: 16px;
+    /* Align approximately below unified controls; adjust if needed */
+    top: 120px;
+    width: min(50vw, 800px);
+    height: calc(100vh - 140px);
+    z-index: 20;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.25);
+}
+.workflow-wrapper.compact-mode .logs-column {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.workflow-wrapper.compact-mode:not(.logs-active) .logs-column {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(30px);
+}
+.workflow-wrapper.compact-mode.logs-active .logs-column {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* In compact mode, keep steps column width unchanged when logs open (no flex-basis change) */
+.workflow-wrapper.compact-mode.logs-active .steps-column {
+    flex-basis: auto;
+    /* Reserve space for the fixed logs panel so steps never go underneath it */
+    margin-right: min(50vw, 800px);
+    padding-right: 16px; /* small gutter between steps and logs */
+    min-height: calc(100vh - 140px); /* ensure sticky active card has space */
+    /* Subtle parallax/brightness for depth while logs overlay is visible */
+    transform: scale(0.985);
+    filter: brightness(0.95);
+    transition: transform 0.35s ease, filter 0.35s ease;
+}
+
+/* Keep the active step visually pinned relative to the logs panel (consistent vertical position) */
+.workflow-wrapper.compact-mode.logs-active .steps-column .step.active-for-log-panel {
+    position: sticky;
+    top: 120px; /* align with .logs-column top for visual consistency */
+    z-index: 1; /* ensure above siblings during transitions */
+    /* Span full width across grid */
+    grid-column: 1 / -1;
+}
+
+/* Entering phase: hide non-active steps to avoid saccade before panel is fully active */
+.workflow-wrapper.compact-mode.logs-entering .steps-column .step:not(.active-for-log-panel) {
+    opacity: 0 !important;
+    transform: translateY(8px) scale(0.97) !important;
+}
+.workflow-wrapper.compact-mode.logs-active .steps-column .step:not(.active-for-log-panel) {
+    display: none !important; /* fully remove from layout to keep stable height/scrollbar */
+}
+.workflow-wrapper.logs-active .steps-column .step.active-for-log-panel {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+/* Ensure explicit visible state when logs panel is closed */
+.workflow-wrapper:not(.logs-active) .steps-column .step {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+}
+
+.logs-column {
+    flex: 0 0 0%;
+    width: 0%;
+    opacity: 0;
+    transform: translateX(30px);
+    background-color: var(--bg-card);
+    border-left: 1px solid var(--border-color);
+    padding: 0;
+    overflow-y: auto;
+    transition: flex-basis 0.5s ease-in-out, width 0.5s ease-in-out, opacity 0.4s 0.1s ease-in-out, transform 0.5s ease-in-out, padding 0.5s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.2);
+    max-height: calc(100vh - 40px);
+}
+
+.workflow-wrapper.logs-active .logs-column {
+    flex-basis: 50%;
+    width: 50%;
+    opacity: 1;
+    transform: translateX(0);
+    padding: 20px 20px 20px 52px;
+ }
+
+.workflow-wrapper.compact-mode .step-details-panel {
+    position: fixed;
+    right: 16px;
+    top: 120px;
+    width: min(30vw, 420px);
+    height: calc(100vh - 140px);
+    z-index: 19;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(30px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+ }
+
+.workflow-wrapper.compact-mode.details-active .step-details-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+ }
+
+.workflow-wrapper.compact-mode.details-active .steps-column {
+    margin-right: min(30vw, 420px);
+    padding-right: 16px;
+ }
+
+.workflow-wrapper.compact-mode.logs-active.details-active .steps-column {
+    margin-right: min(50vw, 800px);
+    padding-right: 16px;
+ }
+
+.workflow-wrapper.compact-mode.logs-active .step-details-panel {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(30px);
+ }
+
+/* Unified controls section compatibility with slideshow mode */
+.workflow-wrapper.slideshow-mode ~ .unified-controls-section,
+.unified-controls-section + .workflow-wrapper.slideshow-mode {
+    /* Ensure proper spacing and visibility during slideshow */
+    z-index: 1;
+    position: relative;
+ }
+```
+
+## File: static/domElements.js
+```javascript
+export const workflowWrapper = document.getElementById('workflow-wrapper');
+export const stepsColumn = document.getElementById('steps-column');
+export const logsColumnGlobal = document.getElementById('logs-column-global');
+export const logPanelTitle = document.getElementById('log-panel-title');
+export const logPanelSubheader = document.getElementById('log-panel-subheader');
+export const logPanelContextStep = document.getElementById('log-panel-context-step');
+export const logPanelContextStatus = document.getElementById('log-panel-context-status');
+export const logPanelContextTimer = document.getElementById('log-panel-context-timer');
+export const logPanelSpecificButtonsContainer = document.getElementById('log-panel-specific-buttons-container');
+export const mainLogContainerPanel = document.getElementById('main-log-container-panel');
+export const mainLogOutputPanel = document.getElementById('main-log-output-panel');
+export const currentStepLogNamePanel = document.getElementById('current-step-log-name-panel');
+export const specificLogContainerPanel = document.getElementById('specific-log-container-panel');
+export const specificLogHeaderTextPanel = document.getElementById('specific-log-header-text-panel');
+export const specificLogPathInfoPanel = document.getElementById('specific-log-path-info-panel');
+export const specificLogOutputContentPanel = document.getElementById('specific-log-output-content-panel');
+export const runAllButton = document.getElementById('run-all-steps-button');
+export const topbarAffix = document.getElementById('topbar-affix');
+export const topbarControls = document.getElementById('topbar-controls');
+export const globalProgressAffix = document.getElementById('global-progress-affix');
+export const globalProgressContainer = document.getElementById('global-progress-container');
+export const globalProgressBar = document.getElementById('global-progress-bar');
+export const globalProgressText = document.getElementById('global-progress-text');
+export const sequenceSummaryPopupOverlay = document.getElementById('sequence-summary-popup-overlay');
+export const sequenceSummaryList = document.getElementById('sequence-summary-list');
+export const closeSummaryPopupButton = document.getElementById('close-summary-popup');
+export const runCustomSequenceButton = document.getElementById('run-custom-sequence-button');
+export const clearCustomSequenceButton = document.getElementById('clear-custom-sequence-button');
+export const customSequenceCheckboxes = document.querySelectorAll('.custom-sequence-checkbox');
+export const customSequenceConfirmPopupOverlay = document.getElementById('custom-sequence-confirm-popup-overlay');
+export const customSequenceConfirmList = document.getElementById('custom-sequence-confirm-list');
+export const confirmRunCustomSequenceButton = document.getElementById('confirm-run-custom-sequence-button');
+export const cancelRunCustomSequenceButton = document.getElementById('cancel-run-custom-sequence-button');
+export const notificationsArea = document.getElementById('notifications-area');
+
+// Lazy DOM element getters to ensure elements are available when accessed
+export function getAllStepDivs() {
+    const elements = document.querySelectorAll('.step');
+    console.debug(`[DOM] getAllStepDivs found ${elements.length} elements`);
+    return elements;
+}
+
+export function getAllRunButtons() {
+    const elements = document.querySelectorAll('.run-button');
+    console.debug(`[DOM] getAllRunButtons found ${elements.length} elements`);
+    return elements;
+}
+
+export function getAllCancelButtons() {
+    const elements = document.querySelectorAll('.cancel-button');
+    console.debug(`[DOM] getAllCancelButtons found ${elements.length} elements`);
+    return elements;
+}
+
+export function getAllSpecificLogButtons() {
+    const elements = document.querySelectorAll('.specific-log-button');
+    console.debug(`[DOM] getAllSpecificLogButtons found ${elements.length} elements`);
+    return elements;
+}
+
+// Enhanced step element getter with validation
+export function getStepElement(stepKey) {
+    if (!stepKey) {
+        console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
+        return null;
+    }
+
+    const element = document.getElementById(`step-${stepKey}`);
+    if (!element) {
+        console.warn(`[DOM] Step element not found: step-${stepKey}`);
+        console.debug('[DOM] Available step elements:',
+            Array.from(document.querySelectorAll('[id^="step-"]')).map(el => el.id));
+    }
+
+    return element;
+}
+
+// Validate DOM structure for debugging
+export function validateDOMStructure() {
+    const results = {
+        stepElements: getAllStepDivs().length,
+        runButtons: getAllRunButtons().length,
+        cancelButtons: getAllCancelButtons().length,
+        workflowWrapper: !!workflowWrapper,
+        stepsColumn: !!stepsColumn,
+        issues: []
+    };
+
+    // Check for common issues
+    if (results.stepElements === 0) {
+        results.issues.push('No step elements found (.step)');
+    }
+
+    if (!results.workflowWrapper) {
+        results.issues.push('Workflow wrapper not found (#workflow-wrapper)');
+    }
+
+    if (!results.stepsColumn) {
+        results.issues.push('Steps column not found (#steps-column)');
+    }
+
+    console.debug('[DOM] Structure validation:', results);
+    return results;
+}
+
+// Legacy exports for backward compatibility (will be deprecated)
+export const allStepDivs = getAllStepDivs();
+export const allRunButtons = getAllRunButtons();
+export const allCancelButtons = getAllCancelButtons();
+export const allSpecificLogButtons = getAllSpecificLogButtons();
+export const closeLogPanelButton = document.getElementById('close-log-panel');
+
+export const localDownloadsList = document.getElementById('local-downloads-list');
+
+
+
+// ÉLÉMENTS POUR LE CONTRÔLE AUTO-SCROLL
+export const autoScrollToggle = document.getElementById('auto-scroll-toggle');
+export const autoScrollStatus = document.getElementById('auto-scroll-status');
+export const autoScrollWidget = document.getElementById('auto-scroll-widget');
+
+// ÉLÉMENTS POUR LE CONTRÔLE SONORE
+export const soundToggle = document.getElementById('sound-toggle');
+export const soundStatus = document.getElementById('sound-status');
+export const soundControlWidget = document.getElementById('sound-control-widget');
+
+
+// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
+export const settingsToggle = document.getElementById('settings-toggle');
+export const settingsPanel = document.getElementById('settings-panel');
 ```
 
 ## File: static/uiUpdater.js

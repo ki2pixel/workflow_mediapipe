@@ -24,7 +24,7 @@ from config.settings import config
 
 logger = logging.getLogger(__name__)
 
-CACHE_ROOT = Path("/mnt/cache")
+CACHE_ROOT = Path(config.CACHE_ROOT_DIR)
 
 
 @dataclass
@@ -121,6 +121,17 @@ class FilesystemService:
         Returns:
             (success, message) tuple.
         """
+        if config.DISABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled by configuration")
+            return False, "Ouverture explorateur désactivée par configuration."
+        if not config.DEBUG and not config.ENABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled in production/headless mode")
+            return False, "Ouverture explorateur désactivée en production/headless."
+
+        is_headless = not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+        if is_headless and not config.ENABLE_EXPLORER_OPEN:
+            logger.info("Explorer opening is disabled in headless mode")
+            return False, "Ouverture explorateur désactivée en mode headless."
         try:
             path = Path(abs_path).resolve()
         except Exception:
@@ -129,7 +140,7 @@ class FilesystemService:
         try:
             path.relative_to(CACHE_ROOT)
         except ValueError:
-            return False, "Chemin en dehors de /mnt/cache non autorisé."
+            return False, f"Chemin en dehors de {str(CACHE_ROOT)} non autorisé."
 
         if not path.exists():
             return False, "Le dossier n'existe pas."

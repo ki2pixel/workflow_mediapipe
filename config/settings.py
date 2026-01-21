@@ -82,10 +82,13 @@ class Config:
         'BASE_PATH_SCRIPTS_ENV', 
         os.path.dirname(os.path.abspath(__file__ + '/../'))
     ))
+    CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
     LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
         'LOCAL_DOWNLOADS_DIR', 
         Path.home() / 'Téléchargements'
     ))
+    DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
+    ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
     DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
     DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
     # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
@@ -222,6 +225,8 @@ class Config:
         # Ensure all path attributes are Path objects
         if isinstance(self.BASE_PATH_SCRIPTS, str):
             self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
+        if isinstance(self.CACHE_ROOT_DIR, str):
+            self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
         if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
             self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
         if isinstance(self.LOGS_DIR, str):
@@ -258,6 +263,13 @@ class Config:
             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
         elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
+
+        if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
+            self.CACHE_ROOT_DIR = Path('/mnt/cache')
+        elif not self.CACHE_ROOT_DIR.is_absolute():
+            self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
+        else:
+            self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
 
         # Default PROJECTS_DIR if not set
         if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):

@@ -66,11 +66,11 @@ Le système utilise exclusivement une source Webhook externe JSON pour le monito
 
 ## Historique des téléchargements (SQLite v4.2)
 
-- **Persistance** : l’historique est stocké dans une base SQLite (`download_history.sqlite3`) gérée par `DownloadHistoryRepository`.
+- **Persistance** : l’historique est stocké dans une base SQLite (`download_history.sqlite3`) gérée par `DownloadHistoryRepository`. L’ancien fichier `download_history.json` n’est plus utilisé (uniquement toléré comme source d’import unique lors des migrations anciennes).
 - **Initialisation** : `CSVService.initialize()` crée automatiquement la base, applique `PRAGMA journal_mode = WAL`, et définit les permissions partagées via `DOWNLOAD_HISTORY_SHARED_GROUP`.
 - **Multi-process** : toutes les écritures (`add_to_download_history_with_timestamp`) effectuent un `INSERT ... ON CONFLICT` pour garantir une cohérence parfaite même avec plusieurs workers Gunicorn.
 - **Format** : le schéma logique reste `{ "url": str, "timestamp": "YYYY-MM-DD HH:MM:SS" }` (heure locale). Le tri chronologique est désormais réalisé côté SQL (`ORDER BY timestamp ASC, url ASC`).
-- **Migration legacy** : utiliser `scripts/migrate_download_history_to_sqlite.py` (backup automatique, option `--dry-run`) avant de supprimer un ancien `download_history.json`. Le script normalise les URLs via `CSVService._normalize_url()` et convertit les timestamps en heure locale.
+- **Migration legacy** : utiliser `scripts/migrate_download_history_to_sqlite.py` (backup automatique, option `--dry-run`) pour convertir un ancien `download_history.json` **avant suppression**. Cette étape est idempotente et ne doit être exécutée qu’une seule fois.
 - **Variables clés** :
   - `DOWNLOAD_HISTORY_DB_PATH` : chemin absolu vers la base (par défaut `<BASE_PATH_SCRIPTS>/download_history.sqlite3`).
   - `DOWNLOAD_HISTORY_SHARED_GROUP` + mode `0o664` : partagent les fichiers `.sqlite3`, `-wal` et `-shm` entre comptes système si nécessaire.
@@ -222,5 +222,5 @@ Pour plus de détails sur les mécanismes de sécurité, consultez [SECURITY.md]
 
 - `INTEGRATION_AIRTABLE.md` — guide complet Airtable
 - `WEBHOOK_INTEGRATION.md` — service Webhook JSON externe
-- `DOWNLOAD_HISTORY_MANAGEMENT.md` — format et gestion d’historique
+- `DOWNLOAD_HISTORY_MANAGEMENT.md` — historique legacy (référence uniquement, ne plus utiliser le stockage JSON)
 - `FIX_DOUBLE_ENCODED_URLS.md` — résolution des doublons liés aux URLs doublement encodées

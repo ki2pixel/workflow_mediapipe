@@ -32,8 +32,8 @@ Le chargement dynamique des modules (ex: `mediapipe`, `pynvml`) est bien géré 
 #### 2.1. Injection de Commandes (Subprocess)
 L'application utilise massivement `subprocess.Popen`.
 *   **Analyse :** La plupart des appels utilisent une liste d'arguments (`['cmd', arg1, arg2]`), ce qui protège contre l'injection shell directe.
-*   **Risque Identifié (Moyen) :** Dans `services/filesystem_service.py`, la méthode `open_path_in_explorer` exécute des commandes système (`xdg-open`, `nautilus`). Bien que le chemin soit validé via `path.relative_to(CACHE_ROOT)`, cela exécute une action sur le *serveur*. Si le serveur est distant, cela n'a aucun effet pour l'utilisateur client, ou pire, ouvre des fenêtres sur le serveur.
-*   **Recommandation :** Désactiver cette fonctionnalité si l'application est déployée sur un serveur headless, ou restreindre strictement les caractères autorisés dans les chemins.
+*   **Statut (2026-01-21) :** Ce risque est désormais **atténué**. `config.settings` expose `CACHE_ROOT_DIR` (ENV) et deux garde-fous (`DISABLE_EXPLORER_OPEN`, `ENABLE_EXPLORER_OPEN`). `FilesystemService.open_path_in_explorer()` refuse toute ouverture si l'application n'est pas en mode DEBUG, si l'environnement est headless (`DISPLAY`/`WAYLAND_DISPLAY` absents) ou si la cible sort du `CACHE_ROOT_DIR`. Les tests unitaires (`tests/unit/test_filesystem_service.py`) couvrent ces cas. 
+*   **Recommandation résiduelle :** Documenter clairement l’activation volontaire d’`ENABLE_EXPLORER_OPEN=1` lorsque l’application est exécutée sur un poste bureau contrôlé ; le laisser à 0 pour tout déploiement serveur/headless.
 
 #### 2.2. Validation des Entrées (Path Traversal)
 *   **Point positif :** `utils/filename_security.py` implémente une classe `FilenameSanitizer` robuste pour l'extraction d'archives. C'est une excellente pratique.
@@ -49,8 +49,8 @@ L'application utilise massivement `subprocess.Popen`.
 
 #### 3.1. Modèle d'Exécution
 Flask tourne en mode `threaded=True`.
-*   **Risque (Critique pour la scalabilité) :** `CSVService` utilise un fichier `download_history.json` protégé par un `threading.RLock`. Ce verrou ne fonctionne qu'au sein d'un **seul processus**. Si vous déployez l'application avec Gunicorn et plusieurs workers (`-w 4`), le verrou sera inefficace et le fichier JSON sera corrompu par des écritures concurrentes.
-*   **Recommandation :** Si l'application doit scaler, remplacez `download_history.json` par une base de données légère (SQLite) qui gère le verrouillage inter-processus.
+*   **Statut (2026-01-21) :** Résolu via la migration officielle vers **SQLite** (`services/download_history_repository.py`). `CSVService.initialize()` crée la base `download_history.sqlite3`, applique WAL et relaie toutes les lectures/écritures via le repository (`upsert_many`, `replace_all`). Le script `scripts/migrate_download_history_to_sqlite.py` assure l'import des anciens `download_history.json` avant suppression. 
+*   **Recommandation résiduelle :** Vérifier que `DOWNLOAD_HISTORY_DB_PATH` pointe vers un volume partagé si plusieurs machines doivent consulter l’historique.
 
 #### 3.2. Workers Longue Durée
 Les étapes du workflow (Step 1-7) sont lancées via `subprocess.Popen` et gérées par `WorkflowState`.
@@ -67,8 +67,8 @@ Les étapes du workflow (Step 1-7) sont lancées via `subprocess.Popen` et gér�
 
 #### 4.1. Système de Fichiers
 L'application dépend fortement d'une structure de dossiers spécifique (`projets_extraits`, `archives`, `logs`).
-*   **Risque :** `services/filesystem_service.py` mentionne `/mnt/cache` en dur. Cela réduit la portabilité (Dockerisation plus complexe).
-*   **Recommandation :** Externaliser tous les chemins racines dans `config/settings.py` via des variables d'environnement.
+*   **Statut (2026-01-21) :** **Atténué** — `CACHE_ROOT_DIR` est désormais configurable (ENV) et normalisé (`Path.resolve()`) dans `config.settings.Config.__post_init__()`. Tous les appels (`FilesystemService`, scripts STEP) consomment ce chemin centralisé.
+*   **Recommandation :** Définir `CACHE_ROOT_DIR` par environnement (local vs serveur) pour refléter la hiérarchie réelle des données et supprimer les mentions restantes de `/mnt/cache` dans la documentation historique.
 
 #### 4.2. Archives et Résultats
 `services/results_archiver.py` utilise un hash SHA256 du contenu vidéo pour indexer les résultats.
@@ -98,8 +98,8 @@ L'application dépend fortement d'une structure de dossiers spécifique (`projet
 | Priorité | Catégorie | Problème / Observation | Recommandation |
 | :--- | :--- | :--- | :--- |
 | **Haute** | **Architecture** | Persistance JSON non safe pour multi-process | **RÉSOLU** : Migration de `download_history.json` vers SQLite (repository `download_history_repository`, refactor `CSVService`, script CLI `scripts/migrate_download_history_to_sqlite.py`, exécuté avec succès, fichiers legacy supprimés). |
-| **Moyenne** | **Sécurité** | `/mnt/cache` en dur et `open_path_in_explorer` | Rendre le chemin configurable via ENV. Désactiver l'ouverture explorateur en prod/headless. |
-| **Moyenne** | **Maintenabilité** | Logique Step 5 très dispersée | Refactoriser `run_tracking_manager.py` pour réduire la complexité de l'injection d'ENV. |
+| **Moyenne** | **Sécurité** | `/mnt/cache` en dur et `open_path_in_explorer` | **RÉSOLU** : `CACHE_ROOT_DIR` (ENV) remplace les chemins en dur et `open_path_in_explorer()` est bloqué par défaut en prod/headless (`DISABLE_EXPLORER_OPEN`, `ENABLE_EXPLORER_OPEN`, détection DISPLAY/WAYLAND). Tests : `pytest -q tests/unit/test_filesystem_service.py`. |
+| **Moyenne** | **Maintenabilité** | Logique Step 5 très dispersée | **RÉSOLU (2026-01-21)** : Refactor `workflow_scripts/step5/run_tracking_manager.py` avec `_EnvConfig` (lecture typed des ENV), helpers `_build_subprocess_env`/`_collect_cuda_lib_paths` pour l'injection `LD_LIBRARY_PATH`, et normalisation du flux GPU/CPU. Validation : `python3 -m py_compile workflow_scripts/step5/run_tracking_manager.py`. |
 | **Faible** | **Code** | Nettoyage `app_new.py` | Déplacer l'initialisation des threads (Polling) dans une fonction `init_app()` propre. |
 
 **Conclusion :**

@@ -89,7 +89,7 @@ projets_extraits/
 
 #### Structure de Sortie Générée
 ```
-/mnt/cache/                         # Destination finale
+${CACHE_ROOT_DIR}/                  # Destination finale (défaut : /mnt/cache)
 ├── projet_camille_001/
 │   └── docs/
 │       ├── video1.mp4
@@ -113,13 +113,14 @@ projets_extraits/
 WORK_DIR = Path(os.getcwd())  # projets_extraits/
 
 # Répertoire de destination finale
-OUTPUT_DIR = Path("/mnt/cache")  # Sélectionné dynamiquement avec repli si non inscriptible
+OUTPUT_DIR = config.CACHE_ROOT_DIR  # Normalisé et imposé par la configuration
 
 # Répertoire de logs
 LOG_DIR = BASE_DIR / "logs" / "step7"
 ```
 
 Notes:
+- `CACHE_ROOT_DIR` est résolu au démarrage (ENV, défaut `/mnt/cache`) puis imposé à tous les services (`FilesystemService`, scripts STEP*). STEP7 ne tentera jamais de copier en dehors de ce périmètre.
 - Si `OUTPUT_DIR` n'est pas inscriptible (montage lecture seule, permissions), la destination est automatiquement remplacée par:
   1) `FALLBACK_OUTPUT_DIR` (si définie et inscriptible)
   2) `_finalized_output/` dans la racine du dépôt

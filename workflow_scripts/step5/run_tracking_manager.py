@@ -4,11 +4,56 @@ import os, sys, json, argparse, subprocess, threading, time, logging
 from pathlib import Path
 from collections import OrderedDict, deque
 from datetime import datetime
+from typing import Mapping, Optional
 
 try:
     from dotenv import load_dotenv
 except ImportError:
     load_dotenv = None
+
+
+class _EnvConfig:
+    def __init__(self, environ: Mapping[str, str]):
+        self._environ = environ
+
+    def get_optional_str(self, key: str) -> Optional[str]:
+        raw = self._environ.get(key)
+        if raw is None:
+            return None
+        value = str(raw).strip()
+        return value if value else None
+
+    def get_str(self, key: str, default: str = "") -> str:
+        value = self.get_optional_str(key)
+        return value if value is not None else default
+
+    def get_int(self, key: str, default: int) -> int:
+        raw = self._environ.get(key)
+        if raw is None:
+            return default
+        try:
+            return int(str(raw).strip())
+        except Exception:
+            return default
+
+    def get_bool(self, key: str, default: bool) -> bool:
+        raw = self._environ.get(key)
+        if raw is None:
+            return default
+
+        normalized = str(raw).strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+        return default
+
+    def get_csv_list(self, key: str) -> list[str]:
+        raw = self.get_str(key, default="").strip().lower()
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def snapshot(self, keys: list[str]) -> dict[str, Optional[str]]:
+        return {k: self.get_optional_str(k) for k in keys}
 
 
 def _load_env_file():
@@ -35,20 +80,8 @@ def _load_env_file():
 _load_env_file()
 
 
-def _read_env_bool(key: str, default: bool) -> bool:
-    raw = os.environ.get(key)
-    if raw is None:
-        return default
-
-    normalized = str(raw).strip().lower()
-    if normalized in {"1", "true", "yes", "y", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "n", "off"}:
-        return False
-    return default
-
-
-step5_enable_object_detection = _read_env_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
+ENV = _EnvConfig(os.environ)
+step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
 
 def _log_env_snapshot():
     relevant_keys = [
@@ -61,7 +94,7 @@ def _log_env_snapshot():
         "STEP5_ENABLE_OBJECT_DETECTION",
         "INSIGHTFACE_HOME",
     ]
-    snapshot = {k: os.environ.get(k) for k in relevant_keys}
+    snapshot = ENV.snapshot(relevant_keys)
     logging.info(f"[EnvSnapshot] {snapshot}")
 
 
@@ -78,12 +111,16 @@ except (ImportError, AttributeError):
     TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
     EOS_ENV_PYTHON = BASE_DIR / "eos_env" / "bin" / "python"
     INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
-    
+
+TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
+EOS_ENV_PYTHON = Path(EOS_ENV_PYTHON)
+INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
+
 WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
 
 TRACKING_ENGINE = None
 
-TF_GPU_ENV_PYTHON = os.environ.get("STEP5_TF_GPU_ENV_PYTHON", "").strip()
+TF_GPU_ENV_PYTHON = ENV.get_str("STEP5_TF_GPU_ENV_PYTHON", "").strip()
 if TF_GPU_ENV_PYTHON:
     TF_GPU_ENV_PYTHON = Path(TF_GPU_ENV_PYTHON)
 
@@ -106,6 +143,7 @@ SYSTEM_CUDA_DEFAULTS = [
     "/usr/local/cuda",
 ]
 
+
 def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
     """Return CUDA library directories bundled in a venv (for ONNX Runtime CUDA provider)."""
     try:
@@ -127,7 +165,7 @@ def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
     return paths
 
 
-def _discover_system_cuda_lib_paths() -> list[str]:
+def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
     """
     Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
     Priority order:
@@ -136,7 +174,7 @@ def _discover_system_cuda_lib_paths() -> list[str]:
       3. Common /usr/local/cuda-* lib64 folders.
       4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
     """
-    explicit_paths = os.environ.get("STEP5_CUDA_LIB_PATH", "").strip()
+    explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
     if explicit_paths:
         resolved = [
             str(Path(p.strip()).expanduser())
@@ -148,7 +186,7 @@ def _discover_system_cuda_lib_paths() -> list[str]:
 
     candidates: list[Path] = []
     for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
-        value = os.environ.get(env_var, "").strip()
+        value = env.get_str(env_var, "").strip()
         if value:
             candidates.append(Path(value).expanduser())
     for default_path in SYSTEM_CUDA_DEFAULTS:
@@ -169,6 +207,7 @@ def _discover_system_cuda_lib_paths() -> list[str]:
             discovered.append(str(debian_cuda))
     return discovered
 
+
 # --- CONFIGURATION DU LOGGER ---
 LOG_DIR = BASE_DIR / "logs" / "step5"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -182,8 +221,8 @@ WORKER_CONFIG_TEMPLATE = {
     "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
     "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
     "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
-    "object_detector_model": os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
-    "object_detector_model_path": os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
+    "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
+    "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
 }
 
 CPU_OPTIMIZED_CONFIG = {
@@ -193,6 +232,56 @@ CPU_OPTIMIZED_CONFIG = {
     "object_score_threshold": 0.4,
     "mp_max_distance_tracking": 80,
 }
+
+
+_DEFAULT_SUBPROCESS_ENV: dict[str, str] = {
+    'OMP_NUM_THREADS': '1',
+    'OPENBLAS_NUM_THREADS': '1',
+    'MKL_NUM_THREADS': '1',
+    'NUMEXPR_NUM_THREADS': '1',
+    'TF_CPP_MIN_LOG_LEVEL': '2',
+    'GLOG_minloglevel': '2',
+    'ABSL_LOGGING_MIN_LOG_LEVEL': '2',
+}
+
+
+def _collect_cuda_lib_paths(worker_python: Path, engine_norm: str) -> list[str]:
+    cuda_paths: list[str] = []
+    cuda_paths_worker = _build_venv_cuda_paths(worker_python)
+    cuda_paths_tracking = _build_venv_cuda_paths(TRACKING_ENV_PYTHON)
+    if cuda_paths_worker:
+        cuda_paths.extend(cuda_paths_worker)
+    elif cuda_paths_tracking:
+        cuda_paths.extend(cuda_paths_tracking)
+
+    if engine_norm == "insightface":
+        system_cuda_paths = _discover_system_cuda_lib_paths(ENV)
+        for path in system_cuda_paths:
+            if path not in cuda_paths:
+                cuda_paths.append(path)
+    return cuda_paths
+
+
+def _apply_ld_library_path(env: dict[str, str], extra_paths: list[str]) -> None:
+    if not extra_paths:
+        return
+    extra_ld_path = ":".join(extra_paths)
+    existing_ld_path = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = (
+        f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
+    )
+
+
+def _build_subprocess_env(worker_python: Path, engine_norm: str) -> dict[str, str]:
+    env = os.environ.copy()
+    cuda_paths = _collect_cuda_lib_paths(worker_python, engine_norm)
+    if cuda_paths:
+        _apply_ld_library_path(env, cuda_paths)
+        logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
+
+    for key, value in _DEFAULT_SUBPROCESS_ENV.items():
+        env.setdefault(key, value)
+    return env
 
 
 def log_reader_thread(process, video_name, progress_map, lock):
@@ -263,8 +352,8 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
     models_dir_path = Path(__file__).resolve().parent / "models"
     worker_script_path = Path(__file__).resolve().parent / worker_script
 
-    worker_python_override_eos = os.environ.get("STEP5_EOS_ENV_PYTHON")
-    worker_python_override_insightface = os.environ.get("STEP5_INSIGHTFACE_ENV_PYTHON")
+    worker_python_override_eos = ENV.get_optional_str("STEP5_EOS_ENV_PYTHON")
+    worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
     worker_python = TRACKING_ENV_PYTHON
     
     if engine_norm == "eos":
@@ -321,35 +410,7 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
         command_args.extend(["--chunk_size", "0"])  # 0 = adaptive in worker
 
     try:
-        env = os.environ.copy()
-        cuda_paths: list[str] = []
-        cuda_paths_worker = _build_venv_cuda_paths(Path(worker_python))
-        cuda_paths_tracking = _build_venv_cuda_paths(Path(TRACKING_ENV_PYTHON))
-        if cuda_paths_worker:
-            cuda_paths.extend(cuda_paths_worker)
-        elif cuda_paths_tracking:
-            cuda_paths.extend(cuda_paths_tracking)
-
-        if engine_norm == "insightface":
-            system_cuda_paths = _discover_system_cuda_lib_paths()
-            for path in system_cuda_paths:
-                if path not in cuda_paths:
-                    cuda_paths.append(path)
-
-        if cuda_paths:
-            extra_ld_path = ":".join(cuda_paths)
-            existing_ld_path = env.get("LD_LIBRARY_PATH", "")
-            env["LD_LIBRARY_PATH"] = (
-                f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
-            )
-            logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
-        env.setdefault('OMP_NUM_THREADS', '1')
-        env.setdefault('OPENBLAS_NUM_THREADS', '1')
-        env.setdefault('MKL_NUM_THREADS', '1')
-        env.setdefault('NUMEXPR_NUM_THREADS', '1')
-        env.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
-        env.setdefault('GLOG_minloglevel', '2')
-        env.setdefault('ABSL_LOGGING_MIN_LOG_LEVEL', '2')
+        env = _build_subprocess_env(Path(worker_python), engine_norm)
 
         p = subprocess.Popen(
             command_args,
@@ -439,17 +500,13 @@ def main():
     )
     args = parser.parse_args()
     try:
-        import os as _os
-        if _os.environ.get('TRACKING_DISABLE_GPU', '').strip() in {'1','true','TRUE','yes','YES'}:
+        if ENV.get_bool('TRACKING_DISABLE_GPU', default=False):
             args.disable_gpu = True
-        if 'TRACKING_CPU_WORKERS' in _os.environ:
-            try:
-                args.cpu_internal_workers = int(_os.environ['TRACKING_CPU_WORKERS'])
-            except ValueError:
-                pass
 
-        if args.tracking_engine is None and 'STEP5_TRACKING_ENGINE' in _os.environ:
-            raw_engine = str(_os.environ.get('STEP5_TRACKING_ENGINE', '')).strip()
+        args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
+
+        if args.tracking_engine is None:
+            raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
             if raw_engine:
                 args.tracking_engine = raw_engine
     except Exception:
@@ -457,8 +514,8 @@ def main():
 
     _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
     
-    gpu_enabled_global = _os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
-    gpu_engines_str = _os.environ.get('STEP5_GPU_ENGINES', '').strip().lower()
+    gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
+    gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
     gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
     _log_env_snapshot()
     
@@ -480,7 +537,7 @@ def main():
                     
                     if not gpu_status['available']:
                         logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
-                        fallback_auto = _os.environ.get('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
+                        fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
                         if fallback_auto:
                             logging.info("Auto-fallback to CPU enabled")
                             args.disable_gpu = True

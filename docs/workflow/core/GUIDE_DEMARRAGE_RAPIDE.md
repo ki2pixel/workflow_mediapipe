@@ -262,6 +262,16 @@ source env/bin/activate
 > ℹ️ `start_workflow.sh` détecte automatiquement `VENV_BASE_DIR` (ordre : valeur exportée > `.env` > dossier projet), exporte `PYTHON_VENV_EXE_ENV` pour Flask et garantit que `config.get_venv_python()` pointe vers les bons environnements (suivi vertical, `tracking_env`, `eos_env`, etc.). Aucun `env/bin/python` ne doit être codé en dur.
 > Lorsque `STEP5_ENABLE_GPU=1`, `workflow_scripts/step5/run_tracking_manager.py` valide l’état du GPU via `Config.check_gpu_availability()`, charge automatiquement l’interpréteur ONNXRuntime défini par `STEP5_INSIGHTFACE_ENV_PYTHON` (si présent) et injecte les chemins CUDA nécessaires dans les workers. En cas d’échec (VRAM insuffisante, ONNXRuntime CUDA indisponible…), un fallback CPU est appliqué si `STEP5_GPU_FALLBACK_AUTO=1`.
 
+#### Ouverture de l'explorateur (optionnel)
+
+- Par défaut, l’ouverture de dossiers via l’API `openCachePathInExplorerAPI()` est **désactivée** (`DISABLE_EXPLORER_OPEN=1` implicite) pour éviter toute exécution graphique sur des serveurs headless.
+- Pour autoriser l’ouverture locale (poste bureau contrôlé) :
+  1. Exporter `ENABLE_EXPLORER_OPEN=1` **et** laisser `DEBUG=true` ou définir le flag côté `.env`.
+  2. Vérifier que la session dispose d’un display (`DISPLAY` ou `WAYLAND_DISPLAY`).
+  3. S’assurer que les chemins demandés sont sous `CACHE_ROOT_DIR` (sinon, la requête est refusée).
+- `FilesystemService.open_path_in_explorer()` applique ces garde-fous et retourne une erreur claire (prod/headless, chemin invalide, commande indisponible).
+- Tests recommandés : `pytest -q tests/unit/test_filesystem_service.py`.
+
 **Sortie attendue** :
 ```text
 ========================================================

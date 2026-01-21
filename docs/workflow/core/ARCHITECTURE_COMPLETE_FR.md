@@ -108,6 +108,7 @@ graph TD
   - `CSVService.add_to_download_history_with_timestamp()` : `INSERT ... ON CONFLICT` conservant le timestamp le plus ancien.
   - `CSVService.save_download_history()` : délègue à `download_history_repository.replace_all()` pour les opérations globales.
   - `CSVService._migrate_legacy_history_json_to_sqlite_if_needed()` : exécution automatique au démarrage si la base est vide.
+- `FilesystemService.open_path_in_explorer()` applique des garde-fous stricts : ouverture autorisée uniquement si `ENABLE_EXPLORER_OPEN=1` (opt-in local), si un display (`DISPLAY`/`WAYLAND_DISPLAY`) est disponible, et si le chemin demandé reste sous `CACHE_ROOT_DIR` (configurable, défaut `/mnt/cache`). En production/headless, l’ouverture est refusée par défaut (`DISABLE_EXPLORER_OPEN=1` implicite).
 
 ### Description des Étapes
 
@@ -409,7 +410,7 @@ is_downloaded = CSVService.is_url_downloaded(url)
 
 **Fonctionnalités principales** :
 - **Interface Webhook** : Communication avec le service Webhook pour la récupération des données (Dropbox direct + proxys R2 uniquement)
-- **Historique structuré** : Gestion des téléchargements avec timestamps locaux (`download_history.json`)
+- **Historique SQLite** : Persistance multi-process via `download_history.sqlite3` + `DownloadHistoryRepository` (WAL, partage de permissions, script `scripts/migrate_download_history_to_sqlite.py` pour l’import legacy)
 - **Normalisation URLs** : Élimination des doublons, nettoyage double-encodage
 - **WorkflowState** : Intégration complète pour l’état des téléchargements et la déduplication intra-iteration
 

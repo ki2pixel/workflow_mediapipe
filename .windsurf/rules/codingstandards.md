@@ -44,18 +44,21 @@ globs:
 
 ### 2.5 Gestion des ressources & instrumentation
 - `utils.resource_manager` obligatoire pour subprocess/fichiers/verrous.
+- **Accès Disque** : Tout accès au cache ou à l'historique doit passer par `FilesystemService` ou `DownloadHistoryRepository` pour garantir les permissions (chown/chmod) et le verrouillage (SQLite WAL).
 - Routes instrumentées via `measure_api()` → `PerformanceService`.
 - `progress_text` = texte pur (`\n` autorisé). Frontend : `textContent`. Test associé : `tests/unit/test_progress_text_safety.py`.
 
 ### 2.6 Configuration, sécurité et source de données
 - Paramètres via `config.settings.config` + `.env` (pas de secrets en dur) et décorateurs `config.security`.
+- **Gestion des chemins et UI** : `CACHE_ROOT_DIR` définit la racine (pas de chemins en dur). L'ouverture de l'explorateur se fait uniquement via `FilesystemService.open_path_in_explorer()` avec garde-fous (interdit si `DISABLE_EXPLORER_OPEN` ou headless).
 - Webhook JSON est la **seule** source de monitoring (`WEBHOOK_*`). `CSVService` agit comme façade Webhook (normalisation URLs).
 - Variables obsolètes : `USE_MYSQL`, `USE_AIRTABLE`, `USE_WEBHOOK`, `CSV_MONITOR_URL`, `CSV_MONITOR_INTERVAL`.
 
-### 2.7 Historique des téléchargements — format structuré local time
-- Format : liste `{ "url": str, "timestamp": "YYYY-MM-DD HH:MM:SS" }` (heure locale).
-- Helpers : `_now_ts_str`, `migrate_history_to_local_time`, `save_download_history`.
-- Tri croissant + unique source Webhook (plus de fallback CSV/Airtable/MySQL).
+### 2.7 Historique des téléchargements — SQLite (MANDATORY)
+- **Persistance** : SQLite via `services/download_history_repository.py` (unique source de vérité, remplace `download_history.json`).
+- **API Repository** : `initialize`, `get_download_history`, `upsert_many`, `replace_all`. L'accès direct au fichier DB est interdit hors du repository.
+- **Migration** : `scripts/migrate_download_history_to_sqlite.py` requis pour convertir les anciens fichiers JSON.
+- **Logique** : `CSVService` utilise le repository pour la synchronisation. Tri chronologique et timestamps local time garantis par la base.
 
 ### 2.8 Scripts spécialisés STEP4 / STEP5
 - **STEP4** : extraction `ffmpeg`, preset `config/optimal_tv_config.json`, profil `AUDIO_PROFILE=gpu_fp32`, fallback Pyannote/Lemonfox avec smoothing `LEMONFOX_SPEECH_*`.
