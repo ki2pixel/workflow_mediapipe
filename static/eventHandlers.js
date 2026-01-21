@@ -23,8 +23,8 @@ function setSelectedStepsOrder(order) {
 }
 
 export function initializeEventHandlers() {
-    if (dom.closeLogPanelButton) {
-        dom.closeLogPanelButton.addEventListener('click', ui.closeLogPanelUI);
+    if (dom.getCloseLogPanelButton()) {
+        dom.getCloseLogPanelButton().addEventListener('click', ui.closeLogPanelUI);
     }
 
     dom.allRunButtons.forEach(button => {
@@ -203,40 +203,40 @@ export function initializeEventHandlers() {
 
 
     // Auto-scroll toggle event handler
-    if (dom.autoScrollToggle) {
+    if (dom.getAutoScrollToggle()) {
         // Initialize the toggle state from localStorage
         const isEnabled = isAutoScrollEnabled();
-        dom.autoScrollToggle.checked = isEnabled;
-        if (dom.autoScrollStatus) {
-            dom.autoScrollStatus.textContent = isEnabled ? 'Activé' : 'Désactivé';
+        dom.getAutoScrollToggle().checked = isEnabled;
+        if (dom.getAutoScrollStatus()) {
+            dom.getAutoScrollStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
         }
 
-        dom.autoScrollToggle.addEventListener('change', (event) => {
+        dom.getAutoScrollToggle().addEventListener('change', (event) => {
             const enabled = event.target.checked;
             setAutoScrollEnabled(enabled);
-            if (dom.autoScrollStatus) {
-                dom.autoScrollStatus.textContent = enabled ? 'Activé' : 'Désactivé';
+            if (dom.getAutoScrollStatus()) {
+                dom.getAutoScrollStatus().textContent = enabled ? 'Activé' : 'Désactivé';
             }
             console.log(`[EVENT] Auto-scroll ${enabled ? 'enabled' : 'disabled'} by user`);
         });
     }
 
     // Sound control toggle event handler
-    if (dom.soundToggle) {
+    if (dom.getSoundToggle()) {
         // Import sound manager functions
         import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
             // Initialize the toggle state from localStorage
             const isEnabled = isSoundEnabled();
-            dom.soundToggle.checked = isEnabled;
-            if (dom.soundStatus) {
-                dom.soundStatus.textContent = isEnabled ? 'Activé' : 'Désactivé';
+            dom.getSoundToggle().checked = isEnabled;
+            if (dom.getSoundStatus()) {
+                dom.getSoundStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
             }
 
-            dom.soundToggle.addEventListener('change', (event) => {
+            dom.getSoundToggle().addEventListener('change', (event) => {
                 const enabled = event.target.checked;
                 setSoundEnabled(enabled);
-                if (dom.soundStatus) {
-                    dom.soundStatus.textContent = enabled ? 'Activé' : 'Désactivé';
+                if (dom.getSoundStatus()) {
+                    dom.getSoundStatus().textContent = enabled ? 'Activé' : 'Désactivé';
                 }
                 console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
             });

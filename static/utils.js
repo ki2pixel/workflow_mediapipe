@@ -1,4 +1,4 @@
-import { notificationsArea } from './domElements.js';
+import { getNotificationsArea } from './domElements.js';
 
 export function formatElapsedTime(startTime) {
     if (!startTime) return "";
@@ -16,6 +16,7 @@ export function formatElapsedTime(startTime) {
 }
 
 export function showNotification(message, type = 'info') { // type can be 'info', 'success', 'error', 'warning'
+    const notificationsArea = getNotificationsArea();
     if (!notificationsArea) return;
     const notif = document.createElement('div');
     notif.className = `notification ${type}`;

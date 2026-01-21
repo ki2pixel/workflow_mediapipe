@@ -889,13 +889,13 @@ const styledContent = parseAndStyleLogContent(htmlContent);
 }
 
 export function updateLocalDownloadsListUI(downloadsData) {
-    if (!dom.localDownloadsList) return;
-    dom.localDownloadsList.innerHTML = '';
+    if (!dom.getLocalDownloadsList()) return;
+    dom.getLocalDownloadsList().innerHTML = '';
     if (!downloadsData || downloadsData.length === 0) {
         const li = document.createElement('li');
         li.textContent = 'Aucune activité de téléchargement locale récente.';
         li.classList.add('placeholder');
-        dom.localDownloadsList.appendChild(li);
+        dom.getLocalDownloadsList().appendChild(li);
         return;
     }
 
@@ -940,7 +940,7 @@ previousDownloadIds = currentDownloadIds;
             statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
         }
         li.innerHTML = `${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}`;
-        dom.localDownloadsList.appendChild(li);
+        dom.getLocalDownloadsList().appendChild(li);
     });
 }
 

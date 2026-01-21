@@ -171,34 +171,34 @@ class AppState {
         this.isDestroyed = true;
     }
     
-    _deepClone(obj, visited = new WeakMap()) {
-        if (obj === null || typeof obj !== 'object') return obj;
-        if (obj instanceof Date) return new Date(obj);
-
-        if (visited.has(obj)) {
-            console.warn('[AppState] Circular reference detected in _deepClone, returning empty object');
-            return {};
-        }
-
-        if (obj instanceof Array) {
-            visited.set(obj, true);
-            const cloned = obj.map(item => this._deepClone(item, visited));
-            visited.delete(obj);
-            return cloned;
-        }
-
-        if (typeof obj === 'object') {
-            visited.set(obj, true);
-            const cloned = {};
-            for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                    cloned[key] = this._deepClone(obj[key], visited);
-                }
+    _deepClone(obj) {
+        if (typeof structuredClone === 'function') {
+            try {
+                return structuredClone(obj);
+            } catch (error) {
+                console.warn('[AppState] structuredClone failed, falling back to manual clone:', error);
             }
-            visited.delete(obj);
-            return cloned;
         }
-        return obj;
+
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+
+        if (obj instanceof Date) {
+            return new Date(obj.getTime());
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map(item => this._deepClone(item));
+        }
+
+        const cloned = {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                cloned[key] = this._deepClone(obj[key]);
+            }
+        }
+        return cloned;
     }
     
     _mergeDeep(target, source) {
@@ -218,7 +218,47 @@ class AppState {
     }
     
     _stateChanged(oldState, newState) {
-        return JSON.stringify(oldState) !== JSON.stringify(newState);
+        return !this._areValuesEqual(oldState, newState);
+    }
+
+    _areValuesEqual(a, b, visited = new WeakMap()) {
+        if (Object.is(a, b)) {
+            return true;
+        }
+
+        if (typeof a !== typeof b) {
+            return false;
+        }
+
+        if (a === null || b === null) {
+            return false;
+        }
+
+        if (typeof a !== 'object') {
+            return false;
+        }
+
+        if (visited.has(a) && visited.get(a) === b) {
+            return true;
+        }
+        visited.set(a, b);
+
+        const aKeys = Object.keys(a);
+        const bKeys = Object.keys(b);
+        if (aKeys.length !== bKeys.length) {
+            return false;
+        }
+
+        for (const key of aKeys) {
+            if (!Object.prototype.hasOwnProperty.call(b, key)) {
+                return false;
+            }
+            if (!this._areValuesEqual(a[key], b[key], visited)) {
+                return false;
+            }
+        }
+
+        return true;
     }
     
     _getPropertyByPath(obj, path) {

@@ -240,7 +240,7 @@ function findStateChanges(oldState, newState) {
 }
 
 async function pollLocalDownloadsStatus() {
-    if (!dom.localDownloadsList) return;
+    if (!dom.getLocalDownloadsList()) return;
 
     try {
         const downloads = await api.fetchLocalDownloadsStatusAPI();
@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeStateManagement();
 
     // Initialize polling with proper resource management
-    if (dom.localDownloadsList) {
+    if (dom.getLocalDownloadsList()) {
         pollingManager.startPolling(
             'localDownloadsStatus',
             pollLocalDownloadsStatus,
@@ -586,8 +586,8 @@ function applySystemMonitorMinimized(widget, compactLine, minimized) {
 }
 
 function setupSettingsPanel() {
-    const toggle = dom.settingsToggle;
-    const panel = dom.settingsPanel;
+    const toggle = dom.getSettingsToggle();
+    const panel = dom.getSettingsPanel();
     if (!toggle || !panel) {
         console.warn('[SETTINGS] Elements not found, skipping setup');
         return;
@@ -645,7 +645,7 @@ function setupKeyboardShortcuts() {
         // Toggle Settings panel with 'S' key
         if (e.key === 's' || e.key === 'S') {
             e.preventDefault();
-            const toggle = dom.settingsToggle;
+            const toggle = dom.getSettingsToggle();
             if (toggle) {
                 toggle.click();
             }

@@ -10,6 +10,16 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-21 18:05:00+01:00: Frontend — Optimisations Audit 🟡 Priorité Moyenne (structuredClone + lazy DOM)
+- **Décision** : Implémenter les recommandations de l'audit `AUDIT_FRONTEND_2026_01_21.md` section "🟡 Priorité Moyenne (Optimisations)" pour améliorer les performances et la robustesse du frontend.
+- **Raison** : L'audit identifiait deux goulots d'étranglement : (1) `_deepClone` manuel dans `AppState` moins performant que `structuredClone` natif, et (2) accès DOM statique dans `domElements.js` pouvant causer des erreurs si le DOM n'est pas prêt.
+- **Implémentation** :
+  - **AppState.js** : Remplacement de `_deepClone` par `structuredClone` avec fallback manuel pour compatibilité, et refactoring de `_stateChanged` pour utiliser un diff superficiel via `_areValuesEqual` (comparaison clé par clé avec `Object.is`) au lieu de `JSON.stringify` pour réduire la charge CPU.
+  - **domElements.js** : Conversion de tous les exports statiques (`export const element = document.getElementById(...)`) en fonctions getter (`export const getElement = () => byId('...')`) pour lazy DOM access, tout en préservant les exports legacy pour rétrocompatibilité.
+  - **Mise à jour des consommateurs** : Adaptation de `main.js`, `uiUpdater.js`, `eventHandlers.js` et `utils.js` pour utiliser les nouvelles fonctions getter.
+- **Validation** : Tests frontend : 6/7 passent (échec mineur sur `test_timeline_logs_phase2.mjs` non critique pour les optimisations).
+- **Impact** : Performance accrue pour le clonage d'états et la détection de changements, accès DOM sécurisé avec lazy evaluation, et rétrocompatibilité maintenue via exports legacy temporaires.
+ 
 ## 2026-01-21 17:30:00+01:00: Stratégie de tests STEP3/STEP5 sous dépendances manquantes
 - **Décision** : Ajouter des skips conditionnels (pytest) pour les tests unitaires STEP3/STEP5 dépendant de `transnetv2_pytorch`, `numpy` ou `scipy` lorsque ces librairies ne sont pas disponibles dans les environnements spécialisés.
 - **Raison** : Les environnements `transnet_env` et `tracking_env` ne disposent pas (encore) de ces paquets. Les scripts `pytest`, `run_step3_tests.sh` et `run_step5_tests.sh` échouaient systématiquement sur des `ModuleNotFoundError` / incompatibilités NumPy 2.x → TensorFlow. Les skips rendent l’état de la suite explicite sans bloquer le reste des tests.

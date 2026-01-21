@@ -1,39 +1,47 @@
-export const workflowWrapper = document.getElementById('workflow-wrapper');
-export const stepsColumn = document.getElementById('steps-column');
-export const logsColumnGlobal = document.getElementById('logs-column-global');
-export const logPanelTitle = document.getElementById('log-panel-title');
-export const logPanelSubheader = document.getElementById('log-panel-subheader');
-export const logPanelContextStep = document.getElementById('log-panel-context-step');
-export const logPanelContextStatus = document.getElementById('log-panel-context-status');
-export const logPanelContextTimer = document.getElementById('log-panel-context-timer');
-export const logPanelSpecificButtonsContainer = document.getElementById('log-panel-specific-buttons-container');
-export const mainLogContainerPanel = document.getElementById('main-log-container-panel');
-export const mainLogOutputPanel = document.getElementById('main-log-output-panel');
-export const currentStepLogNamePanel = document.getElementById('current-step-log-name-panel');
-export const specificLogContainerPanel = document.getElementById('specific-log-container-panel');
-export const specificLogHeaderTextPanel = document.getElementById('specific-log-header-text-panel');
-export const specificLogPathInfoPanel = document.getElementById('specific-log-path-info-panel');
-export const specificLogOutputContentPanel = document.getElementById('specific-log-output-content-panel');
-export const runAllButton = document.getElementById('run-all-steps-button');
-export const topbarAffix = document.getElementById('topbar-affix');
-export const topbarControls = document.getElementById('topbar-controls');
-export const globalProgressAffix = document.getElementById('global-progress-affix');
-export const globalProgressContainer = document.getElementById('global-progress-container');
-export const globalProgressBar = document.getElementById('global-progress-bar');
-export const globalProgressText = document.getElementById('global-progress-text');
-export const sequenceSummaryPopupOverlay = document.getElementById('sequence-summary-popup-overlay');
-export const sequenceSummaryList = document.getElementById('sequence-summary-list');
-export const closeSummaryPopupButton = document.getElementById('close-summary-popup');
-export const runCustomSequenceButton = document.getElementById('run-custom-sequence-button');
-export const clearCustomSequenceButton = document.getElementById('clear-custom-sequence-button');
-export const customSequenceCheckboxes = document.querySelectorAll('.custom-sequence-checkbox');
-export const customSequenceConfirmPopupOverlay = document.getElementById('custom-sequence-confirm-popup-overlay');
-export const customSequenceConfirmList = document.getElementById('custom-sequence-confirm-list');
-export const confirmRunCustomSequenceButton = document.getElementById('confirm-run-custom-sequence-button');
-export const cancelRunCustomSequenceButton = document.getElementById('cancel-run-custom-sequence-button');
-export const notificationsArea = document.getElementById('notifications-area');
-
 const _SAFE_STEP_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function byId(id) {
+    return document.getElementById(id);
+}
+
+function bySelectorAll(selector) {
+    return document.querySelectorAll(selector);
+}
+
+export const getWorkflowWrapper = () => byId('workflow-wrapper');
+export const getStepsColumn = () => byId('steps-column');
+export const getLogsColumnGlobal = () => byId('logs-column-global');
+export const getLogPanelTitle = () => byId('log-panel-title');
+export const getLogPanelSubheader = () => byId('log-panel-subheader');
+export const getLogPanelContextStep = () => byId('log-panel-context-step');
+export const getLogPanelContextStatus = () => byId('log-panel-context-status');
+export const getLogPanelContextTimer = () => byId('log-panel-context-timer');
+export const getLogPanelSpecificButtonsContainer = () => byId('log-panel-specific-buttons-container');
+export const getMainLogContainerPanel = () => byId('main-log-container-panel');
+export const getMainLogOutputPanel = () => byId('main-log-output-panel');
+export const getCurrentStepLogNamePanel = () => byId('current-step-log-name-panel');
+export const getSpecificLogContainerPanel = () => byId('specific-log-container-panel');
+export const getSpecificLogHeaderTextPanel = () => byId('specific-log-header-text-panel');
+export const getSpecificLogPathInfoPanel = () => byId('specific-log-path-info-panel');
+export const getSpecificLogOutputContentPanel = () => byId('specific-log-output-content-panel');
+export const getRunAllButton = () => byId('run-all-steps-button');
+export const getTopbarAffix = () => byId('topbar-affix');
+export const getTopbarControls = () => byId('topbar-controls');
+export const getGlobalProgressAffix = () => byId('global-progress-affix');
+export const getGlobalProgressContainer = () => byId('global-progress-container');
+export const getGlobalProgressBar = () => byId('global-progress-bar');
+export const getGlobalProgressText = () => byId('global-progress-text');
+export const getSequenceSummaryPopupOverlay = () => byId('sequence-summary-popup-overlay');
+export const getSequenceSummaryList = () => byId('sequence-summary-list');
+export const getCloseSummaryPopupButton = () => byId('close-summary-popup');
+export const getRunCustomSequenceButton = () => byId('run-custom-sequence-button');
+export const getClearCustomSequenceButton = () => byId('clear-custom-sequence-button');
+export const getCustomSequenceCheckboxes = () => bySelectorAll('.custom-sequence-checkbox');
+export const getCustomSequenceConfirmPopupOverlay = () => byId('custom-sequence-confirm-popup-overlay');
+export const getCustomSequenceConfirmList = () => byId('custom-sequence-confirm-list');
+export const getConfirmRunCustomSequenceButton = () => byId('confirm-run-custom-sequence-button');
+export const getCancelRunCustomSequenceButton = () => byId('cancel-run-custom-sequence-button');
+export const getNotificationsArea = () => byId('notifications-area');
 
 // Lazy DOM element getters to ensure elements are available when accessed
 export function getAllStepDivs() {
@@ -88,8 +96,8 @@ export function validateDOMStructure() {
         stepElements: getAllStepDivs().length,
         runButtons: getAllRunButtons().length,
         cancelButtons: getAllCancelButtons().length,
-        workflowWrapper: !!workflowWrapper,
-        stepsColumn: !!stepsColumn,
+        workflowWrapper: !!getWorkflowWrapper(),
+        stepsColumn: !!getStepsColumn(),
         issues: []
     };
 
@@ -135,3 +143,21 @@ export const soundControlWidget = document.getElementById('sound-control-widget'
 // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
 export const settingsToggle = document.getElementById('settings-toggle');
 export const settingsPanel = document.getElementById('settings-panel');
+
+// New getter functions for lazy DOM access
+export const getCloseLogPanelButton = () => byId('close-log-panel');
+export const getLocalDownloadsList = () => byId('local-downloads-list');
+
+// ÉLÉMENTS POUR LE CONTRÔLE AUTO-SCROLL
+export const getAutoScrollToggle = () => byId('auto-scroll-toggle');
+export const getAutoScrollStatus = () => byId('auto-scroll-status');
+export const getAutoScrollWidget = () => byId('auto-scroll-widget');
+
+// ÉLÉMENTS POUR LE CONTRÔLE SONORE
+export const getSoundToggle = () => byId('sound-toggle');
+export const getSoundStatus = () => byId('sound-status');
+export const getSoundControlWidget = () => byId('sound-control-widget');
+
+// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
+export const getSettingsToggle = () => byId('settings-toggle');
+export const getSettingsPanel = () => byId('settings-panel');
