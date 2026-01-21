@@ -49,14 +49,13 @@ Le frontend offre une interface interactive pour :
 -   **Timeline Connectée** : Visualisation pipeline moderne avec nœuds connectés, spine lumineux et micro-interactions (implémenté Phase 1 HTML/CSS).
 
 ### Gestion des Téléchargements
--   **Système de suivi** : Suivi des téléchargements via un fichier `download_history.json` structuré `{url, timestamp}` pour éviter les doublons.
--   **Robustesse** : Gestion des accès concurrents avec verrouillage, écritures atomiques, et sauvegarde automatique.
--   **Résilience** : Cache mémoire et mécanisme de fallback pour éviter les re-téléchargements en cas d'erreur.
--   **Support multi-sources** : Prise en charge de Dropbox, SwissTransfer, et autres services de partage de fichiers.
+-   **Système de suivi** : Historique persistant stocké en SQLite (table `download_history`) via `download_history_repository`, garantissant l’intégrité en mode multi-workers.
+-   **Robustesse** : Verrouillage natif SQLite + normalisation systématique des URLs pour éviter les doublons et garantir des écritures atomiques.
+-   **Résilience** : Cache mémoire et mécanisme de fallback (DRY_RUN) pour éviter les re-téléchargements en cas d’erreur.
+-   **Support multi-sources** : Prise en charge de Dropbox (direct + proxy), SwissTransfer et autres services validés par Webhook.
 
 ### Nouvelles Fonctionnalités Ajoutées
 -   **Diagnostics Système** : Modale accessible affichant les versions Python/FFmpeg, disponibilité GPU, et flags de configuration filtrés.
 -   **Notifications Utilisateur** : Notifications navigateur (avec fallback UI) pour les fins d'étapes ou erreurs, améliorant la réactivité utilisateur.
 -   **Archives Persistantes (ResultsArchiver)** : Archivage durable des sorties d'analyse indexées par hash SHA-256 de la vidéo sous `ARCHIVES_DIR`, avec `metadata.json` (provenance, `created_at`).
-{{ ... }}
 -   **Frontend Report Viewer** : Modale accessible (A11y complète), prévisualisation HTML inline (iframe sandbox), téléchargement HTML, et styles dédiés `css/features/reports.css`.

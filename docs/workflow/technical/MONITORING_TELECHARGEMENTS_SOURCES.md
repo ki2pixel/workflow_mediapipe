@@ -64,18 +64,19 @@ Le système utilise exclusivement une source Webhook externe JSON pour le monito
 - Documentation complète : [WEBHOOK_INTEGRATION.md](WEBHOOK_INTEGRATION.md)
 - Gestion de l'historique : [DOWNLOAD_HISTORY_MANAGEMENT.md](DOWNLOAD_HISTORY_MANAGEMENT.md)
 
-## Historique des téléchargements
+## Historique des téléchargements (SQLite v4.2)
 
-L’historique des téléchargements est stocké dans `download_history.json` au format structuré :
+- **Persistance** : l’historique est stocké dans une base SQLite (`download_history.sqlite3`) gérée par `DownloadHistoryRepository`.
+- **Initialisation** : `CSVService.initialize()` crée automatiquement la base, applique `PRAGMA journal_mode = WAL`, et définit les permissions partagées via `DOWNLOAD_HISTORY_SHARED_GROUP`.
+- **Multi-process** : toutes les écritures (`add_to_download_history_with_timestamp`) effectuent un `INSERT ... ON CONFLICT` pour garantir une cohérence parfaite même avec plusieurs workers Gunicorn.
+- **Format** : le schéma logique reste `{ "url": str, "timestamp": "YYYY-MM-DD HH:MM:SS" }` (heure locale). Le tri chronologique est désormais réalisé côté SQL (`ORDER BY timestamp ASC, url ASC`).
+- **Migration legacy** : utiliser `scripts/migrate_download_history_to_sqlite.py` (backup automatique, option `--dry-run`) avant de supprimer un ancien `download_history.json`. Le script normalise les URLs via `CSVService._normalize_url()` et convertit les timestamps en heure locale.
+- **Variables clés** :
+  - `DOWNLOAD_HISTORY_DB_PATH` : chemin absolu vers la base (par défaut `<BASE_PATH_SCRIPTS>/download_history.sqlite3`).
+  - `DOWNLOAD_HISTORY_SHARED_GROUP` + mode `0o664` : partagent les fichiers `.sqlite3`, `-wal` et `-shm` entre comptes système si nécessaire.
+  - `BASE_PATH_SCRIPTS` : racine utilisée pour résoudre les chemins relatifs (voir `config/settings.py`).
 
-- `{ "url": str, "timestamp": "YYYY-MM-DD HH:MM:SS" }` (heure locale)
-- Données triées chronologiquement, puis par URL pour stabilité.
-
-Points clés (voir `DOWNLOAD_HISTORY_MANAGEMENT.md` et `FIX_DOUBLE_ENCODED_URLS.md`) :
-
-- Normalisation avancée des URLs (`CSVService._normalize_url()`)
-- Migrer les anciens formats via `migrate_history_to_local_time()`
-- Éviter les doublons même en présence d’URLs HTML‑échappées ou doublement encodées
+> ℹ️ Les documents `DOWNLOAD_HISTORY_MANAGEMENT.md` et `FIX_DOUBLE_ENCODED_URLS.md` restent applicables : la normalisation avancée des URLs, la migration vers l’heure locale et la prévention des doublons sont désormais appliquées avant insertion SQL.
 
 ## DRY_RUN_DOWNLOADS
 
@@ -193,7 +194,7 @@ if norm_fallback_url:
 
 - **Source unique** : `WebhookService.fetch_records()` fournit la totalité des entrées surveillées ; aucune lecture MySQL/Airtable/CSV n’est conservée dans le code.
 - **Auto-download contrôlé** : la logique `_looks_like_archive_download()` + `has_new_schema_hints` garantit que seuls les paquets Dropbox conformes (original_filename/fallback_url ou proxy `/dropbox/`) peuvent déclencher `execute_csv_download_worker()`. Tout lien hors scope est ignoré.
-- **Historique structuré** : `CSVService.save_download_history()` persiste uniquement les URLs véritablement traitées afin d’éviter les faux positifs et d’autoriser les réessais pilotés par Webhook sur les entrées en échec.
+- **Historique structuré** : l’historique des URLs traitées est persisté dans SQLite (via `CSVService.add_to_download_history_with_timestamp()`), afin d’éviter les faux positifs et d’autoriser les réessais pilotés par Webhook sur les entrées en échec.
 
 ## Sécurité et Validation
 

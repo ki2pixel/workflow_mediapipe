@@ -100,6 +100,15 @@ graph TD
     H --> I[Résultats Finaux]
 ```
 
+**Historique SQLite (mise à jour 2026-01-21)**  
+- Persistance multi-process via `DownloadHistoryRepository` (base locale `download_history.sqlite3`, WAL activé).  
+- Variables : `DOWNLOAD_HISTORY_DB_PATH` (chemin absolu) et `DOWNLOAD_HISTORY_SHARED_GROUP` (chgrp + chmod 664 des fichiers `.sqlite3`, `-wal`, `-shm`).  
+- Script officiel : `scripts/migrate_download_history_to_sqlite.py [--dry-run]` pour convertir un ancien `download_history.json` avant suppression.  
+- Fonctions clés :
+  - `CSVService.add_to_download_history_with_timestamp()` : `INSERT ... ON CONFLICT` conservant le timestamp le plus ancien.
+  - `CSVService.save_download_history()` : délègue à `download_history_repository.replace_all()` pour les opérations globales.
+  - `CSVService._migrate_legacy_history_json_to_sqlite_if_needed()` : exécution automatique au démarrage si la base est vide.
+
 ### Description des Étapes
 
 #### Étape 1 : Extraction d'Archives (`extract_archives.py`)
@@ -378,7 +387,7 @@ metrics = PerformanceService.get_performance_summary()
 - Tendances de performance
 
 #### 6. CSVService (`services/csv_service.py`)
-**Responsabilité** : Interface vers le monitoring Webhook des téléchargements (source unique)
+**Responsabilité** : Interface vers le monitoring Webhook des téléchargements (source unique) + persistance SQLite de l’historique
 
 ```python
 from services.csv_service import CSVService

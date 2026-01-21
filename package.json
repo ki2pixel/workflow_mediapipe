@@ -5,6 +5,6 @@
   "type": "module",
   "description": "Frontend test harness for minimal JS tests (no bundler)",
   "scripts": {
-    "test:frontend": "node tests/frontend/polling_backoff.test.js && node tests/frontend/dom_escape.test.js && node tests/frontend/test_log_safety.mjs && node tests/frontend/test_dom_batcher_performance.mjs && node tests/frontend/test_focus_trap.mjs && node tests/frontend/test_step_details_panel.mjs && node tests/frontend/test_sequence_auto_scroll.mjs"
+    "test:frontend": "node tests/frontend/polling_backoff.test.js && node tests/frontend/dom_escape.test.js && node tests/frontend/test_log_safety.mjs && node tests/frontend/test_dom_batcher_performance.mjs && node tests/frontend/test_focus_trap.mjs && node tests/frontend/test_step_details_panel.mjs && node tests/frontend/test_timeline_logs_phase2.mjs && node tests/frontend/test_sequence_auto_scroll.mjs"
   }
 }

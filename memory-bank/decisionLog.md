@@ -10,6 +10,29 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-21 13:10:00+01:00: Migration download_history → SQLite (multi-workers)
+- **Décision** : Remplacer la persistance JSON (`download_history.json` + RLock) par une base SQLite gérée par `download_history_repository` et fournir un script CLI de migration.
+- **Raison** : L’audit backend 2026-01-21 signalait que le verrou fichier n’était pas inter-process et exposait des corruptions lors des déploiements multi-workers (Gunicorn). SQLite offre un verrouillage natif, reste léger et garantit l’intégrité.
+- **Implémentation** :
+  - Ajout de `DOWNLOAD_HISTORY_DB_PATH` (configurable) et normalisation automatique sous `BASE_PATH_SCRIPTS`.
+  - Nouveau module `services/download_history_repository.py` (init DB, `upsert_many`, `replace_all`, permissions partagées).
+  - Refactor complet de `CSVService` : lecture/écriture via SQLite, migration idempotente JSON→SQLite au démarrage, API publique inchangée.
+  - Script CLI `scripts/migrate_download_history_to_sqlite.py` (backup optionnel, mode dry-run) + exécution confirmée, puis suppression des fichiers legacy.
+  - Documentation technique mise à jour (CSV downloads / monitoring) et tests adaptés (`test_csv_dry_run.py`, `test_csv_monitor_no_retrigger.py`, `test_double_encoded_urls.py`, `test_csv_service_url_normalization.py`).
+- **Validation** : `pytest -q tests/unit/test_csv_service_url_normalization.py tests/integration/test_csv_dry_run.py tests/integration/test_csv_monitor_no_retrigger.py tests/integration/test_double_encoded_urls.py`, lancement du script CLI (34 URLs migrées) puis suppression de `download_history.json(.bak)`.
+- **Impact** : Historique multi-process safe, disparition des corruptions JSON, outillage de migration reproductible, documentation alignée.
+
+## 2026-01-20 20:02:00+01:00: Audit Logs Panel — Phase 2 (Intégration Timeline-Logs)
+- **Décision** : Refactor le panneau logs vers un overlay plus contextuel, directement associé à l’étape active (Timeline), et réduire l’encombrement visuel.
+- **Raison** : Améliorer l’ergonomie et réduire la charge cognitive en liant explicitement les logs à l’étape active (état + timer), tout en préparant la cohabitation avec le panneau Step Details.
+- **Implémentation** :
+  - **Header contextuel** : Ajout d’un sous-header dans le panneau logs (étape / statut / timer) + conteneur global de boutons “logs spécifiques” (`templates/index_new.html`, `static/domElements.js`).
+  - **CSS header & boutons** : Mise à jour des styles pour supporter la nouvelle structure du header et des boutons “logs spécifiques” (`static/css/components/logs.css`).
+  - **Synchronisation UI** : Mise à jour de `static/uiUpdater.js` pour alimenter le header contextuel, gérer le conteneur global de boutons, et ancrer verticalement le panneau en mode compact près de l’étape active.
+  - **Tests** : Ajout d’un test dédié `tests/frontend/test_timeline_logs_phase2.mjs` + intégration dans `npm run test:frontend` (`package.json`).
+- **Validation** : `npm run test:frontend` OK.
+- **Impact** : Panneau logs plus lisible, association Timeline↔Logs explicite, et surface de régression couverte par un test Node/ESM.
+
 ## 2026-01-20 14:30:00+01:00: Fix Top Bar Scrolling — Correction positionnement fixe
 - **Décision** : Implémenter une solution robuste pour corriger le problème où la top bar et la global progress bar disparaissent progressivement pendant le scroll auto et manuel.
 - **Raison** : La solution précédente avec `position: sticky` était insuffisante car elle peut être cassée par des propriétés CSS sur les parents (overflow, transform, filter). Une approche avec `position: fixed` et compensation de flux est nécessaire pour garantir que la top bar reste toujours visible.

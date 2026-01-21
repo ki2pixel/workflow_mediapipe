@@ -6,16 +6,14 @@ Centralized service for CSV monitoring functionality.
 import logging
 import os
 import json
-import threading
 import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Set, Optional, List
-import tempfile
 import shutil
 import urllib.parse
 import html
-from pathlib import Path
 from config.settings import config
+from services.download_history_repository import download_history_repository
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +29,9 @@ except Exception:
 # Note: CSV monitoring state and downloads tracking are now managed in app_new.py
 # This service acts as an interface to those global variables
 
-# Download history
-DOWNLOAD_HISTORY_FILE = config.BASE_PATH_SCRIPTS / "download_history.json"
+LEGACY_DOWNLOAD_HISTORY_FILE = config.BASE_PATH_SCRIPTS / "download_history.json"
 _SHARED_GROUP = config.DOWNLOAD_HISTORY_SHARED_GROUP
 _SHARED_FILE_MODE = 0o664
-
-# Single-process reentrant lock to serialize access to download history file
-# Use RLock to avoid deadlocks when a method holding the lock calls another
-# method that also acquires the same lock (e.g., add_to_download_history_with_timestamp -> save_download_history).
-_HISTORY_LOCK = threading.RLock()
 
 # Optional in-memory cache for last known good history set to avoid bursts on transient read errors
 _LAST_KNOWN_HISTORY_SET: Set[str] = set()
@@ -100,17 +92,55 @@ class CSVService:
         if not CSVService._initialized:
             CSVService._initialized = True
             logger.info("CSV service initialized")
-            # Best-effort migration to structured local-time format if needed
             try:
-                if DOWNLOAD_HISTORY_FILE.exists():
-                    CSVService.migrate_history_to_local_time()
-                    # Best-effort normalization/dedup: unify URL variants to avoid re-downloads
-                    try:
-                        CSVService._normalize_and_deduplicate_history()
-                    except Exception as norm_err:
-                        logger.warning(f"History normalization skipped due to error: {norm_err}")
+                download_history_repository.initialize()
             except Exception as e:
-                logger.warning(f"History migration skipped due to error: {e}")
+                logger.warning(f"History DB initialization failed: {e}")
+
+            try:
+                CSVService._migrate_legacy_history_json_to_sqlite_if_needed()
+            except Exception as e:
+                logger.warning(f"Legacy history migration skipped due to error: {e}")
+
+    @staticmethod
+    def _migrate_legacy_history_json_to_sqlite_if_needed() -> Dict[str, Any]:
+        try:
+            if not LEGACY_DOWNLOAD_HISTORY_FILE.exists():
+                return {"status": "noop", "reason": "legacy_missing"}
+            if download_history_repository.count() > 0:
+                return {"status": "noop", "reason": "db_not_empty"}
+
+            items = CSVService._load_structured_history()
+            if not items:
+                return {"status": "noop", "reason": "legacy_empty"}
+
+            def _normalize_ts_for_db(ts: str) -> str:
+                if not ts:
+                    return ""
+                raw = str(ts).strip()
+                if not raw:
+                    return ""
+                try:
+                    dt = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+                    if dt.tzinfo:
+                        return dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    pass
+                return raw
+
+            entries = []
+            for item in items:
+                url = item.get('url')
+                ts = item.get('timestamp') or ''
+                if not url:
+                    continue
+                entries.append((url, _normalize_ts_for_db(ts)))
+
+            download_history_repository.upsert_many(entries)
+            return {"status": "success", "total": len(entries)}
+        except Exception as e:
+            logger.warning(f"Legacy history migration failed: {e}")
+            return {"status": "error", "message": str(e)}
     
     @staticmethod
     def get_monitor_status() -> Dict[str, Any]:
@@ -151,48 +181,13 @@ class CSVService:
             Set[str]: URLs present in history
         """
         try:
+            CSVService.initialize()
             global _LAST_KNOWN_HISTORY_SET
-            with _HISTORY_LOCK:
-                if not DOWNLOAD_HISTORY_FILE.exists():
-                    return set()
-                # Avoid decoding errors on empty/incomplete writes
-                if DOWNLOAD_HISTORY_FILE.stat().st_size == 0:
-                    logger.error("Error loading download history: file size is 0 (likely interrupted write)")
-                    # Fallback to backup if available
-                    bak_path = DOWNLOAD_HISTORY_FILE.with_suffix('.json.bak')
-                    if bak_path.exists() and bak_path.stat().st_size > 0:
-                        try:
-                            with open(bak_path, 'r', encoding='utf-8') as f_bak:
-                                data = json.load(f_bak)
-                            urls = CSVService._parse_history_to_set(data)
-                            # refresh cache
-                            _LAST_KNOWN_HISTORY_SET = set(urls)
-                            return urls
-                        except Exception:
-                            pass
-                    # Fallback to last known in-memory cache to avoid mass re-downloads
-                    return set(_LAST_KNOWN_HISTORY_SET)
-
-                with open(DOWNLOAD_HISTORY_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                urls = CSVService._parse_history_to_set(data)
-                # update cache on success
-                _LAST_KNOWN_HISTORY_SET = set(urls)
-                return urls
+            urls = download_history_repository.get_urls()
+            _LAST_KNOWN_HISTORY_SET = set(urls)
+            return set(urls)
         except Exception as e:
             logger.error(f"Error loading download history: {e}")
-            # Fallback to backup first
-            try:
-                bak_path = DOWNLOAD_HISTORY_FILE.with_suffix('.json.bak')
-                if bak_path.exists() and bak_path.stat().st_size > 0:
-                    with open(bak_path, 'r', encoding='utf-8') as f_bak:
-                        data = json.load(f_bak)
-                    urls = CSVService._parse_history_to_set(data)
-                    _LAST_KNOWN_HISTORY_SET = set(urls)
-                    return urls
-            except Exception:
-                pass
-            # Last resort, return cached set to avoid duplicates burst
             return set(_LAST_KNOWN_HISTORY_SET)
 
     @staticmethod
@@ -333,9 +328,9 @@ class CSVService:
             List[Dict[str, str]]: Each item contains 'url' and 'timestamp' (string)
         """
         try:
-            if not DOWNLOAD_HISTORY_FILE.exists():
+            if not LEGACY_DOWNLOAD_HISTORY_FILE.exists():
                 return []
-            with open(DOWNLOAD_HISTORY_FILE, 'r', encoding='utf-8') as f:
+            with open(LEGACY_DOWNLOAD_HISTORY_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             if not isinstance(data, list):
                 return []
@@ -416,7 +411,7 @@ class CSVService:
 
             converted.sort(key=_sort_key)
 
-            with open(DOWNLOAD_HISTORY_FILE, 'w', encoding='utf-8') as f:
+            with open(LEGACY_DOWNLOAD_HISTORY_FILE, 'w', encoding='utf-8') as f:
                 json.dump(converted, f, indent=2, ensure_ascii=False)
 
             return {"status": "success", "updated": updated, "total": len(converted)}
@@ -425,7 +420,7 @@ class CSVService:
             return {"status": "error", "message": str(e)}
     
     @staticmethod
-    def _ensure_shared_permissions(target: Path) -> None:
+    def _ensure_shared_permissions(target):
         """
         Apply shared group/permission settings to the target file if configured.
         """
@@ -454,62 +449,23 @@ class CSVService:
         - Sort by timestamp ASC, then URL for deterministic order.
         """
         try:
-            with _HISTORY_LOCK:
-                existing = CSVService._load_structured_history()
-                # Map existing timestamps
-                ts_by_url: Dict[str, str] = {}
-                for item in existing:
-                    url = item.get('url')
-                    ts = item.get('timestamp') or ''
-                    if url:
-                        ts_by_url[url] = ts
+            ts_by_url = download_history_repository.get_ts_by_url()
+            normalized_set = {CSVService._normalize_url(u) for u in history_set}
 
-                # Build new structured list
-                structured: List[Dict[str, str]] = []
-                # Normalize all URLs before persisting
-                normalized_set = {CSVService._normalize_url(u) for u in history_set}
-                for url in sorted(normalized_set):  # sort for stability before timestamp sort tie-breaker
-                    ts = ts_by_url.get(url)
-                    if not ts:
-                        ts = CSVService._now_ts_str()
-                    structured.append({'url': url, 'timestamp': ts})
+            entries = []
+            for url in sorted(normalized_set):
+                ts = ts_by_url.get(url) or CSVService._now_ts_str()
+                entries.append((url, ts))
 
-                # Sort chronologically (empty timestamps last), then by URL
-                def _sort_key(item: Dict[str, str]):
-                    ts = item.get('timestamp') or '9999-12-31 23:59:59'
-                    return (ts, item.get('url') or '')
+            def _sort_key(item):
+                ts = item[1] or '9999-12-31 23:59:59'
+                return (ts, item[0] or '')
 
-                structured.sort(key=_sort_key)
+            entries.sort(key=_sort_key)
+            download_history_repository.replace_all(entries)
 
-                # Write atomically with backup
-                tmp_fd, tmp_path_str = tempfile.mkstemp(prefix='download_history_', suffix='.json', dir=str(DOWNLOAD_HISTORY_FILE.parent))
-                try:
-                    with os.fdopen(tmp_fd, 'w', encoding='utf-8') as f_tmp:
-                        json.dump(structured, f_tmp, indent=2, ensure_ascii=False)
-
-                    # Create backup of current file if exists
-                    if DOWNLOAD_HISTORY_FILE.exists() and DOWNLOAD_HISTORY_FILE.stat().st_size > 0:
-                        bak_path = DOWNLOAD_HISTORY_FILE.with_suffix('.json.bak')
-                        try:
-                            shutil.copyfile(DOWNLOAD_HISTORY_FILE, bak_path)
-                            CSVService._ensure_shared_permissions(bak_path)
-                        except Exception:
-                            # Non-fatal
-                            pass
-
-                    os.replace(tmp_path_str, DOWNLOAD_HISTORY_FILE)
-                    CSVService._ensure_shared_permissions(DOWNLOAD_HISTORY_FILE)
-
-                    # Update in-memory cache on success
-                    global _LAST_KNOWN_HISTORY_SET
-                    _LAST_KNOWN_HISTORY_SET = set(normalized_set)
-                finally:
-                    # Ensure temp file removed if still present
-                    try:
-                        if os.path.exists(tmp_path_str):
-                            os.remove(tmp_path_str)
-                    except Exception:
-                        pass
+            global _LAST_KNOWN_HISTORY_SET
+            _LAST_KNOWN_HISTORY_SET = set(normalized_set)
         except Exception as e:
             logger.error(f"Error saving download history: {e}")
     
@@ -524,15 +480,7 @@ class CSVService:
         Returns:
             True if successful, False otherwise
         """
-        try:
-            history = CSVService.get_download_history()
-            history.add(CSVService._normalize_url(url))
-            # save_download_history will assign timestamp if new and keep ordering
-            CSVService.save_download_history(history)
-            return True
-        except Exception as e:
-            logger.error(f"Error adding to download history: {e}")
-            return False
+        return CSVService.add_to_download_history_with_timestamp(url, None)
 
     @staticmethod
     def add_to_download_history_with_timestamp(url: str, timestamp_str: Optional[str]) -> bool:
@@ -550,42 +498,26 @@ class CSVService:
             True if persisted successfully, else False
         """
         try:
-            with _HISTORY_LOCK:
-                # Load existing structured history and map
-                existing = CSVService._load_structured_history()
-                ts_by_url: Dict[str, str] = {item['url']: (item.get('timestamp') or '') for item in existing if item.get('url')}
-
-                # Normalize/choose timestamp
-                ts_norm = None
-                if timestamp_str:
-                    # Try a few formats, else keep as-is
+            ts_norm = None
+            if timestamp_str:
+                try:
+                    dt = datetime.fromisoformat(str(timestamp_str).replace('Z', '+00:00'))
+                    ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
                     try:
-                        # Try ISO first
-                        dt = datetime.fromisoformat(str(timestamp_str).replace('Z', '+00:00'))
+                        dt = datetime.strptime(str(timestamp_str), '%Y-%m-%d %H:%M:%S')
                         ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
                     except Exception:
-                        # Try common MySQL format
-                        try:
-                            dt = datetime.strptime(str(timestamp_str), '%Y-%m-%d %H:%M:%S')
-                            ts_norm = dt.strftime('%Y-%m-%d %H:%M:%S')
-                        except Exception:
-                            # Fallback: keep raw string
-                            ts_norm = str(timestamp_str)
-                if not ts_norm:
-                    ts_norm = CSVService._now_ts_str()
+                        ts_norm = str(timestamp_str)
+            if not ts_norm:
+                ts_norm = CSVService._now_ts_str()
 
-                norm_url = CSVService._normalize_url(url)
-                # Preserve existing timestamp if it is earlier than the new one
-                if norm_url in ts_by_url:
-                    prev_ts = ts_by_url[norm_url] or ts_norm
-                    # Keep lexicographically smaller timestamp as a simple heuristic
-                    ts_by_url[norm_url] = min(prev_ts or ts_norm, ts_norm or prev_ts)
-                else:
-                    ts_by_url[norm_url] = ts_norm
+            norm_url = CSVService._normalize_url(url)
+            download_history_repository.upsert(norm_url, ts_norm)
 
-                # Persist using save logic
-                CSVService.save_download_history(set(ts_by_url.keys()))
-                return True
+            global _LAST_KNOWN_HISTORY_SET
+            _LAST_KNOWN_HISTORY_SET.add(norm_url)
+            return True
         except Exception as e:
             logger.error(f"Error adding to download history with timestamp: {e}")
             return False
@@ -981,9 +913,10 @@ class CSVService:
             Result dictionary with status and message
         """
         try:
-            # Persist as empty structured list
-            with open(DOWNLOAD_HISTORY_FILE, 'w', encoding='utf-8') as f:
-                json.dump([], f, indent=2)
+            CSVService.initialize()
+            download_history_repository.delete_all()
+            global _LAST_KNOWN_HISTORY_SET
+            _LAST_KNOWN_HISTORY_SET = set()
             return {
                 "status": "success",
                 "message": "Download history cleared"

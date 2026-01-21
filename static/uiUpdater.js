@@ -84,6 +84,65 @@ function getStatusMeta(status) {
     return STATUS_UI_MAP[normalized] || STATUS_UI_MAP.idle;
 }
 
+function getStepDisplayNameForLogPanel(stepKey) {
+    if (!stepKey) return '';
+    const config = getStepsConfig();
+    const stepConfig = config ? config[stepKey] : null;
+    if (stepConfig && stepConfig.display_name) return stepConfig.display_name;
+
+    const stepEl = document.getElementById(`step-${stepKey}`);
+    const datasetName = stepEl && stepEl.dataset ? stepEl.dataset.stepName : null;
+    if (datasetName) return datasetName;
+
+    return stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function updateLogPanelContextUI(stepKey) {
+    const displayName = stepKey ? getStepDisplayNameForLogPanel(stepKey) : '';
+
+    const statusEl = stepKey ? document.getElementById(`status-${stepKey}`) : null;
+    const timerEl = stepKey ? document.getElementById(`timer-${stepKey}`) : null;
+
+    if (dom.logPanelContextStep) {
+        dom.logPanelContextStep.textContent = stepKey ? displayName : 'Aucune étape active';
+    }
+    if (dom.logPanelContextStatus) {
+        dom.logPanelContextStatus.textContent = statusEl ? (statusEl.textContent || '') : '';
+    }
+    if (dom.logPanelContextTimer) {
+        dom.logPanelContextTimer.textContent = timerEl ? (timerEl.textContent || '') : '';
+    }
+}
+
+function clearLogPanelSpecificButtons() {
+    const container = dom.logPanelSpecificButtonsContainer;
+    if (!container) return;
+
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+}
+
+function positionLogsPanelNearActiveStep(stepKey) {
+    if (!stepKey) return;
+    if (!dom.workflowWrapper || !dom.logsColumnGlobal) return;
+    if (!dom.workflowWrapper.classList.contains('compact-mode')) return;
+
+    const activeStepElement = document.getElementById(`step-${stepKey}`);
+    if (!activeStepElement || typeof activeStepElement.getBoundingClientRect !== 'function') return;
+
+    const rect = activeStepElement.getBoundingClientRect();
+    const minTop = 120;
+    const minHeight = 280;
+    const bottomPadding = 20;
+
+    const maxTop = Math.max(minTop, (window.innerHeight || 800) - minHeight - bottomPadding);
+    const targetTop = Math.max(minTop, Math.min(Math.round(rect.top), maxTop));
+
+    dom.logsColumnGlobal.style.top = `${targetTop}px`;
+    dom.logsColumnGlobal.style.height = `${Math.max(minHeight, (window.innerHeight || 800) - targetTop - bottomPadding)}px`;
+}
+
 function updateStepStateChip(stepKey, status) {
     const chip = document.getElementById(`state-chip-${stepKey}`);
     if (!chip) return;
@@ -91,7 +150,6 @@ function updateStepStateChip(stepKey, status) {
     chip.className = `step-state-chip ${meta.chipClass}`;
     chip.textContent = `${meta.icon} ${meta.label}`;
 }
-
 
 export function startStepTimer(stepKey) {
     const existingTimer = state.getStepTimer(stepKey);
@@ -168,8 +226,6 @@ export function updateGlobalUIForSequenceState(isRunning) {
 
     dom.customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
 
-
-
     Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
         const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
         const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKeyConfig}"]`);
@@ -211,10 +267,7 @@ export function setActiveStepForLogPanelUI(stepKey) {
         }
     }
 
-    const dynamicLogButtonsContainer = document.getElementById('log-panel-specific-buttons-container');
-    if (dynamicLogButtonsContainer) {
-        dynamicLogButtonsContainer.innerHTML = '';
-    }
+    clearLogPanelSpecificButtons();
 
     if (stepKey) {
         const config = getStepsConfig();
@@ -224,8 +277,9 @@ export function setActiveStepForLogPanelUI(stepKey) {
 
         if(dom.logPanelTitle) dom.logPanelTitle.textContent = `Logs: ${displayName}`;
         if(dom.currentStepLogNamePanel) dom.currentStepLogNamePanel.textContent = displayName;
+        updateLogPanelContextUI(stepKey);
 
-        if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && dynamicLogButtonsContainer) {
+        if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && dom.logPanelSpecificButtonsContainer) {
             stepConfig.specific_logs.forEach((logConf, index) => {
                 const button = document.createElement('button');
                 button.className = 'specific-log-button';
@@ -236,12 +290,13 @@ export function setActiveStepForLogPanelUI(stepKey) {
                     const apiModule = await import('./apiService.js');
                     await apiModule.fetchSpecificLogAPI(stepKey, index, logConf.name);
                 });
-                dynamicLogButtonsContainer.appendChild(button);
+                dom.logPanelSpecificButtonsContainer.appendChild(button);
             });
         }
     } else {
         if(dom.logPanelTitle) dom.logPanelTitle.textContent = "Logs";
         if(dom.currentStepLogNamePanel) dom.currentStepLogNamePanel.textContent = "Aucune étape active";
+        updateLogPanelContextUI(null);
     }
 }
 
@@ -253,8 +308,7 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
     const displayName = stepConfig ? (stepConfig.display_name || stepKeyToFocus) : stepKeyToFocus;
 
     if (dom.mainLogOutputPanel) {
-        const escapedDisplayName = DOMUpdateUtils.escapeHtml(displayName);
-        dom.mainLogOutputPanel.innerHTML = `<i>Chargement des logs pour ${escapedDisplayName}...</i>`;
+        dom.mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
     }
 
     if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'flex';
@@ -279,8 +333,7 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
     } catch (error) {
         console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
         if (state.getActiveStepKeyForLogs() === stepKeyToFocus && dom.mainLogOutputPanel) {
-            const escapedErrorMessage = DOMUpdateUtils.escapeHtml(error?.message || 'Erreur inconnue');
-            dom.mainLogOutputPanel.innerHTML = `<i>Erreur: ${escapedErrorMessage}</i>`;
+            dom.mainLogOutputPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
         }
     }
 }
@@ -301,6 +354,7 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
                 dom.workflowWrapper.classList.remove('logs-entering');
             }, 500);
         });
+        positionLogsPanelNearActiveStep(stepKeyToFocus);
         fetchAndDisplayLogsForPanel(stepKeyToFocus);
         return;
     }
@@ -309,6 +363,7 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
         console.log(`[UI] Log panel already open for ${currentActiveLogStep}, switching to ${stepKeyToFocus}.`);
         setActiveStepForLogPanelUI(stepKeyToFocus);
         hideNonActiveSteps(stepKeyToFocus, true);
+        positionLogsPanelNearActiveStep(stepKeyToFocus);
         fetchAndDisplayLogsForPanel(stepKeyToFocus);
         return;
     }
@@ -329,6 +384,7 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
             dom.workflowWrapper.classList.remove('logs-entering');
         }, 500);
     });
+    positionLogsPanelNearActiveStep(stepKeyToFocus);
     fetchAndDisplayLogsForPanel(stepKeyToFocus);
 }
 
@@ -349,10 +405,15 @@ export function closeLogPanelUI() {
     });
 
     setActiveStepForLogPanelUI(null);
-    if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.innerHTML = "";
+    if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.textContent = "";
     if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
-}
 
+    if (dom.logsColumnGlobal) {
+        dom.logsColumnGlobal.style.removeProperty('top');
+        dom.logsColumnGlobal.style.removeProperty('height');
+    }
+    clearLogPanelSpecificButtons();
+}
 
 export function updateStepCardUI(stepKey, data) {
     console.group(`[PROGRESS DEBUG] updateStepCardUI - ${stepKey}`);
@@ -367,267 +428,267 @@ export function updateStepCardUI(stepKey, data) {
 
     performanceOptimizer.measureDomUpdate(`updateStepCard-${stepKey}`, () => {
         try {
-    const statusEl = document.getElementById(`status-${stepKey}`);
-    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
-    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+            const statusEl = document.getElementById(`status-${stepKey}`);
+            const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+            const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
 
-    const normalizedStatus = normalizeStatus(data.status || 'idle');
-    const statusMeta = getStatusMeta(normalizedStatus);
+            const normalizedStatus = normalizeStatus(data.status || 'idle');
+            const statusMeta = getStatusMeta(normalizedStatus);
 
-    if (statusEl) {
-        statusEl.textContent = statusMeta.label;
-        statusEl.className = `status-badge ${statusMeta.badgeClass}`;
-    }
+            if (statusEl) {
+                statusEl.textContent = statusMeta.label;
+                statusEl.className = `status-badge ${statusMeta.badgeClass}`;
+            }
 
-    const stepCardEl = document.getElementById(`step-${stepKey}`);
-    if (stepCardEl) {
-        stepCardEl.setAttribute('data-status', normalizedStatus);
-    }
+            const stepCardEl = document.getElementById(`step-${stepKey}`);
+            if (stepCardEl) {
+                stepCardEl.setAttribute('data-status', normalizedStatus);
+            }
 
-    updateStepStateChip(stepKey, normalizedStatus);
+            updateStepStateChip(stepKey, normalizedStatus);
 
-    if (runButton && cancelButton) {
-        const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
-        runButton.disabled = isCurrentlyRunningOrStarting || state.getIsAnySequenceRunning();
-        cancelButton.disabled = !isCurrentlyRunningOrStarting;
-    }
+            if (runButton && cancelButton) {
+                const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                runButton.disabled = isCurrentlyRunningOrStarting || state.getIsAnySequenceRunning();
+                cancelButton.disabled = !isCurrentlyRunningOrStarting;
+            }
 
+            const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
+            if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                if (state.getActiveStepKeyForLogs() !== stepKey) {
+                    setActiveStepForLogPanelUI(stepKey);
+                    hideNonActiveSteps(stepKey, true);
+                }
+            }
 
-    const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
-    if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
-        if (state.getActiveStepKeyForLogs() !== stepKey) {
-            setActiveStepForLogPanelUI(stepKey);
-            hideNonActiveSteps(stepKey, true);
-        }
-    }
+            if (logsOpen && state.getActiveStepKeyForLogs() === stepKey) {
+                updateLogPanelContextUI(stepKey);
+            }
 
-    if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && state.getStepTimer(stepKey))) {
-        stopStepTimer(stepKey);
+            if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && state.getStepTimer(stepKey))) {
+                stopStepTimer(stepKey);
+            } else if (normalizedStatus === 'idle' && !state.getStepTimer(stepKey)) {
+                resetStepTimerDisplay(stepKey);
+            } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !state.getStepTimer(stepKey)?.intervalId) {
+                // TODO: Implement proper timer resumption after page reload
+                // Date: 2026-01-19
+                // Owner: kidpixel
+                // Issue: startStepTimer doesn't resume from existing startTime
+                // Solution needed: Backend should provide duration_str for running steps
+            }
 
+            const progressContainer = document.getElementById(`progress-container-${stepKey}`);
+            const progressBar = document.getElementById(`progress-bar-${stepKey}`);
+            const progressTextEl = document.getElementById(`progress-text-${stepKey}`);
 
-    } else if (normalizedStatus === 'idle' && !state.getStepTimer(stepKey)) {
-        resetStepTimerDisplay(stepKey);
-    } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !state.getStepTimer(stepKey)?.intervalId) {
-        // TODO: Implement proper timer resumption after page reload
-        // Date: 2026-01-19
-        // Owner: kidpixel
-        // Issue: startStepTimer doesn't resume from existing startTime
-        // Solution needed: Backend should provide duration_str for running steps
-    }
+            let percentage = 0;
 
+            if (progressContainer && progressBar && progressTextEl) {
+                if (data.progress_total > 0) {
+                    let currentProgress = data.progress_current_fractional || data.progress_current;
 
-    const progressContainer = document.getElementById(`progress-container-${stepKey}`);
-    const progressBar = document.getElementById(`progress-bar-${stepKey}`);
-    const progressTextEl = document.getElementById(`progress-text-${stepKey}`);
-
-    if (progressContainer && progressBar && progressTextEl) {
-        let percentage = 0;
-        if (data.progress_total > 0) {
-            let currentProgress = data.progress_current_fractional || data.progress_current;
-
-            if (data.progress_current_fractional === null && data.progress_text) {
-                const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
-                if (!isSpecialRunning) {
-                    const percentMatch = data.progress_text.match(/(\d+)%/);
-                    if (percentMatch) {
-                        const textPercent = parseInt(percentMatch[1]);
-                        currentProgress = (textPercent / 100) * data.progress_total;
-                        console.log(`[PROGRESS FALLBACK] ${stepKey}: Extracted ${textPercent}% from text, using fractional: ${currentProgress}`);
+                    if (data.progress_current_fractional === null && data.progress_text) {
+                        const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
+                        if (!isSpecialRunning) {
+                            const percentMatch = data.progress_text.match(/(\d+)%/);
+                            if (percentMatch) {
+                                const textPercent = parseInt(percentMatch[1]);
+                                currentProgress = (textPercent / 100) * data.progress_total;
+                                console.log(`[PROGRESS FALLBACK] ${stepKey}: Extracted ${textPercent}% from text, using fractional: ${currentProgress}`);
+                            }
+                        }
                     }
+
+                    percentage = Math.round((currentProgress / data.progress_total) * 100);
+                    percentage = Math.min(percentage, 100);
+
+                    if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                        if (percentage >= 100) {
+                            percentage = 99;
+                        }
+                        if (data.progress_total > 0 && data.progress_current === data.progress_total) {
+                            percentage = Math.min(percentage, 99);
+                        }
+                    }
+
+                    console.log(`[PROGRESS CALC] ${stepKey}:`, {
+                        progress_current: data.progress_current,
+                        progress_current_fractional: data.progress_current_fractional,
+                        progress_total: data.progress_total,
+                        currentProgress: currentProgress,
+                        calculatedPercentage: (currentProgress / data.progress_total) * 100,
+                        finalPercentage: percentage,
+                        status: data.status,
+                        progress_text: data.progress_text
+                    });
+
+                    let displayCurrent = data.progress_current;
+                    if ((!displayCurrent || displayCurrent === 0) && typeof data.progress_current_fractional === 'number' && data.progress_current_fractional > 0) {
+                        const frac = Math.max(0, Math.min(data.progress_total, data.progress_current_fractional));
+                        displayCurrent = Math.min(data.progress_total, Math.floor(frac) + 1);
+                    }
+
+                    progressContainer.style.display = 'block';
+                    progressBar.style.backgroundColor = 'var(--blue)';
+                    progressBar.style.width = `${percentage}%`;
+                    progressBar.textContent = `${percentage}%`;
+                    progressBar.setAttribute('aria-valuenow', percentage);
+
+                    if (['running','starting','initiated'].includes(normalizedStatus)) {
+                        progressBar.setAttribute('data-active', 'true');
+                    } else {
+                        progressBar.removeAttribute('data-active');
+                    }
+
+                    const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
+                    if (data.progress_text && data.progress_text.trim()) {
+                        lastProgressTextByStep[stepKey] = data.progress_text;
+                    }
+                    const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
+                    progressTextEl.textContent = subText;
+
+                    const shouldAutoCenter = state.getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                    if (shouldAutoCenter) {
+                        const logsOpenNow = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
+                        if (!logsOpenNow) {
+                            const now = performance.now();
+                            const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
+                            if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
+                                _lastAutoCenterTsByStep[stepKey] = now;
+                                requestAnimationFrame(() => {
+                                    scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
+                                });
+                            }
+                        }
+                    }
+
+                    if (candidateText && ['running','starting','initiated'].includes(data.status)) {
+                        progressTextEl.setAttribute('data-processing', 'true');
+                    } else {
+                        progressTextEl.removeAttribute('data-processing');
+                    }
+
+                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
+                    }
+                } else if (data.status === 'completed' && data.progress_total === 0) {
+                    percentage = 0;
+                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
+                } else if (data.status === 'completed' && data.progress_total > 0) {
+                    percentage = 100;
+                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
+                } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
+                    percentage = 0;
+                    console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
                 }
-            }
-
-            percentage = Math.round((currentProgress / data.progress_total) * 100);
-
-            percentage = Math.min(percentage, 100);
-
-            if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
-                if (percentage >= 100) {
-                    percentage = 99;
-                }
-                if (data.progress_total > 0 && data.progress_current === data.progress_total) {
-                    percentage = Math.min(percentage, 99);
-                }
-            }
-
-            console.log(`[PROGRESS CALC] ${stepKey}:`, {
-                progress_current: data.progress_current,
-                progress_current_fractional: data.progress_current_fractional,
-                progress_total: data.progress_total,
-                currentProgress: currentProgress,
-                calculatedPercentage: (currentProgress / data.progress_total) * 100,
-                finalPercentage: percentage,
-                status: data.status,
-                progress_text: data.progress_text
-            });
-
-            let displayCurrent = data.progress_current;
-            if ((!displayCurrent || displayCurrent === 0) && typeof data.progress_current_fractional === 'number' && data.progress_current_fractional > 0) {
-                const frac = Math.max(0, Math.min(data.progress_total, data.progress_current_fractional));
-                displayCurrent = Math.min(data.progress_total, Math.floor(frac) + 1);
-            }
-
-            progressContainer.style.display = 'block';
-            progressBar.style.backgroundColor = 'var(--blue)';
-            progressBar.style.width = `${percentage}%`;
-            progressBar.textContent = `${percentage}%`;
-            progressBar.setAttribute('aria-valuenow', percentage);
-
-            if (['running','starting','initiated'].includes(normalizedStatus)) {
+            } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
+                progressContainer.style.display = 'block';
+                progressBar.style.backgroundColor = 'var(--blue)';
                 progressBar.setAttribute('data-active', 'true');
-            } else {
-                progressBar.removeAttribute('data-active');
-            }
+                const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
+                if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
+                progressTextEl.textContent = runningText;
 
-            const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
-            if (data.progress_text && data.progress_text.trim()) {
-                lastProgressTextByStep[stepKey] = data.progress_text;
-            }
-            const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
-            progressTextEl.textContent = subText;
-
-            const shouldAutoCenter = state.getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
-            if (shouldAutoCenter) {
-                const logsOpenNow = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
-                if (!logsOpenNow) {
-                    const now = performance.now();
-                    const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
-                    if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
-                        _lastAutoCenterTsByStep[stepKey] = now;
-                        requestAnimationFrame(() => {
-                            scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
-                        });
-                    }
+                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                    const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
+                    try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
                 }
-            }
 
-            if (candidateText && ['running','starting','initiated'].includes(data.status)) {
-                progressTextEl.setAttribute('data-processing', 'true');
-            } else {
+                if (runningText && runningText.trim()) {
+                    progressTextEl.setAttribute('data-processing', 'true');
+                } else {
+                    progressTextEl.removeAttribute('data-processing');
+                }
+            } else if (data.status === 'completed') {
+                progressContainer.style.display = 'block';
+                progressBar.style.backgroundColor = 'var(--green)';
+                progressBar.removeAttribute('data-active');
+
+                if (data.progress_total === 0) {
+                    let noWorkText = "Aucun élément à traiter";
+                    if (data.progress_text && data.progress_text.trim() !== "") {
+                        noWorkText = data.progress_text;
+                    }
+                    progressTextEl.textContent = noWorkText;
+                    progressBar.style.width = '10%';
+                    progressBar.textContent = '✓';
+                } else {
+                    let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
+                    if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
+                        baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
+                    }
+                    const config = STEPS_CONFIG_FROM_SERVER[stepKey];
+                    if (config && config.post_completion_message_ui) {
+                        progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
+                    } else {
+                        progressTextEl.textContent = baseCompletionText;
+                    }
+
+                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
+                    }
+                    delete lastProgressTextByStep[stepKey];
+                }
+            } else if (data.status === 'failed') {
+                progressContainer.style.display = 'block';
+                progressBar.style.backgroundColor = 'var(--red)';
+                let failureText = `Échec`;
+                if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
+                if (data.progress_text) failureText += `: ${data.progress_text}`;
+                progressTextEl.textContent = failureText;
+                progressBar.removeAttribute('data-active');
                 progressTextEl.removeAttribute('data-processing');
-            }
 
-            if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
-            }
-        } else if (data.status === 'completed' && data.progress_total === 0) {
-            percentage = 0;
-            console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
-        } else if (data.status === 'completed' && data.progress_total > 0) {
-            percentage = 100;
-            console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
-        } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
-            percentage = 0;
-            console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
-        }
-    } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
-        progressContainer.style.display = 'block';
-        progressBar.style.backgroundColor = 'var(--blue)';
-        progressBar.setAttribute('data-active', 'true');
-        const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
-        if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
-        progressTextEl.textContent = runningText;
-
-        if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-            const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-            const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
-            try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
-        }
-
-        if (runningText && runningText.trim()) {
-            progressTextEl.setAttribute('data-processing', 'true');
-        } else {
-            progressTextEl.removeAttribute('data-processing');
-        }
-    } else if (data.status === 'completed') {
-        progressContainer.style.display = 'block';
-        progressBar.style.backgroundColor = 'var(--green)';
-        progressBar.removeAttribute('data-active');
-
-        if (data.progress_total === 0) {
-            let noWorkText = "Aucun élément à traiter";
-            if (data.progress_text && data.progress_text.trim() !== "") {
-                noWorkText = data.progress_text;
-            }
-            progressTextEl.textContent = noWorkText;
-            progressBar.style.width = '10%';
-            progressBar.textContent = '✓';
-        } else {
-            let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
-            if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
-                baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
-            }
-            const config = STEPS_CONFIG_FROM_SERVER[stepKey];
-            if (config && config.post_completion_message_ui) {
-                progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
+                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                    try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
+                }
+                delete lastProgressTextByStep[stepKey];
+            } else if (data.status === 'starting' || data.status === 'initiated') {
+                progressContainer.style.display = 'block';
+                progressBar.style.width = `0%`;
+                progressBar.textContent = `0%`;
+                progressBar.style.backgroundColor = 'var(--blue)';
+                progressBar.setAttribute('data-active', 'true');
+                progressTextEl.textContent = "Démarrage...";
             } else {
-                progressTextEl.textContent = baseCompletionText;
+                progressContainer.style.display = 'none';
+                progressBar.setAttribute('aria-valuenow', 0);
             }
 
-            if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
-            }
-            delete lastProgressTextByStep[stepKey];
-        }
-    } else if (data.status === 'failed') {
-        progressContainer.style.display = 'block';
-        progressBar.style.backgroundColor = 'var(--red)';
-        let failureText = `Échec`;
-        if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
-        if (data.progress_text) failureText += `: ${data.progress_text}`;
-        progressTextEl.textContent = failureText;
-        progressBar.removeAttribute('data-active');
-        progressTextEl.removeAttribute('data-processing');
-
-        if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-            const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-            try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
-        }
-delete lastProgressTextByStep[stepKey];
-    } else if (data.status === 'starting' || data.status === 'initiated') {
-progressContainer.style.display = 'block';
-        progressBar.style.width = `0%`;
-        progressBar.textContent = `0%`;
-        progressBar.style.backgroundColor = 'var(--blue)';
-        progressBar.setAttribute('data-active', 'true');
-        progressTextEl.textContent = "Démarrage...";
-    } else {
-        progressContainer.style.display = 'none';
-        progressBar.setAttribute('aria-valuenow', 0);
-    }
-
-    const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
-        if (dom.workflowWrapper) {
-            if (anyRunning) {
-                dom.workflowWrapper.classList.add('any-step-running');
-                if (['running','starting','initiated'].includes(data.status)) {
-                    dom.workflowWrapper.setAttribute('data-active-step', stepKey);
-                } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
+            const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
+            if (dom.workflowWrapper) {
+                if (anyRunning) {
+                    dom.workflowWrapper.classList.add('any-step-running');
+                    if (['running','starting','initiated'].includes(data.status)) {
+                        dom.workflowWrapper.setAttribute('data-active-step', stepKey);
+                    } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
+                        dom.workflowWrapper.removeAttribute('data-active-step');
+                    }
+                } else {
+                    dom.workflowWrapper.classList.remove('any-step-running');
                     dom.workflowWrapper.removeAttribute('data-active-step');
                 }
-            } else {
-                dom.workflowWrapper.classList.remove('any-step-running');
-                dom.workflowWrapper.removeAttribute('data-active-step');
             }
-        }
 
-        try {
-            if (!_stepDetailsPanelModulePromise) {
-                _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
-            }
-            _stepDetailsPanelModulePromise
-                .then((mod) => {
-                    if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
-                        mod.refreshStepDetailsPanelIfOpen(stepKey);
-                    }
-                })
-                .catch((e) => {
-                    console.debug('[UI] Step details module not available:', e);
-                });
+            try {
+                if (!_stepDetailsPanelModulePromise) {
+                    _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
+                }
+                _stepDetailsPanelModulePromise
+                    .then((mod) => {
+                        if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
+                            mod.refreshStepDetailsPanelIfOpen(stepKey);
+                        }
+                    })
+                    .catch((e) => {
+                        console.debug('[UI] Step details module not available:', e);
+                    });
+            } catch (_) {}
         } catch (_) {}
-    } catch (_) {}
 
         console.groupEnd();
     });

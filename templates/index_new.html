@@ -191,8 +191,16 @@
         </div>
         <div class="logs-column" id="logs-column-global">
             <div class="log-panel-header">
-                <span id="log-panel-title">Logs</span>
-                <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
+                <div class="log-panel-header-main">
+                    <span id="log-panel-title">Logs</span>
+                    <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
+                </div>
+                <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
+                    <span id="log-panel-context-step">Aucune étape active</span>
+                    <span id="log-panel-context-status"></span>
+                    <span id="log-panel-context-timer"></span>
+                </div>
+                <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
             </div>
             <div class="log-container" id="main-log-container-panel">
                 <div class="log-header">

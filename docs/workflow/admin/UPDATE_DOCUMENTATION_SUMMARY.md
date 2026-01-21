@@ -4,6 +4,14 @@
 
 Ce document résume les mises à jour apportées à la documentation pour refléter les optimisations v4.1 incluant les améliorations de progression, le mode CPU-only pour le tracking, et les optimisations audio ffmpeg.
 
+## 2026-01-20 — Audit Logs Panel — Phase 2 (Intégration Timeline-Logs) (COMPLET)
+- ✅ **Header contextuel** : Étape/statut/timer dans le panneau logs
+- ✅ **Boutons globaux** : Conteneur unifié pour "logs spécifiques"
+- ✅ **Ancrage vertical** : Positionnement près de l'étape active en mode compact
+- ✅ **Tests frontend** : `test_timeline_logs_phase2.mjs` intégré
+- **Validation** : `npm run test:frontend` OK
+- **Impact** : Ergonomie améliorée, association Timeline↔Logs explicite
+
 ## 2026-01-20 — Timeline Connectée Phase 3 (Advanced Features) - COMPLET
 - ✅ **Panneau détails contextuel** : Module `static/stepDetailsPanel.js` avec sélection par clic/clavier, synchronisation AppState/DOMBatcher, fermeture auto logs, focus trap/restore, gestion Escape
 - ✅ **Accessibilité WCAG** : `aria-expanded`, navigation clavier complète, aria-live, support `prefers-reduced-motion`

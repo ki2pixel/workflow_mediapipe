@@ -1,0 +1,68 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "input": {
+    "maxFileSize": 2000000
+  },
+  "output": {
+    "filePath": "repomix-output.md",
+    "style": "markdown",
+    "parsableStyle": false,
+    "compress": false,
+    "headerText": "Workflow MediaPipe — extrait optimisé pour IA.\nCe bundle exclut les artefacts volumineux (archives, modèles, logs) pour rester sous la limite de Repomix.\nConsultez `docs/workflow/guides/REPOMIX_USAGE.md` pour l'utilisation et `.windsurf/rules/codingstandards.md` pour les règles obligatoires.",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "files": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 10,
+    "showLineNumbers": false,
+    "includeEmptyDirectories": false,
+    "truncateBase64": true
+  },
+  "include": [
+    "app_new.py",
+    "routes/**",
+    "services/**",
+    "workflow_scripts/**/*.py",
+    "utils/**",
+    "config/**",
+    "static/**",
+    "templates/**"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "archives/**",
+      "sound-design/**",
+      "assets/**",
+      "transnetv2-weights/**",
+      "workflow_scripts/**/models/**",
+      "workflow_scripts/**/assets/**",
+      "logs/**",
+      "debug/**",
+      "download_history*.json",
+      "download_history*.bak",
+      "download_history*.sqlite3",
+      "download_history*.sqlite3-wal",
+      "download_history*.sqlite3-shm",
+      "*.mp3",
+      "*.wav",
+      "*.tflite",
+      "*.task",
+      "*.onnx",
+      "*.pth",
+      "*.zip",
+      "*.tar",
+      "*.tar.gz",
+      "*.rar",
+      "*.7z"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}

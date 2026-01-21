@@ -154,7 +154,7 @@ html, body { overflow-y: scroll; }
     width: 50%;
     opacity: 1;
     transform: translateX(0);
-    padding: 20px;
+    padding: 20px 20px 20px 52px;
  }
 
 .workflow-wrapper.compact-mode .step-details-panel {

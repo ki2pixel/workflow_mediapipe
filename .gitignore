@@ -49,6 +49,9 @@ ort
 videos_to_track.json
 videos_to_track_eos_smoke.json
 step5_metrics.csv
+download_history.sqlite3
+download_history.sqlite3-wal
+download_history.sqlite3-shm
 
 # Modèles lourds maintenus hors Git (stockage externe)
 workflow_scripts/step5/models/engines/insightface/1k3d68.onnx

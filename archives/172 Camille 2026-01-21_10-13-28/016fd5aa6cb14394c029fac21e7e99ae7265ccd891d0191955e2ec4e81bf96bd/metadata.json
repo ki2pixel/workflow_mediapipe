@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/172 Camille/docs/Jean Lassalle raconte une blague grivoise !.mp4",
+  "video_stem": "Jean Lassalle raconte une blague grivoise !",
+  "video_hash": "016fd5aa6cb14394c029fac21e7e99ae7265ccd891d0191955e2ec4e81bf96bd",
+  "created_at": "2026-01-21T10:13:28.259896+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/172 Camille 2026-01-21_10-13-28/016fd5aa6cb14394c029fac21e7e99ae7265ccd891d0191955e2ec4e81bf96bd/Jean Lassalle raconte une blague grivoise !_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/172 Camille 2026-01-21_10-13-28/016fd5aa6cb14394c029fac21e7e99ae7265ccd891d0191955e2ec4e81bf96bd/Jean Lassalle raconte une blague grivoise !_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/172 Camille 2026-01-21_10-13-28/016fd5aa6cb14394c029fac21e7e99ae7265ccd891d0191955e2ec4e81bf96bd/Jean Lassalle raconte une blague grivoise !_tracking.json"
+  }
+}

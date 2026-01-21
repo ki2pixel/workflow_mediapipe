@@ -87,6 +87,7 @@ class Config:
         Path.home() / 'Téléchargements'
     ))
     DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
+    DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
     # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
     # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
     LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
@@ -225,6 +226,9 @@ class Config:
             self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
         if isinstance(self.LOGS_DIR, str):
             self.LOGS_DIR = Path(self.LOGS_DIR)
+
+        if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
+            self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
         
         # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
         if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
@@ -249,6 +253,12 @@ class Config:
             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
         elif not self.LOGS_DIR.is_absolute():
             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
+
+        if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
+            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
+        elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
+            self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
+
         # Default PROJECTS_DIR if not set
         if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
             self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'

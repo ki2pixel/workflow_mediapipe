@@ -29,6 +29,16 @@ brew install ffmpeg git python3
 # Ajouter FFmpeg au PATH système
 ```
 
+### Outils de Développement
+
+#### Génération Bundle Repomix
+```bash
+# Générer un bundle du code applicatif (excluant archives/assets/logs)
+npx repomix --config repomix.config.json
+```
+Le bundle est généré dans `repomix-output.md` pour analyse LLM.
+Voir `docs/workflow/guides/REPOMIX_USAGE.md` pour l'utilisation complète.
+
 ## Installation
 
 ### 1. Clonage et Configuration Initiale

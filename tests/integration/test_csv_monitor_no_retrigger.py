@@ -21,16 +21,13 @@ def setup_tmp_base(tmp_path):
 def test_monitor_does_not_retrigger_for_normalized_duplicate(tmp_path):
     settings, csv_service = setup_tmp_base(tmp_path)
 
-    # Prepare history file with canonical URL (normalized)
-    hist_file = settings.config.BASE_PATH_SCRIPTS / 'download_history.json'
-    hist_file.parent.mkdir(parents=True, exist_ok=True)
-
     canonical = 'https://www.dropbox.com/scl/fo/tokenABC/Folder?dl=1&rlkey=KEY'
-    data = [{
-        'url': canonical,
-        'timestamp': '2025-10-13 12:00:00'
-    }]
-    hist_file.write_text(json.dumps(data), encoding='utf-8')
+
+    # Seed history via public API (SQLite-backed)
+    csv_service.CSVService.add_to_download_history_with_timestamp(
+        canonical,
+        '2025-10-13 12:00:00',
+    )
 
     # Prepare a dummy app_new module with fetch_csv_data and a sentinel for download worker
     dummy = ModuleType('app_new')
@@ -61,10 +58,6 @@ def test_monitor_does_not_retrigger_for_normalized_duplicate(tmp_path):
         # History should remain single entry
         urls_after = csv_service.CSVService.get_download_history()
         assert len(urls_after) == 1
-
-        # File should still be one structured entry
-        loaded = json.loads(hist_file.read_text(encoding='utf-8'))
-        assert isinstance(loaded, list) and len(loaded) == 1
     finally:
         # Cleanup dummy module
         sys.modules.pop('app_new', None)

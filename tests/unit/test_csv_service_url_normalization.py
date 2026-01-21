@@ -7,7 +7,7 @@ from pathlib import Path
 def reload_with_base(tmp_path):
     os.environ['BASE_PATH_SCRIPTS_ENV'] = str(tmp_path)
     # Ensure clean module state
-    for mod in ['config.settings', 'services.csv_service']:
+    for mod in ['config.settings', 'services.download_history_repository', 'services.csv_service']:
         if mod in sys.modules:
             del sys.modules[mod]
     settings = importlib.import_module('config.settings')
@@ -110,18 +110,18 @@ def test_history_dedup_on_save_and_load(tmp_path):
     ]
     history_file.write_text(__import__('json').dumps(raw), encoding='utf-8')
 
-    # Initialize triggers migration + normalization
+    # Initialize triggers legacy JSON -> SQLite migration
     csv_service.CSVService.initialize()
 
-    # Load set should have only one entry for the token
+    from services.download_history_repository import download_history_repository
+
     urls = csv_service.CSVService.get_download_history()
     assert len(urls) == 1
+    url = list(urls)[0]
+    assert url.count('dl=1') == 1
 
-    # File content should be structured and deduplicated
-    data = __import__('json').loads(history_file.read_text(encoding='utf-8'))
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert data[0]['url'].count('dl=1') == 1
+    ts_by_url = download_history_repository.get_ts_by_url()
+    assert ts_by_url.get(url) == '2025-10-13 10:00:00'
 
 
 def test_history_dedup_with_double_encoded_urls(tmp_path):
@@ -146,16 +146,9 @@ def test_history_dedup_with_double_encoded_urls(tmp_path):
     # Initialize triggers migration + normalization
     csv_service.CSVService.initialize()
 
-    # Load set should have only one entry (duplicates removed)
     urls = csv_service.CSVService.get_download_history()
     assert len(urls) == 1, f"Expected 1 unique URL after dedup, got {len(urls)}"
 
-    # File content should be deduplicated
-    data = __import__('json').loads(history_file.read_text(encoding='utf-8'))
-    assert isinstance(data, list)
-    assert len(data) == 1, f"Expected 1 entry in history file, got {len(data)}"
-    
-    # The normalized URL should not contain malformed sequences
-    saved_url = data[0]['url']
+    saved_url = list(urls)[0]
     assert 'amp%3B' not in saved_url.lower(), f"Double-encoded sequence should be cleaned: {saved_url}"
     assert saved_url.count('dl=1') == 1, f"Expected exactly one dl=1: {saved_url}"

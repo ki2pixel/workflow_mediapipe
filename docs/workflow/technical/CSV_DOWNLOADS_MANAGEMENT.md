@@ -120,8 +120,9 @@ get_csv_downloads_status() -> Dict[str, Any]
 
 ### Politique d'historique & réessais (2026-01-09)
 
-- `_check_csv_for_downloads()` n'ajoute pas les URLs **non éligibles** à `download_history.json`.
+- `_check_csv_for_downloads()` n'ajoute pas les URLs **non éligibles** à l’historique persistant (SQLite).
   - **Objectif** : conserver une politique "Dropbox-only" (Dropbox direct + proxy R2), et ignorer tous les autres liens.
+- **Persistance multi-workers** : l’historique est désormais stocké dans SQLite (chemin configurable via `DOWNLOAD_HISTORY_DB_PATH`, défaut : `download_history.sqlite3` sous `BASE_PATH_SCRIPTS_ENV`).
 - Les écritures dans l'historique ne se produisent désormais que dans deux cas :
   1. Mode `DRY_RUN_DOWNLOADS=true` (simulation pour les tests) — l'URL est marquée comme traitée pour préserver la parité avec une exécution réelle.
   2. Téléchargement réel réussi via `execute_csv_download_worker()` — l'historique n'est mis à jour qu'après confirmation du succès.
