@@ -1,10 +1,11 @@
 import { POLLING_INTERVAL } from './constants.js';
 import * as ui from './uiUpdater.js';
-import * as state from './state.js';
 import { runStepAPI } from './apiService.js';
 import { showSequenceSummaryUI } from './popupManager.js';
 import { formatElapsedTime } from './utils.js';
 import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
+
+import { appState } from './state/AppState.js';
 
 import { soundEvents } from './soundManager.js';
 
@@ -57,7 +58,7 @@ async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSt
         console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
     }
 
-    let timerData = state.getStepTimer(stepKey);
+    let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
     if (timerData && timerData.startTime) {
         console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
     } else {
@@ -70,7 +71,7 @@ async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSt
     ui.stopStepTimer(stepKey);
     console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
 
-    timerData = state.getStepTimer(stepKey);
+    timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
     const duration = (timerData?.elapsedTimeFormatted) || "N/A";
 
     console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
@@ -109,7 +110,7 @@ export async function runStepSequence(stepsToExecute, sequenceName = "Séquence"
     let sequenceFailed = false;
 
     if (isAutoModeSequence) {
-        state.setAutoModeLogPanelOpened(false); // Reset flag for this new auto sequence
+        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
     }
 
     for (let i = 0; i < stepsToExecute.length; i++) {
@@ -163,7 +164,7 @@ export async function runStepSequence(stepsToExecute, sequenceName = "Séquence"
 
     ui.updateGlobalUIForSequenceState(false);
     if (isAutoModeSequence) {
-        state.setAutoModeLogPanelOpened(false);
+        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
     }
 }
 
@@ -173,7 +174,7 @@ function waitForStepCompletionInSequence(stepKey) {
         console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
 
         const checkInterval = setInterval(() => {
-            const data = state.PROCESS_INFO_CLIENT[stepKey];
+            const data = appState.getStateProperty(`processInfo.${stepKey}`);
 
             if (!data) {
                 return;

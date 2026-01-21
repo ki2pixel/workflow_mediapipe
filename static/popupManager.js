@@ -1,5 +1,5 @@
 import * as dom from './domElements.js';
-import * as state from './state.js';
+import { appState } from './state/AppState.js';
 import { DOMUpdateUtils } from './utils/DOMBatcher.js';
 
 function handlePopupKeydown(event) {
@@ -37,14 +37,14 @@ export function openPopupUI(popupOverlay) {
         currentFocused !== document.documentElement &&
         typeof currentFocused.focus === 'function' &&
         currentFocused.nodeType === Node.ELEMENT_NODE) {
-        state.setFocusedElementBeforePopup(currentFocused);
+        appState.setState({ focusedElementBeforePopup: currentFocused }, 'popup_focus_store');
         console.debug('[POPUP] Stored focusable element:', {
             tagName: currentFocused.tagName,
             id: currentFocused.id || 'no-id',
             className: currentFocused.className || 'no-class'
         });
     } else {
-        state.setFocusedElementBeforePopup(null);
+        appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_store');
         console.debug('[POPUP] No valid focusable element to store');
     }
 
@@ -79,7 +79,7 @@ export function closePopupUI(popupOverlay) {
     popupOverlay.setAttribute('aria-hidden', 'true');
     popupOverlay.style.display = 'none';
     popupOverlay.removeEventListener('keydown', handlePopupKeydown);
-    const prevFocused = state.getFocusedElementBeforePopup();
+    const prevFocused = appState.getStateProperty('focusedElementBeforePopup');
 
     if (prevFocused && typeof prevFocused.focus === 'function') {
         try {
@@ -104,7 +104,7 @@ export function closePopupUI(popupOverlay) {
         console.debug('[POPUP] Previous focused element is not focusable:', elementInfo);
     }
 
-    state.setFocusedElementBeforePopup(null);
+    appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_clear');
 }
 
 export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "Séquence", overallDuration = null) {
@@ -153,7 +153,8 @@ export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "S
 
 export function showCustomSequenceConfirmUI() {
     dom.customSequenceConfirmList.innerHTML = '';
-    state.getSelectedStepsOrder().forEach((stepKey, index) => {
+    const selectedStepsOrder = appState.getStateProperty('selectedStepsOrder') || [];
+    selectedStepsOrder.forEach((stepKey, index) => {
         const stepElement = document.getElementById(`step-${stepKey}`);
         const stepName = stepElement ? stepElement.dataset.stepName : stepKey;
         const li = document.createElement('li');

@@ -3,7 +3,6 @@
 import { POLLING_INTERVAL } from './constants.js';
 import * as ui from './uiUpdater.js';
 import * as dom from './domElements.js';
-import * as state from './state.js';
 import { appState } from './state/AppState.js';
 import { showNotification, sendBrowserNotification } from './utils.js';
 import { soundEvents } from './soundManager.js';
@@ -71,13 +70,13 @@ function handleStepFailure(stepKey, error, errorSource) {
         statusEl.className = 'status-badge status-failed';
     }
 
-    if (state.getActiveStepKeyForLogs() === stepKey) {
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
         ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${errorMessage}</i>`);
     }
 
     const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
     if (runButton) {
-        runButton.disabled = state.getIsAnySequenceRunning();
+        runButton.disabled = !!appState.getStateProperty('isAnySequenceRunning');
     }
     const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
     if (cancelButton) {
@@ -104,7 +103,7 @@ export async function runStepAPI(stepKey) {
     const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
     if(cancelButton) cancelButton.disabled = false;
 
-    if (state.getActiveStepKeyForLogs() === stepKey) {
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
         ui.updateMainLogOutputUI('<i>Initiation du processus...</i>');
     }
 
@@ -138,7 +137,7 @@ function appendItalicLineToMainLog(panelEl, message) {
 }
 
 export async function cancelStepAPI(stepKey) {
-    if (state.getActiveStepKeyForLogs() === stepKey) {
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
         appendItalicLineToMainLog(dom.mainLogOutputPanel, 'Annulation en cours...');
     }
 
@@ -156,7 +155,7 @@ export async function cancelStepAPI(stepKey) {
         console.log(`[CANCEL DEBUG] Response received (ok):`, data);
         showNotification(data.message || "Annulation demandée", 'info');
 
-        if (state.getActiveStepKeyForLogs() === stepKey) {
+        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
             appendItalicLineToMainLog(dom.mainLogOutputPanel, data.message || 'Annulation demandée');
         }
     } catch (error) {
@@ -164,14 +163,14 @@ export async function cancelStepAPI(stepKey) {
 
         errorHandler.handleApiError(`cancel/${stepKey}`, error, { stepKey });
 
-        if (state.getActiveStepKeyForLogs() === stepKey) {
+        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
             appendItalicLineToMainLog(dom.mainLogOutputPanel, `Erreur communication pour annulation: ${error.toString()}`);
         }
     }
 }
 
 export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
-    state.clearPollingInterval(stepKey);
+    stopPollingAPI(stepKey);
 
     const pollingInterval = isAutoModeHighFrequency ? 200 : POLLING_INTERVAL;
     console.log(`[API startPollingAPI] 🚀 Polling démarré pour ${stepKey}. Intervalle: ${pollingInterval}ms ${isAutoModeHighFrequency ? '(AutoMode high-frequency)' : '(normal)'}`);
@@ -185,7 +184,7 @@ export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
             if (!response.ok) {
                 console.warn(`[API performPoll] Erreur ${response.status} lors du polling pour ${stepKey}. Arrêt du polling.`);
                 stopPollingAPI(stepKey);
-                if (!state.getIsAnySequenceRunning()) {
+                if (!appState.getStateProperty('isAnySequenceRunning')) {
                     handleStepFailure(stepKey, new Error(`Erreur statut (${response.status})`), 'Polling');
                 }
                 return;
@@ -196,16 +195,16 @@ export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
             const statusEmoji = data.status === 'running' ? '🔄' : data.status === 'completed' ? '✅' : data.status === 'failed' ? '❌' : '⚪';
             console.log(`[API POLL RESPONSE] ${statusEmoji} ${stepKey} (${(pollEndTime - pollStartTime).toFixed(2)}ms): status="${data.status}", progress=${data.progress_current}/${data.progress_total}, return_code=${data.return_code}`);
 
-            const previousStatus = (state.PROCESS_INFO_CLIENT[stepKey] && state.PROCESS_INFO_CLIENT[stepKey].status) || 'unknown';
-            state.PROCESS_INFO_CLIENT[stepKey] = data;
+            const previousStatus = appState.getStateProperty(`processInfo.${stepKey}.status`) || 'unknown';
+            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_polled');
 
             if (typeof data.is_any_sequence_running === 'boolean') {
-                state.setIsAnySequenceRunning(data.is_any_sequence_running);
+                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_polled');
             }
 
             ui.updateStepCardUI(stepKey, data);
 
-            if (state.getActiveStepKeyForLogs() === stepKey && dom.workflowWrapper.classList.contains('logs-active')) {
+            if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey && dom.workflowWrapper.classList.contains('logs-active')) {
                 ui.updateMainLogOutputUI(data.log.join(''));
             }
             const isTerminal = ['completed', 'failed'].includes(data.status);
@@ -227,7 +226,7 @@ export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
         } catch (error) {
             console.error(`[API performPoll] Erreur CATCH polling ${stepKey}:`, error);
             stopPollingAPI(stepKey);
-            if (!state.getIsAnySequenceRunning()) {
+            if (!appState.getStateProperty('isAnySequenceRunning')) {
                 handleStepFailure(stepKey, error, 'Polling');
             }
         }
@@ -239,13 +238,10 @@ export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
         pollingInterval, // Use dynamic interval (200ms for AutoMode, 500ms for normal)
         { immediate: true, maxErrors: 3 }
     );
-
-    state.addPollingInterval(stepKey, pollingId);
 }
 
 export function stopPollingAPI(stepKey) {
     pollingManager.stopPolling(`step-${stepKey}`);
-    state.clearPollingInterval(stepKey);
     console.log(`[API stopPollingAPI] Polling arrêté pour ${stepKey}.`);
 }
 
@@ -276,32 +272,42 @@ export async function fetchInitialStatusAPI(stepKey) {
         const response = await fetch(`/status/${stepKey}`);
         if (!response.ok) {
             console.warn(`Initial status fetch failed for ${stepKey}: ${response.status}. Using fallback.`);
-            state.PROCESS_INFO_CLIENT[stepKey] = state.PROCESS_INFO_CLIENT[stepKey] || {
-                status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
-                is_any_sequence_running: false
-            };
+            appState.setState({
+                processInfo: {
+                    [stepKey]: appState.getStateProperty(`processInfo.${stepKey}`) || {
+                        status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+                        is_any_sequence_running: false
+                    }
+                }
+            }, 'process_info_initial_fallback');
         } else {
             const data = await response.json();
-            state.PROCESS_INFO_CLIENT[stepKey] = data;
-            if (data.is_any_sequence_running && !state.getIsAnySequenceRunning()) {
-                state.setIsAnySequenceRunning(true);
+            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_initial');
+
+            if (typeof data.is_any_sequence_running === 'boolean') {
+                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_initial');
             }
         }
 
+        const stepInfo = appState.getStateProperty(`processInfo.${stepKey}`) || {
+            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+            is_any_sequence_running: false
+        };
+
         if (stepKey === 'clear_disk_cache') {
-            ui.updateClearCacheGlobalButtonState(state.PROCESS_INFO_CLIENT[stepKey].status);
+            ui.updateClearCacheGlobalButtonState(stepInfo.status);
         } else {
-            ui.updateStepCardUI(stepKey, state.PROCESS_INFO_CLIENT[stepKey]);
+            ui.updateStepCardUI(stepKey, stepInfo);
         }
         
-        if (['running', 'starting', 'initiated'].includes(state.PROCESS_INFO_CLIENT[stepKey].status)) {
+        if (['running', 'starting', 'initiated'].includes(stepInfo.status)) {
             console.log(`[API fetchInitialStatusAPI] Étape ${stepKey} en cours au démarrage. Lancement du polling.`);
             startPollingAPI(stepKey);
         }
 
     } catch (err) {
         console.error(`Erreur CATCH fetchInitialStatusAPI pour ${stepKey}:`, err);
-        const fallbackData = state.PROCESS_INFO_CLIENT[stepKey] || {
+        const fallbackData = appState.getStateProperty(`processInfo.${stepKey}`) || {
             status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
             is_any_sequence_running: false
         };

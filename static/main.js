@@ -156,6 +156,23 @@ try {
 }
 ui.setStepsConfig(stepsConfigData);
 
+function initializeProcessInfoFromDOM() {
+    const initialProcessInfo = {};
+    document.querySelectorAll('.step').forEach(s => {
+        const stepKey = s && s.dataset ? s.dataset.stepKey : null;
+        if (!stepKey) return;
+        initialProcessInfo[stepKey] = {
+            status: 'idle',
+            log: [],
+            progress_current: 0,
+            progress_total: 0,
+            progress_text: '',
+            is_any_sequence_running: false
+        };
+    });
+    appState.setState({ processInfo: initialProcessInfo }, 'process_info_init');
+}
+
 const LOCAL_DOWNLOAD_POLLING_INTERVAL = POLLING_INTERVAL * 2;
 
 const SYSTEM_MONITOR_POLLING_INTERVAL = 5000;
@@ -400,6 +417,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const initialStatusPromises = [];
     const allStepKeysForInitialStatus = Object.keys(stepsConfigData);
+
+    initializeProcessInfoFromDOM();
 
     allStepKeysForInitialStatus.forEach(stepKey => {
         initialStatusPromises.push(api.fetchInitialStatusAPI(stepKey));

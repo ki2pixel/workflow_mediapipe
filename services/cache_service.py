@@ -6,6 +6,7 @@ Centralized caching service for improved performance.
 import logging
 import json
 import time
+import re
 from functools import lru_cache, wraps
 from typing import Dict, Any, Optional, Callable
 from pathlib import Path
@@ -15,6 +16,8 @@ from config.settings import config
 from services.workflow_state import get_workflow_state
 
 logger = logging.getLogger(__name__)
+
+_SAFE_STEP_KEY_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
 
 # Global cache instance (will be initialized by Flask app)
 cache_instance: Optional[Cache] = None
@@ -207,6 +210,12 @@ class CacheService:
 
             result: Dict[str, Any] = {}
             for step_key, step_data_orig in commands_config.items():
+                if not isinstance(step_key, str) or not _SAFE_STEP_KEY_PATTERN.match(step_key):
+                    logger.error(
+                        "Unsafe step_key detected in WorkflowCommandsConfig; skipping for frontend DOM safety: %r",
+                        step_key,
+                    )
+                    continue
                 frontend_step_data: Dict[str, Any] = {}
                 for key, value in step_data_orig.items():
                     if key == "progress_patterns":

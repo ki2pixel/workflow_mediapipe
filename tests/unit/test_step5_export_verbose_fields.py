@@ -6,9 +6,21 @@ des données volumineuses (landmarks, coefficients EOS) tout en préservant
 la compatibilité avec STEP6.
 """
 
+from importlib import util as _import_util
+from unittest.mock import MagicMock
 import os
 import pytest
-from unittest.mock import MagicMock
+
+if _import_util.find_spec("numpy") is None:
+    pytestmark = pytest.mark.skip(
+        reason="numpy non disponible dans cet environnement; tests STEP5 export verbose ignorés."
+    )
+
+if _import_util.find_spec("scipy") is None:
+    pytestmark = pytest.mark.skip(  # type: ignore[assignment]
+        reason="scipy non disponible dans cet environnement; tests STEP5 export verbose ignorés."
+    )
+
 from utils.tracking_optimizations import apply_tracking_and_management
 
 

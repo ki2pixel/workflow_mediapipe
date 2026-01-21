@@ -33,6 +33,8 @@ export const confirmRunCustomSequenceButton = document.getElementById('confirm-r
 export const cancelRunCustomSequenceButton = document.getElementById('cancel-run-custom-sequence-button');
 export const notificationsArea = document.getElementById('notifications-area');
 
+const _SAFE_STEP_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 // Lazy DOM element getters to ensure elements are available when accessed
 export function getAllStepDivs() {
     const elements = document.querySelectorAll('.step');
@@ -62,6 +64,11 @@ export function getAllSpecificLogButtons() {
 export function getStepElement(stepKey) {
     if (!stepKey) {
         console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
+        return null;
+    }
+
+    if (!_SAFE_STEP_KEY_PATTERN.test(String(stepKey))) {
+        console.warn('[DOM] getStepElement called with unsafe stepKey (refusing to query by id):', stepKey);
         return null;
     }
 

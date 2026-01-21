@@ -617,61 +617,73 @@ Le frontend suit une architecture basée sur un état centralisé immutable avec
 ### Gestion d'État Centralisée : AppState
 
 #### AppState (`static/state/AppState.js`)
-**Responsabilité** : Gestion immutable de l'état de l'application
+**Responsabilité** : Gestion immutable de l'état de l'application (remplace complètement `state.js` depuis le 21/01/2026).
 
 ```javascript
 import { appState } from './state/AppState.js';
 
-// Lecture de l'état
-const currentStatus = appState.getState().stepStatuses;
+// Lecture immutable
+const {
+    activeStepKeyForLogsPanel,
+    stepTimers,
+    performanceMetrics
+} = appState.getState();
 
-// Modification de l'état (immutable)
+// Mise à jour (immutabilité garantie via merge profond interne)
 appState.setState({
-    stepStatuses: {
-        ...currentStatus,
-        STEP1: { status: 'running', progress: 50 }
+    stepTimers: {
+        ...stepTimers,
+        STEP3: { startTime: Date.now(), elapsedMs: 0 }
     }
-});
+}, 'step_timer_start');
 
-// Abonnement aux changements
-appState.subscribe('stepStatuses', (newStatuses) => {
-    updateUI(newStatuses);
+// Abonnement ciblé
+const unsubscribe = appState.subscribe((newState, prevState) => {
+    if (newState.activeStepKeyForLogsPanel !== prevState.activeStepKeyForLogsPanel) {
+        updateLogsPanel(newState.activeStepKeyForLogsPanel);
+    }
 });
 ```
 
-**Fonctionnalités** :
-- **État immutable** : Prévient les mutations accidentelles
-- **Notifications de changement** : Abonnements ciblés par propriété
-- **Mises à jour groupées** : Plusieurs changements en une notification
-- **Outils de développement** : Inspection et débogage de l'état
-- **Compatibilité legacy** : Couche de compatibilité pour l'ancien code
-
-#### Structure de l'État
+**Structure actuelle de l'état**
 
 ```javascript
 {
-    stepStatuses: {
-        STEP1: { status: 'idle', progress: 0, logs: [] },
-        STEP2: { status: 'running', progress: 45, logs: [...] },
-        // ...
-    },
-    systemStatus: {
-        cpu: 25.5,
-        memory: { percent: 60.2, used_gb: 8.1 },
-        gpu: { utilization_percent: 80, temperature_c: 65 }
-    },
-    sequenceStatus: {
-        isRunning: false,
-        currentStep: null,
-        steps: []
-    },
-    uiState: {
-        activeTab: 'workflow',
-        soundEnabled: true,
-        notifications: []
-    }
+  pollingIntervals: {},
+  activeStepKeyForLogsPanel: null,
+  isAnySequenceRunning: false,
+  focusedElementBeforePopup: null,
+  ui: {
+    compactMode: false,
+    localDownloadsVisible: true
+  },
+  stepTimers: {},
+  selectedStepsOrder: [],
+  processInfo: {},
+  performanceMetrics: {
+    apiResponseTimes: [],
+    errorCounts: {},
+    lastUpdate: null
+  },
+  cacheStats: {
+    hits: 0,
+    misses: 0,
+    hitRate: 0
+  }
 }
 ```
+
+**Fonctionnalités** :
+- **État immutable** : Prévient les mutations accidentelles (copie profonde via `_mergeDeep`).
+- **Notifications de changement** : Abonnements globaux (`subscribe`) ou ciblés (`subscribeToProperty`).
+- **Mises à jour groupées** : `batchUpdate()` combine plusieurs mutations et ne notifie qu'une seule fois.
+- **Hooks UI** : Gestion intégrée des timers d'étapes, du panneau de logs connecté et des métriques de performance.
+- **Compatibilité legacy** : Les anciens exports (`state.js`) ont été supprimés; tout nouveau module doit dépendre d’`appState`.
+- **Optimisation planifiée** : L’audit frontend recommande de remplacer `_deepClone` par `structuredClone()` et d’éviter les comparaisons `JSON.stringify` pour `_stateChanged` (TODO suivi dans l’audit).
+
+#### Structure de l'État
+
+> **Note** : L’ancienne structure `stepStatuses/systemStatus/uiState` décrite lors de la phase `state.js` n’est plus utilisée. Toute logique dépendante doit migrer vers les clés listées ci-dessus ou introduire explicitement les nouvelles propriétés nécessaires dans `AppState`.
 
 ### Optimisations de Performance
 

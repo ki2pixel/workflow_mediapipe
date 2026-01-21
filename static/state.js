@@ -1,25 +1,28 @@
 // Import new immutable state management
 import { appState } from './state/AppState.js';
 
-// Initialize process info from DOM
-const initialProcessInfo = {};
-document.querySelectorAll('.step').forEach(s => {
-    initialProcessInfo[s.dataset.stepKey] = {
-        status: 'idle',
-        log: [],
-        progress_current: 0,
-        progress_total: 0,
-        progress_text: '',
-        is_any_sequence_running: false
-    };
+export const PROCESS_INFO_CLIENT = new Proxy({}, {
+    get(_target, prop) {
+        if (typeof prop !== 'string') return undefined;
+        return appState.getStateProperty(`processInfo.${prop}`);
+    },
+    set(_target, prop, value) {
+        if (typeof prop !== 'string') return false;
+        appState.setState({ processInfo: { [prop]: value } }, 'process_info_update');
+        return true;
+    },
+    ownKeys() {
+        const root = appState.getStateProperty('processInfo') || {};
+        return Reflect.ownKeys(root);
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+        const root = appState.getStateProperty('processInfo') || {};
+        if (Object.prototype.hasOwnProperty.call(root, prop)) {
+            return { enumerable: true, configurable: true };
+        }
+        return undefined;
+    }
 });
-
-// Initialize app state with process info
-appState.setState({
-    processInfo: initialProcessInfo
-}, 'initialization');
-
-export const PROCESS_INFO_CLIENT = initialProcessInfo;
 
 // Legacy exports for backward compatibility (deprecated - use appState instead)
 export let pollingIntervals = {};
@@ -99,6 +102,14 @@ export function setFocusedElementBeforePopup(element) {
 }
 export function getFocusedElementBeforePopup() {
     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
+}
+
+export function setAutoModeLogPanelOpened(opened) {
+    appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
+}
+
+export function getAutoModeLogPanelOpened() {
+    return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
 }
 
 export function addPollingInterval(stepKey, id) {

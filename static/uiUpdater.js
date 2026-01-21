@@ -1,6 +1,6 @@
 import { formatElapsedTime, showNotification } from './utils.js';
 import * as dom from './domElements.js';
-import * as state from './state.js';
+import { appState } from './state/AppState.js';
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
 
 const lastProgressTextByStep = {};
@@ -32,6 +32,52 @@ const STATUS_UI_MAP = {
 let STEPS_CONFIG_FROM_SERVER = {};
 export function setStepsConfig(config) {
     STEPS_CONFIG_FROM_SERVER = config;
+}
+
+function getIsAnySequenceRunning() {
+    return !!appState.getStateProperty('isAnySequenceRunning');
+}
+
+function getActiveStepKeyForLogs() {
+    return appState.getStateProperty('activeStepKeyForLogsPanel');
+}
+
+function setActiveStepKeyForLogs(stepKey) {
+    appState.setState({ activeStepKeyForLogsPanel: stepKey }, 'setActiveStepKeyForLogs');
+}
+
+function getSelectedStepsOrder() {
+    return appState.getStateProperty('selectedStepsOrder') || [];
+}
+
+function getProcessInfo(stepKey) {
+    if (!stepKey) return null;
+    return appState.getStateProperty(`processInfo.${stepKey}`) || null;
+}
+
+function setProcessInfo(stepKey, info) {
+    if (!stepKey) return;
+    appState.setState({ processInfo: { [stepKey]: info } }, 'process_info_update');
+}
+
+function getStepTimers() {
+    return appState.getStateProperty('stepTimers') || {};
+}
+
+function getStepTimer(stepKey) {
+    return getStepTimers()[stepKey];
+}
+
+function setStepTimer(stepKey, timerData, source = 'setStepTimer') {
+    const timers = getStepTimers();
+    appState.setState({ stepTimers: { ...timers, [stepKey]: timerData } }, source);
+}
+
+function deleteStepTimer(stepKey) {
+    const timers = getStepTimers();
+    if (!timers || !Object.prototype.hasOwnProperty.call(timers, stepKey)) return;
+    const { [stepKey]: _removed, ...remaining } = timers;
+    appState.setState({ stepTimers: remaining }, 'deleteStepTimer');
 }
 
 function onWrapperTransitionEndOnce(callback, fallbackMs = 500) {
@@ -152,18 +198,18 @@ function updateStepStateChip(stepKey, status) {
 }
 
 export function startStepTimer(stepKey) {
-    const existingTimer = state.getStepTimer(stepKey);
+    const existingTimer = getStepTimer(stepKey);
     if (existingTimer && existingTimer.intervalId) {
         clearInterval(existingTimer.intervalId);
     }
 
     const startTime = Date.now();
-    state.addStepTimer(stepKey, {
+    setStepTimer(stepKey, {
         startTime: startTime,
         startTimeDate: new Date(startTime),
         intervalId: null,
         elapsedTimeFormatted: "0s"
-    });
+    }, 'startStepTimer');
 
     if (stepKey !== 'clear_disk_cache') {
         domBatcher.scheduleUpdate(`timer-init-${stepKey}`, () => {
@@ -173,7 +219,7 @@ export function startStepTimer(stepKey) {
     }
 
     const newIntervalId = setInterval(() => {
-        const currentTimer = state.getStepTimer(stepKey);
+        const currentTimer = getStepTimer(stepKey);
         if (!currentTimer || (!currentTimer.startTime && !currentTimer.startTimeDate)) {
             if (currentTimer && currentTimer.intervalId) clearInterval(currentTimer.intervalId);
             return;
@@ -181,7 +227,7 @@ export function startStepTimer(stepKey) {
 
         const startTimeToUse = currentTimer.startTime ? new Date(currentTimer.startTime) : currentTimer.startTimeDate;
         const elapsedTimeStr = formatElapsedTime(startTimeToUse);
-        currentTimer.elapsedTimeFormatted = elapsedTimeStr;
+        setStepTimer(stepKey, { ...currentTimer, elapsedTimeFormatted: elapsedTimeStr }, 'timer_tick');
 
         if (stepKey !== 'clear_disk_cache') {
             domBatcher.scheduleUpdate(`timer-update-${stepKey}`, () => {
@@ -191,19 +237,23 @@ export function startStepTimer(stepKey) {
         }
     }, 1000);
 
-    const currentTimerData = state.getStepTimer(stepKey);
+    const currentTimerData = getStepTimer(stepKey);
     if (currentTimerData) {
-        currentTimerData.intervalId = newIntervalId;
+        setStepTimer(stepKey, { ...currentTimerData, intervalId: newIntervalId }, 'timer_interval_set');
     }
 }
 
 export function stopStepTimer(stepKey) {
-    state.clearStepTimerInterval(stepKey);
-    const timerData = state.getStepTimer(stepKey);
-    if (timerData && (timerData.startTime || timerData.startTimeDate)) {
-        const startTimeToUse = timerData.startTime ? new Date(timerData.startTime) : timerData.startTimeDate;
+    const timerData = getStepTimer(stepKey);
+    if (timerData && timerData.intervalId) {
+        clearInterval(timerData.intervalId);
+        setStepTimer(stepKey, { ...timerData, intervalId: null }, 'timer_interval_cleared');
+    }
+    const updatedTimerData = getStepTimer(stepKey);
+    if (updatedTimerData && (updatedTimerData.startTime || updatedTimerData.startTimeDate)) {
+        const startTimeToUse = updatedTimerData.startTime ? new Date(updatedTimerData.startTime) : updatedTimerData.startTimeDate;
         const elapsedTimeStr = formatElapsedTime(startTimeToUse);
-        timerData.elapsedTimeFormatted = elapsedTimeStr;
+        setStepTimer(stepKey, { ...updatedTimerData, elapsedTimeFormatted: elapsedTimeStr }, 'timer_stopped');
         if (stepKey !== 'clear_disk_cache') {
             const timerEl = document.getElementById(`timer-${stepKey}`);
             if (timerEl) timerEl.textContent = `(Terminé en ${elapsedTimeStr})`;
@@ -216,20 +266,20 @@ export function resetStepTimerDisplay(stepKey) {
         const timerEl = document.getElementById(`timer-${stepKey}`);
         if (timerEl) timerEl.textContent = "";
     }
-    state.deleteStepTimer(stepKey);
+    deleteStepTimer(stepKey);
 }
 
 export function updateGlobalUIForSequenceState(isRunning) {
     if (dom.runAllButton) dom.runAllButton.disabled = isRunning;
-    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = isRunning || state.getSelectedStepsOrder().length === 0;
-    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = isRunning || state.getSelectedStepsOrder().length === 0;
+    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
 
     dom.customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
 
     Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
         const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
         const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKeyConfig}"]`);
-        const stepInfo = state.PROCESS_INFO_CLIENT[stepKeyConfig];
+        const stepInfo = getProcessInfo(stepKeyConfig);
 
         if (runButton) runButton.disabled = isRunning;
 
@@ -245,7 +295,7 @@ export function updateGlobalUIForSequenceState(isRunning) {
 
 export function setActiveStepForLogPanelUI(stepKey) {
     console.log(`[UI] setActiveStepForLogPanelUI, new active step for logs: ${stepKey}`);
-    state.setActiveStepKeyForLogs(stepKey);
+    setActiveStepKeyForLogs(stepKey);
 
     const allStepDivs = dom.getAllStepDivs();
     allStepDivs.forEach(s => {
@@ -301,7 +351,7 @@ export function setActiveStepForLogPanelUI(stepKey) {
 }
 
 async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
-    console.log(`[UI] fetchAndDisplayLogsForPanel called for: ${stepKeyToFocus}. Current active log panel: ${state.getActiveStepKeyForLogs()}`);
+    console.log(`[UI] fetchAndDisplayLogsForPanel called for: ${stepKeyToFocus}. Current active log panel: ${getActiveStepKeyForLogs()}`);
     if (!stepKeyToFocus) return;
 
     const stepConfig = getStepsConfig()[stepKeyToFocus];
@@ -321,25 +371,25 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
             throw new Error(`Erreur ${response.status} lors de la récupération des logs pour ${displayName}`);
         }
         const data = await response.json();
-        state.PROCESS_INFO_CLIENT[stepKeyToFocus] = { ...state.PROCESS_INFO_CLIENT[stepKeyToFocus], ...data };
+        setProcessInfo(stepKeyToFocus, { ...(getProcessInfo(stepKeyToFocus) || {}), ...data });
         console.log(`[UI] fetchAndDisplayLogsForPanel - response for: ${stepKeyToFocus}, Log content length: ${data.log ? data.log.length : 'N/A'}`);
 
-        if (state.getActiveStepKeyForLogs() === stepKeyToFocus) {
+        if (getActiveStepKeyForLogs() === stepKeyToFocus) {
             console.log(`[UI] fetchAndDisplayLogsForPanel - Updating main log for ${stepKeyToFocus} with ${data.log ? data.log.length : 0} lines.`);
             updateMainLogOutputUI(data.log.join(''));
         } else {
-            console.log(`[UI] fetchAndDisplayLogsForPanel - Log focus changed. Current: ${state.getActiveStepKeyForLogs()}, Fetched for: ${stepKeyToFocus}. Not updating main log panel.`);
+            console.log(`[UI] fetchAndDisplayLogsForPanel - Log focus changed. Current: ${getActiveStepKeyForLogs()}, Fetched for: ${stepKeyToFocus}. Not updating main log panel.`);
         }
     } catch (error) {
         console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
-        if (state.getActiveStepKeyForLogs() === stepKeyToFocus && dom.mainLogOutputPanel) {
+        if (getActiveStepKeyForLogs() === stepKeyToFocus && dom.mainLogOutputPanel) {
             dom.mainLogOutputPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
         }
     }
 }
 
 export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
-    const currentActiveLogStep = state.getActiveStepKeyForLogs();
+    const currentActiveLogStep = getActiveStepKeyForLogs();
     const isPanelOpen = dom.workflowWrapper.classList.contains('logs-active');
     console.log(`[UI] openLogPanelUI called for: ${stepKeyToFocus}, forceOpen: ${forceOpen}, currentActive: ${currentActiveLogStep}, isPanelOpen: ${isPanelOpen}`);
 
@@ -449,27 +499,27 @@ export function updateStepCardUI(stepKey, data) {
 
             if (runButton && cancelButton) {
                 const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
-                runButton.disabled = isCurrentlyRunningOrStarting || state.getIsAnySequenceRunning();
+                runButton.disabled = isCurrentlyRunningOrStarting || getIsAnySequenceRunning();
                 cancelButton.disabled = !isCurrentlyRunningOrStarting;
             }
 
             const logsOpen = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
             if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
-                if (state.getActiveStepKeyForLogs() !== stepKey) {
+                if (getActiveStepKeyForLogs() !== stepKey) {
                     setActiveStepForLogPanelUI(stepKey);
                     hideNonActiveSteps(stepKey, true);
                 }
             }
 
-            if (logsOpen && state.getActiveStepKeyForLogs() === stepKey) {
+            if (logsOpen && getActiveStepKeyForLogs() === stepKey) {
                 updateLogPanelContextUI(stepKey);
             }
 
-            if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && state.getStepTimer(stepKey))) {
+            if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && getStepTimer(stepKey))) {
                 stopStepTimer(stepKey);
-            } else if (normalizedStatus === 'idle' && !state.getStepTimer(stepKey)) {
+            } else if (normalizedStatus === 'idle' && !getStepTimer(stepKey)) {
                 resetStepTimerDisplay(stepKey);
-            } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !state.getStepTimer(stepKey)?.intervalId) {
+            } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !getStepTimer(stepKey)?.intervalId) {
                 // TODO: Implement proper timer resumption after page reload
                 // Date: 2026-01-19
                 // Owner: kidpixel
@@ -547,7 +597,7 @@ export function updateStepCardUI(stepKey, data) {
                     const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
                     progressTextEl.textContent = subText;
 
-                    const shouldAutoCenter = state.getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
+                    const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
                     if (shouldAutoCenter) {
                         const logsOpenNow = dom.workflowWrapper && dom.workflowWrapper.classList.contains('logs-active');
                         if (!logsOpenNow) {
@@ -695,9 +745,9 @@ export function updateStepCardUI(stepKey, data) {
 }
 
 export function updateCustomSequenceButtonsUI() {
-    const hasSelection = state.getSelectedStepsOrder().length > 0;
-    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || state.getIsAnySequenceRunning();
-    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || state.getIsAnySequenceRunning();
+    const hasSelection = getSelectedStepsOrder().length > 0;
+    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
+    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
 }
 
 export function updateGlobalProgressUI(text, percentage, isError = false) {
@@ -899,9 +949,9 @@ export function updateClearCacheGlobalButtonState(status, message = '') {
 
     dom.clearCacheGlobalButton.classList.remove('idle', 'running', 'completed', 'failed');
     const textSpan = dom.clearCacheGlobalButton.querySelector('.button-text');
-    const currentStepInfo = state.PROCESS_INFO_CLIENT['clear_disk_cache'];
+    const currentStepInfo = getProcessInfo('clear_disk_cache');
 
-const isOtherSequenceRunning = state.getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
+const isOtherSequenceRunning = getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
 
 
     switch (status) {

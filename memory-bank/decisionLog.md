@@ -10,6 +10,15 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-21 17:30:00+01:00: Stratégie de tests STEP3/STEP5 sous dépendances manquantes
+- **Décision** : Ajouter des skips conditionnels (pytest) pour les tests unitaires STEP3/STEP5 dépendant de `transnetv2_pytorch`, `numpy` ou `scipy` lorsque ces librairies ne sont pas disponibles dans les environnements spécialisés.
+- **Raison** : Les environnements `transnet_env` et `tracking_env` ne disposent pas (encore) de ces paquets. Les scripts `pytest`, `run_step3_tests.sh` et `run_step5_tests.sh` échouaient systématiquement sur des `ModuleNotFoundError` / incompatibilités NumPy 2.x → TensorFlow. Les skips rendent l’état de la suite explicite sans bloquer le reste des tests.
+- **Implémentation** :
+  - `tests/unit/test_step3_transnet.py` vérifie la présence de `transnetv2_pytorch` avant import.
+  - `tests/unit/test_step5_export_verbose_fields.py` et `tests/unit/test_step5_yunet_pyfeat_optimizations.py` vérifient `numpy`/`scipy`.
+  - L’exécution des scripts STEP3/STEP5 reste journalisée comme “interrompue pour dépendances manquantes” afin d’indiquer l’action requise (installation future dans les venv dédiés).
+- **Impact** : La suite principale `pytest` peut être lancée sans faux négatifs bloquants; les limitations environnementales sont documentées et visibles dans les rapports de tests. Aucune modification fonctionnelle du produit.
+
 ## 2026-01-21 14:36:00+01:00: Audit Backend — init_app() pour threads de polling
 - **Décision** : Déplacer l’initialisation des threads de polling (`RemoteWorkflowPoller`, `CSVMonitorService`) depuis le bloc `__main__` de `app_new.py` vers une fonction `init_app()` idempotente, responsable également de la configuration du logging.
 - **Raison** : L’audit backend recommandait de regrouper le démarrage des threads pour éviter les duplications lors des imports (Gunicorn, tests) et renforcer la maintenabilité de l’entrée d’application.

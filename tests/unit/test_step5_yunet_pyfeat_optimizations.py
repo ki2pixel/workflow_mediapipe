@@ -6,11 +6,24 @@ Vérifie :
 - Throttling des blendshapes (cache, fréquence)
 - Invariants (landmarks padding, JSON dense)
 """
+
+from importlib import util as _import_util
+from pathlib import Path
 import os
 import sys
-from pathlib import Path
-import pytest
+
 import numpy as np
+import pytest
+
+if _import_util.find_spec("numpy") is None:
+    pytestmark = pytest.mark.skip(
+        reason="numpy non disponible dans cet environnement; tests STEP5 pyfeat ignorés."
+    )
+
+if _import_util.find_spec("scipy") is None:
+    pytestmark = pytest.mark.skip(  # type: ignore[assignment]
+        reason="scipy non disponible dans cet environnement; tests STEP5 pyfeat ignorés."
+    )
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))

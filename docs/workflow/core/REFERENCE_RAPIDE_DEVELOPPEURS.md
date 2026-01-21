@@ -163,20 +163,29 @@ Les composants suivants ont été supprimés pour simplifier l'interface :
 - Les diagnostics sont accessibles via `/api/system/diagnostics` uniquement
 - Le mode compact unifié est maintenu sans les fonctionnalités avancées
 
-### Frontend État Centralisé
+### Frontend État Centralisé & Garde-fous DOM (2026-01-21)
 ```javascript
 // static/state/AppState.js
 import { appState } from './state/AppState.js';
 
-// Lecture
-const status = appState.getState().stepStatuses;
+const { activeStepKeyForLogsPanel, stepTimers } = appState.getState();
 
-// Modification (immutable)
-appState.setState({ stepStatuses: newStatus });
+appState.setState({
+    stepTimers: {
+        ...stepTimers,
+        STEP3: { startTime: Date.now(), elapsedMs: 0 }
+    }
+}, 'step_timer_start');
 
-// Abonnement
-appState.subscribe('stepStatuses', callback);
+const unsubscribe = appState.subscribe((next, prev) => {
+    if (next.activeStepKeyForLogsPanel !== prev.activeStepKeyForLogsPanel) {
+        updateLogsPanel(next.activeStepKeyForLogsPanel);
+    }
+});
 ```
+
+- Toute interaction DOM doit passer par les getters “lazy” (`domElements.getStepElement(stepKey)`) qui vérifient les IDs et refusent les clés hors `[A-Za-z0-9_-]+`.
+- Le backend (`CacheService`) rejette également toute `step_key` invalide, ce qui sécurise la Timeline, le Logs Panel et les boutons spécifiques.
 
 ### Références complémentaires
 - Smart Upload (feature retirée le 18 janvier 2026 — historique dans `memory-bank/decisionLog.md` et archives `docs/workflow/legacy/SMART_UPLOAD_FEATURE.md`)
