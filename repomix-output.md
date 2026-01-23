@@ -12930,328 +12930,6 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
 export default performanceOptimizer;
 ```
 
-## File: static/utils/PollingManager.js
-```javascript
-/**
- * Centralized polling management utility for workflow_mediapipe frontend.
- * 
- * This module provides safe interval management with automatic cleanup
- * to prevent memory leaks and ensure proper resource management.
- */
-
-class PollingManager {
-    /**
-     * Initialize the polling manager.
-     */
-    constructor() {
-        this.intervals = new Map();
-        this.timeouts = new Map();
-        this.isDestroyed = false;
-        this.pendingResumes = new Map();
-        this.errorCounts = new Map();
-        this.maxErrorCount = 5;
-        
-        this._bindCleanupEvents();
-        
-        console.debug('PollingManager initialized');
-    }
-
-    /**
-     * Start polling with a given callback function.
-     * 
-     * @param {string} name - Unique name for this polling operation
-     * @param {Function} callback - Function to call on each interval
-     * @param {number} interval - Interval in milliseconds
-     * @param {Object} options - Additional options
-     * @param {boolean} options.immediate - Whether to call callback immediately
-     * @param {number} options.maxErrors - Maximum consecutive errors before stopping
-     * @returns {string|null} - Polling ID or null if manager is destroyed
-     */
-    startPolling(name, callback, interval, options = {}) {
-        if (this.isDestroyed) {
-            console.warn('PollingManager: Cannot start polling, manager is destroyed');
-            return null;
-        }
-
-        this.stopPolling(name);
-
-        const {
-            immediate = false,
-            maxErrors = this.maxErrorCount
-        } = options;
-
-        this.errorCounts.set(name, 0);
-
-        const wrappedCallback = async () => {
-            if (this.isDestroyed) {
-                return;
-            }
-
-            try {
-                const result = await callback();
-                this.errorCounts.set(name, 0);
-
-                if (typeof result === 'number' && result > 0) {
-                    const existing = this.intervals.get(name);
-                    if (existing) {
-                        clearInterval(existing.id);
-                        this.intervals.delete(name);
-                    }
-                    if (this.pendingResumes.has(name)) {
-                        clearTimeout(this.pendingResumes.get(name));
-                    }
-                    const resumeId = setTimeout(() => {
-                        if (!this.isDestroyed && !this.intervals.has(name)) {
-                            const newIntervalId = setInterval(wrappedCallback, interval);
-                            this.intervals.set(name, {
-                                id: newIntervalId,
-                                callback: wrappedCallback,
-                                interval: interval,
-                                startTime: Date.now()
-                            });
-                            this.pendingResumes.delete(name);
-                            console.debug(`Resumed polling: ${name} after ${result}ms backoff`);
-                        }
-                    }, result);
-                    this.pendingResumes.set(name, resumeId);
-                    return;
-                }
-            } catch (error) {
-                const errorCount = (this.errorCounts.get(name) || 0) + 1;
-                this.errorCounts.set(name, errorCount);
-                
-                console.error(`Polling error in ${name} (attempt ${errorCount}):`, error);
-                
-                if (errorCount >= maxErrors) {
-                    console.error(`Stopping polling ${name} due to ${errorCount} consecutive errors`);
-                    this.stopPolling(name);
-                    
-                    this._dispatchPollingError(name, error, errorCount);
-                }
-            }
-        };
-
-        if (immediate) {
-            wrappedCallback();
-        }
-
-        const intervalId = setInterval(wrappedCallback, interval);
-        this.intervals.set(name, {
-            id: intervalId,
-            callback: wrappedCallback,
-            interval: interval,
-            startTime: Date.now()
-        });
-
-        console.debug(`Started polling: ${name} (interval: ${interval}ms)`);
-        return name;
-    }
-
-    /**
-     * Stop a specific polling operation.
-     * 
-     * @param {string} name - Name of the polling operation to stop
-     * @returns {boolean} - True if polling was stopped, false if not found
-     */
-    stopPolling(name) {
-        const pollingInfo = this.intervals.get(name);
-        if (pollingInfo) {
-            clearInterval(pollingInfo.id);
-            this.intervals.delete(name);
-            this.errorCounts.delete(name);
-            if (this.pendingResumes.has(name)) {
-                clearTimeout(this.pendingResumes.get(name));
-                this.pendingResumes.delete(name);
-            }
-            
-            const duration = Date.now() - pollingInfo.startTime;
-            console.debug(`Stopped polling: ${name} (ran for ${duration}ms)`);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Schedule a one-time delayed execution.
-     * 
-     * @param {string} name - Unique name for this timeout
-     * @param {Function} callback - Function to call after delay
-     * @param {number} delay - Delay in milliseconds
-     * @returns {string|null} - Timeout ID or null if manager is destroyed
-     */
-    setTimeout(name, callback, delay) {
-        if (this.isDestroyed) {
-            console.warn('PollingManager: Cannot set timeout, manager is destroyed');
-            return null;
-        }
-
-        this.clearTimeout(name);
-
-        const wrappedCallback = () => {
-            if (this.isDestroyed) {
-                return;
-            }
-
-            try {
-                callback();
-            } catch (error) {
-                console.error(`Timeout callback error in ${name}:`, error);
-            } finally {
-                this.timeouts.delete(name);
-            }
-        };
-
-        const timeoutId = setTimeout(wrappedCallback, delay);
-        this.timeouts.set(name, {
-            id: timeoutId,
-            callback: wrappedCallback,
-            delay: delay,
-            startTime: Date.now()
-        });
-
-        console.debug(`Set timeout: ${name} (delay: ${delay}ms)`);
-        return name;
-    }
-
-    /**
-     * Clear a specific timeout.
-     * 
-     * @param {string} name - Name of the timeout to clear
-     * @returns {boolean} - True if timeout was cleared, false if not found
-     */
-    clearTimeout(name) {
-        const timeoutInfo = this.timeouts.get(name);
-        if (timeoutInfo) {
-            clearTimeout(timeoutInfo.id);
-            this.timeouts.delete(name);
-            
-            console.debug(`Cleared timeout: ${name}`);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Get information about active polling operations.
-     * 
-     * @returns {Object} - Information about active operations
-     */
-    getActiveOperations() {
-        const now = Date.now();
-        
-        return {
-            intervals: Array.from(this.intervals.entries()).map(([name, info]) => ({
-                name,
-                interval: info.interval,
-                runningTime: now - info.startTime,
-                errorCount: this.errorCounts.get(name) || 0
-            })),
-            timeouts: Array.from(this.timeouts.entries()).map(([name, info]) => ({
-                name,
-                delay: info.delay,
-                timeRemaining: Math.max(0, (info.startTime + info.delay) - now)
-            })),
-            totalIntervals: this.intervals.size,
-            totalTimeouts: this.timeouts.size
-        };
-    }
-
-    /**
-     * Get summarized statistics for monitoring consumers (PerformanceMonitor).
-     *
-     * @returns {Object}
-     */
-    getStats() {
-        const ops = this.getActiveOperations();
-        return {
-            totalIntervals: ops.totalIntervals,
-            totalTimeouts: ops.totalTimeouts,
-            intervals: ops.intervals,
-            timeouts: ops.timeouts
-        };
-    }
-
-    /**
-     * Destroy the polling manager and clean up all resources.
-     */
-    destroy() {
-        if (this.isDestroyed) {
-            return;
-        }
-
-        console.debug('Destroying PollingManager...');
-
-        this.intervals.forEach((info, name) => {
-            clearInterval(info.id);
-            console.debug(`Cleaned up interval: ${name}`);
-        });
-        this.intervals.clear();
-
-        this.timeouts.forEach((info, name) => {
-            clearTimeout(info.id);
-            console.debug(`Cleaned up timeout: ${name}`);
-        });
-        this.timeouts.clear();
-
-        this.errorCounts.clear();
-
-        this.pendingResumes.forEach((timeoutId, name) => {
-            clearTimeout(timeoutId);
-            console.debug(`Cleared pending resume: ${name}`);
-        });
-        this.pendingResumes.clear();
-
-        this.isDestroyed = true;
-        console.debug('PollingManager destroyed');
-    }
-
-    /**
-     * Bind cleanup events to prevent memory leaks.
-     * @private
-     */
-    _bindCleanupEvents() {
-        window.addEventListener('beforeunload', () => {
-            this.destroy();
-        });
-
-        window.addEventListener('pagehide', () => {
-            this.destroy();
-        });
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                console.debug('Page hidden, polling continues in background');
-            }
-        });
-    }
-
-    /**
-     * Dispatch a custom event for polling errors.
-     * @private
-     */
-    _dispatchPollingError(name, error, errorCount) {
-        const event = new CustomEvent('pollingError', {
-            detail: {
-                name,
-                error,
-                errorCount,
-                timestamp: new Date().toISOString()
-            }
-        });
-        
-        window.dispatchEvent(event);
-    }
-}
-
-// Create and export global polling manager instance
-const pollingManager = new PollingManager();
-
-// Export for use in other modules
-export { PollingManager, pollingManager };
-
-window.pollingManager = pollingManager;
-```
-
 ## File: static/constants.js
 ```javascript
 export const POLLING_INTERVAL = 2000; // Increased from 500ms to 2000ms to reduce logging
@@ -29638,544 +29316,326 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
 export default appState;
 ```
 
-## File: static/apiService.js
+## File: static/utils/PollingManager.js
 ```javascript
-// --- START OF REFACTORED apiService.js ---
-
-import { POLLING_INTERVAL } from './constants.js';
-import * as ui from './uiUpdater.js';
-import * as dom from './domElements.js';
-import { appState } from './state/AppState.js';
-import { showNotification, sendBrowserNotification } from './utils.js';
-import { soundEvents } from './soundManager.js';
-import { pollingManager } from './utils/PollingManager.js';
-import { errorHandler } from './utils/ErrorHandler.js';
-
-
 /**
- * Fetch helper that toggles a loading state on a button during the request.
- * It adds data-loading="true" and disables the button while the fetch runs.
- * @param {string} url
- * @param {RequestInit} options
- * @param {HTMLElement|string|null} buttonElOrId - element or element id
- * @returns {Promise<any>} parsed JSON response (or throws on network/error)
+ * Centralized polling management utility for workflow_mediapipe frontend.
+ * 
+ * This module provides safe interval management with automatic cleanup
+ * to prevent memory leaks and ensure proper resource management.
  */
-export async function fetchWithLoadingState(url, options = {}, buttonElOrId = null) {
-    let btn = null;
-    if (typeof buttonElOrId === 'string') {
-        btn = document.getElementById(buttonElOrId);
-    } else if (buttonElOrId && buttonElOrId.nodeType === 1) {
-        btn = buttonElOrId;
+
+class PollingManager {
+    /**
+     * Initialize the polling manager.
+     */
+    constructor() {
+        this.intervals = new Map();
+        this.timeouts = new Map();
+        this.isDestroyed = false;
+        this.pendingResumes = new Map();
+        this.errorCounts = new Map();
+        this.maxErrorCount = 5;
+        
+        this._bindCleanupEvents();
+        
+        console.debug('PollingManager initialized');
     }
 
-    try {
-        if (btn) {
-            btn.setAttribute('data-loading', 'true');
-            btn.disabled = true;
+    /**
+     * Start polling with a given callback function.
+     * 
+     * @param {string} name - Unique name for this polling operation
+     * @param {Function} callback - Function to call on each interval
+     * @param {number} interval - Interval in milliseconds
+     * @param {Object} options - Additional options
+     * @param {boolean} options.immediate - Whether to call callback immediately
+     * @param {number} options.maxErrors - Maximum consecutive errors before stopping
+     * @returns {string|null} - Polling ID or null if manager is destroyed
+     */
+    startPolling(name, callback, interval, options = {}) {
+        if (this.isDestroyed) {
+            console.warn('PollingManager: Cannot start polling, manager is destroyed');
+            return null;
         }
-        const response = await fetch(url, options);
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error((data && data.message) || `Erreur HTTP ${response.status}`);
-        }
-        return data;
-    } finally {
-        if (btn) {
-            btn.removeAttribute('data-loading');
-            btn.disabled = false;
-        }
-    }
-}
 
-/**
- * Centralized function to handle UI updates and state changes when a step fails.
- * This avoids code duplication in runStepAPI and performPoll.
- * @param {string} stepKey - The key of the step that failed.
- * @param {Error} error - The error object.
- * @param {string} errorSource - A string indicating where the error occurred (e.g., 'Lancement', 'Polling').
- */
-function handleStepFailure(stepKey, error, errorSource) {
-    const errorMessage = error.message || 'Erreur inconnue.';
-    console.error(`[API handleStepFailure] Erreur ${errorSource} pour ${stepKey}:`, error);
+        this.stopPolling(name);
 
-    if (errorMessage.includes('Étape inconnue')) {
-        console.warn(`[API handleStepFailure] Étape '${stepKey}' n'est pas reconnue.`);
-    }
+        const {
+            immediate = false,
+            maxErrors = this.maxErrorCount
+        } = options;
 
-    soundEvents.errorEvent();
+        this.errorCounts.set(name, 0);
 
-    showNotification(`Erreur ${errorSource} ${stepKey}: ${errorMessage}`, 'error');
-
-    const statusEl = document.getElementById(`status-${stepKey}`);
-    if (statusEl) {
-        statusEl.textContent = `Erreur: ${errorMessage.substring(0, 50)}`;
-        statusEl.className = 'status-badge status-failed';
-    }
-
-    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
-        ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${errorMessage}</i>`);
-    }
-
-    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
-    if (runButton) {
-        runButton.disabled = !!appState.getStateProperty('isAnySequenceRunning');
-    }
-    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-    if (cancelButton) {
-        cancelButton.disabled = true;
-    }
-
-    ui.stopStepTimer(stepKey);
-    const progressBar = document.getElementById(`progress-bar-${stepKey}`);
-    if (progressBar) {
-        progressBar.style.backgroundColor = 'var(--red)';
-    }
-
-    stopPollingAPI(stepKey);
-}
-
-
-export async function runStepAPI(stepKey) {
-    // --- UI setup (unchanged) ---
-    ui.resetStepTimerDisplay(stepKey);
-    const statusEl = document.getElementById(`status-${stepKey}`);
-    if(statusEl) { statusEl.textContent = 'Initiation...'; statusEl.className = 'status-badge status-initiated'; }
-    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
-    if(runButton) runButton.disabled = true;
-    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-    if(cancelButton) cancelButton.disabled = false;
-
-    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
-        ui.updateMainLogOutputUI('<i>Initiation du processus...</i>');
-    }
-
-    try {
-        const data = await fetchWithLoadingState(`/run/${stepKey}`, { method: 'POST' }, runButton);
-        console.log(`[API runStepAPI] Réponse pour ${stepKey}:`, data);
-
-        if (data.status === 'initiated') {
-            const statusEl = document.getElementById(`status-${stepKey}`);
-            if(statusEl) { statusEl.textContent = 'Lancé'; statusEl.className = 'status-badge status-starting'; }
-            ui.startStepTimer(stepKey);
-            console.log(`[API runStepAPI] Appel de startPollingAPI pour ${stepKey}`);
-            startPollingAPI(stepKey);
-            return true;
-        } else {
-            throw new Error(data.message || `Réponse invalide du serveur pour le lancement de ${stepKey}.`);
-        }
-    } catch (error) {
-        handleStepFailure(stepKey, error, 'Lancement');
-        return false;
-    }
-}
-
-function appendItalicLineToMainLog(panelEl, message) {
-    if (!panelEl) return;
-    const br = document.createElement('br');
-    const i = document.createElement('i');
-    i.textContent = String(message ?? '');
-    panelEl.appendChild(br);
-    panelEl.appendChild(i);
-}
-
-export async function cancelStepAPI(stepKey) {
-    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
-        appendItalicLineToMainLog(dom.mainLogOutputPanel, 'Annulation en cours...');
-    }
-
-    try {
-        const cancelUrl = `/cancel/${stepKey}`;
-        const fullUrl = new URL(cancelUrl, window.location.origin).href;
-        console.log(`[CANCEL DEBUG] Attempting to cancel ${stepKey}:`);
-        console.log(`  - Relative URL: ${cancelUrl}`);
-        console.log(`  - Full URL: ${fullUrl}`);
-        console.log(`  - Current origin: ${window.location.origin}`);
-        console.log(`  - Current port: ${window.location.port}`);
-
-        const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
-        const data = await fetchWithLoadingState(cancelUrl, { method: 'POST' }, cancelButton);
-        console.log(`[CANCEL DEBUG] Response received (ok):`, data);
-        showNotification(data.message || "Annulation demandée", 'info');
-
-        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
-            appendItalicLineToMainLog(dom.mainLogOutputPanel, data.message || 'Annulation demandée');
-        }
-    } catch (error) {
-        console.error(`Erreur annulation ${stepKey}:`, error);
-
-        errorHandler.handleApiError(`cancel/${stepKey}`, error, { stepKey });
-
-        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
-            appendItalicLineToMainLog(dom.mainLogOutputPanel, `Erreur communication pour annulation: ${error.toString()}`);
-        }
-    }
-}
-
-export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
-    stopPollingAPI(stepKey);
-
-    const pollingInterval = isAutoModeHighFrequency ? 200 : POLLING_INTERVAL;
-    console.log(`[API startPollingAPI] 🚀 Polling démarré pour ${stepKey}. Intervalle: ${pollingInterval}ms ${isAutoModeHighFrequency ? '(AutoMode high-frequency)' : '(normal)'}`);
-
-    const performPoll = async () => {
-        try {
-            const pollStartTime = performance.now();
-            console.log(`[API POLL] Fetching status for ${stepKey} at ${new Date().toISOString()}`);
-
-            const response = await fetch(`/status/${stepKey}`);
-            if (!response.ok) {
-                console.warn(`[API performPoll] Erreur ${response.status} lors du polling pour ${stepKey}. Arrêt du polling.`);
-                stopPollingAPI(stepKey);
-                if (!appState.getStateProperty('isAnySequenceRunning')) {
-                    handleStepFailure(stepKey, new Error(`Erreur statut (${response.status})`), 'Polling');
-                }
+        const wrappedCallback = async () => {
+            if (this.isDestroyed) {
                 return;
             }
-            const data = await response.json();
 
-            const pollEndTime = performance.now();
-            const statusEmoji = data.status === 'running' ? '🔄' : data.status === 'completed' ? '✅' : data.status === 'failed' ? '❌' : '⚪';
-            console.log(`[API POLL RESPONSE] ${statusEmoji} ${stepKey} (${(pollEndTime - pollStartTime).toFixed(2)}ms): status="${data.status}", progress=${data.progress_current}/${data.progress_total}, return_code=${data.return_code}`);
+            try {
+                const result = await callback();
+                this.errorCounts.set(name, 0);
 
-            const previousStatus = appState.getStateProperty(`processInfo.${stepKey}.status`) || 'unknown';
-            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_polled');
-
-            if (typeof data.is_any_sequence_running === 'boolean') {
-                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_polled');
-            }
-
-            ui.updateStepCardUI(stepKey, data);
-
-            const workflowWrapper = typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
-            if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey && workflowWrapper && workflowWrapper.classList.contains('logs-active')) {
-                ui.updateMainLogOutputUI(data.log.join(''));
-            }
-            const isTerminal = ['completed', 'failed'].includes(data.status);
-            if (isTerminal && previousStatus !== data.status) {
-                const title = data.status === 'completed' ? '✅ Étape terminée' : '❌ Étape en erreur';
-                const body = `${stepKey} — statut: ${data.status}`;
-                sendBrowserNotification(title, body).catch(() => {});
-            }
-
-            const shouldStopPolling = isTerminal ||
-                                    (data.status === 'idle' && !appState.getStateProperty('autoModeEnabled'));
-
-            if (shouldStopPolling) {
-                console.log(`[API performPoll] Statut final '${data.status}' pour ${stepKey}. Arrêt du polling.`);
-                stopPollingAPI(stepKey);
-            } else if (data.status === 'idle' && appState.getStateProperty('autoModeEnabled')) {
-                console.log(`[API performPoll] ⚪ ${stepKey} idle mais AutoMode actif - maintien du polling pour détecter les transitions`);
-            }
-        } catch (error) {
-            console.error(`[API performPoll] Erreur CATCH polling ${stepKey}:`, error);
-            stopPollingAPI(stepKey);
-            if (!appState.getStateProperty('isAnySequenceRunning')) {
-                handleStepFailure(stepKey, error, 'Polling');
-            }
-        }
-    };
-
-    const pollingId = pollingManager.startPolling(
-        `step-${stepKey}`,
-        performPoll,
-        pollingInterval, // Use dynamic interval (200ms for AutoMode, 500ms for normal)
-        { immediate: true, maxErrors: 3 }
-    );
-}
-
-export function stopPollingAPI(stepKey) {
-    pollingManager.stopPolling(`step-${stepKey}`);
-    console.log(`[API stopPollingAPI] Polling arrêté pour ${stepKey}.`);
-}
-
-export async function fetchSpecificLogAPI(stepKey, logIndex, logName, buttonElOrId = null) {
-    ui.updateSpecificLogUI(logName, null, "<i>Chargement...</i>");
-    try {
-        let data;
-        const url = `/get_specific_log/${stepKey}/${logIndex}`;
-        if (buttonElOrId) {
-            data = await fetchWithLoadingState(url, {}, buttonElOrId);
-        } else {
-            const response = await fetch(url);
-            data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || `Erreur HTTP ${response.status}`);
-            }
-        }
-        ui.updateSpecificLogUI(logName, data.path, data.content);
-    } catch (error) {
-        console.error(`Erreur fetch log spécifique ${stepKey}/${logIndex}:`, error);
-        ui.updateSpecificLogUI(logName, null, '', true, `Erreur de communication: ${error.toString()}`);
-    }
-}
-
-
-export async function fetchInitialStatusAPI(stepKey) {
-    try {
-        const response = await fetch(`/status/${stepKey}`);
-        if (!response.ok) {
-            console.warn(`Initial status fetch failed for ${stepKey}: ${response.status}. Using fallback.`);
-            appState.setState({
-                processInfo: {
-                    [stepKey]: appState.getStateProperty(`processInfo.${stepKey}`) || {
-                        status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
-                        is_any_sequence_running: false
+                if (typeof result === 'number' && result > 0) {
+                    const existing = this.intervals.get(name);
+                    if (existing) {
+                        clearInterval(existing.id);
+                        this.intervals.delete(name);
                     }
+                    if (this.pendingResumes.has(name)) {
+                        clearTimeout(this.pendingResumes.get(name));
+                    }
+                    const resumeId = setTimeout(() => {
+                        if (!this.isDestroyed && !this.intervals.has(name)) {
+                            const newIntervalId = setInterval(wrappedCallback, interval);
+                            this.intervals.set(name, {
+                                id: newIntervalId,
+                                callback: wrappedCallback,
+                                interval: interval,
+                                startTime: Date.now()
+                            });
+                            this.pendingResumes.delete(name);
+                            console.debug(`Resumed polling: ${name} after ${result}ms backoff`);
+                        }
+                    }, result);
+                    this.pendingResumes.set(name, resumeId);
+                    return;
                 }
-            }, 'process_info_initial_fallback');
-        } else {
-            const data = await response.json();
-            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_initial');
-
-            if (typeof data.is_any_sequence_running === 'boolean') {
-                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_initial');
+            } catch (error) {
+                const errorCount = (this.errorCounts.get(name) || 0) + 1;
+                this.errorCounts.set(name, errorCount);
+                
+                console.error(`Polling error in ${name} (attempt ${errorCount}):`, error);
+                
+                if (errorCount >= maxErrors) {
+                    console.error(`Stopping polling ${name} due to ${errorCount} consecutive errors`);
+                    this.stopPolling(name);
+                    
+                    this._dispatchPollingError(name, error, errorCount);
+                }
             }
-        }
-
-        const stepInfo = appState.getStateProperty(`processInfo.${stepKey}`) || {
-            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
-            is_any_sequence_running: false
         };
 
-        if (stepKey === 'clear_disk_cache') {
-            ui.updateClearCacheGlobalButtonState(stepInfo.status);
-        } else {
-            ui.updateStepCardUI(stepKey, stepInfo);
-        }
-        
-        if (['running', 'starting', 'initiated'].includes(stepInfo.status)) {
-            console.log(`[API fetchInitialStatusAPI] Étape ${stepKey} en cours au démarrage. Lancement du polling.`);
-            startPollingAPI(stepKey);
+        if (immediate) {
+            wrappedCallback();
         }
 
-    } catch (err) {
-        console.error(`Erreur CATCH fetchInitialStatusAPI pour ${stepKey}:`, err);
-        const fallbackData = appState.getStateProperty(`processInfo.${stepKey}`) || {
-            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
-            is_any_sequence_running: false
-        };
-        if (stepKey === 'clear_disk_cache') {
-            ui.updateClearCacheGlobalButtonState(fallbackData.status);
-        } else {
-            ui.updateStepCardUI(stepKey, fallbackData);
-        }
-    }
-}
-
-export async function fetchLocalDownloadsStatusAPI() {
-    try {
-        const response = await fetch('/api/csv_downloads_status');
-        if (!response.ok) {
-            console.warn(`Erreur lors de la récupération du statut des téléchargements CSV: ${response.status}`);
-            return [];
-        }
-        return await response.json();
-    } catch (error) {
-        console.error("Erreur réseau fetchLocalDownloadsStatusAPI:", error);
-        return [];
-    }
-}
-
-
-
-export async function fetchCSVMonitorStatusAPI() {
-    try {
-        const response = await fetch('/api/csv_monitor_status');
-        if (!response.ok) {
-            throw new Error(`Erreur HTTP ${response.status}`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error("Erreur fetchCSVMonitorStatusAPI:", error);
-        return {
-            csv_monitor: { status: "error", last_check: null, error: "Impossible de récupérer le statut" },
-            auto_mode_enabled: false,
-            csv_url: "",
-            check_interval: 15
-        };
-    }
-}
-```
-
-## File: static/popupManager.js
-```javascript
-import * as dom from './domElements.js';
-import { appState } from './state/AppState.js';
-import { DOMUpdateUtils } from './utils/DOMBatcher.js';
-
-function handlePopupKeydown(event) {
-    const popupOverlay = event.currentTarget;
-    if (event.key === 'Escape') {
-        closePopupUI(popupOverlay);
-    }
-    if (event.key === 'Tab') {
-        const focusableElements = Array.from(popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
-        if (focusableElements.length === 0) return;
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        if (event.shiftKey) {
-            if (document.activeElement === firstElement) {
-                lastElement.focus();
-                event.preventDefault();
-            }
-        } else {
-            if (document.activeElement === lastElement) {
-                firstElement.focus();
-                event.preventDefault();
-            }
-        }
-    }
-}
-
-export function openPopupUI(popupOverlay) {
-    if (!popupOverlay) return;
-
-    const currentFocused = document.activeElement;
-    if (currentFocused &&
-        currentFocused !== document.body &&
-        currentFocused !== document.documentElement &&
-        typeof currentFocused.focus === 'function' &&
-        currentFocused.nodeType === Node.ELEMENT_NODE) {
-        appState.setState({ focusedElementBeforePopup: currentFocused }, 'popup_focus_store');
-        console.debug('[POPUP] Stored focusable element:', {
-            tagName: currentFocused.tagName,
-            id: currentFocused.id || 'no-id',
-            className: currentFocused.className || 'no-class'
+        const intervalId = setInterval(wrappedCallback, interval);
+        this.intervals.set(name, {
+            id: intervalId,
+            callback: wrappedCallback,
+            interval: interval,
+            startTime: Date.now()
         });
-    } else {
-        appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_store');
-        console.debug('[POPUP] No valid focusable element to store');
+
+        console.debug(`Started polling: ${name} (interval: ${interval}ms)`);
+        return name;
     }
 
-    popupOverlay.style.display = 'flex';
-    popupOverlay.setAttribute('data-visible', 'true');
-    popupOverlay.setAttribute('aria-hidden', 'false');
-    const focusableElements = popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-
-    let elementToFocus = null;
-    for (let i = 0; i < focusableElements.length; i++) {
-        const element = focusableElements[i];
-        if (element.offsetParent !== null && typeof element.focus === 'function') {
-            elementToFocus = element;
-            break;
-        }
-    }
-
-    if (elementToFocus) {
-        try {
-            elementToFocus.focus();
-        } catch (error) {
-            console.warn('[POPUP] Failed to focus element in popup:', error);
-        }
-    }
-
-    popupOverlay.addEventListener('keydown', handlePopupKeydown);
-}
-
-export function closePopupUI(popupOverlay) {
-    if (!popupOverlay) return;
-    popupOverlay.removeAttribute('data-visible');
-    popupOverlay.setAttribute('aria-hidden', 'true');
-    popupOverlay.style.display = 'none';
-    popupOverlay.removeEventListener('keydown', handlePopupKeydown);
-    const prevFocused = appState.getStateProperty('focusedElementBeforePopup');
-
-    if (prevFocused && typeof prevFocused.focus === 'function') {
-        try {
-            if (prevFocused.isConnected && document.hasFocus()) {
-                if (document.contains(prevFocused) && prevFocused.offsetParent !== null) {
-                    prevFocused.focus();
-                } else {
-                    console.debug('[POPUP] Previous focused element no longer focusable, skipping focus restoration');
-                }
+    /**
+     * Stop a specific polling operation.
+     * 
+     * @param {string} name - Name of the polling operation to stop
+     * @returns {boolean} - True if polling was stopped, false if not found
+     */
+    stopPolling(name) {
+        const pollingInfo = this.intervals.get(name);
+        if (pollingInfo) {
+            clearInterval(pollingInfo.id);
+            this.intervals.delete(name);
+            this.errorCounts.delete(name);
+            if (this.pendingResumes.has(name)) {
+                clearTimeout(this.pendingResumes.get(name));
+                this.pendingResumes.delete(name);
             }
-        } catch (error) {
-            console.warn('[POPUP] Failed to restore focus to previous element:', error);
+            
+            const duration = Date.now() - pollingInfo.startTime;
+            console.debug(`Stopped polling: ${name} (ran for ${duration}ms)`);
+            return true;
         }
-    } else if (prevFocused) {
-        const elementInfo = {
-            tagName: prevFocused.tagName || 'unknown',
-            id: prevFocused.id || 'no-id',
-            className: prevFocused.className || 'no-class',
-            nodeType: prevFocused.nodeType || 'unknown',
-            hasFocusMethod: typeof prevFocused.focus === 'function'
+        return false;
+    }
+
+    /**
+     * Schedule a one-time delayed execution.
+     * 
+     * @param {string} name - Unique name for this timeout
+     * @param {Function} callback - Function to call after delay
+     * @param {number} delay - Delay in milliseconds
+     * @returns {string|null} - Timeout ID or null if manager is destroyed
+     */
+    setTimeout(name, callback, delay) {
+        if (this.isDestroyed) {
+            console.warn('PollingManager: Cannot set timeout, manager is destroyed');
+            return null;
+        }
+
+        this.clearTimeout(name);
+
+        const wrappedCallback = () => {
+            if (this.isDestroyed) {
+                return;
+            }
+
+            try {
+                callback();
+            } catch (error) {
+                console.error(`Timeout callback error in ${name}:`, error);
+            } finally {
+                this.timeouts.delete(name);
+            }
         };
-        console.debug('[POPUP] Previous focused element is not focusable:', elementInfo);
+
+        const timeoutId = setTimeout(wrappedCallback, delay);
+        this.timeouts.set(name, {
+            id: timeoutId,
+            callback: wrappedCallback,
+            delay: delay,
+            startTime: Date.now()
+        });
+
+        console.debug(`Set timeout: ${name} (delay: ${delay}ms)`);
+        return name;
     }
 
-    appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_clear');
-}
-
-function resolveSequenceSummaryElements() {
-    const overlay = typeof dom.getSequenceSummaryPopupOverlay === 'function'
-        ? dom.getSequenceSummaryPopupOverlay()
-        : dom.sequenceSummaryPopupOverlay;
-    const list = typeof dom.getSequenceSummaryList === 'function'
-        ? dom.getSequenceSummaryList()
-        : dom.sequenceSummaryList;
-    return { overlay, list };
-}
-
-export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "Séquence", overallDuration = null) {
-    const { overlay, list } = resolveSequenceSummaryElements();
-    if (!overlay || !list) {
-        console.error("Éléments DOM pour la popup de résumé non trouvés!");
-        return;
+    /**
+     * Clear a specific timeout.
+     * 
+     * @param {string} name - Name of the timeout to clear
+     * @returns {boolean} - True if timeout was cleared, false if not found
+     */
+    clearTimeout(name) {
+        const timeoutInfo = this.timeouts.get(name);
+        if (timeoutInfo) {
+            clearTimeout(timeoutInfo.id);
+            this.timeouts.delete(name);
+            
+            console.debug(`Cleared timeout: ${name}`);
+            return true;
+        }
+        return false;
     }
-    const summaryTitle = overlay.querySelector("h3");
-    if (summaryTitle) summaryTitle.textContent = `Résumé: ${sequenceName}`;
 
-    list.innerHTML = '';
-    if (overallDuration && typeof overallDuration === 'string') {
-        const totalItem = document.createElement('li');
-        totalItem.style.fontWeight = 'bold';
-        totalItem.style.marginBottom = '8px';
-        totalItem.style.paddingBottom = '8px';
-        totalItem.style.borderBottom = `1px solid var(--border-color)`;
-        const safeDuration = DOMUpdateUtils.escapeHtml(overallDuration);
-        totalItem.innerHTML = `<span class="status-icon" style="color:var(--accent-color);">⏱️</span> Durée totale: ${safeDuration}`;
-        list.appendChild(totalItem);
+    /**
+     * Get information about active polling operations.
+     * 
+     * @returns {Object} - Information about active operations
+     */
+    getActiveOperations() {
+        const now = Date.now();
+        
+        return {
+            intervals: Array.from(this.intervals.entries()).map(([name, info]) => ({
+                name,
+                interval: info.interval,
+                runningTime: now - info.startTime,
+                errorCount: this.errorCounts.get(name) || 0
+            })),
+            timeouts: Array.from(this.timeouts.entries()).map(([name, info]) => ({
+                name,
+                delay: info.delay,
+                timeRemaining: Math.max(0, (info.startTime + info.delay) - now)
+            })),
+            totalIntervals: this.intervals.size,
+            totalTimeouts: this.timeouts.size
+        };
     }
-    results.forEach(result => {
-        const listItem = document.createElement('li');
-        const icon = result.success ? '<span class="status-icon status-completed" style="color:var(--green);">✔️</span>' : '<span class="status-icon status-failed" style="color:var(--red);">❌</span>';
-        const safeName = DOMUpdateUtils.escapeHtml(String(result.name ?? ''));
-        const safeDurationText = result.duration && result.duration !== "N/A" ? DOMUpdateUtils.escapeHtml(String(result.duration)) : "";
-        const durationText = safeDurationText ? `<span class="duration">(${safeDurationText})</span>` : "";
-        listItem.innerHTML = `${icon} ${safeName}: ${result.success ? 'Terminée avec succès' : 'Échouée ou annulée'} ${durationText}`;
-        list.appendChild(listItem);
-    });
 
-    const overallStatusItem = document.createElement('li');
-    overallStatusItem.style.fontWeight = 'bold';
-    overallStatusItem.style.marginTop = '10px';
-    overallStatusItem.style.paddingTop = '10px';
-    overallStatusItem.style.borderTop = `1px solid var(--border-color)`;
-    const safeSequenceName = DOMUpdateUtils.escapeHtml(String(sequenceName ?? 'Séquence'));
-    if (overallSuccess) {
-        overallStatusItem.innerHTML = `<span class="status-icon status-completed" style="color:var(--green);">🎉</span> ${safeSequenceName} terminée avec succès !`;
-    } else {
-        overallStatusItem.innerHTML = `<span class="status-icon status-failed" style="color:var(--red);">⚠️</span> ${safeSequenceName} a rencontré une ou plusieurs erreurs.`;
+    /**
+     * Get summarized statistics for monitoring consumers (PerformanceMonitor).
+     *
+     * @returns {Object}
+     */
+    getStats() {
+        const ops = this.getActiveOperations();
+        return {
+            totalIntervals: ops.totalIntervals,
+            totalTimeouts: ops.totalTimeouts,
+            intervals: ops.intervals,
+            timeouts: ops.timeouts
+        };
     }
-    list.appendChild(overallStatusItem);
-    openPopupUI(overlay);
+
+    /**
+     * Destroy the polling manager and clean up all resources.
+     */
+    destroy() {
+        if (this.isDestroyed) {
+            return;
+        }
+
+        console.debug('Destroying PollingManager...');
+
+        this.intervals.forEach((info, name) => {
+            clearInterval(info.id);
+            console.debug(`Cleaned up interval: ${name}`);
+        });
+        this.intervals.clear();
+
+        this.timeouts.forEach((info, name) => {
+            clearTimeout(info.id);
+            console.debug(`Cleaned up timeout: ${name}`);
+        });
+        this.timeouts.clear();
+
+        this.errorCounts.clear();
+
+        this.pendingResumes.forEach((timeoutId, name) => {
+            clearTimeout(timeoutId);
+            console.debug(`Cleared pending resume: ${name}`);
+        });
+        this.pendingResumes.clear();
+
+        this.isDestroyed = true;
+        console.debug('PollingManager destroyed');
+    }
+
+    /**
+     * Bind cleanup events to prevent memory leaks.
+     * @private
+     */
+    _bindCleanupEvents() {
+        window.addEventListener('beforeunload', () => {
+            this.destroy();
+        });
+
+        window.addEventListener('pagehide', () => {
+            this.destroy();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.debug('Page hidden, polling continues in background');
+            }
+        });
+    }
+
+    /**
+     * Dispatch a custom event for polling errors.
+     * @private
+     */
+    _dispatchPollingError(name, error, errorCount) {
+        const event = new CustomEvent('pollingError', {
+            detail: {
+                name,
+                error,
+                errorCount,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+        window.dispatchEvent(event);
+    }
 }
 
-export function showCustomSequenceConfirmUI() {
-    dom.customSequenceConfirmList.innerHTML = '';
-    const selectedStepsOrder = appState.getStateProperty('selectedStepsOrder') || [];
-    selectedStepsOrder.forEach((stepKey, index) => {
-        const stepElement = document.getElementById(`step-${stepKey}`);
-        const stepName = stepElement ? stepElement.dataset.stepName : stepKey;
-        const li = document.createElement('li');
-        const safeStepName = DOMUpdateUtils.escapeHtml(String(stepName ?? ''));
-        li.innerHTML = `<span class="order-prefix">${index + 1}.</span> ${safeStepName}`;
-        dom.customSequenceConfirmList.appendChild(li);
-    });
-    openPopupUI(dom.customSequenceConfirmPopupOverlay);
-}
+// Create and export global polling manager instance
+const pollingManager = new PollingManager();
+
+// Export for use in other modules
+export { PollingManager, pollingManager };
+
+window.pollingManager = pollingManager;
 ```
 
 ## File: static/scrollManager.js
@@ -33339,6 +32799,744 @@ html, body { overflow-y: scroll; }
  }
 ```
 
+## File: static/apiService.js
+```javascript
+// --- START OF REFACTORED apiService.js ---
+
+import { POLLING_INTERVAL } from './constants.js';
+import * as ui from './uiUpdater.js';
+import * as dom from './domElements.js';
+import { appState } from './state/AppState.js';
+import { showNotification, sendBrowserNotification } from './utils.js';
+import { soundEvents } from './soundManager.js';
+import { pollingManager } from './utils/PollingManager.js';
+import { errorHandler } from './utils/ErrorHandler.js';
+
+
+/**
+ * Fetch helper that toggles a loading state on a button during the request.
+ * It adds data-loading="true" and disables the button while the fetch runs.
+ * @param {string} url
+ * @param {RequestInit} options
+ * @param {HTMLElement|string|null} buttonElOrId - element or element id
+ * @returns {Promise<any>} parsed JSON response (or throws on network/error)
+ */
+export async function fetchWithLoadingState(url, options = {}, buttonElOrId = null) {
+    let btn = null;
+    if (typeof buttonElOrId === 'string') {
+        btn = document.getElementById(buttonElOrId);
+    } else if (buttonElOrId && buttonElOrId.nodeType === 1) {
+        btn = buttonElOrId;
+    }
+
+    try {
+        if (btn) {
+            btn.setAttribute('data-loading', 'true');
+            btn.disabled = true;
+        }
+        const response = await fetch(url, options);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error((data && data.message) || `Erreur HTTP ${response.status}`);
+        }
+        return data;
+    } finally {
+        if (btn) {
+            btn.removeAttribute('data-loading');
+            btn.disabled = false;
+        }
+    }
+}
+
+/**
+ * Centralized function to handle UI updates and state changes when a step fails.
+ * This avoids code duplication in runStepAPI and performPoll.
+ * @param {string} stepKey - The key of the step that failed.
+ * @param {Error} error - The error object.
+ * @param {string} errorSource - A string indicating where the error occurred (e.g., 'Lancement', 'Polling').
+ */
+function handleStepFailure(stepKey, error, errorSource) {
+    const errorMessage = error.message || 'Erreur inconnue.';
+    console.error(`[API handleStepFailure] Erreur ${errorSource} pour ${stepKey}:`, error);
+
+    if (errorMessage.includes('Étape inconnue')) {
+        console.warn(`[API handleStepFailure] Étape '${stepKey}' n'est pas reconnue.`);
+    }
+
+    soundEvents.errorEvent();
+
+    showNotification(`Erreur ${errorSource} ${stepKey}: ${errorMessage}`, 'error');
+
+    const statusEl = document.getElementById(`status-${stepKey}`);
+    if (statusEl) {
+        statusEl.textContent = `Erreur: ${errorMessage.substring(0, 50)}`;
+        statusEl.className = 'status-badge status-failed';
+    }
+
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+        ui.updateMainLogOutputUI(`<i>Erreur d'initiation: ${errorMessage}</i>`);
+    }
+
+    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+    if (runButton) {
+        runButton.disabled = !!appState.getStateProperty('isAnySequenceRunning');
+    }
+    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+    if (cancelButton) {
+        cancelButton.disabled = true;
+    }
+
+    ui.stopStepTimer(stepKey);
+    const progressBar = document.getElementById(`progress-bar-${stepKey}`);
+    if (progressBar) {
+        progressBar.style.backgroundColor = 'var(--red)';
+    }
+
+    stopPollingAPI(stepKey);
+}
+
+
+export async function runStepAPI(stepKey) {
+    // --- UI setup (unchanged) ---
+    ui.resetStepTimerDisplay(stepKey);
+    const statusEl = document.getElementById(`status-${stepKey}`);
+    if(statusEl) { statusEl.textContent = 'Initiation...'; statusEl.className = 'status-badge status-initiated'; }
+    const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+    if(runButton) runButton.disabled = true;
+    const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+    if(cancelButton) cancelButton.disabled = false;
+
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+        ui.updateMainLogOutputUI('<i>Initiation du processus...</i>');
+    }
+
+    try {
+        const data = await fetchWithLoadingState(`/run/${stepKey}`, { method: 'POST' }, runButton);
+        console.log(`[API runStepAPI] Réponse pour ${stepKey}:`, data);
+
+        if (data.status === 'initiated') {
+            const statusEl = document.getElementById(`status-${stepKey}`);
+            if(statusEl) { statusEl.textContent = 'Lancé'; statusEl.className = 'status-badge status-starting'; }
+            ui.startStepTimer(stepKey);
+            console.log(`[API runStepAPI] Appel de startPollingAPI pour ${stepKey}`);
+            startPollingAPI(stepKey);
+            return true;
+        } else {
+            throw new Error(data.message || `Réponse invalide du serveur pour le lancement de ${stepKey}.`);
+        }
+    } catch (error) {
+        handleStepFailure(stepKey, error, 'Lancement');
+        return false;
+    }
+}
+
+function appendItalicLineToMainLog(panelEl, message) {
+    if (!panelEl) return;
+    const br = document.createElement('br');
+    const i = document.createElement('i');
+    i.textContent = String(message ?? '');
+    panelEl.appendChild(br);
+    panelEl.appendChild(i);
+}
+
+export async function cancelStepAPI(stepKey) {
+    if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+        appendItalicLineToMainLog(dom.mainLogOutputPanel, 'Annulation en cours...');
+    }
+
+    try {
+        const cancelUrl = `/cancel/${stepKey}`;
+        const fullUrl = new URL(cancelUrl, window.location.origin).href;
+        console.log(`[CANCEL DEBUG] Attempting to cancel ${stepKey}:`);
+        console.log(`  - Relative URL: ${cancelUrl}`);
+        console.log(`  - Full URL: ${fullUrl}`);
+        console.log(`  - Current origin: ${window.location.origin}`);
+        console.log(`  - Current port: ${window.location.port}`);
+
+        const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+        const data = await fetchWithLoadingState(cancelUrl, { method: 'POST' }, cancelButton);
+        console.log(`[CANCEL DEBUG] Response received (ok):`, data);
+        showNotification(data.message || "Annulation demandée", 'info');
+
+        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+            appendItalicLineToMainLog(dom.mainLogOutputPanel, data.message || 'Annulation demandée');
+        }
+    } catch (error) {
+        console.error(`Erreur annulation ${stepKey}:`, error);
+
+        errorHandler.handleApiError(`cancel/${stepKey}`, error, { stepKey });
+
+        if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey) {
+            appendItalicLineToMainLog(dom.mainLogOutputPanel, `Erreur communication pour annulation: ${error.toString()}`);
+        }
+    }
+}
+
+export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
+    stopPollingAPI(stepKey);
+
+    const pollingInterval = isAutoModeHighFrequency ? 200 : POLLING_INTERVAL;
+    console.log(`[API startPollingAPI] 🚀 Polling démarré pour ${stepKey}. Intervalle: ${pollingInterval}ms ${isAutoModeHighFrequency ? '(AutoMode high-frequency)' : '(normal)'}`);
+
+    const performPoll = async () => {
+        try {
+            const pollStartTime = performance.now();
+            console.log(`[API POLL] Fetching status for ${stepKey} at ${new Date().toISOString()}`);
+
+            const response = await fetch(`/status/${stepKey}`);
+            if (!response.ok) {
+                console.warn(`[API performPoll] Erreur ${response.status} lors du polling pour ${stepKey}. Arrêt du polling.`);
+                stopPollingAPI(stepKey);
+                if (!appState.getStateProperty('isAnySequenceRunning')) {
+                    handleStepFailure(stepKey, new Error(`Erreur statut (${response.status})`), 'Polling');
+                }
+                return;
+            }
+            const data = await response.json();
+
+            const pollEndTime = performance.now();
+            const statusEmoji = data.status === 'running' ? '🔄' : data.status === 'completed' ? '✅' : data.status === 'failed' ? '❌' : '⚪';
+            console.log(`[API POLL RESPONSE] ${statusEmoji} ${stepKey} (${(pollEndTime - pollStartTime).toFixed(2)}ms): status="${data.status}", progress=${data.progress_current}/${data.progress_total}, return_code=${data.return_code}`);
+
+            const previousStatus = appState.getStateProperty(`processInfo.${stepKey}.status`) || 'unknown';
+            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_polled');
+
+            if (typeof data.is_any_sequence_running === 'boolean') {
+                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_polled');
+            }
+
+            ui.updateStepCardUI(stepKey, data);
+
+            const workflowWrapper = typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
+            if (appState.getStateProperty('activeStepKeyForLogsPanel') === stepKey && workflowWrapper && workflowWrapper.classList.contains('logs-active')) {
+                ui.updateMainLogOutputUI(data.log.join(''));
+            }
+            const isTerminal = ['completed', 'failed'].includes(data.status);
+            if (isTerminal && previousStatus !== data.status) {
+                const title = data.status === 'completed' ? '✅ Étape terminée' : '❌ Étape en erreur';
+                const body = `${stepKey} — statut: ${data.status}`;
+                sendBrowserNotification(title, body).catch(() => {});
+            }
+
+            const shouldStopPolling = isTerminal ||
+                                    (data.status === 'idle' && !appState.getStateProperty('autoModeEnabled'));
+
+            if (shouldStopPolling) {
+                console.log(`[API performPoll] Statut final '${data.status}' pour ${stepKey}. Arrêt du polling.`);
+                stopPollingAPI(stepKey);
+            } else if (data.status === 'idle' && appState.getStateProperty('autoModeEnabled')) {
+                console.log(`[API performPoll] ⚪ ${stepKey} idle mais AutoMode actif - maintien du polling pour détecter les transitions`);
+            }
+        } catch (error) {
+            console.error(`[API performPoll] Erreur CATCH polling ${stepKey}:`, error);
+            stopPollingAPI(stepKey);
+            if (!appState.getStateProperty('isAnySequenceRunning')) {
+                handleStepFailure(stepKey, error, 'Polling');
+            }
+        }
+    };
+
+    const pollingId = pollingManager.startPolling(
+        `step-${stepKey}`,
+        performPoll,
+        pollingInterval, // Use dynamic interval (200ms for AutoMode, 500ms for normal)
+        { immediate: true, maxErrors: 3 }
+    );
+}
+
+export function stopPollingAPI(stepKey) {
+    pollingManager.stopPolling(`step-${stepKey}`);
+    console.log(`[API stopPollingAPI] Polling arrêté pour ${stepKey}.`);
+}
+
+export async function fetchSpecificLogAPI(stepKey, logIndex, logName, buttonElOrId = null) {
+    ui.updateSpecificLogUI(logName, null, "<i>Chargement...</i>");
+    try {
+        let data;
+        const url = `/get_specific_log/${stepKey}/${logIndex}`;
+        if (buttonElOrId) {
+            data = await fetchWithLoadingState(url, {}, buttonElOrId);
+        } else {
+            const response = await fetch(url);
+            data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || `Erreur HTTP ${response.status}`);
+            }
+        }
+        ui.updateSpecificLogUI(logName, data.path, data.content);
+    } catch (error) {
+        console.error(`Erreur fetch log spécifique ${stepKey}/${logIndex}:`, error);
+        ui.updateSpecificLogUI(logName, null, '', true, `Erreur de communication: ${error.toString()}`);
+    }
+}
+
+
+export async function fetchInitialStatusAPI(stepKey) {
+    try {
+        const response = await fetch(`/status/${stepKey}`);
+        if (!response.ok) {
+            console.warn(`Initial status fetch failed for ${stepKey}: ${response.status}. Using fallback.`);
+            appState.setState({
+                processInfo: {
+                    [stepKey]: appState.getStateProperty(`processInfo.${stepKey}`) || {
+                        status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+                        is_any_sequence_running: false
+                    }
+                }
+            }, 'process_info_initial_fallback');
+        } else {
+            const data = await response.json();
+            appState.setState({ processInfo: { [stepKey]: data } }, 'process_info_initial');
+
+            if (typeof data.is_any_sequence_running === 'boolean') {
+                appState.setState({ isAnySequenceRunning: data.is_any_sequence_running }, 'sequence_running_initial');
+            }
+        }
+
+        const stepInfo = appState.getStateProperty(`processInfo.${stepKey}`) || {
+            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+            is_any_sequence_running: false
+        };
+
+        if (stepKey === 'clear_disk_cache') {
+            ui.updateClearCacheGlobalButtonState(stepInfo.status);
+        } else {
+            ui.updateStepCardUI(stepKey, stepInfo);
+        }
+        
+        if (['running', 'starting', 'initiated'].includes(stepInfo.status)) {
+            console.log(`[API fetchInitialStatusAPI] Étape ${stepKey} en cours au démarrage. Lancement du polling.`);
+            startPollingAPI(stepKey);
+        }
+
+    } catch (err) {
+        console.error(`Erreur CATCH fetchInitialStatusAPI pour ${stepKey}:`, err);
+        const fallbackData = appState.getStateProperty(`processInfo.${stepKey}`) || {
+            status: 'idle', log: [], progress_current: 0, progress_total: 0, progress_text: '',
+            is_any_sequence_running: false
+        };
+        if (stepKey === 'clear_disk_cache') {
+            ui.updateClearCacheGlobalButtonState(fallbackData.status);
+        } else {
+            ui.updateStepCardUI(stepKey, fallbackData);
+        }
+    }
+}
+
+export async function fetchLocalDownloadsStatusAPI() {
+    try {
+        const response = await fetch('/api/csv_downloads_status');
+        if (!response.ok) {
+            console.warn(`Erreur lors de la récupération du statut des téléchargements CSV: ${response.status}`);
+            return [];
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Erreur réseau fetchLocalDownloadsStatusAPI:", error);
+        return [];
+    }
+}
+
+
+
+export async function fetchCSVMonitorStatusAPI() {
+    try {
+        const response = await fetch('/api/csv_monitor_status');
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Erreur fetchCSVMonitorStatusAPI:", error);
+        return {
+            csv_monitor: { status: "error", last_check: null, error: "Impossible de récupérer le statut" },
+            auto_mode_enabled: false,
+            csv_url: "",
+            check_interval: 15
+        };
+    }
+}
+```
+
+## File: static/popupManager.js
+```javascript
+import * as dom from './domElements.js';
+import { appState } from './state/AppState.js';
+import { DOMUpdateUtils } from './utils/DOMBatcher.js';
+
+function handlePopupKeydown(event) {
+    const popupOverlay = event.currentTarget;
+    if (event.key === 'Escape') {
+        closePopupUI(popupOverlay);
+    }
+    if (event.key === 'Tab') {
+        const focusableElements = Array.from(popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement) {
+                lastElement.focus();
+                event.preventDefault();
+            }
+        } else {
+            if (document.activeElement === lastElement) {
+                firstElement.focus();
+                event.preventDefault();
+            }
+        }
+    }
+}
+
+export function openPopupUI(popupOverlay) {
+    if (!popupOverlay) return;
+
+    const currentFocused = document.activeElement;
+    if (currentFocused &&
+        currentFocused !== document.body &&
+        currentFocused !== document.documentElement &&
+        typeof currentFocused.focus === 'function' &&
+        currentFocused.nodeType === Node.ELEMENT_NODE) {
+        appState.setState({ focusedElementBeforePopup: currentFocused }, 'popup_focus_store');
+        console.debug('[POPUP] Stored focusable element:', {
+            tagName: currentFocused.tagName,
+            id: currentFocused.id || 'no-id',
+            className: currentFocused.className || 'no-class'
+        });
+    } else {
+        appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_store');
+        console.debug('[POPUP] No valid focusable element to store');
+    }
+
+    popupOverlay.style.display = 'flex';
+    popupOverlay.setAttribute('data-visible', 'true');
+    popupOverlay.setAttribute('aria-hidden', 'false');
+    const focusableElements = popupOverlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+
+    let elementToFocus = null;
+    for (let i = 0; i < focusableElements.length; i++) {
+        const element = focusableElements[i];
+        if (element.offsetParent !== null && typeof element.focus === 'function') {
+            elementToFocus = element;
+            break;
+        }
+    }
+
+    if (elementToFocus) {
+        try {
+            elementToFocus.focus();
+        } catch (error) {
+            console.warn('[POPUP] Failed to focus element in popup:', error);
+        }
+    }
+
+    popupOverlay.addEventListener('keydown', handlePopupKeydown);
+}
+
+export function closePopupUI(popupOverlay) {
+    if (!popupOverlay) return;
+    popupOverlay.removeAttribute('data-visible');
+    popupOverlay.setAttribute('aria-hidden', 'true');
+    popupOverlay.style.display = 'none';
+    popupOverlay.removeEventListener('keydown', handlePopupKeydown);
+    const prevFocused = appState.getStateProperty('focusedElementBeforePopup');
+
+    if (prevFocused && typeof prevFocused.focus === 'function') {
+        try {
+            if (prevFocused.isConnected && document.hasFocus()) {
+                if (document.contains(prevFocused) && prevFocused.offsetParent !== null) {
+                    prevFocused.focus();
+                } else {
+                    console.debug('[POPUP] Previous focused element no longer focusable, skipping focus restoration');
+                }
+            }
+        } catch (error) {
+            console.warn('[POPUP] Failed to restore focus to previous element:', error);
+        }
+    } else if (prevFocused) {
+        const elementInfo = {
+            tagName: prevFocused.tagName || 'unknown',
+            id: prevFocused.id || 'no-id',
+            className: prevFocused.className || 'no-class',
+            nodeType: prevFocused.nodeType || 'unknown',
+            hasFocusMethod: typeof prevFocused.focus === 'function'
+        };
+        console.debug('[POPUP] Previous focused element is not focusable:', elementInfo);
+    }
+
+    appState.setState({ focusedElementBeforePopup: null }, 'popup_focus_clear');
+}
+
+function resolveSequenceSummaryElements() {
+    const overlay = typeof dom.getSequenceSummaryPopupOverlay === 'function'
+        ? dom.getSequenceSummaryPopupOverlay()
+        : dom.sequenceSummaryPopupOverlay;
+    const list = typeof dom.getSequenceSummaryList === 'function'
+        ? dom.getSequenceSummaryList()
+        : dom.sequenceSummaryList;
+    return { overlay, list };
+}
+
+export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "Séquence", overallDuration = null) {
+    const { overlay, list } = resolveSequenceSummaryElements();
+    if (!overlay || !list) {
+        console.error("Éléments DOM pour la popup de résumé non trouvés!");
+        return;
+    }
+    const summaryTitle = overlay.querySelector("h3");
+    if (summaryTitle) summaryTitle.textContent = `Résumé: ${sequenceName}`;
+
+    list.innerHTML = '';
+    if (overallDuration && typeof overallDuration === 'string') {
+        const totalItem = document.createElement('li');
+        totalItem.style.fontWeight = 'bold';
+        totalItem.style.marginBottom = '8px';
+        totalItem.style.paddingBottom = '8px';
+        totalItem.style.borderBottom = `1px solid var(--border-color)`;
+        const safeDuration = DOMUpdateUtils.escapeHtml(overallDuration);
+        totalItem.innerHTML = `<span class="status-icon" style="color:var(--accent-color);">⏱️</span> Durée totale: ${safeDuration}`;
+        list.appendChild(totalItem);
+    }
+    results.forEach(result => {
+        const listItem = document.createElement('li');
+        const icon = result.success ? '<span class="status-icon status-completed" style="color:var(--green);">✔️</span>' : '<span class="status-icon status-failed" style="color:var(--red);">❌</span>';
+        const safeName = DOMUpdateUtils.escapeHtml(String(result.name ?? ''));
+        const safeDurationText = result.duration && result.duration !== "N/A" ? DOMUpdateUtils.escapeHtml(String(result.duration)) : "";
+        const durationText = safeDurationText ? `<span class="duration">(${safeDurationText})</span>` : "";
+        listItem.innerHTML = `${icon} ${safeName}: ${result.success ? 'Terminée avec succès' : 'Échouée ou annulée'} ${durationText}`;
+        list.appendChild(listItem);
+    });
+
+    const overallStatusItem = document.createElement('li');
+    overallStatusItem.style.fontWeight = 'bold';
+    overallStatusItem.style.marginTop = '10px';
+    overallStatusItem.style.paddingTop = '10px';
+    overallStatusItem.style.borderTop = `1px solid var(--border-color)`;
+    const safeSequenceName = DOMUpdateUtils.escapeHtml(String(sequenceName ?? 'Séquence'));
+    if (overallSuccess) {
+        overallStatusItem.innerHTML = `<span class="status-icon status-completed" style="color:var(--green);">🎉</span> ${safeSequenceName} terminée avec succès !`;
+    } else {
+        overallStatusItem.innerHTML = `<span class="status-icon status-failed" style="color:var(--red);">⚠️</span> ${safeSequenceName} a rencontré une ou plusieurs erreurs.`;
+    }
+    list.appendChild(overallStatusItem);
+    openPopupUI(overlay);
+}
+
+export function showCustomSequenceConfirmUI() {
+    dom.customSequenceConfirmList.innerHTML = '';
+    const selectedStepsOrder = appState.getStateProperty('selectedStepsOrder') || [];
+    selectedStepsOrder.forEach((stepKey, index) => {
+        const stepElement = document.getElementById(`step-${stepKey}`);
+        const stepName = stepElement ? stepElement.dataset.stepName : stepKey;
+        const li = document.createElement('li');
+        const safeStepName = DOMUpdateUtils.escapeHtml(String(stepName ?? ''));
+        li.innerHTML = `<span class="order-prefix">${index + 1}.</span> ${safeStepName}`;
+        dom.customSequenceConfirmList.appendChild(li);
+    });
+    openPopupUI(dom.customSequenceConfirmPopupOverlay);
+}
+```
+
+## File: static/sequenceManager.js
+```javascript
+import { POLLING_INTERVAL } from './constants.js';
+import * as ui from './uiUpdater.js';
+import { runStepAPI } from './apiService.js';
+import { showSequenceSummaryUI } from './popupManager.js';
+import { formatElapsedTime } from './utils.js';
+import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
+
+import { appState } from './state/AppState.js';
+
+import { soundEvents } from './soundManager.js';
+
+/**
+ * Executes and tracks a single step within a sequence.
+ * This helper function encapsulates all logic for one step, from initiation to completion.
+ * @private
+ * @param {string} stepKey - The unique key for the step.
+ * @param {string} sequenceName - The name of the parent sequence.
+ * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
+ * @param {number} totalSteps - The total number of steps in the sequence.
+ * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
+ */
+async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
+    const stepConfig = ui.getStepsConfig()[stepKey];
+    const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
+
+    console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
+
+    ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
+        Math.round(((currentStepNum - 1) / totalSteps) * 100)
+    );
+
+    if (stepKey !== 'clear_disk_cache') {
+        ui.openLogPanelUI(stepKey, true);
+        ui.setActiveStepForLogPanelUI(stepKey);
+        
+        if (isSequenceAutoScrollEnabled()) {
+            setTimeout(() => {
+                scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
+            }, 0);
+        }
+    }
+
+    const stepInitiated = await runStepAPI(stepKey);
+    if (!stepInitiated) {
+        console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
+        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
+            Math.round(((currentStepNum - 1) / totalSteps) * 100), true
+        );
+        return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
+    }
+
+    ui.startStepTimer(stepKey);
+    console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
+
+    try {
+        ui.setActiveStepForLogPanelUI(stepKey);
+    } catch (e) {
+        console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
+    }
+
+    let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+    if (timerData && timerData.startTime) {
+        console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
+    } else {
+        console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
+    }
+
+    console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
+    const stepCompleted = await waitForStepCompletionInSequence(stepKey);
+
+    ui.stopStepTimer(stepKey);
+    console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
+
+    timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+    const duration = (timerData?.elapsedTimeFormatted) || "N/A";
+
+    console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
+        timerData,
+        duration,
+        startTime: timerData?.startTime,
+        elapsedTimeFormatted: timerData?.elapsedTimeFormatted
+    });
+
+    if (!stepCompleted) {
+        console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
+
+        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
+            Math.round((currentStepNum / totalSteps) * 100), true
+        );
+        return { name: stepDisplayName, success: false, duration };
+    }
+
+    console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
+
+    soundEvents.stepSuccess();
+
+    return { name: stepDisplayName, success: true, duration };
+}
+
+export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
+    console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
+    ui.updateGlobalUIForSequenceState(true);
+    ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
+
+    const sequenceStart = Date.now();
+
+    const sequenceResults = [];
+    const totalStepsInThisSequence = stepsToExecute.length;
+    const isAutoModeSequence = sequenceName === "AutoMode";
+    let sequenceFailed = false;
+
+    if (isAutoModeSequence) {
+        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
+    }
+
+    for (let i = 0; i < stepsToExecute.length; i++) {
+        const stepKey = stepsToExecute[i];
+        const currentStepNum = i + 1;
+
+        const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
+        sequenceResults.push(result);
+
+        if (!result.success) {
+            sequenceFailed = true;
+            break; // Exit the loop immediately on failure
+        }
+
+        if (i < stepsToExecute.length - 1) {
+            const nextStepKey = stepsToExecute[i + 1];
+            if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
+                try {
+                    ui.openLogPanelUI(nextStepKey, true);
+                    ui.setActiveStepForLogPanelUI(nextStepKey);
+                    
+                    if (isSequenceAutoScrollEnabled()) {
+                        setTimeout(() => {
+                            scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
+                        }, 0);
+                    }
+                } catch (e) {
+                    console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
+                }
+            }
+            ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
+                Math.round((currentStepNum / totalStepsInThisSequence) * 100)
+            );
+        }
+    }
+
+    console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
+
+    if (sequenceFailed) {
+    } else {
+        ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
+        soundEvents.workflowCompletion();
+    }
+
+    if (sequenceResults.length > 0) {
+        const overallDuration = formatElapsedTime(new Date(sequenceStart));
+        showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
+    } else {
+        console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
+    }
+
+    ui.updateGlobalUIForSequenceState(false);
+    if (isAutoModeSequence) {
+        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
+    }
+}
+
+function waitForStepCompletionInSequence(stepKey) {
+    return new Promise((resolve) => {
+        const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
+        console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
+
+        const checkInterval = setInterval(() => {
+            const data = appState.getStateProperty(`processInfo.${stepKey}`);
+
+            if (!data) {
+                return;
+            }
+
+            if (data.status === 'completed') {
+                console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (data.status === 'failed' || data.return_code === -9) {
+                console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
+                clearInterval(checkInterval);
+                resolve(false);
+            }
+            }, POLLING_INTERVAL / 2);
+    });
+}
+```
+
 ## File: static/eventHandlers.js
 ```javascript
 import * as dom from './domElements.js';
@@ -33598,204 +33796,6 @@ export function initializeEventHandlers() {
             });
         });
     }
-}
-```
-
-## File: static/sequenceManager.js
-```javascript
-import { POLLING_INTERVAL } from './constants.js';
-import * as ui from './uiUpdater.js';
-import { runStepAPI } from './apiService.js';
-import { showSequenceSummaryUI } from './popupManager.js';
-import { formatElapsedTime } from './utils.js';
-import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
-
-import { appState } from './state/AppState.js';
-
-import { soundEvents } from './soundManager.js';
-
-/**
- * Executes and tracks a single step within a sequence.
- * This helper function encapsulates all logic for one step, from initiation to completion.
- * @private
- * @param {string} stepKey - The unique key for the step.
- * @param {string} sequenceName - The name of the parent sequence.
- * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
- * @param {number} totalSteps - The total number of steps in the sequence.
- * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
- */
-async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
-    const stepConfig = ui.getStepsConfig()[stepKey];
-    const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
-
-    console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
-
-    ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
-        Math.round(((currentStepNum - 1) / totalSteps) * 100)
-    );
-
-    if (stepKey !== 'clear_disk_cache') {
-        ui.openLogPanelUI(stepKey, true);
-        ui.setActiveStepForLogPanelUI(stepKey);
-        
-        if (isSequenceAutoScrollEnabled()) {
-            setTimeout(() => {
-                scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
-            }, 0);
-        }
-    }
-
-    const stepInitiated = await runStepAPI(stepKey);
-    if (!stepInitiated) {
-        console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
-        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
-            Math.round(((currentStepNum - 1) / totalSteps) * 100), true
-        );
-        return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
-    }
-
-    ui.startStepTimer(stepKey);
-    console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
-
-    try {
-        ui.setActiveStepForLogPanelUI(stepKey);
-    } catch (e) {
-        console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
-    }
-
-    let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
-    if (timerData && timerData.startTime) {
-        console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
-    } else {
-        console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
-    }
-
-    console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
-    const stepCompleted = await waitForStepCompletionInSequence(stepKey);
-
-    ui.stopStepTimer(stepKey);
-    console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
-
-    timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
-    const duration = (timerData?.elapsedTimeFormatted) || "N/A";
-
-    console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
-        timerData,
-        duration,
-        startTime: timerData?.startTime,
-        elapsedTimeFormatted: timerData?.elapsedTimeFormatted
-    });
-
-    if (!stepCompleted) {
-        console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
-
-        ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
-            Math.round((currentStepNum / totalSteps) * 100), true
-        );
-        return { name: stepDisplayName, success: false, duration };
-    }
-
-    console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
-
-    soundEvents.stepSuccess();
-
-    return { name: stepDisplayName, success: true, duration };
-}
-
-export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
-    console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
-    ui.updateGlobalUIForSequenceState(true);
-    ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
-
-    const sequenceStart = Date.now();
-
-    const sequenceResults = [];
-    const totalStepsInThisSequence = stepsToExecute.length;
-    const isAutoModeSequence = sequenceName === "AutoMode";
-    let sequenceFailed = false;
-
-    if (isAutoModeSequence) {
-        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
-    }
-
-    for (let i = 0; i < stepsToExecute.length; i++) {
-        const stepKey = stepsToExecute[i];
-        const currentStepNum = i + 1;
-
-        const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
-        sequenceResults.push(result);
-
-        if (!result.success) {
-            sequenceFailed = true;
-            break; // Exit the loop immediately on failure
-        }
-
-        if (i < stepsToExecute.length - 1) {
-            const nextStepKey = stepsToExecute[i + 1];
-            if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
-                try {
-                    ui.openLogPanelUI(nextStepKey, true);
-                    ui.setActiveStepForLogPanelUI(nextStepKey);
-                    
-                    if (isSequenceAutoScrollEnabled()) {
-                        setTimeout(() => {
-                            scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
-                        }, 0);
-                    }
-                } catch (e) {
-                    console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
-                }
-            }
-            ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
-                Math.round((currentStepNum / totalStepsInThisSequence) * 100)
-            );
-        }
-    }
-
-    console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
-
-    if (sequenceFailed) {
-    } else {
-        ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
-        soundEvents.workflowCompletion();
-    }
-
-    if (sequenceResults.length > 0) {
-        const overallDuration = formatElapsedTime(new Date(sequenceStart));
-        showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
-    } else {
-        console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
-    }
-
-    ui.updateGlobalUIForSequenceState(false);
-    if (isAutoModeSequence) {
-        appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
-    }
-}
-
-function waitForStepCompletionInSequence(stepKey) {
-    return new Promise((resolve) => {
-        const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
-        console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
-
-        const checkInterval = setInterval(() => {
-            const data = appState.getStateProperty(`processInfo.${stepKey}`);
-
-            if (!data) {
-                return;
-            }
-
-            if (data.status === 'completed') {
-                console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
-                clearInterval(checkInterval);
-                resolve(true);
-            } else if (data.status === 'failed' || data.return_code === -9) {
-                console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
-                clearInterval(checkInterval);
-                resolve(false);
-            }
-            }, POLLING_INTERVAL / 2);
-    });
 }
 ```
 

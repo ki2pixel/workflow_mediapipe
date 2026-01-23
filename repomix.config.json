@@ -15,7 +15,7 @@
     "removeComments": false,
     "removeEmptyLines": false,
     "topFilesLength": 10,
-    "showLineNumbers": false,
+    "showLineNumbers": true,
     "includeEmptyDirectories": false,
     "truncateBase64": true
   },

@@ -60,7 +60,6 @@ function setupLocalDownloadsToggle() {
         applyLocalDownloadsVisibility(section, btn, visible);
         try { localStorage.setItem('ui.localDownloadsVisible', String(visible)); } catch (_) {}
         appState.setState({ ui: { localDownloadsVisible: visible } }, 'downloads_visibility_toggle');
-        // Clear alert state if revealing
         if (visible) {
             btn.classList.remove('downloads-toggle--alert');
             try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
@@ -179,8 +178,6 @@ const SYSTEM_MONITOR_POLLING_INTERVAL = 5000;
 
 
 function initializeStateManagement() {
-    console.log('Initializing state management and performance monitoring...');
-
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         appState.subscribe((newState, oldState, source) => {
             console.debug(`[StateManagement] State changed from ${source}:`, {
@@ -204,15 +201,12 @@ function initializeStateManagement() {
         }
     });
 
-    console.log('Performance monitoring initialized automatically');
-
     setTimeout(() => {
         if (typeof CacheService !== 'undefined' && CacheService.warm_cache) {
             CacheService.warm_cache();
         }
     }, 1000);
 
-    console.log('State management and performance monitoring initialized successfully');
 }
 
 function findStateChanges(oldState, newState) {
@@ -245,24 +239,19 @@ async function pollLocalDownloadsStatus() {
         const downloads = await api.fetchLocalDownloadsStatusAPI();
         ui.updateLocalDownloadsListUI(downloads);
 
-        // Update app state with current downloads for CSV monitoring
         appState.setState({ csvDownloads: downloads }, 'downloads_polled');
 
-        // Update toggle alert state if section is hidden and activity occurs
         updateDownloadsToggleAlert(downloads);
 
-        // Clear error state on success
         errorHandler.clearErrors('localDownloadsStatus', {
             elementId: 'local-downloads-list'
         });
 
     } catch (error) {
-        // Handle error with proper user feedback and exponential backoff
         const delay = await errorHandler.handlePollingError('localDownloadsStatus', error, {
             elementId: 'local-downloads-list'
         });
 
-        // Apply delay if needed (PollingManager will handle this automatically)
         if (delay > 0) {
             console.debug(`Applying ${delay}ms delay for localDownloadsStatus polling`);
         }
@@ -288,9 +277,7 @@ async function pollSystemMonitor() {
         const data = await response.json();
         console.debug('[MAIN] System monitor data received:', data);
 
-        // Batch DOM updates to minimize reflows
         domBatcher.scheduleUpdate('system-monitor-update', () => {
-            // CPU
             const cpuBar = document.getElementById('cpu-monitor-bar');
             const cpuValue = document.getElementById('cpu-monitor-value');
             if (cpuBar && cpuValue) {
@@ -300,7 +287,6 @@ async function pollSystemMonitor() {
                 cpuBar.dataset.usageLevel = cpuPercent > 85 ? 'high' : cpuPercent > 60 ? 'medium' : 'low';
             }
 
-            // RAM
             const ramBar = document.getElementById('ram-monitor-bar');
             const ramValue = document.getElementById('ram-monitor-value');
             const ramDetails = document.getElementById('ram-monitor-details');
@@ -312,7 +298,6 @@ async function pollSystemMonitor() {
                 ramBar.dataset.usageLevel = memPercent > 85 ? 'high' : memPercent > 70 ? 'medium' : 'low';
             }
 
-            // GPU
             const gpuSection = document.getElementById('gpu-monitor-section');
             const gpuError = document.getElementById('gpu-monitor-error');
             if (gpuSection && gpuError) {
@@ -342,7 +327,6 @@ async function pollSystemMonitor() {
                 }
             }
 
-            // Compact line values (shown when minimized)
             const compactLine = document.getElementById('monitor-compact-line');
             if (compactLine) {
                 const compactCpu = document.getElementById('compact-cpu');
@@ -375,18 +359,15 @@ async function pollSystemMonitor() {
             monitorWidget.style.opacity = '1';
         });
 
-        // Clear error state on success
         errorHandler.clearErrors('systemMonitor', {
             elementId: 'system-monitor-widget'
         });
 
     } catch (error) {
-        // Handle error with proper user feedback
         const delay = await errorHandler.handlePollingError('systemMonitor', error, {
             elementId: 'system-monitor-widget'
         });
 
-        // Visual feedback for system monitor errors
         domBatcher.scheduleUpdate('system-monitor-error', () => {
             monitorWidget.style.opacity = '0.5';
         });
@@ -403,7 +384,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (dom.customSequenceConfirmPopupOverlay) dom.customSequenceConfirmPopupOverlay.style.display = 'none';
 
-    // Initialize theme system
     themeManager.init();
 
     if (document.getElementById('report-overlay')) {
@@ -433,16 +413,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initializeEventHandlers();
 
-    // Initialize sound manager
     initializeSoundManager();
 
-    // Initialize CSV download monitor for auto-workflow prompts
     initializeCSVDownloadMonitor();
 
-    // Initialize state management and performance monitoring
     initializeStateManagement();
 
-    // Initialize polling with proper resource management
     if (dom.getLocalDownloadsList()) {
         pollingManager.startPolling(
             'localDownloadsStatus',
@@ -452,17 +428,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
     }
 
-    // Setup unified-controls toggle for Local Downloads visibility
     setupLocalDownloadsToggle();
 
 
 
 
-    // System monitor polling - with retry mechanism
     const startSystemMonitorPolling = () => {
         const widget = document.getElementById('system-monitor-widget');
         if (widget) {
-            console.log('[MAIN] ✅ Starting system monitor polling');
             pollingManager.startPolling(
                 'systemMonitor',
                 pollSystemMonitor,
@@ -471,16 +444,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             );
             return true;
         } else {
-            console.warn('[MAIN] ⚠️ System monitor widget not found, retrying...');
+            console.warn('[MAIN] System monitor widget not found, retrying...');
             return false;
         }
     };
 
-    // Try immediately, then retry if needed
     if (!startSystemMonitorPolling()) {
         setTimeout(() => {
             if (!startSystemMonitorPolling()) {
-                console.error('[MAIN] ❌ System monitor widget not found after retry');
+                console.error('[MAIN] System monitor widget not found after retry');
             }
         }, 1000);
     }

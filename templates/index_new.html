@@ -5,13 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Workflow Manager</title>
-    <!-- Core styles (always loaded first) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v={{ cache_buster }}">
 
-    <!-- Component styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/controls.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/steps.css') }}?v={{ cache_buster }}">
@@ -21,17 +19,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
-    <!-- Utilities and responsive (loaded last) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
 </head>
 
 <body>
-    <!-- DELETION: Le bouton de cache est déjà supprimé, c'est parfait. -->
-
     <div id="notifications-area" aria-live="assertive"></div>
 
-    <!-- Unified Controls Section (Top Sticky Bar) -->
     <div class="topbar-affix" id="topbar-affix">
         <div class="unified-controls-section unified-controls--topbar" id="topbar-controls">
             <div class="workflow-controls">
@@ -61,7 +55,6 @@
                         <div class="theme-selector-container settings-block">
                             <label for="theme-selector" class="theme-selector-label">Thème:</label>
                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
-                                <!-- Options populated by themeManager.js -->
                             </select>
                         </div>
 
@@ -97,7 +90,7 @@
             <section id="workflow-steps" class="workflow-pipeline" role="region" aria-label="Pipeline de traitement">
                 <div class="pipeline-timeline" role="list">
                     <div class="timeline-axis" aria-hidden="true"></div>
-                    {% for step_key, config in steps_config.items() %} {# On s'assure de ne pas afficher une étape qui n'aurait pas de config #}
+                    {% for step_key, config in steps_config.items() %}
                     {% if config %}
                     <div class="timeline-row">
                         <div class="timeline-rail-column" aria-hidden="true">
@@ -108,7 +101,6 @@
                                 <div class="timeline-content">
                             <div class="timeline-head">
                                 <div class="step-title-group">
-                                {# --- MODIFICATION: Logique des icônes mise à jour pour l'inversion --- #}
                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
                                 </div>
@@ -142,7 +134,7 @@
                                         {% endfor %}
                                     </div>
                                 </div>
-                                {% endif %} {# --- DELETION: La zone de progression des workers de tracking est supprimée --- #}
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -201,7 +193,6 @@
         </div>
     </div>
 
-    <!-- Popups de confirmation et de résumé -->
     <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
         <div class="popup-content">
             <h3 id="sequence-summary-title">Résumé de la Séquence</h3>
@@ -209,7 +200,6 @@
             <button id="close-summary-popup" class="popup-cancel-button">Fermer</button>
         </div>
     </div>
-    <!-- --- BLOC MANQUANT À AJOUTER CI-DESSOUS --- -->
     <div id="custom-sequence-confirm-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-sequence-confirm-title">
         <div class="popup-content">
             <h3 id="custom-sequence-confirm-title">Confirmer la Séquence Personnalisée</h3>
@@ -224,14 +214,12 @@
         </div>
     </div>
 
-    <!-- Widget de Monitoring Système (mis à jour) -->
     <div id="system-monitor-widget" class="system-monitor-widget">
         <div class="monitor-header">
             <span class="monitor-icon">💻</span>
             <span class="monitor-title">Moniteur Système</span>
             <button id="system-monitor-minimize" class="monitor-close" aria-label="Réduire le moniteur" title="Réduire (affichage compact)">×</button>
         </div>
-        <!-- Ligne compacte visible en mode réduit -->
         <div id="monitor-compact-line" class="monitor-compact-line" aria-hidden="true" style="display:none;">
             C: <span id="compact-cpu"></span> · R: <span id="compact-ram"></span> · G: <span id="compact-gpu"></span>
         </div>
@@ -251,9 +239,7 @@
         </div>
         <div id="ram-monitor-details" class="monitor-details">... / ... GB</div>
 
-        <!-- --- MODIFICATION: Ajout de la section GPU --- -->
         <div id="gpu-monitor-section" style="display: none;">
-            <!-- Caché par défaut, affiché par JS si GPU détecté -->
             <div class="monitor-item">
                 <span class="monitor-label">GPU</span>
                 <div class="monitor-bar-container">
@@ -264,7 +250,6 @@
             <div id="gpu-monitor-details" class="monitor-details">... °C | ... / ... GB</div>
         </div>
         <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
-        <!-- --- FIN DE LA MODIFICATION --- -->
     </div>
 
     

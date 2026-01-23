@@ -14,6 +14,12 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import uuid
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 import psutil
 import requests
 from flask import Flask, render_template, jsonify, request, send_from_directory
@@ -22,10 +28,9 @@ from flask_caching import Cache
 try:
     from dotenv import load_dotenv
     load_dotenv()
-    print("✅ Dotenv loaded successfully")
+    logger.info("Dotenv configuration loaded")
 except ImportError:
-    print("⚠️ Dotenv not available - using environment variables directly")
-    pass
+    logger.warning("python-dotenv not available; relying on environment variables only")
 
 from config.settings import config
 from config.security import SecurityConfig, require_internal_worker_token, require_render_register_token
@@ -48,13 +53,7 @@ try:
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
-    print("AVERTISSEMENT: pandas non disponible. Les fichiers Excel ne pourront pas être traités.")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+    logger.warning("pandas not available; Excel files cannot be processed")
 
 try:
     import pynvml
@@ -263,15 +262,7 @@ def init_app():
             root_logger.addHandler(file_handler)
             root_logger.addHandler(console_handler)
 
-        APP_LOGGER.info("--- Lanceur de Workflow Démarré (Version Ubuntu) ---")
-
-        APP_LOGGER.info("🚀🚀🚀 [STARTUP_TEST] UPDATED CODE WITH COMPREHENSIVE DEBUGGING IS RUNNING! 🚀🚀🚀")
-        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] EXECUTING FROM: {__file__}")
-        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] WORKING DIRECTORY: {os.getcwd()}")
-        APP_LOGGER.info(f"🔍 [FILE_PATH_TEST] PYTHON EXECUTABLE: {sys.executable}")
-        APP_LOGGER.info(f"BASE_PATH_SCRIPTS: {BASE_PATH_SCRIPTS}")
-        APP_LOGGER.info(f"Script de tracking parallèle: {PARALLEL_TRACKING_SCRIPT_PATH}")
-        APP_LOGGER.info(f"Répertoire de travail: {BASE_PATH_SCRIPTS / 'projets_extraits'}")
+        APP_LOGGER.info("Workflow launcher initialized (Ubuntu profile)")
 
         os.makedirs(BASE_PATH_SCRIPTS / 'projets_extraits', exist_ok=True)
 
@@ -323,7 +314,7 @@ REMOTE_SEQUENCE_STEP_KEYS = [
 
 if PYNVML_AVAILABLE:
     atexit.register(pynvml.nvmlShutdown)
-    print("INFO: La fonction de nettoyage pynvml.nvmlShutdown a été enregistrée pour la sortie de l'application.")
+    logger.info("pynvml shutdown hook registered")
 def format_duration_seconds(seconds_total: float) -> str:
     if seconds_total is None or seconds_total < 0: return "N/A"
     seconds_total = int(seconds_total)

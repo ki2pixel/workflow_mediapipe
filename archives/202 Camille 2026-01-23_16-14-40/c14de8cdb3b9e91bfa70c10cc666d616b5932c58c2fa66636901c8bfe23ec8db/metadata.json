@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/202 Camille/docs/Il mise sur des steaks hachés ultra nutritifs... à base d’abats.mp4",
+  "video_stem": "Il mise sur des steaks hachés ultra nutritifs... à base d’abats",
+  "video_hash": "c14de8cdb3b9e91bfa70c10cc666d616b5932c58c2fa66636901c8bfe23ec8db",
+  "created_at": "2026-01-23T16:14:40.333279+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/202 Camille 2026-01-23_16-14-40/c14de8cdb3b9e91bfa70c10cc666d616b5932c58c2fa66636901c8bfe23ec8db/Il mise sur des steaks hachés ultra nutritifs... à base d’abats_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/202 Camille 2026-01-23_16-14-40/c14de8cdb3b9e91bfa70c10cc666d616b5932c58c2fa66636901c8bfe23ec8db/Il mise sur des steaks hachés ultra nutritifs... à base d’abats_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/202 Camille 2026-01-23_16-14-40/c14de8cdb3b9e91bfa70c10cc666d616b5932c58c2fa66636901c8bfe23ec8db/Il mise sur des steaks hachés ultra nutritifs... à base d’abats_tracking.json"
+  }
+}

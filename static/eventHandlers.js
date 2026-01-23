@@ -59,10 +59,8 @@ export function initializeEventHandlers() {
                 if (specificLogContainer) specificLogContainer.style.display = 'none';
                 ui.openLogPanelUI(stepKey);
 
-                // Scroll to the step immediately when manually triggered
                 scrollToStepImmediate(stepKey, { scrollDelay: 0 });
 
-                // Play workflow start sound for individual step execution
                 soundEvents.workflowStart();
 
                 await api.runStepAPI(stepKey);
@@ -221,24 +219,8 @@ export function initializeEventHandlers() {
         });
     }
 
-    // --- DELETION START: Suppression du gestionnaire d'événement pour le bouton de cache ---
-    /*
-    if (dom.clearCacheGlobalButton) {
-        dom.clearCacheGlobalButton.addEventListener('click', async () => {
-            const stepKey = 'clear_disk_cache'; 
-            // ... (toute la logique interne est supprimée) ...
-        });
-    }
-    */
-    // --- DELETION END ---
-
-
-
-    // Sound control toggle event handler
     if (dom.getSoundToggle()) {
-        // Import sound manager functions
         import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
-            // Initialize the toggle state from localStorage
             const isEnabled = isSoundEnabled();
             dom.getSoundToggle().checked = isEnabled;
             if (dom.getSoundStatus()) {

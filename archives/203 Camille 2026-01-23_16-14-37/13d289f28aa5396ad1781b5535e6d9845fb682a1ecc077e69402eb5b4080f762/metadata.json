@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/203 Camille/docs/PRIME 19 EXTRAIT 2.mp4",
+  "video_stem": "PRIME 19 EXTRAIT 2",
+  "video_hash": "13d289f28aa5396ad1781b5535e6d9845fb682a1ecc077e69402eb5b4080f762",
+  "created_at": "2026-01-23T16:14:37.524355+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/203 Camille 2026-01-23_16-14-37/13d289f28aa5396ad1781b5535e6d9845fb682a1ecc077e69402eb5b4080f762/PRIME 19 EXTRAIT 2_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/203 Camille 2026-01-23_16-14-37/13d289f28aa5396ad1781b5535e6d9845fb682a1ecc077e69402eb5b4080f762/PRIME 19 EXTRAIT 2_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/203 Camille 2026-01-23_16-14-37/13d289f28aa5396ad1781b5535e6d9845fb682a1ecc077e69402eb5b4080f762/PRIME 19 EXTRAIT 2_tracking.json"
+  }
+}
