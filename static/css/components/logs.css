@@ -1,45 +1,49 @@
-.logs-column {
-    position: relative;
-    background: color-mix(in oklab, var(--bg-card) 92%, transparent);
-    border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
-    border-radius: var(--pipeline-card-radius);
+.logs-overlay-container {
+    z-index: 1100;
+    background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
+    padding: clamp(16px, 3vw, 36px);
+}
+
+.logs-content-wrapper {
+    width: min(80vw, 1100px);
+    height: min(80vh, 780px);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background: var(--bg-card);
+    border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+    border-radius: 28px;
+    padding: 20px 22px 24px;
     box-shadow:
-        0 10px 26px rgba(0,0,0,0.22),
-        0 0 0 1px rgb(var(--accent-primary-rgb) / 0.12);
+        0 28px 60px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    transition:
+        opacity var(--motion-duration-medium) var(--motion-ease-standard),
+        transform var(--motion-duration-medium) var(--motion-ease-standard);
+    overflow: hidden;
 }
 
-.logs-column > * {
-    position: relative;
-    z-index: 1;
+.logs-overlay-container[data-visible="true"] .logs-content-wrapper {
+    opacity: 1;
+    transform: translateY(0) scale(1);
 }
 
-.logs-column::before {
-    content: '';
-    position: absolute;
-    left: 12px;
-    top: 0;
-    bottom: 0;
-    width: var(--pipeline-axis-width);
-    background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
-    border-radius: 999px;
-    opacity: 0.9;
-    pointer-events: none;
+@media (prefers-reduced-motion: reduce) {
+    .logs-content-wrapper {
+        transition: none;
+        transform: none;
+    }
 }
 
-.logs-column::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 36px;
-    background: radial-gradient(
-        circle at 12px 30%,
-        rgb(var(--accent-primary-rgb) / 0.22) 0%,
-        rgb(var(--accent-primary-rgb) / 0.10) 40%,
-        rgb(var(--accent-primary-rgb) / 0.00) 70%
-    );
-    pointer-events: none;
+@media (max-width: 900px) {
+    .logs-content-wrapper {
+        width: 95vw;
+        height: 90vh;
+        border-radius: 20px;
+        padding: 18px;
+    }
 }
 
 .log-panel-header {
@@ -118,23 +122,33 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    background: color-mix(in oklab, var(--bg-card) 80%, transparent);
-    border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+    background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
+    border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
     border-radius: 999px;
-    color: var(--text-secondary);
+    color: var(--text-bright);
     font-size: 1.45em;
     cursor: pointer;
+    box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
     transition:
         color var(--motion-duration-fast) var(--motion-ease-standard),
         background var(--motion-duration-fast) var(--motion-ease-standard),
         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-        transform var(--motion-duration-fast) var(--motion-ease-standard);
+        transform var(--motion-duration-fast) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 #close-log-panel:hover {
     color: var(--text-primary);
-    background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-    border-color: rgb(var(--accent-primary-rgb) / 0.35);
+    background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
+    border-color: rgb(var(--accent-primary-rgb) / 0.7);
+    box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+}
+
+#close-log-panel:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
+        0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
 }
 
 #close-log-panel:active {

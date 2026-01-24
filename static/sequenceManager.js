@@ -30,7 +30,7 @@ async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSt
     );
 
     if (stepKey !== 'clear_disk_cache') {
-        ui.openLogPanelUI(stepKey, true);
+        ui.openLogPanelUI(stepKey);
         ui.setActiveStepForLogPanelUI(stepKey);
         
         if (isSequenceAutoScrollEnabled()) {
@@ -129,7 +129,7 @@ export async function runStepSequence(stepsToExecute, sequenceName = "Séquence"
             const nextStepKey = stepsToExecute[i + 1];
             if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
                 try {
-                    ui.openLogPanelUI(nextStepKey, true);
+                    ui.openLogPanelUI(nextStepKey);
                     ui.setActiveStepForLogPanelUI(nextStepKey);
                     
                     if (isSequenceAutoScrollEnabled()) {

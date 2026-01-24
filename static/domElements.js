@@ -148,6 +148,10 @@ export const getSoundToggle = () => byId('sound-toggle');
 export const getSoundStatus = () => byId('sound-status');
 export const getSoundControlWidget = () => byId('sound-control-widget');
 
+// Toggle auto ouverture logs
+export const logsAutoOpenToggle = document.getElementById('logs-auto-open-toggle');
+export const getLogsAutoOpenToggle = () => byId('logs-auto-open-toggle');
+
 // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
 export const getSettingsToggle = () => byId('settings-toggle');
 export const getSettingsPanel = () => byId('settings-panel');

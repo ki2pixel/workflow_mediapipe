@@ -4,6 +4,11 @@
 
 Ce document résume les mises à jour apportées à la documentation pour refléter les optimisations v4.1 incluant les améliorations de progression, le mode CPU-only pour le tracking, et les optimisations audio ffmpeg.
 
+## 2026-01-24 — Migration Audit Logs Overlay vers Documentation Pérenne (COMPLET)
+- ✅ **ARCHITECTURE_COMPLETE_FR.md** : Ajout d’une sous-section “Panneau de logs en overlay” décrivant la Lightbox indépendante (Option A), le toggle “📟 Auto-ouverture des logs”, la synchronisation AppState/Timeline et l’absence de layout shifting.
+- ✅ **GUIDE_DEMARRAGE_RAPIDE.md** : Enrichissement de la section “Logs — rendu et auto-scroll” pour documenter le comportement overlay, la persistance localStorage, le respect de `getAutoOpenLogOverlay()` par les séquences et l’implémentation `openPopupUI`/`closePopupUI`.
+- ✅ **Migration terminée** : L’audit temporaire `docs/workflow/audits/Ergonomie-Amelioree-Pour-Les-Logs.md` peut être supprimé ; les informations critiques sont désormais préservées dans la documentation pérenne.
+
 ## 2026-01-21 — Retrait des toggles “Logs Cinématiques” & “Auto-scroll” (COMPLET)
 - ✅ **GUIDE_DEMARRAGE_RAPIDE.md** : Remplacement de la section “Cinematic Log Mode” par un paragraphe “Logs — rendu et auto-scroll” détaillant la disparition du toggle, l’auto-scroll structurel (`scrollManager`/`sequenceManager`) et l’alignement accessibilité.
 - ✅ **ARCHITECTURE_COMPLETE_FR.md** : Section “Logs Panel — Theme & Auto-scroll” mise à jour pour noter la suppression de `static/cinematicLogMode.js`, l’absence d’attributs `data-cinematic-mode` et le comportement auto-scroll sans réglage utilisateur.

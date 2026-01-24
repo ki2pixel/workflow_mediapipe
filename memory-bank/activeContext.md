@@ -4,6 +4,7 @@
 Aucune tâche active.
 
 ## Objectifs
+- [2026-01-24 15:25:00] **Frontend — Auto-ouverture logs paramétrable (COMPLET)** : Ajout du toggle "📟 Auto-ouverture des logs" dans Settings, synchronisation AppState/localStorage, conditionnement de `openLogPanelUI`/`sequenceManager` pour respecter la préférence utilisateur.
 - [2026-01-21 20:05:00] **Frontend — Suppression toggles obsolètes (COMPLET)** : Nettoyage des contrôles “Logs Cinématiques” et “📜 Défilement Auto” devenus redondants avec Timeline Connectée (auto-scroll structurel). Fichiers impactés : `templates/index_new.html`, `static/main.js`, `static/eventHandlers.js`, `static/domElements.js`, suppression de `static/cinematicLogMode.js` et `static/css/features/cinematic-logs.css`. Tests UI non requis, vérification visuelle planifiée.
 - [2026-01-21 14:36:00] **Audit Backend — init_app() pour threads de polling (COMPLET)** : Déplacement des threads `RemoteWorkflowPoller` et `CSVMonitorService` dans `init_app()` (logging + verrou/idempotence) afin d’éviter les doubles démarrages lors des imports/WSGI. Tests : `python3 -m py_compile app_new.py`.
 - [2026-01-21 14:24:00] **Audit Backend — Simplification injection ENV Step5 (COMPLET)** : Refactor du gestionnaire STEP5 (`workflow_scripts/step5/run_tracking_manager.py`) pour centraliser la lecture des variables d'environnement via `_EnvConfig`, normaliser la sélection des moteurs/GPU et encapsuler l'injection `LD_LIBRARY_PATH` dans un helper dédié.

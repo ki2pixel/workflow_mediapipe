@@ -76,6 +76,7 @@ Intégration Source Webhook + CSVService : chaîne de données unifiée
     - Phase 1 : Structure HTML/CSS avec variables Timeline et spine/connecteurs
     - Phase 2 : Transitions harmonisées et micro-interactions hover/focus-within  
     - Phase 3 : Panneau détails contextuel (StepDetailsPanel.js), accessibilité WCAG complète, tests frontend intégrés
+  - **Panneau de logs en overlay** : ✅ **Lightbox indépendante** (Option A) sans layout shifting, centrée et responsive, pilotée par le toggle “📟 Auto-ouverture des logs” dans Settings. Les séquences et l’auto-scroll respectent la préférence utilisateur via `getAutoOpenLogOverlay()`. La logique utilise `openPopupUI`/`closePopupUI` et le conteneur `.logs-overlay-container` est détaché du flux principal.
 
 - **Archivage** :
   - Génération de hash SHA-256 pour l'intégrité des données

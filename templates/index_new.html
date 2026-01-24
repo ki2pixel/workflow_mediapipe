@@ -64,6 +64,14 @@
                                 <input type="checkbox" id="sound-toggle" checked>
                             </label>
                         </div>
+
+                        <div class="settings-block">
+                            <label class="btn-like-switch" for="logs-auto-open-toggle" aria-label="Activer/Désactiver l'ouverture auto du panneau de logs">
+                                📟 Auto-ouverture des logs
+                                <input type="checkbox" id="logs-auto-open-toggle" checked>
+                            </label>
+                            <small class="settings-helper">Ouvrir automatiquement la popup de logs lors du lancement d'une étape.</small>
+                        </div>
                     </div>
                 </section>
 
@@ -166,31 +174,6 @@
                 </aside>
             </section>
         </div>
-        <div class="logs-column" id="logs-column-global">
-            <div class="log-panel-header">
-                <div class="log-panel-header-main">
-                    <span id="log-panel-title">Logs</span>
-                    <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
-                </div>
-                <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
-                    <span id="log-panel-context-step">Aucune étape active</span>
-                    <span id="log-panel-context-status"></span>
-                    <span id="log-panel-context-timer"></span>
-                </div>
-                <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
-            </div>
-            <div class="log-container" id="main-log-container-panel">
-                <div class="log-header">
-                    Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
-                </div>
-                <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
-            </div>
-            <div class="log-container" id="specific-log-container-panel" style="display:none;">
-                <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
-                <div class="specific-log-path" id="specific-log-path-info-panel"></div>
-                <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
-            </div>
-        </div>
     </div>
 
     <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
@@ -252,7 +235,35 @@
         <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
     </div>
 
-    
+    <div class="logs-overlay-container popup-overlay" id="logs-column-global">
+        <div class="logs-content-wrapper">
+            <div class="log-panel-header">
+                <div class="log-panel-header-main">
+                    <span id="log-panel-title">Logs</span>
+                    <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
+                </div>
+                <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
+                    <span id="log-panel-context-step">Aucune étape active</span>
+                    <span id="log-panel-context-status"></span>
+                    <span id="log-panel-context-timer"></span>
+                </div>
+                <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
+            </div>
+            <div class="log-container" id="main-log-container-panel">
+                <div class="log-header">
+                    Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
+                </div>
+                <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
+            </div>
+            <div class="log-container" id="specific-log-container-panel" style="display:none;">
+                <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
+                <div class="specific-log-path" id="specific-log-path-info-panel"></div>
+                <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
+            </div>
+        </div>
+    </div>
+
+
     <script id="steps-config-data" type="application/json">{{ steps_config | tojson | safe }}</script>
     <script src="{{ url_for('static', filename='main.js') }}?v={{ cache_buster }}" type="module" defer></script>
 </body>

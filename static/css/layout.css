@@ -56,106 +56,6 @@ html, body { overflow-y: scroll; }
   }
 }
 
-/* (removed flex-specific sizing for steps; grid handles column widths) */
-
-.workflow-wrapper.logs-active .steps-column {
-    flex-basis: 48%;
-    align-items: stretch;
-    opacity: 1;
-}
-
-/* COMPACT MODE: Overlay logs panel to avoid grid reflow and saccades */
-.workflow-wrapper.compact-mode .logs-column {
-    position: fixed;
-    right: 16px;
-    /* Align approximately below unified controls; adjust if needed */
-    top: 120px;
-    width: min(50vw, 800px);
-    height: calc(100vh - 140px);
-    z-index: 20;
-    box-shadow: -5px 0 15px rgba(0,0,0,0.25);
-}
-.workflow-wrapper.compact-mode .logs-column {
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.workflow-wrapper.compact-mode:not(.logs-active) .logs-column {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(30px);
-}
-.workflow-wrapper.compact-mode.logs-active .logs-column {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateX(0);
-}
-
-/* In compact mode, keep steps column width unchanged when logs open (no flex-basis change) */
-.workflow-wrapper.compact-mode.logs-active .steps-column {
-    flex-basis: auto;
-    /* Reserve space for the fixed logs panel so steps never go underneath it */
-    margin-right: min(50vw, 800px);
-    padding-right: 16px; /* small gutter between steps and logs */
-    min-height: calc(100vh - 140px); /* ensure sticky active card has space */
-    /* Subtle parallax/brightness for depth while logs overlay is visible */
-    transform: scale(0.985);
-    filter: brightness(0.95);
-    transition: transform 0.35s ease, filter 0.35s ease;
-}
-
-/* Keep the active step visually pinned relative to the logs panel (consistent vertical position) */
-.workflow-wrapper.compact-mode.logs-active .steps-column .step.active-for-log-panel {
-    position: sticky;
-    top: 120px; /* align with .logs-column top for visual consistency */
-    z-index: 1; /* ensure above siblings during transitions */
-    /* Span full width across grid */
-    grid-column: 1 / -1;
-}
-
-/* Entering phase: hide non-active steps to avoid saccade before panel is fully active */
-.workflow-wrapper.compact-mode.logs-entering .steps-column .step:not(.active-for-log-panel) {
-    opacity: 0 !important;
-    transform: translateY(8px) scale(0.97) !important;
-}
-.workflow-wrapper.compact-mode.logs-active .steps-column .step:not(.active-for-log-panel) {
-    display: none !important; /* fully remove from layout to keep stable height/scrollbar */
-}
-.workflow-wrapper.logs-active .steps-column .step.active-for-log-panel {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-}
-
-/* Ensure explicit visible state when logs panel is closed */
-.workflow-wrapper:not(.logs-active) .steps-column .step {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
-}
-
-.logs-column {
-    flex: 0 0 0%;
-    width: 0%;
-    opacity: 0;
-    transform: translateX(30px);
-    background-color: var(--bg-card);
-    border-left: 1px solid var(--border-color);
-    padding: 0;
-    overflow-y: auto;
-    transition: flex-basis 0.5s ease-in-out, width 0.5s ease-in-out, opacity 0.4s 0.1s ease-in-out, transform 0.5s ease-in-out, padding 0.5s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    box-shadow: -5px 0 15px rgba(0,0,0,0.2);
-    max-height: calc(100vh - 40px);
-}
-
-.workflow-wrapper.logs-active .logs-column {
-    flex-basis: 50%;
-    width: 50%;
-    opacity: 1;
-    transform: translateX(0);
-    padding: 20px 20px 20px 52px;
- }
 
 .workflow-wrapper.compact-mode .step-details-panel {
     position: fixed;
@@ -179,17 +79,6 @@ html, body { overflow-y: scroll; }
 .workflow-wrapper.compact-mode.details-active .steps-column {
     margin-right: min(30vw, 420px);
     padding-right: 16px;
- }
-
-.workflow-wrapper.compact-mode.logs-active.details-active .steps-column {
-    margin-right: min(50vw, 800px);
-    padding-right: 16px;
- }
-
-.workflow-wrapper.compact-mode.logs-active .step-details-panel {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(30px);
  }
 
 /* Unified controls section compatibility with slideshow mode */

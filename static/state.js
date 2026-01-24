@@ -31,6 +31,7 @@ export let stepTimers = {};
 export let selectedStepsOrder = [];
 export let isAnySequenceRunning = false;
 export let focusedElementBeforePopup = null;
+export let autoOpenLogOverlay = true;
 
 
 // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
@@ -102,6 +103,17 @@ export function setFocusedElementBeforePopup(element) {
 }
 export function getFocusedElementBeforePopup() {
     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
+}
+
+export function setAutoOpenLogOverlay(enabled) {
+    autoOpenLogOverlay = !!enabled;
+    const currentUI = appState.getStateProperty('ui') || {};
+    appState.setState({ ui: { ...currentUI, autoOpenLogOverlay: autoOpenLogOverlay } }, 'setAutoOpenLogOverlay');
+}
+
+export function getAutoOpenLogOverlay() {
+    const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
+    return typeof uiValue === 'boolean' ? uiValue : autoOpenLogOverlay;
 }
 
 export function setAutoModeLogPanelOpened(opened) {

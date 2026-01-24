@@ -7,7 +7,8 @@ class AppState {
             isAnySequenceRunning: false,
             focusedElementBeforePopup: null,
             ui: {
-                compactMode: false
+                compactMode: false,
+                autoOpenLogOverlay: true
             },
             
             stepTimers: {},
@@ -131,7 +132,8 @@ class AppState {
             isAnySequenceRunning: false,
             focusedElementBeforePopup: null,
             ui: {
-                compactMode: false
+                compactMode: false,
+                autoOpenLogOverlay: true
             },
             stepTimers: {},
             selectedStepsOrder: [],

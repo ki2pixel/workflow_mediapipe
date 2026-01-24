@@ -10,6 +10,15 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## 2026-01-24 15:25:00+01:00: Frontend — Auto-ouverture du panneau de logs contrôlable
+- **Décision** : Introduire un toggle “📟 Auto-ouverture des logs” dans le panneau Settings pour permettre aux opérateurs de désactiver l’ouverture automatique de l’overlay pendant les exécutions d’étapes ou de séquences.
+- **Raison** : Limiter l’encombrement visuel lors des démos/monitorings tout en conservant un accès manuel direct aux logs (boutons “Logs” et Step Details).
+- **Implémentation** :
+  - `templates/index_new.html` + `static/eventHandlers.js` : ajout du contrôle, persistance `localStorage`, synchronisation AppState.
+  - `static/uiUpdater.js` + `static/sequenceManager.js` : `openLogPanelUI` consulte désormais `getAutoOpenLogOverlay()` et n’ouvre l’overlay que si la préférence est active ; seuls les clics explicites forcent l’ouverture.
+  - Documentation mise à jour (`docs/workflow/audits/Ergonomie-Amelioree-Pour-Les-Logs.md`).
+- **Impact** : Expérience opérateur personnalisable, plus de forçage de popup en mode séquence quand l’option est désactivée, compatibilité maintenue pour les cas nécessitant l’overlay.
+
 ## 2026-01-21 20:05:00+01:00: Frontend — Retrait des toggles “Logs Cinématiques” & “Défilement Auto”
 - **Décision** : Supprimer les contrôles UI “Logs Cinématiques” et “📜 Défilement Auto” devenus redondants depuis l’achèvement de Timeline Connectée (auto-scroll structurel géré par `scrollManager`/`sequenceManager`).
 - **Raison** : Ces toggles n’étaient plus branchés sur une logique active et maintenaient du code mort (DOM, JS, CSS). Ils alourdissaient les bundles et rendaient l’UI confuse alors que l’autoscroll et les effets logs sont désormais automatiques.

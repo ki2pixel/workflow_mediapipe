@@ -8,6 +8,7 @@ import { openPopupUI, closePopupUI, showCustomSequenceConfirmUI } from './popupM
 import { scrollToStepImmediate } from './scrollManager.js';
 import { soundEvents } from './soundManager.js';
 import { appState } from './state/AppState.js';
+import { setAutoOpenLogOverlay, getAutoOpenLogOverlay } from './state.js';
 
 function getIsAnySequenceRunning() {
     return !!appState.getStateProperty('isAnySequenceRunning');
@@ -57,7 +58,9 @@ export function initializeEventHandlers() {
                 ui.updateMainLogOutputUI('');
                 const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
                 if (specificLogContainer) specificLogContainer.style.display = 'none';
-                ui.openLogPanelUI(stepKey);
+                if (getAutoOpenLogOverlay()) {
+                    ui.openLogPanelUI(stepKey, true);
+                }
 
                 scrollToStepImmediate(stepKey, { scrollDelay: 0 });
 
@@ -84,6 +87,20 @@ export function initializeEventHandlers() {
         });
     });
 
+    const logsAutoOpenToggle = resolveElement(dom.getLogsAutoOpenToggle, dom.logsAutoOpenToggle);
+    if (logsAutoOpenToggle) {
+        const savedPreference = localStorage.getItem('autoOpenLogOverlay');
+        const initialValue = savedPreference === null ? getAutoOpenLogOverlay() : savedPreference === 'true';
+        logsAutoOpenToggle.checked = initialValue;
+        setAutoOpenLogOverlay(initialValue);
+        logsAutoOpenToggle.addEventListener('change', (event) => {
+            const enabled = event.target.checked;
+            localStorage.setItem('autoOpenLogOverlay', enabled.toString());
+            setAutoOpenLogOverlay(enabled);
+            console.log(`[EVENT] Auto log overlay ${enabled ? 'enabled' : 'disabled'} by user`);
+        });
+    }
+
     const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
     specificLogButtons.forEach(button => {
         button.addEventListener('click', async () => {
@@ -92,7 +109,7 @@ export function initializeEventHandlers() {
             const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
 
             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
-                ui.openLogPanelUI(stepKey);
+                ui.openLogPanelUI(stepKey, true);
                 try {
                     const statusResponse = await fetch(`/status/${stepKey}`);
                     if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);

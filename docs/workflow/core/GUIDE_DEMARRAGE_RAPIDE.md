@@ -477,6 +477,7 @@ grep "STEP1" logs/app.log
 
 - **Mode cinématique retiré** : le toggle “Cinematic Log Mode” et `static/cinematicLogMode.js` ont été supprimés le 2026‑01‑21 pour alléger l’UI. Les panneaux utilisent désormais le thème standard Timeline Connectée défini dans `static/css/components/logs.css`.
 - **Auto-scroll structurel** : le centrage des étapes est géré automatiquement par `scrollManager` et `sequenceManager` (spacer dédié, throttling 700 ms, prise en compte de la topbar). Il n’existe plus de réglage utilisateur pour activer/désactiver cette fonctionnalité.
+- **Panneau de logs en overlay** : Les logs s’affichent dans une lightbox indépendante (Option A) sans impacter la largeur de la Timeline. L’ouverture automatique est contrôlée par le toggle “📟 Auto-ouverture des logs” dans Settings, persisté dans `localStorage` et respecté par les séquences via `getAutoOpenLogOverlay()`. L’implémentation utilise `openPopupUI`/`closePopupUI` et le conteneur `.logs-overlay-container` est détaché du flux principal.
 - **Accessibilité** : les animations suivent `prefers-reduced-motion`; aucun attribut `data-cinematic-mode` n’est injecté. Les captures destinées à la documentation reflètent donc toujours le rendu par défaut.
 
 ### Gestion des Environnements
