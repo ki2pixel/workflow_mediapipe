@@ -1,6 +1,10 @@
 # Documentation Technique - Étape 1 : Extraction d'Archives
 
-## Description Fonctionnelle
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: none directly in STEP1; related security modules are low‑complexity.
+
+---
+
+## Purpose & Pipeline Role
 
 ### Objectif
 L'Étape 1 constitue le point d'entrée du pipeline de traitement vidéo MediaPipe. Elle est responsable de l'extraction sécurisée et automatisée d'archives contenant des contenus vidéo, en préparant les données pour les étapes suivantes du workflow.
@@ -18,16 +22,40 @@ L'Étape 1 constitue le point d'entrée du pipeline de traitement vidéo MediaPi
 - **Gestion d'état** : Suivi des archives déjà traitées pour éviter les doublons
 - **Organisation structurée** : Création d'une hiérarchie de dossiers cohérente pour le pipeline
 
-## Spécifications Techniques
+---
+
+## Inputs & Outputs
+
+### Inputs
+- **Archives** : Fichiers ZIP, RAR, TAR/TGZ/TBZ2/TXZ dans le répertoire source
+- **Filtres** : Mots-clés optionnels pour filtrer les archives (défaut: "Camille")
+- **État** : Fichier de suivi des archives déjà traitées
+
+### Outputs
+- **Projets extraits** : Structure `projets_extraits/<nom_projet>/docs/` avec fichiers vidéo
+- **Logs** : Journaux détaillés dans `logs/step1/`
+- **État mis à jour** : Archives marquées comme traitées
+
+---
+
+## Command & Environment
+
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step1/extract_archives.py --source-dir archives_source/ --output-dir projets_extraits/
+```
 
 ### Environnement Virtuel
 - **Environnement utilisé** : `env/` (environnement principal)
 - **Activation** : `source env/bin/activate`
 - **Partage** : Utilisé également par les étapes 2 et 6
 
-### Technologies et Bibliothèques Principales
+---
 
-#### Bibliothèques Standard Python
+## Dependencies
+
+### Bibliothèques Standard Python
 ```python
 import zipfile      # Extraction archives ZIP/ZIPX
 import rarfile      # Extraction archives RAR
@@ -38,15 +66,93 @@ import re           # Expressions régulières pour validation
 import unicodedata  # Normalisation Unicode
 ```
 
-#### Bibliothèques Externes
+### Bibliothèques Externes
 ```python
 import rarfile      # Support RAR (nécessite unrar)
 ```
 
-#### Modules de Sécurité Personnalisés
+### Modules de Sécurité Personnalisés
 ```python
 from utils.filename_security import FilenameSanitizer, validate_extraction_path
 ```
+
+---
+
+## Configuration
+
+### Variables d'Environnement
+- **EXTRACTION_KEYWORD_FILTER** : Mot-clé pour filtrer les archives (défaut: "Camille")
+- **EXTRACTION_MAX_DEPTH** : Profondeur maximale d'extraction (défaut: 10)
+- **EXTRACTION_ALLOWED_EXTENSIONS** : Extensions de fichiers autorisées
+
+### Paramètres de Sécurité
+- **Path Traversal Protection** : Validation systématique des chemins d'extraction
+- **Filename Sanitization** : Nettoyage des caractères dangereux dans les noms de fichiers
+- **Size Limits** : Limites sur la taille des archives et des fichiers extraits
+
+---
+
+## Known Hotspots
+
+### Complexité Backend
+- Aucun hotspot identifié dans les modules STEP1 (complexité faible)
+- Modules de sécurité associés sont simples et bien testés
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit d'extraction** : Mo/s par archive
+- **Taux de succès** : % d'archives extraites avec succès
+- **Temps de traitement** : Durée moyenne par archive
+
+### Patterns de Logging
+```python
+# Logs de progression
+logger.info(f"Extraction de {archive_path} - {current}/{total}")
+
+# Logs de sécurité
+logger.warning(f"Tentative de path traversal détectée: {dangerous_path}")
+
+# Logs d'erreur
+logger.error(f"Échec d'extraction: {error}")
+```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **Archive corrompue** : Retry avec extraction partielle
+2. **Path traversal** : Blocage et logging de sécurité
+3. **Espace disque insuffisant** : Pause et alerte utilisateur
+4. **Permissions refusées** : Tentative avec élévation de privilèges
+
+### Procédures de Récupération
+```bash
+# Réessayer une archive spécifique
+python workflow_scripts/step1/extract_archives.py --retry-failed archive_name.zip
+
+# Nettoyer les échecs
+python workflow_scripts/step1/extract_archives.py --cleanup-failed
+
+# Validation post-récupération
+python scripts/validate_step1_output.py
+```
+
+---
+
+## Related Documentation
+
+- **Pipeline Overview** : `../README.md`
+- **Security Guidelines** : `../technical/SECURITY.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
+
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.*
 
 ### Formats d'Entrée et de Sortie
 
@@ -681,5 +787,4 @@ total_archives=$(ls archives_source/ | wc -l)
 successful_extractions=$(ls projets_extraits/ | wc -l)
 success_rate=$((successful_extractions * 100 / total_archives))
 echo "Taux de succès: ${success_rate}%"
-```
 ```

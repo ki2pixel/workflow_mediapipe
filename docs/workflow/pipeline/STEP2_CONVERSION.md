@@ -1,6 +1,10 @@
 # Documentation Technique - Étape 2 : Conversion Vidéo
 
-## Description Fonctionnelle
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: moderate complexity in `convert_videos.py` (radon C), but no critical hotspots.
+
+---
+
+## Purpose & Pipeline Role
 
 ### Objectif
 L'Étape 2 normalise toutes les vidéos extraites à un framerate standard de 25 FPS, garantissant une cohérence temporelle pour les étapes suivantes du pipeline de traitement. Cette standardisation est cruciale pour l'efficacité des algorithmes de détection de scènes, d'analyse audio et de tracking vidéo.
@@ -19,35 +23,132 @@ L'Étape 2 normalise toutes les vidéos extraites à un framerate standard de 25
 - **Compression optimisée** : Réduction jusqu'à 70% de la taille des fichiers sans perte de qualité visible
 - **Qualité préservée** : Paramètres d'encodage optimisés pour maintenir la qualité visuelle
 
-## Spécifications Techniques
+---
+
+## Inputs & Outputs
+
+### Inputs
+- **Vidéos brutes** : Fichiers vidéo extraits par STEP1 dans `projets_extraits/*/docs/`
+- **Formats supportés** : MP4, MOV, AVI, MKV, WEBM, FLV, WMV
+- **Métadonnées** : Informations de résolution, codec, et bitrate
+
+### Outputs
+- **Vidéos standardisées** : Fichiers vidéo à 25 FPS, optimisés en taille
+- **Logs détaillés** : Journal de conversion dans `logs/step2/`
+- **Métriques de performance** : Temps de traitement, débit, utilisation GPU
+
+---
+
+## Command & Environment
+
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step2/convert_videos.py --input-dir projets_extraits/ --fps 25 --use-gpu
+```
 
 ### Environnement Virtuel
 - **Activation** : `source env/bin/activate`
 - **Partage** : Utilisé également par les étapes 1 et 6
 
-### Compression Non Destructive
+---
 
-### Objectif
-Réduire la taille des fichiers vidéo après conversion tout en préservant la qualité visuelle et les métadonnées, avec un traitement optimisé pour le GPU. La compression utilise des paramètres de haute qualité (CRF 28 pour CPU, CQ 28 pour GPU) pour réduire la taille des fichiers jusqu'à 70% sans perte de qualité visible.
+## Dependencies
 
-### Caractéristiques principales
-- **Préservation des métadonnées** : Toutes les métadonnées EXIF et autres tags sont conservés
-- **Gestion audio avancée** : Copie directe des flux audio compatibles, ré-encodage AAC 192k si nécessaire
-- **Traitement optimisé** : Utilisation du GPU (h264_nvenc) lorsqu'disponible, avec basculement automatique sur CPU (libx264)
-- **Gestion des erreurs** : Nettoyage des fichiers temporaires en cas d'échec
-- **Journalisation détaillée** : Suivi précis de la progression et des opérations
-
-#### Implémentation Technique
-
-##### Fonction `compress_single_video`
+### Bibliothèques Principales
 ```python
-def compress_single_video(video_path, use_gpu=False):
-    """
-    Compresse une vidéo .mp4 sans changer la résolution ni le framerate.
-    
-    La fonction effectue les opérations suivantes :
-    1. Vérification des prérequis (fichier source, codecs disponibles)
-    2. Création d'un fichier temporaire pour la compression
+import subprocess        # Interface avec FFmpeg
+import pathlib           # Manipulation des chemins
+import re                # Expressions régulières
+import json              # Métadonnées
+import logging           # Journalisation
+```
+
+### Dépendances Externes
+- **FFmpeg** : Conversion vidéo et manipulation des codecs
+- **NVIDIA GPU** : Accélération matérielle via `h264_nvenc`
+- **CPU fallback** : `libx264` si GPU non disponible
+
+---
+
+## Configuration
+
+### Variables d'Environnement
+- **STEP2_FPS_TARGET** : Framerate cible (défaut: 25)
+- **STEP2_USE_GPU** : Forcer l'utilisation GPU (true/false)
+- **STEP2_QUALITY_CRF** : Constant Rate Factor (défaut: 28)
+- **STEP2_AUDIO_BITRATE** : Bitrate audio (défaut: 192k)
+- **STEP2_MAX_CONCURRENT** : Conversions parallèles maximum
+
+### Paramètres d'Encodage
+- **GPU** : `h264_nvenc` avec `cq=28` pour qualité optimale
+- **CPU** : `libx264` avec `crf=28` comme fallback
+- **Audio** : AAC 192k ou copie directe si compatible
+
+---
+
+## Known Hotspots
+
+### Complexité Backend
+- **`convert_videos.py`** : Complexité modérée (radon C) dans la gestion des conversions parallèles
+- **Points d'attention** : Gestion des ressources GPU et validation des codecs
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit de conversion** : Vidéos/seconde
+- **Utilisation GPU** : % GPU et mémoire VRAM
+- **Taux de compression** : % réduction taille
+- **Qualité préservée** : PSNR/SSIM si disponible
+
+### Patterns de Logging
+```python
+# Logs de progression
+logger.info(f"Conversion {video_path} - {current}/{total} ({progress:.1f}%)")
+
+# Logs GPU
+logger.info(f"GPU utilization: {gpu_util}% - VRAM: {vram_used}MB")
+
+# Logs d'erreur
+logger.error(f"Échec conversion {video_path}: {error}")
+```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **GPU indisponible** : Basculement automatique sur CPU
+2. **Codec incompatible** : Tentative avec codec alternatif
+3. **Espace disque insuffisant** : Pause et alerte
+4. **Fichier corrompu** : Logging et passage au fichier suivant
+
+### Procédures de Récupération
+```bash
+# Réessayer avec CPU uniquement
+python workflow_scripts/step2/convert_videos.py --force-cpu
+
+# Nettoyer les fichiers temporaires
+python workflow_scripts/step2/convert_videos.py --cleanup-temp
+
+# Validation post-conversion
+python scripts/validate_step2_output.py
+```
+
+---
+
+## Related Documentation
+
+- **Pipeline Overview** : `../README.md`
+- **GPU Usage Guide** : `../pipeline/STEP5_GPU_USAGE.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
+
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.*
     3. Compression avec les paramètres optimisés pour GPU ou CPU
     4. Vérification de l'intégrité du fichier résultant
     5. Remplacement du fichier original si la compression réussit
@@ -774,5 +875,4 @@ duration=$((end_time - start_time))
 video_count=$(find projets_extraits/ -name "*.mp4" -o -name "*.mov" -o -name "*.avi" | wc -l)
 throughput=$(echo "scale=2; $video_count / $duration" | bc)
 echo "Débit de conversion: $throughput vidéos/seconde"
-```
 ```

@@ -1,5 +1,7 @@
 # Guide Utilisateur : Support GPU pour STEP5
 
+> **🔴 Known Hotspot** – Critical complexity (radon F/E) in STEP5 workers. GPU operations require careful monitoring due to high complexity in `process_video_worker.py` and `run_tracking_manager.py`. See `../complexity_report.txt` for detailed analysis.
+
 **Version** : 4.2+  
 **Date** : 27 décembre 2025  
 **Statut** : STABLE — GPU réservé exclusivement à InsightFace
@@ -9,6 +11,31 @@
 ## Vue d'ensemble
 
 ⚠️ **IMPORTANT** : Le support GPU pour STEP5 est **réservé exclusivement au moteur InsightFace**. Tous les autres moteurs (MediaPipe Face Landmarker, OpenSeeFace, OpenCV YuNet + PyFeat, EOS) s'exécutent automatiquement en mode CPU-only, même si `STEP5_ENABLE_GPU=1` est activé.
+
+---
+
+## 🔴 Critical Complexity Areas (GPU Operations)
+
+### High-Risk Components Requiring Careful Monitoring
+
+#### STEP5 Workers (Radon F/E)
+- **`process_video_worker.py`** : Complexité critique (radon F) dans `main` et `process_frame_chunk`
+- **`run_tracking_manager.py`** : Complexité critique (radon F) dans `main`
+- **`face_engines.py`** : Complexité élevée (radon E) dans `detect` (InsightFace, EOS)
+
+#### GPU-Specific Risks
+- **Memory Management** : OOM fréquent avec InsightFace GPU
+- **Resource Contention** : 1 seul worker GPU séquentiel autorisé
+- **Fallback Complexity** : Basculement CPU/GPU ajoute à la complexité
+- **Error Recovery** : Les crashes GPU nécessitent des procédures de récupération spécifiques
+
+#### Monitoring Recommendations
+- Surveiller `CUDAExecutionProvider` dans les logs
+- Vérifier l'utilisation VRAM toutes les 20 frames (profiling intégré)
+- Implémenter des timeouts stricts pour les opérations GPU
+- Tester les scénarios de fallback GPU→CPU
+
+---
 
 ### Caractéristiques
 

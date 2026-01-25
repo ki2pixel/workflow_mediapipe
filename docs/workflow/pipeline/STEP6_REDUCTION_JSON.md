@@ -1,6 +1,10 @@
 # Documentation Technique - Étape 6 : Réduction JSON
 
-## Description Fonctionnelle
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: low complexity (radon C) in `json_reducer.py`; straightforward data processing.
+
+---
+
+## Purpose & Pipeline Role
 
 ### Objectif
 L'Étape 6 est une étape intermédiaire cruciale qui optimise les fichiers de métadonnées générés par les analyses vidéo et audio. Son rôle est de réduire la taille de ces fichiers JSON en ne conservant que les informations strictement nécessaires pour les scripts After Effects, améliorant ainsi les performances et la fluidité du processus de post-production.
@@ -12,19 +16,45 @@ L'Étape 6 est une étape intermédiaire cruciale qui optimise les fichiers de m
 - **Étape suivante** : Finalisation (STEP7)
 
 ### Valeur Ajoutée
-- **Optimisation des performances** : Réduit significativement le temps de chargement et de traitement des données dans After Effects.
-- **Réduction de la taille des fichiers** : Économise de l'espace de stockage et facilite le transfert des données.
-- **Standardisation des données** : Garantit que seuls les champs pertinents sont présents, évitant les erreurs d'interprétation.
-- **Automatisation complète** : S'intègre de manière transparente dans le workflow sans intervention manuelle.
+- **Optimisation des performances** : Réduit significativement le temps de chargement et de traitement des données dans After Effects
+- **Réduction de la taille des fichiers** : Économise de l'espace de stockage et facilite le transfert des données
+- **Standardisation des données** : Garantit que seuls les champs pertinents sont présents, évitant les erreurs d'interprétation
+- **Automatisation complète** : S'intègre de manière transparente dans le workflow sans intervention manuelle
 
-## Spécifications Techniques
+---
+
+## Inputs & Outputs
+
+### Inputs
+- **JSON tracking** : Fichiers de tracking vidéo de STEP5 avec landmarks/blendshapes
+- **JSON audio** : Fichiers d'analyse audio de STEP4
+- **Configuration** : Paramètres de réduction via variables d'environnement
+
+### Outputs
+- **JSON réduits** : Fichiers allégés avec champs essentiels uniquement
+- **Taille optimisée** : Réduction de 74-95% selon `STEP5_EXPORT_VERBOSE_FIELDS`
+- **Logs détaillés** : Journal de réduction dans `logs/step6/`
+
+---
+
+## Command & Environment
+
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step6/json_reducer.py --base-dir . --work-dir projets_extraits/ --keyword Camille
+```
 
 ### Environnement Virtuel
 - **Environnement utilisé** : `env/` (environnement principal)
 - **Activation** : `source env/bin/activate`
-- **Partage** : Utilise le même environnement que les étapes 1, 2 et 6.
+- **Partage** : Utilisé également par les étapes 1, 2 et 6
 
-### Technologies et Bibliothèques Principales
+---
+
+## Dependencies
+
+### Bibliothèques Principales
 ```python
 import json         # Manipulation des fichiers JSON
 import os           # Opérations sur le système de fichiers
@@ -32,22 +62,89 @@ from pathlib import Path  # Manipulation moderne des chemins
 import logging      # Journalisation des opérations
 ```
 
+### Dépendances Externes
+- Aucune dépendance externe complexe
+- Traitement purement Python natif
+
+---
+
+## Configuration
+
+### Variables d'Environnement
+- **STEP5_EXPORT_VERBOSE_FIELDS** : Contrôle la verbosité des exports STEP5 (false par défaut)
+- **STEP6_KEYWORD_FILTER** : Mot-clé pour filtrer les projets (défaut: 'Camille')
+- **STEP6_LOG_LEVEL** : Niveau de logging (INFO, DEBUG, WARNING)
+
 ### Paramètres de Configuration
-Le script `json_reducer.py` accepte les paramètres suivants en ligne de commande pour plus de flexibilité :
-- `--base_dir` : Chemin de base du projet (contenant `projets_extraits`).
-- `--work_dir` : Chemin explicite vers le répertoire `projets_extraits`.
-- `--keyword` : Mot-clé pour filtrer les dossiers de projet (par défaut : 'Camille').
-- `--log_dir` : Répertoire pour stocker les fichiers de logs (par défaut : `logs/step6`).
+- `--base_dir` : Chemin de base du projet
+- `--work_dir` : Chemin vers `projets_extraits`
+- `--keyword` : Filtre de projets
+- `--log_dir` : Répertoire des logs
 
-## Architecture et Algorithmes
+---
 
-### Workflow de Réduction
-1.  **Découverte des projets** : Le script scanne le répertoire de travail à la recherche de projets correspondant au mot-clé.
-2.  **Identification des paires de fichiers** : Pour chaque vidéo, il recherche les fichiers `.json` et `_audio.json` correspondants.
-3.  **Réduction Vidéo (`.json`)** :
-    *   Parcourt l'analyse de chaque frame.
-    *   Pour chaque objet suivi, il ne conserve que les champs essentiels : `id`, `centroid_x`, `source`, `label`, `active_speakers`.
-    *   Les données volumineuses comme les `landmarks` et `blendshapes` sont supprimées.
+## Known Hotspots
+
+### Complexité Backend
+- **`json_reducer.py`** : Complexité faible (radon C) dans `process_directory` et `reduce_video_json`
+- **Points d'attention** : Validation de structure JSON, gestion des fichiers corrompus
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit de réduction** : Fichiers/seconde traités
+- **Taux de compression** : % réduction taille des fichiers
+- **Intégrité** : Validation des structures JSON réduites
+- **Temps de traitement** : Durée moyenne par projet
+
+### Patterns de Logging
+```python
+# Logs de progression
+logger.info(f"Réduction {project_name} - {current}/{total}")
+
+# Logs de compression
+logger.info(f"Compression: {original_size}MB -> {reduced_size}MB ({ratio:.1%} reduction)")
+
+# Logs d'erreur
+logger.error(f"Échec réduction {json_file}: {error}")
+```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **JSON corrompu** : Logging et passage au fichier suivant
+2. **Structure invalide** : Tentative de réduction avec fallback
+3. **Permissions insuffisantes** : Pause et alerte utilisateur
+4. **Espace disque insuffisant** : Pause et nettoyage
+
+### Procédures de Récupération
+```bash
+# Réessayer avec logging debug
+STEP6_LOG_LEVEL=DEBUG python workflow_scripts/step6/json_reducer.py
+
+# Nettoyer les fichiers temporaires
+python workflow_scripts/step6/json_reducer.py --cleanup-temp
+
+# Validation post-réduction
+python scripts/validate_step6_output.py
+```
+
+---
+
+## Related Documentation
+
+- **Pipeline Overview** : `../README.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
+- **STEP5 Configuration** : `../pipeline/STEP5_SUIVI_VIDEO.md`
+
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.*
 4.  **Réduction Audio (`_audio.json`)** :
     *   Parcourt l'analyse de chaque frame.
     *   Ne conserve que les champs `is_speech_present` et `active_speaker_labels`.

@@ -1,6 +1,10 @@
 # Documentation Technique - Étape 4 : Analyse Audio
 
-## Description Fonctionnelle
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: moderate complexity in Lemonfox service (radon C), CSV monitoring critical (radon F) for webhook integration.
+
+---
+
+## Purpose & Pipeline Role
 
 ### Objectif
 L'Étape 4 effectue une analyse audio avancée des vidéos en utilisant la diarisation de locuteurs via Pyannote.audio. Cette étape identifie automatiquement les segments de parole, distingue les différents locuteurs et génère une timeline audio détaillée frame par frame pour optimiser les analyses suivantes.
@@ -18,36 +22,150 @@ L'Étape 4 effectue une analyse audio avancée des vidéos en utilisant la diari
 - **Support multi-locuteurs** : Détection automatique du nombre de locuteurs
 - **Intégration workflow** : Données audio utilisées par l'étape de tracking pour améliorer la détection de parole
 
-## Améliorations Récentes (v4.1+)
+---
 
-### Configuration Optimisée de Pyannote (v4.1.2)
+## Inputs & Outputs
 
-**Nouveauté** : Chargement automatique du preset `config/optimal_tv_config.json`
+### Inputs
+- **Vidéos standardisées** : Fichiers vidéo à 25 FPS de STEP2
+- **CSV de scènes** : Fichiers de détection de scènes de STEP3
+- **Configuration** : Paramètres Pyannote/Lemonfox via JSON ou variables d'environnement
 
-**Détails** :
-- Le preset est chargé automatiquement au démarrage du service audio
-- Gestion automatique du `batch_size` en fonction de la mémoire disponible
-- Optimisation pour la cohérence GPU/CPU via le profil `AUDIO_PROFILE=gpu_fp32`
+### Outputs
+- **JSON audio** : Analyse diarization frame par frame
+- **Logs détaillés** : Journal d'analyse dans `logs/step4/`
+- **Métriques** : Nombre de locuteurs, temps de parole, utilisation GPU/CPU
 
-**Configuration recommandée** :
+---
+
+## Command & Environment
+
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step4/run_audio_analysis.py --input-dir projets_extraits/ --config config/optimal_tv_config.json
+```
+
+### Environnement Virtuel
+- **Environnement utilisé** : `audio_env/` (environnement spécialisé)
+- **Activation** : `source audio_env/bin/activate`
+- **Partage** : Isolé pour PyTorch CUDA 11.x compatibilité
+
+---
+
+## Dependencies
+
+### Bibliothèques Principales
+```python
+import torch              # PyTorch pour Pyannote/Lemonfox
+import pyannote.audio     # Diarization state-of-the-art
+import numpy as np        # Calcul numérique
+import librosa            # Traitement audio
+import json               # Configuration et sorties
+```
+
+### Dépendances Externes
+- **Pyannote.audio 3.1** : Modèle de diarization
+- **Lemonfox API** : Alternative SaaS (optionnelle)
+- **FFmpeg** : Extraction audio via subprocess
+- **CUDA 11.x** : Accélération GPU (profil gpu_fp32)
+
+---
+
+## Configuration
+
+### Variables d'Environnement
+- **AUDIO_PROFILE** : `gpu_fp32` (défaut) ou `cpu_fp32`
+- **PYANNOTE_BATCH_SIZE** : Taille du lot (défaut: auto)
+- **HUGGINGFACE_HUB_TOKEN** : Token pour modèles Pyannote
+- **AUDIO_PARTIAL_SUCCESS_OK** : Permettre succès partiel (1/0)
+- **LEMONFOX_API_KEY** : Clé API alternative (optionnelle)
+
+### Configuration JSON (optimal_tv_config.json)
+```json
+{
+  "segmentation": {
+    "model": "pyannote/segmentation"
+  },
+  "embedding": {
+    "model": "pyannote/embedding"
+  },
+  "diarization": {
+    "clustering": "AgglomerativeClustering",
+    "threshold": 0.5
+  }
+}
+```
+
+---
+
+## Known Hotspots
+
+### Complexité Backend
+- **`lemonfox_audio_service.py`** : Complexité modérée (radon C) dans `_call_lemonfox_api`
+- **`csv_service.py`** : Complexité critique (radon F) dans `_check_csv_for_downloads` et `_normalize_url`
+- **Points d'attention** : Gestion token HF, OOM GPU, validation URLs webhook
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit d'analyse** : Secondes audio/seconde
+- **Utilisation GPU** : % GPU et mémoire VRAM
+- **Précision diarization** : Nombre de locuteurs détectés
+- **Taux de succès** : % vidéos traitées avec succès
+
+### Patterns de Logging
+```python
+# Logs de progression
+logger.info(f"Analyse audio {video_path} - {current}/{total}")
+
+# Logs GPU
+logger.info(f"GPU memory: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
+
+# Logs Lemonfox
+logger.info(f"Lemonfox API call: {duration}ms, cost: {cost}")
+
+# Logs d'erreur
+logger.error(f"Échec analyse {video_path}: {error}")
+```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **GPU OOM** : Réduction batch_size ou fallback CPU
+2. **Token HF invalide** : Validation et prompt utilisateur
+3. **Lemonfox API error** : Fallback automatique vers Pyannote
+4. **Audio corrompu** : Logging et passage au fichier suivant
+
+### Procédures de Récupération
 ```bash
-# Dans .env ou la configuration du service
-AUDIO_PROFILE=gpu_fp32  # Désactive AMP (FP16) pour éviter les faux négatifs
-PYANNOTE_BATCH_SIZE=auto  # Ajustement automatique selon la mémoire disponible
+# Réessayer avec CPU uniquement
+AUDIO_PROFILE=cpu_fp32 python workflow_scripts/step4/run_audio_analysis.py
+
+# Réduire la taille des lots
+PYANNOTE_BATCH_SIZE=8 python workflow_scripts/step4/run_audio_analysis.py
+
+# Validation post-analyse
+python scripts/validate_step4_output.py
 ```
 
-**Logs de diagnostic** :
-```
-[INFO] Chargement du preset Pyannote: config/optimal_tv_config.json
-[INFO] Configuration GPU/CPU: profile=gpu_fp32, batch_size=16
-[PROFILING] Pyannote inference: 42.3ms/segment (moyenne sur 100 segments)
-```
+---
 
-### Intégration de Lemonfox avec Fallback Pyannote (v4.1.1)
+## Related Documentation
 
-#### Nouveau : Support de Lemonfox pour l'Analyse Audio
+- **Pipeline Overview** : `../README.md`
+- **Lemonfox Integration** : `../pipeline/STEP4_LEMONFOX_IMPLEMENTATION_STATUS.md`
+- **GPU/CPU Coherence** : `../pipeline/STEP4_GPU_CPU_COHERENCE.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
 
-**Fonctionnalité** : 
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.* 
 - **Lemonfox** est maintenant la solution principale pour l'analyse audio, avec un fallback automatique vers Pyannote en cas d'échec.
 - Activation via la variable d'environnement `STEP4_USE_LEMONFOX=1`
 

@@ -1,8 +1,37 @@
 # Vue d'Ensemble - Workflow MediaPipe v4.2
 
+> **Code-Doc Metrics** – 38 files, 9,064 LOC Markdown; complexity hotspots in CSV/STEP5 workers. See `cloc_stats.json` and `complexity_report.txt` for detailed analysis.
+
 > **Workflow MediaPipe** est un système complet d'analyse vidéo automatisée qui traite les fichiers vidéo à travers un pipeline modulaire en 7 étapes. Le système combine des technologies de vision par ordinateur, d'analyse audio et de traitement des données pour générer des métadonnées riches utilisables dans After Effects.
 
-## Architecture du Système
+## Architecture Snapshot (Code-Doc Analysis)
+
+### Documentation Structure
+```
+docs/workflow/
+├── admin/                     # Administration & audits (5 files)
+├── config/                    # Configuration & deployment (3 files)
+├── core/                      # Core documentation (4 files)
+├── features/                  # Feature documentation (2 files)
+├── lemonfox-ai/               # Lemonfox AI integration (1 file)
+├── pipeline/                  # 7-step pipeline docs (11 files)
+├── technical/                 # Technical deep-dives (9 files)
+├── README.md                  # This file
+├── overview.md                # System overview
+└── index.md                   # Portal index
+```
+
+### Code Metrics Summary
+- **Total Files**: 38 text files (Markdown, Shell, JSON)
+- **Primary Language**: Markdown (9,064 LOC, 2564 blanks)
+- **Supporting Code**: Shell scripts (486 LOC), JSON config (24 LOC)
+- **Complexity Distribution**:
+  - **Critical (F)**: CSV monitoring, STEP5 workers
+  - **High (E/D)**: STEP3 TransNet, STEP5 engines
+  - **Moderate (C)**: STEP2 conversion, STEP4 Lemonfox, STEP7 finalization
+  - **Low (A/B)**: STEP1 extraction, STEP6 JSON reduction
+
+---
 
 ### Backend (Flask + Services)
 - **Framework** : Flask avec architecture orientée services

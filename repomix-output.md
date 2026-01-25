@@ -27341,375 +27341,6 @@ app_new.py
 388: }
 ```
 
-## File: static/css/components/logs.css
-```css
-  1: .logs-column {
-  2:     position: relative;
-  3:     background: color-mix(in oklab, var(--bg-card) 92%, transparent);
-  4:     border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
-  5:     border-radius: var(--pipeline-card-radius);
-  6:     box-shadow:
-  7:         0 10px 26px rgba(0,0,0,0.22),
-  8:         0 0 0 1px rgb(var(--accent-primary-rgb) / 0.12);
-  9: }
- 10: 
- 11: .logs-column > * {
- 12:     position: relative;
- 13:     z-index: 1;
- 14: }
- 15: 
- 16: .logs-column::before {
- 17:     content: '';
- 18:     position: absolute;
- 19:     left: 12px;
- 20:     top: 0;
- 21:     bottom: 0;
- 22:     width: var(--pipeline-axis-width);
- 23:     background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
- 24:     border-radius: 999px;
- 25:     opacity: 0.9;
- 26:     pointer-events: none;
- 27: }
- 28: 
- 29: .logs-column::after {
- 30:     content: '';
- 31:     position: absolute;
- 32:     left: 0;
- 33:     top: 0;
- 34:     bottom: 0;
- 35:     width: 36px;
- 36:     background: radial-gradient(
- 37:         circle at 12px 30%,
- 38:         rgb(var(--accent-primary-rgb) / 0.22) 0%,
- 39:         rgb(var(--accent-primary-rgb) / 0.10) 40%,
- 40:         rgb(var(--accent-primary-rgb) / 0.00) 70%
- 41:     );
- 42:     pointer-events: none;
- 43: }
- 44: 
- 45: .log-panel-header {
- 46:     display: flex;
- 47:     flex-direction: column;
- 48:     align-items: stretch;
- 49:     gap: 10px;
- 50:     padding-bottom: 10px;
- 51:     margin-bottom: 15px;
- 52:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
- 53:     color: var(--accent-primary);
- 54:     font-size: 1.3em;
- 55:     font-weight: 500;
- 56:     flex-shrink: 0;
- 57:     transition: color var(--motion-duration-medium) var(--motion-ease-standard);
- 58: }
- 59: 
- 60: .log-panel-header-main {
- 61:     display: flex;
- 62:     justify-content: space-between;
- 63:     align-items: center;
- 64:     gap: 12px;
- 65: }
- 66: 
- 67: .log-panel-subheader {
- 68:     display: flex;
- 69:     flex-wrap: wrap;
- 70:     align-items: baseline;
- 71:     gap: 10px;
- 72:     font-size: 0.85em;
- 73:     color: var(--text-secondary);
- 74: }
- 75: 
- 76: #log-panel-context-step {
- 77:     color: var(--text-primary);
- 78:     font-weight: 500;
- 79: }
- 80: 
- 81: .log-panel-specific-buttons {
- 82:     display: flex;
- 83:     flex-wrap: wrap;
- 84:     gap: 10px;
- 85: }
- 86: 
- 87: .log-panel-specific-buttons .specific-log-button {
- 88:     display: inline-flex;
- 89:     align-items: center;
- 90:     justify-content: center;
- 91:     gap: 8px;
- 92:     border-radius: 999px;
- 93:     padding: 10px 18px;
- 94:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
- 95:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
- 96:     color: var(--text-secondary);
- 97:     cursor: pointer;
- 98:     transition:
- 99:         color var(--motion-duration-fast) var(--motion-ease-standard),
-100:         background var(--motion-duration-fast) var(--motion-ease-standard),
-101:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-102:         transform var(--motion-duration-fast) var(--motion-ease-standard);
-103: }
-104: 
-105: .log-panel-specific-buttons .specific-log-button:hover {
-106:     color: var(--text-primary);
-107:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-108:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
-109: }
-110: 
-111: .log-panel-specific-buttons .specific-log-button:active {
-112:     transform: scale(0.98);
-113: }
-114: 
-115: #close-log-panel {
-116:     display: inline-flex;
-117:     align-items: center;
-118:     justify-content: center;
-119:     width: 44px;
-120:     height: 44px;
-121:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
-122:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-123:     border-radius: 999px;
-124:     color: var(--text-secondary);
-125:     font-size: 1.45em;
-126:     cursor: pointer;
-127:     transition:
-128:         color var(--motion-duration-fast) var(--motion-ease-standard),
-129:         background var(--motion-duration-fast) var(--motion-ease-standard),
-130:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-131:         transform var(--motion-duration-fast) var(--motion-ease-standard);
-132: }
-133: 
-134: #close-log-panel:hover {
-135:     color: var(--text-primary);
-136:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-137:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
-138: }
-139: 
-140: #close-log-panel:active {
-141:     transform: scale(0.96);
-142: }
-143: 
-144: .log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
-145: .log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
-146: 
-147: .log-output,
-148: .specific-log-output {
-149:     background-color: var(--log-bg);
-150:     color: var(--text-bright);
-151:     padding: 15px;
-152:     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-153:     font-size: 1em;
-154:     line-height: 1.45;
-155:     max-height: 300px;
-156:     overflow-y: auto;
-157:     white-space: pre-wrap;
-158:     word-break: break-all;
-159:     border-radius: 0 0 8px 8px;
-160:     flex-grow: 1;
-161: }
-162: 
-163: /* Enhanced Log Styling - Different log types */
-164: .log-line {
-165:     display: block;
-166:     margin: 2px 0;
-167:     padding: 2px 6px;
-168:     border-radius: 3px;
-169:     position: relative;
-170: }
-171: 
-172: .log-line.log-success {
-173:     background-color: rgb(var(--status-success-rgb) / 0.12);
-174:     border-left: 3px solid var(--status-success);
-175:     color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
-176: }
-177: 
-178: .log-line.log-warning {
-179:     background-color: rgb(var(--status-warning-rgb) / 0.12);
-180:     border-left: 3px solid var(--status-warning);
-181:     color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
-182: }
-183: 
-184: .log-line.log-error {
-185:     background-color: rgb(var(--status-error-rgb) / 0.12);
-186:     border-left: 3px solid var(--status-error);
-187:     color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
-188:     font-weight: 500;
-189: }
-190: 
-191: .log-line.log-info {
-192:     background-color: rgb(var(--status-running-rgb) / 0.12);
-193:     border-left: 3px solid var(--status-running);
-194:     color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
-195: }
-196: 
-197: .log-line.log-debug {
-198:     background-color: rgba(158, 158, 158, 0.1);
-199:     border-left: 3px solid #9e9e9e;
-200:     color: #616161;
-201:     font-size: 0.85em;
-202: }
-203: 
-204: .log-line.log-command {
-205:     background-color: rgba(156, 39, 176, 0.1);
-206:     border-left: 3px solid #9c27b0;
-207:     color: #7b1fa2;
-208:     font-weight: 500;
-209: }
-210: 
-211: .log-line.log-progress {
-212:     background-color: rgb(var(--accent-primary-rgb) / 0.10);
-213:     border-left: 3px solid var(--accent-primary);
-214:     color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-215: }
-216: 
-217: /* Log icons for better visual distinction */
-218: .log-line::before {
-219:     content: '';
-220:     display: inline-block;
-221:     width: 12px;
-222:     height: 12px;
-223:     margin-right: 8px;
-224:     border-radius: 50%;
-225:     vertical-align: middle;
-226: }
-227: 
-228: .log-line.log-success::before {
-229:     background-color: var(--status-success);
-230:     content: '✓';
-231:     color: white;
-232:     font-size: 8px;
-233:     text-align: center;
-234:     line-height: 12px;
-235:     font-weight: bold;
-236: }
-237: 
-238: .log-line.log-warning::before {
-239:     background-color: var(--status-warning);
-240:     content: '⚠';
-241:     color: white;
-242:     font-size: 8px;
-243:     text-align: center;
-244:     line-height: 12px;
-245: }
-246: 
-247: .log-line.log-error::before {
-248:     background-color: var(--status-error);
-249:     content: '✕';
-250:     color: white;
-251:     font-size: 8px;
-252:     text-align: center;
-253:     line-height: 12px;
-254:     font-weight: bold;
-255: }
-256: 
-257: .log-line.log-info::before {
-258:     background-color: var(--status-running);
-259:     content: 'ℹ';
-260:     color: white;
-261:     font-size: 8px;
-262:     text-align: center;
-263:     line-height: 12px;
-264: }
-265: 
-266: .log-line.log-debug::before {
-267:     background-color: #9e9e9e;
-268:     content: '•';
-269:     color: white;
-270:     font-size: 10px;
-271:     text-align: center;
-272:     line-height: 12px;
-273: }
-274: 
-275: .log-line.log-command::before {
-276:     background-color: #9c27b0;
-277:     content: '$';
-278:     color: white;
-279:     font-size: 8px;
-280:     text-align: center;
-281:     line-height: 12px;
-282:     font-weight: bold;
-283: }
-284: 
-285: .log-line.log-progress::before {
-286:     background-color: var(--accent-primary);
-287:     content: '⟳';
-288:     color: white;
-289:     font-size: 8px;
-290:     text-align: center;
-291:     line-height: 12px;
-292: }
-293: 
-294: /* Dark mode adjustments for log styling */
-295: @media (prefers-color-scheme: dark) {
-296:     .log-line.log-success {
-297:         background-color: rgb(var(--status-success-rgb) / 0.15);
-298:         color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
-299:     }
-300: 
-301:     .log-line.log-warning {
-302:         background-color: rgb(var(--status-warning-rgb) / 0.15);
-303:         color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
-304:     }
-305: 
-306:     .log-line.log-error {
-307:         background-color: rgb(var(--status-error-rgb) / 0.15);
-308:         color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
-309:     }
-310: 
-311:     .log-line.log-info {
-312:         background-color: rgb(var(--status-running-rgb) / 0.15);
-313:         color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
-314:     }
-315: 
-316:     .log-line.log-debug {
-317:         background-color: rgba(158, 158, 158, 0.15);
-318:         color: #bdbdbd;
-319:     }
-320: 
-321:     .log-line.log-command {
-322:         background-color: rgba(156, 39, 176, 0.15);
-323:         color: #ba68c8;
-324:     }
-325: 
-326:     .log-line.log-progress {
-327:         background-color: rgb(var(--accent-primary-rgb) / 0.15);
-328:         color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-329:     }
-330: }
-331: 
-332: /* Hover effects for better interactivity */
-333: .log-line:hover {
-334:     background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
-335:     transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
-336: }
-337: 
-338: /* Improved spacing and readability */
-339: .log-output .log-line:first-child {
-340:     margin-top: 0;
-341: }
-342: 
-343: .log-output .log-line:last-child {
-344:     margin-bottom: 0;
-345: }
-346: .log-output:empty:before {
-347:     content: "En attente de logs...";
-348:     color: var(--text-secondary);
-349:     font-style: italic;
-350: }
-351: .specific-log-output:empty:before {
-352:     content: "Aucun log spécifique chargé.";
-353:     color: var(--text-secondary);
-354:     font-style: italic;
-355: }
-356: 
-357: .specific-log-controls-wrapper { margin-top: 15px; }
-358: .specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
-359: 
-360: .specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
-361: 
-362: .log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
-363: .log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
-364: .log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
-365: .log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
-```
-
 ## File: static/css/components/steps.css
 ```css
   1: .step {
@@ -28803,308 +28434,6 @@ app_new.py
 75: }
 ```
 
-## File: static/state/AppState.js
-```javascript
-  1: class AppState {
-  2:     constructor() {
-  3:         this.state = {
-  4:             pollingIntervals: {},
-  5:             
-  6:             activeStepKeyForLogsPanel: null,
-  7:             isAnySequenceRunning: false,
-  8:             focusedElementBeforePopup: null,
-  9:             ui: {
- 10:                 compactMode: false
- 11:             },
- 12:             
- 13:             stepTimers: {},
- 14:             selectedStepsOrder: [],
- 15:             
- 16:             processInfo: {},
- 17:             
- 18:             performanceMetrics: {
- 19:                 apiResponseTimes: [],
- 20:                 errorCounts: {},
- 21:                 lastUpdate: null
- 22:             },
- 23:             
- 24:             cacheStats: {
- 25:                 hits: 0,
- 26:                 misses: 0,
- 27:                 hitRate: 0
- 28:             }
- 29:         };
- 30:         
- 31:         this.listeners = new Set();
- 32:         this.isDestroyed = false;
- 33:         
- 34:         this.stateChangeCount = 0;
- 35:         this.lastStateChange = Date.now();
- 36:         
- 37:         console.debug('[AppState] Initialized with immutable state management');
- 38:     }
- 39:     
- 40:     getState() {
- 41:         if (this.isDestroyed) {
- 42:             console.warn('[AppState] Attempted to access destroyed state');
- 43:             return {};
- 44:         }
- 45:         return this._deepClone(this.state);
- 46:     }
- 47:     
- 48:     getStateProperty(path) {
- 49:         if (this.isDestroyed) return undefined;
- 50:         
- 51:         return path.split('.').reduce((obj, key) => {
- 52:             return obj && obj[key] !== undefined ? obj[key] : undefined;
- 53:         }, this.state);
- 54:     }
- 55:     
- 56:     setState(updates, source = 'unknown') {
- 57:         if (this.isDestroyed) {
- 58:             console.warn('[AppState] Attempted to update destroyed state');
- 59:             return;
- 60:         }
- 61:         
- 62:         const oldState = this._deepClone(this.state);
- 63:         const newState = this._mergeDeep(this.state, updates);
- 64:         
- 65:         if (this._stateChanged(oldState, newState)) {
- 66:             this.state = newState;
- 67:             this.stateChangeCount++;
- 68:             this.lastStateChange = Date.now();
- 69:             
- 70:             console.debug(`[AppState] State updated from ${source}:`, updates);
- 71:             
- 72:             this._notifyListeners(newState, oldState, source);
- 73:         }
- 74:     }
- 75:     
- 76:     subscribe(listener) {
- 77:         if (typeof listener !== 'function') {
- 78:             throw new Error('[AppState] Listener must be a function');
- 79:         }
- 80:         
- 81:         this.listeners.add(listener);
- 82:         
- 83:         return () => {
- 84:             this.listeners.delete(listener);
- 85:         };
- 86:     }
- 87:     
- 88:     /**
- 89:      * Subscribe to specific state property changes.
- 90:      * @param {string} path - Dot-notation path to property
- 91:      * @param {Function} listener - Callback function (newValue, oldValue) => void
- 92:      * @returns {Function} Unsubscribe function
- 93:      */
- 94:     subscribeToProperty(path, listener) {
- 95:         const propertyListener = (newState, oldState) => {
- 96:             const newValue = this._getPropertyByPath(newState, path);
- 97:             const oldValue = this._getPropertyByPath(oldState, path);
- 98:             
- 99:             if (newValue !== oldValue) {
-100:                 listener(newValue, oldValue);
-101:             }
-102:         };
-103:         
-104:         return this.subscribe(propertyListener);
-105:     }
-106:     
-107:     batchUpdate(updateFn, source = 'batch') {
-108:         const originalNotify = this._notifyListeners;
-109:         const updates = [];
-110:         
-111:         this._notifyListeners = (newState, oldState, updateSource) => {
-112:             updates.push({ newState, oldState, source: updateSource });
-113:         };
-114:         
-115:         try {
-116:             updateFn();
-117:         } finally {
-118:             this._notifyListeners = originalNotify;
-119:             
-120:             if (updates.length > 0) {
-121:                 const finalUpdate = updates[updates.length - 1];
-122:                 this._notifyListeners(finalUpdate.newState, updates[0].oldState, source);
-123:             }
-124:         }
-125:     }
-126:     
-127:     reset() {
-128:         const initialState = {
-129:             pollingIntervals: {},
-130:             activeStepKeyForLogsPanel: null,
-131:             isAnySequenceRunning: false,
-132:             focusedElementBeforePopup: null,
-133:             ui: {
-134:                 compactMode: false
-135:             },
-136:             stepTimers: {},
-137:             selectedStepsOrder: [],
-138: 
-139:             processInfo: {},
-140:             performanceMetrics: {
-141:                 apiResponseTimes: [],
-142:                 errorCounts: {},
-143:                 lastUpdate: null
-144:             },
-145:             cacheStats: {
-146:                 hits: 0,
-147:                 misses: 0,
-148:                 hitRate: 0
-149:             }
-150:         };
-151:         
-152:         this.setState(initialState, 'reset');
-153:         console.info('[AppState] State reset to initial values');
-154:     }
-155:     
-156:     getStats() {
-157:         return {
-158:             listenerCount: this.listeners.size,
-159:             stateChangeCount: this.stateChangeCount,
-160:             lastStateChange: this.lastStateChange,
-161:             isDestroyed: this.isDestroyed,
-162:             stateSize: JSON.stringify(this.state).length
-163:         };
-164:     }
-165:     
-166:     destroy() {
-167:         console.info('[AppState] Destroying state manager');
-168:         
-169:         this.listeners.clear();
-170:         this.state = {};
-171:         this.isDestroyed = true;
-172:     }
-173:     
-174:     _deepClone(obj) {
-175:         if (typeof structuredClone === 'function') {
-176:             try {
-177:                 return structuredClone(obj);
-178:             } catch (error) {
-179:                 console.warn('[AppState] structuredClone failed, falling back to manual clone:', error);
-180:             }
-181:         }
-182: 
-183:         if (obj === null || typeof obj !== 'object') {
-184:             return obj;
-185:         }
-186: 
-187:         if (obj instanceof Date) {
-188:             return new Date(obj.getTime());
-189:         }
-190: 
-191:         if (Array.isArray(obj)) {
-192:             return obj.map(item => this._deepClone(item));
-193:         }
-194: 
-195:         const cloned = {};
-196:         for (const key in obj) {
-197:             if (Object.prototype.hasOwnProperty.call(obj, key)) {
-198:                 cloned[key] = this._deepClone(obj[key]);
-199:             }
-200:         }
-201:         return cloned;
-202:     }
-203:     
-204:     _mergeDeep(target, source) {
-205:         const result = this._deepClone(target);
-206:         
-207:         for (const key in source) {
-208:             if (source.hasOwnProperty(key)) {
-209:                 if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-210:                     result[key] = this._mergeDeep(result[key] || {}, source[key]);
-211:                 } else {
-212:                     result[key] = source[key];
-213:                 }
-214:             }
-215:         }
-216:         
-217:         return result;
-218:     }
-219:     
-220:     _stateChanged(oldState, newState) {
-221:         return !this._areValuesEqual(oldState, newState);
-222:     }
-223: 
-224:     _areValuesEqual(a, b, visited = new WeakMap()) {
-225:         if (Object.is(a, b)) {
-226:             return true;
-227:         }
-228: 
-229:         if (typeof a !== typeof b) {
-230:             return false;
-231:         }
-232: 
-233:         if (a === null || b === null) {
-234:             return false;
-235:         }
-236: 
-237:         if (typeof a !== 'object') {
-238:             return false;
-239:         }
-240: 
-241:         if (visited.has(a) && visited.get(a) === b) {
-242:             return true;
-243:         }
-244:         visited.set(a, b);
-245: 
-246:         const aKeys = Object.keys(a);
-247:         const bKeys = Object.keys(b);
-248:         if (aKeys.length !== bKeys.length) {
-249:             return false;
-250:         }
-251: 
-252:         for (const key of aKeys) {
-253:             if (!Object.prototype.hasOwnProperty.call(b, key)) {
-254:                 return false;
-255:             }
-256:             if (!this._areValuesEqual(a[key], b[key], visited)) {
-257:                 return false;
-258:             }
-259:         }
-260: 
-261:         return true;
-262:     }
-263:     
-264:     _getPropertyByPath(obj, path) {
-265:         return path.split('.').reduce((current, key) => {
-266:             return current && current[key] !== undefined ? current[key] : undefined;
-267:         }, obj);
-268:     }
-269:     
-270:     _notifyListeners(newState, oldState, source) {
-271:         this.listeners.forEach(listener => {
-272:             try {
-273:                 listener(newState, oldState, source);
-274:             } catch (error) {
-275:                 console.error('[AppState] Listener error:', error);
-276:             }
-277:         });
-278:     }
-279: }
-280: 
-281: export const appState = new AppState();
-282: 
-283: window.addEventListener('beforeunload', () => {
-284:     appState.destroy();
-285: });
-286: 
-287: if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-288:     window.appState = appState;
-289:     
-290:     appState.subscribe((newState, oldState, source) => {
-291:         console.debug(`[AppState] Change from ${source}:`, {
-292:             newState: newState,
-293:             oldState: oldState
-294:         });
-295:     });
-296: }
-297: 
-298: export default appState;
-```
-
 ## File: static/utils/PollingManager.js
 ```javascript
   1: /**
@@ -29837,147 +29166,6 @@ app_new.py
 406: }
 407: 
 408: export { SCROLL_CONFIG };
-```
-
-## File: static/state.js
-```javascript
-  1: // Import new immutable state management
-  2: import { appState } from './state/AppState.js';
-  3: 
-  4: export const PROCESS_INFO_CLIENT = new Proxy({}, {
-  5:     get(_target, prop) {
-  6:         if (typeof prop !== 'string') return undefined;
-  7:         return appState.getStateProperty(`processInfo.${prop}`);
-  8:     },
-  9:     set(_target, prop, value) {
- 10:         if (typeof prop !== 'string') return false;
- 11:         appState.setState({ processInfo: { [prop]: value } }, 'process_info_update');
- 12:         return true;
- 13:     },
- 14:     ownKeys() {
- 15:         const root = appState.getStateProperty('processInfo') || {};
- 16:         return Reflect.ownKeys(root);
- 17:     },
- 18:     getOwnPropertyDescriptor(_target, prop) {
- 19:         const root = appState.getStateProperty('processInfo') || {};
- 20:         if (Object.prototype.hasOwnProperty.call(root, prop)) {
- 21:             return { enumerable: true, configurable: true };
- 22:         }
- 23:         return undefined;
- 24:     }
- 25: });
- 26: 
- 27: // Legacy exports for backward compatibility (deprecated - use appState instead)
- 28: export let pollingIntervals = {};
- 29: export let activeStepKeyForLogsPanel = null;
- 30: export let stepTimers = {};
- 31: export let selectedStepsOrder = [];
- 32: export let isAnySequenceRunning = false;
- 33: export let focusedElementBeforePopup = null;
- 34: 
- 35: 
- 36: // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
- 37: export const REMOTE_SEQUENCE_STEP_KEYS = [
- 38:     "STEP1",
- 39:     "STEP2",
- 40:     "STEP3",
- 41:     "STEP4",
- 42:     "STEP5",
- 43:     "STEP6",
- 44:     "STEP7"
- 45: ];
- 46: 
- 47: // Modern state management functions using AppState
- 48: export function setActiveStepKeyForLogs(key) {
- 49:     activeStepKeyForLogsPanel = key; // Legacy
- 50:     appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
- 51: }
- 52: export function getActiveStepKeyForLogs() {
- 53:     return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
- 54: }
- 55: 
- 56: export function addStepTimer(stepKey, timerData) {
- 57:     stepTimers[stepKey] = timerData; // Legacy
- 58:     appState.setState({
- 59:         stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
- 60:     }, 'addStepTimer');
- 61: }
- 62: export function getStepTimer(stepKey) {
- 63:     return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
- 64: }
- 65: export function clearStepTimerInterval(stepKey) {
- 66:     const timer = getStepTimer(stepKey);
- 67:     if (timer && timer.intervalId) {
- 68:         clearInterval(timer.intervalId);
- 69:         const updatedTimer = { ...timer, intervalId: null };
- 70:         addStepTimer(stepKey, updatedTimer);
- 71:     }
- 72: }
- 73: export function deleteStepTimer(stepKey) {
- 74:     if (getStepTimer(stepKey)) {
- 75:         clearStepTimerInterval(stepKey);
- 76:         delete stepTimers[stepKey]; // Legacy
- 77:         const currentTimers = appState.getStateProperty('stepTimers') || {};
- 78:         const { [stepKey]: removed, ...remainingTimers } = currentTimers;
- 79:         appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
- 80:     }
- 81: }
- 82: 
- 83: export function setSelectedStepsOrder(order) {
- 84:     selectedStepsOrder = order; // Legacy
- 85:     appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
- 86: }
- 87: export function getSelectedStepsOrder() {
- 88:     return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
- 89: }
- 90: 
- 91: export function setIsAnySequenceRunning(running) {
- 92:     isAnySequenceRunning = running; // Legacy
- 93:     appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
- 94: }
- 95: export function getIsAnySequenceRunning() {
- 96:     return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
- 97: }
- 98: 
- 99: export function setFocusedElementBeforePopup(element) {
-100:     focusedElementBeforePopup = element; // Legacy
-101:     appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
-102: }
-103: export function getFocusedElementBeforePopup() {
-104:     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
-105: }
-106: 
-107: export function setAutoModeLogPanelOpened(opened) {
-108:     appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
-109: }
-110: 
-111: export function getAutoModeLogPanelOpened() {
-112:     return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
-113: }
-114: 
-115: export function addPollingInterval(stepKey, id) {
-116:     pollingIntervals[stepKey] = id; // Legacy
-117:     appState.setState({
-118:         pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
-119:     }, 'addPollingInterval');
-120: }
-121: export function clearPollingInterval(stepKey) {
-122:     if (pollingIntervals[stepKey]) {
-123:         clearInterval(pollingIntervals[stepKey]);
-124:         delete pollingIntervals[stepKey]; // Legacy
-125:     }
-126:     const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
-127:     const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
-128:     appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
-129: }
-130: export function getPollingInterval(stepKey) {
-131:     return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
-132: }
-133: 
-134: 
-135: 
-136: // Export the appState for direct access to modern state management
-137: export { appState };
 ```
 
 ## File: static/utils.js
@@ -31307,209 +30495,691 @@ app_new.py
 602: config = Config()
 ```
 
-## File: static/css/layout.css
+## File: static/css/components/logs.css
 ```css
-  1: .workflow-wrapper {
-  2:     display: flex;
-  3:     width: 100%;
-  4:     max-width: 1600px;
-  5:     flex-grow: 1;
-  6: }
-  7: 
-  8: /* Local Downloads panel animation (class-based for max browser compatibility) */
-  9: .local-downloads-section {
- 10:     opacity: 0;
- 11:     transform: translateX(30px) scale(0.98);
- 12:     transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
- 13:                 transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
- 14: }
- 15: 
- 16: .local-downloads-section.downloads-visible {
- 17:     opacity: 1;
- 18:     transform: translateX(0) scale(1);
- 19: }
- 20: 
- 21: @media (prefers-reduced-motion: reduce) {
- 22:     .local-downloads-section { transition: none !important; transform: none !important; }
- 23: }
- 24: 
- 25: /* Keep vertical scrollbar always present to avoid layout jank during height changes */
- 26: html, body { overflow-y: scroll; }
+  1: .logs-overlay-container {
+  2:     z-index: 1100;
+  3:     background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
+  4:     padding: clamp(16px, 3vw, 36px);
+  5: }
+  6: 
+  7: .logs-content-wrapper {
+  8:     width: min(80vw, 1100px);
+  9:     height: min(80vh, 780px);
+ 10:     display: flex;
+ 11:     flex-direction: column;
+ 12:     gap: 18px;
+ 13:     background: var(--bg-card);
+ 14:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+ 15:     border-radius: 28px;
+ 16:     padding: 20px 22px 24px;
+ 17:     box-shadow:
+ 18:         0 28px 60px rgba(0, 0, 0, 0.45),
+ 19:         0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
+ 20:     opacity: 0;
+ 21:     transform: translateY(12px) scale(0.98);
+ 22:     transition:
+ 23:         opacity var(--motion-duration-medium) var(--motion-ease-standard),
+ 24:         transform var(--motion-duration-medium) var(--motion-ease-standard);
+ 25:     overflow: hidden;
+ 26: }
  27: 
- 28: .steps-column {
- 29:     flex: 1 1 100%;
- 30:     padding: 10px 20px;
- 31:     display: flex;
- 32:     flex-direction: column;
- 33:     align-items: center;
- 34:     transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
- 35:     opacity: 1;
- 36:     scroll-margin-top: 0;
- 37: }
- 38: 
- 39: /* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
- 40: .workflow-wrapper.compact-mode .steps-column {
- 41:     display: grid;
- 42:     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
- 43:     grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
- 44:     gap: 16px 16px; /* row gap, column gap */
- 45:     align-items: start; /* cards height adapt to content by default */
- 46:     align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
- 47:     justify-items: center; /* center cards if column wider than minmax */
- 48:     padding: 10px 20px;
- 49:     transition: opacity 0.5s ease-in-out;
- 50: }
- 51: 
- 52: /* Desktop optimization: uniformize row heights to avoid subtle misalignment */
- 53: @media (min-width: 1200px) {
- 54:   .workflow-wrapper.compact-mode .steps-column {
- 55:     align-items: start;
- 56:   }
- 57: }
- 58: 
- 59: /* (removed flex-specific sizing for steps; grid handles column widths) */
- 60: 
- 61: .workflow-wrapper.logs-active .steps-column {
- 62:     flex-basis: 48%;
- 63:     align-items: stretch;
- 64:     opacity: 1;
- 65: }
- 66: 
- 67: /* COMPACT MODE: Overlay logs panel to avoid grid reflow and saccades */
- 68: .workflow-wrapper.compact-mode .logs-column {
- 69:     position: fixed;
- 70:     right: 16px;
- 71:     /* Align approximately below unified controls; adjust if needed */
- 72:     top: 120px;
- 73:     width: min(50vw, 800px);
- 74:     height: calc(100vh - 140px);
- 75:     z-index: 20;
- 76:     box-shadow: -5px 0 15px rgba(0,0,0,0.25);
- 77: }
- 78: .workflow-wrapper.compact-mode .logs-column {
- 79:     transition: opacity 0.3s ease, transform 0.3s ease;
- 80: }
- 81: .workflow-wrapper.compact-mode:not(.logs-active) .logs-column {
- 82:     opacity: 0;
- 83:     pointer-events: none;
- 84:     transform: translateX(30px);
- 85: }
- 86: .workflow-wrapper.compact-mode.logs-active .logs-column {
- 87:     opacity: 1;
- 88:     pointer-events: auto;
- 89:     transform: translateX(0);
- 90: }
- 91: 
- 92: /* In compact mode, keep steps column width unchanged when logs open (no flex-basis change) */
- 93: .workflow-wrapper.compact-mode.logs-active .steps-column {
- 94:     flex-basis: auto;
- 95:     /* Reserve space for the fixed logs panel so steps never go underneath it */
- 96:     margin-right: min(50vw, 800px);
- 97:     padding-right: 16px; /* small gutter between steps and logs */
- 98:     min-height: calc(100vh - 140px); /* ensure sticky active card has space */
- 99:     /* Subtle parallax/brightness for depth while logs overlay is visible */
-100:     transform: scale(0.985);
-101:     filter: brightness(0.95);
-102:     transition: transform 0.35s ease, filter 0.35s ease;
-103: }
-104: 
-105: /* Keep the active step visually pinned relative to the logs panel (consistent vertical position) */
-106: .workflow-wrapper.compact-mode.logs-active .steps-column .step.active-for-log-panel {
-107:     position: sticky;
-108:     top: 120px; /* align with .logs-column top for visual consistency */
-109:     z-index: 1; /* ensure above siblings during transitions */
-110:     /* Span full width across grid */
-111:     grid-column: 1 / -1;
-112: }
-113: 
-114: /* Entering phase: hide non-active steps to avoid saccade before panel is fully active */
-115: .workflow-wrapper.compact-mode.logs-entering .steps-column .step:not(.active-for-log-panel) {
-116:     opacity: 0 !important;
-117:     transform: translateY(8px) scale(0.97) !important;
-118: }
-119: .workflow-wrapper.compact-mode.logs-active .steps-column .step:not(.active-for-log-panel) {
-120:     display: none !important; /* fully remove from layout to keep stable height/scrollbar */
-121: }
-122: .workflow-wrapper.logs-active .steps-column .step.active-for-log-panel {
-123:     opacity: 1;
-124:     transform: translateY(0) scale(1);
-125:     pointer-events: auto;
-126:     transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-127: }
-128: 
-129: /* Ensure explicit visible state when logs panel is closed */
-130: .workflow-wrapper:not(.logs-active) .steps-column .step {
-131:     opacity: 1;
-132:     transform: translateY(0) scale(1);
-133:     transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
-134: }
-135: 
-136: .logs-column {
-137:     flex: 0 0 0%;
-138:     width: 0%;
-139:     opacity: 0;
-140:     transform: translateX(30px);
-141:     background-color: var(--bg-card);
-142:     border-left: 1px solid var(--border-color);
-143:     padding: 0;
-144:     overflow-y: auto;
-145:     transition: flex-basis 0.5s ease-in-out, width 0.5s ease-in-out, opacity 0.4s 0.1s ease-in-out, transform 0.5s ease-in-out, padding 0.5s ease-in-out;
-146:     display: flex;
-147:     flex-direction: column;
-148:     box-shadow: -5px 0 15px rgba(0,0,0,0.2);
-149:     max-height: calc(100vh - 40px);
-150: }
-151: 
-152: .workflow-wrapper.logs-active .logs-column {
-153:     flex-basis: 50%;
-154:     width: 50%;
-155:     opacity: 1;
-156:     transform: translateX(0);
-157:     padding: 20px 20px 20px 52px;
-158:  }
-159: 
-160: .workflow-wrapper.compact-mode .step-details-panel {
-161:     position: fixed;
-162:     right: 16px;
-163:     top: 120px;
-164:     width: min(30vw, 420px);
-165:     height: calc(100vh - 140px);
-166:     z-index: 19;
-167:     opacity: 0;
-168:     pointer-events: none;
-169:     transform: translateX(30px);
-170:     transition: opacity 0.3s ease, transform 0.3s ease;
-171:  }
-172: 
-173: .workflow-wrapper.compact-mode.details-active .step-details-panel {
-174:     opacity: 1;
-175:     pointer-events: auto;
-176:     transform: translateX(0);
-177:  }
-178: 
-179: .workflow-wrapper.compact-mode.details-active .steps-column {
-180:     margin-right: min(30vw, 420px);
-181:     padding-right: 16px;
-182:  }
-183: 
-184: .workflow-wrapper.compact-mode.logs-active.details-active .steps-column {
-185:     margin-right: min(50vw, 800px);
-186:     padding-right: 16px;
-187:  }
+ 28: .logs-overlay-container[data-visible="true"] .logs-content-wrapper {
+ 29:     opacity: 1;
+ 30:     transform: translateY(0) scale(1);
+ 31: }
+ 32: 
+ 33: @media (prefers-reduced-motion: reduce) {
+ 34:     .logs-content-wrapper {
+ 35:         transition: none;
+ 36:         transform: none;
+ 37:     }
+ 38: }
+ 39: 
+ 40: @media (max-width: 900px) {
+ 41:     .logs-content-wrapper {
+ 42:         width: 95vw;
+ 43:         height: 90vh;
+ 44:         border-radius: 20px;
+ 45:         padding: 18px;
+ 46:     }
+ 47: }
+ 48: 
+ 49: .log-panel-header {
+ 50:     display: flex;
+ 51:     flex-direction: column;
+ 52:     align-items: stretch;
+ 53:     gap: 10px;
+ 54:     padding-bottom: 10px;
+ 55:     margin-bottom: 15px;
+ 56:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+ 57:     color: var(--accent-primary);
+ 58:     font-size: 1.3em;
+ 59:     font-weight: 500;
+ 60:     flex-shrink: 0;
+ 61:     transition: color var(--motion-duration-medium) var(--motion-ease-standard);
+ 62: }
+ 63: 
+ 64: .log-panel-header-main {
+ 65:     display: flex;
+ 66:     justify-content: space-between;
+ 67:     align-items: center;
+ 68:     gap: 12px;
+ 69: }
+ 70: 
+ 71: .log-panel-subheader {
+ 72:     display: flex;
+ 73:     flex-wrap: wrap;
+ 74:     align-items: baseline;
+ 75:     gap: 10px;
+ 76:     font-size: 0.85em;
+ 77:     color: var(--text-secondary);
+ 78: }
+ 79: 
+ 80: #log-panel-context-step {
+ 81:     color: var(--text-primary);
+ 82:     font-weight: 500;
+ 83: }
+ 84: 
+ 85: .log-panel-specific-buttons {
+ 86:     display: flex;
+ 87:     flex-wrap: wrap;
+ 88:     gap: 10px;
+ 89: }
+ 90: 
+ 91: .log-panel-specific-buttons .specific-log-button {
+ 92:     display: inline-flex;
+ 93:     align-items: center;
+ 94:     justify-content: center;
+ 95:     gap: 8px;
+ 96:     border-radius: 999px;
+ 97:     padding: 10px 18px;
+ 98:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
+ 99:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+100:     color: var(--text-secondary);
+101:     cursor: pointer;
+102:     transition:
+103:         color var(--motion-duration-fast) var(--motion-ease-standard),
+104:         background var(--motion-duration-fast) var(--motion-ease-standard),
+105:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
+106:         transform var(--motion-duration-fast) var(--motion-ease-standard);
+107: }
+108: 
+109: .log-panel-specific-buttons .specific-log-button:hover {
+110:     color: var(--text-primary);
+111:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
+112:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
+113: }
+114: 
+115: .log-panel-specific-buttons .specific-log-button:active {
+116:     transform: scale(0.98);
+117: }
+118: 
+119: #close-log-panel {
+120:     display: inline-flex;
+121:     align-items: center;
+122:     justify-content: center;
+123:     width: 44px;
+124:     height: 44px;
+125:     background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
+126:     border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
+127:     border-radius: 999px;
+128:     color: var(--text-bright);
+129:     font-size: 1.45em;
+130:     cursor: pointer;
+131:     box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
+132:     transition:
+133:         color var(--motion-duration-fast) var(--motion-ease-standard),
+134:         background var(--motion-duration-fast) var(--motion-ease-standard),
+135:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
+136:         transform var(--motion-duration-fast) var(--motion-ease-standard),
+137:         box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+138: }
+139: 
+140: #close-log-panel:hover {
+141:     color: var(--text-primary);
+142:     background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
+143:     border-color: rgb(var(--accent-primary-rgb) / 0.7);
+144:     box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+145: }
+146: 
+147: #close-log-panel:focus-visible {
+148:     outline: none;
+149:     box-shadow:
+150:         0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
+151:         0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+152: }
+153: 
+154: #close-log-panel:active {
+155:     transform: scale(0.96);
+156: }
+157: 
+158: .log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
+159: .log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
+160: 
+161: .log-output,
+162: .specific-log-output {
+163:     background-color: var(--log-bg);
+164:     color: var(--text-bright);
+165:     padding: 15px;
+166:     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+167:     font-size: 1em;
+168:     line-height: 1.45;
+169:     max-height: 300px;
+170:     overflow-y: auto;
+171:     white-space: pre-wrap;
+172:     word-break: break-all;
+173:     border-radius: 0 0 8px 8px;
+174:     flex-grow: 1;
+175: }
+176: 
+177: /* Enhanced Log Styling - Different log types */
+178: .log-line {
+179:     display: block;
+180:     margin: 2px 0;
+181:     padding: 2px 6px;
+182:     border-radius: 3px;
+183:     position: relative;
+184: }
+185: 
+186: .log-line.log-success {
+187:     background-color: rgb(var(--status-success-rgb) / 0.12);
+188:     border-left: 3px solid var(--status-success);
+189:     color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
+190: }
+191: 
+192: .log-line.log-warning {
+193:     background-color: rgb(var(--status-warning-rgb) / 0.12);
+194:     border-left: 3px solid var(--status-warning);
+195:     color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
+196: }
+197: 
+198: .log-line.log-error {
+199:     background-color: rgb(var(--status-error-rgb) / 0.12);
+200:     border-left: 3px solid var(--status-error);
+201:     color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
+202:     font-weight: 500;
+203: }
+204: 
+205: .log-line.log-info {
+206:     background-color: rgb(var(--status-running-rgb) / 0.12);
+207:     border-left: 3px solid var(--status-running);
+208:     color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
+209: }
+210: 
+211: .log-line.log-debug {
+212:     background-color: rgba(158, 158, 158, 0.1);
+213:     border-left: 3px solid #9e9e9e;
+214:     color: #616161;
+215:     font-size: 0.85em;
+216: }
+217: 
+218: .log-line.log-command {
+219:     background-color: rgba(156, 39, 176, 0.1);
+220:     border-left: 3px solid #9c27b0;
+221:     color: #7b1fa2;
+222:     font-weight: 500;
+223: }
+224: 
+225: .log-line.log-progress {
+226:     background-color: rgb(var(--accent-primary-rgb) / 0.10);
+227:     border-left: 3px solid var(--accent-primary);
+228:     color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+229: }
+230: 
+231: /* Log icons for better visual distinction */
+232: .log-line::before {
+233:     content: '';
+234:     display: inline-block;
+235:     width: 12px;
+236:     height: 12px;
+237:     margin-right: 8px;
+238:     border-radius: 50%;
+239:     vertical-align: middle;
+240: }
+241: 
+242: .log-line.log-success::before {
+243:     background-color: var(--status-success);
+244:     content: '✓';
+245:     color: white;
+246:     font-size: 8px;
+247:     text-align: center;
+248:     line-height: 12px;
+249:     font-weight: bold;
+250: }
+251: 
+252: .log-line.log-warning::before {
+253:     background-color: var(--status-warning);
+254:     content: '⚠';
+255:     color: white;
+256:     font-size: 8px;
+257:     text-align: center;
+258:     line-height: 12px;
+259: }
+260: 
+261: .log-line.log-error::before {
+262:     background-color: var(--status-error);
+263:     content: '✕';
+264:     color: white;
+265:     font-size: 8px;
+266:     text-align: center;
+267:     line-height: 12px;
+268:     font-weight: bold;
+269: }
+270: 
+271: .log-line.log-info::before {
+272:     background-color: var(--status-running);
+273:     content: 'ℹ';
+274:     color: white;
+275:     font-size: 8px;
+276:     text-align: center;
+277:     line-height: 12px;
+278: }
+279: 
+280: .log-line.log-debug::before {
+281:     background-color: #9e9e9e;
+282:     content: '•';
+283:     color: white;
+284:     font-size: 10px;
+285:     text-align: center;
+286:     line-height: 12px;
+287: }
+288: 
+289: .log-line.log-command::before {
+290:     background-color: #9c27b0;
+291:     content: '$';
+292:     color: white;
+293:     font-size: 8px;
+294:     text-align: center;
+295:     line-height: 12px;
+296:     font-weight: bold;
+297: }
+298: 
+299: .log-line.log-progress::before {
+300:     background-color: var(--accent-primary);
+301:     content: '⟳';
+302:     color: white;
+303:     font-size: 8px;
+304:     text-align: center;
+305:     line-height: 12px;
+306: }
+307: 
+308: /* Dark mode adjustments for log styling */
+309: @media (prefers-color-scheme: dark) {
+310:     .log-line.log-success {
+311:         background-color: rgb(var(--status-success-rgb) / 0.15);
+312:         color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
+313:     }
+314: 
+315:     .log-line.log-warning {
+316:         background-color: rgb(var(--status-warning-rgb) / 0.15);
+317:         color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
+318:     }
+319: 
+320:     .log-line.log-error {
+321:         background-color: rgb(var(--status-error-rgb) / 0.15);
+322:         color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
+323:     }
+324: 
+325:     .log-line.log-info {
+326:         background-color: rgb(var(--status-running-rgb) / 0.15);
+327:         color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
+328:     }
+329: 
+330:     .log-line.log-debug {
+331:         background-color: rgba(158, 158, 158, 0.15);
+332:         color: #bdbdbd;
+333:     }
+334: 
+335:     .log-line.log-command {
+336:         background-color: rgba(156, 39, 176, 0.15);
+337:         color: #ba68c8;
+338:     }
+339: 
+340:     .log-line.log-progress {
+341:         background-color: rgb(var(--accent-primary-rgb) / 0.15);
+342:         color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+343:     }
+344: }
+345: 
+346: /* Hover effects for better interactivity */
+347: .log-line:hover {
+348:     background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
+349:     transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+350: }
+351: 
+352: /* Improved spacing and readability */
+353: .log-output .log-line:first-child {
+354:     margin-top: 0;
+355: }
+356: 
+357: .log-output .log-line:last-child {
+358:     margin-bottom: 0;
+359: }
+360: .log-output:empty:before {
+361:     content: "En attente de logs...";
+362:     color: var(--text-secondary);
+363:     font-style: italic;
+364: }
+365: .specific-log-output:empty:before {
+366:     content: "Aucun log spécifique chargé.";
+367:     color: var(--text-secondary);
+368:     font-style: italic;
+369: }
+370: 
+371: .specific-log-controls-wrapper { margin-top: 15px; }
+372: .specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
+373: 
+374: .specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
+375: 
+376: .log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
+377: .log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
+378: .log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
+379: .log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
+```
+
+## File: static/state/AppState.js
+```javascript
+  1: class AppState {
+  2:     constructor() {
+  3:         this.state = {
+  4:             pollingIntervals: {},
+  5:             
+  6:             activeStepKeyForLogsPanel: null,
+  7:             isAnySequenceRunning: false,
+  8:             focusedElementBeforePopup: null,
+  9:             ui: {
+ 10:                 compactMode: false,
+ 11:                 autoOpenLogOverlay: true
+ 12:             },
+ 13:             
+ 14:             stepTimers: {},
+ 15:             selectedStepsOrder: [],
+ 16:             
+ 17:             processInfo: {},
+ 18:             
+ 19:             performanceMetrics: {
+ 20:                 apiResponseTimes: [],
+ 21:                 errorCounts: {},
+ 22:                 lastUpdate: null
+ 23:             },
+ 24:             
+ 25:             cacheStats: {
+ 26:                 hits: 0,
+ 27:                 misses: 0,
+ 28:                 hitRate: 0
+ 29:             }
+ 30:         };
+ 31:         
+ 32:         this.listeners = new Set();
+ 33:         this.isDestroyed = false;
+ 34:         
+ 35:         this.stateChangeCount = 0;
+ 36:         this.lastStateChange = Date.now();
+ 37:         
+ 38:         console.debug('[AppState] Initialized with immutable state management');
+ 39:     }
+ 40:     
+ 41:     getState() {
+ 42:         if (this.isDestroyed) {
+ 43:             console.warn('[AppState] Attempted to access destroyed state');
+ 44:             return {};
+ 45:         }
+ 46:         return this._deepClone(this.state);
+ 47:     }
+ 48:     
+ 49:     getStateProperty(path) {
+ 50:         if (this.isDestroyed) return undefined;
+ 51:         
+ 52:         return path.split('.').reduce((obj, key) => {
+ 53:             return obj && obj[key] !== undefined ? obj[key] : undefined;
+ 54:         }, this.state);
+ 55:     }
+ 56:     
+ 57:     setState(updates, source = 'unknown') {
+ 58:         if (this.isDestroyed) {
+ 59:             console.warn('[AppState] Attempted to update destroyed state');
+ 60:             return;
+ 61:         }
+ 62:         
+ 63:         const oldState = this._deepClone(this.state);
+ 64:         const newState = this._mergeDeep(this.state, updates);
+ 65:         
+ 66:         if (this._stateChanged(oldState, newState)) {
+ 67:             this.state = newState;
+ 68:             this.stateChangeCount++;
+ 69:             this.lastStateChange = Date.now();
+ 70:             
+ 71:             console.debug(`[AppState] State updated from ${source}:`, updates);
+ 72:             
+ 73:             this._notifyListeners(newState, oldState, source);
+ 74:         }
+ 75:     }
+ 76:     
+ 77:     subscribe(listener) {
+ 78:         if (typeof listener !== 'function') {
+ 79:             throw new Error('[AppState] Listener must be a function');
+ 80:         }
+ 81:         
+ 82:         this.listeners.add(listener);
+ 83:         
+ 84:         return () => {
+ 85:             this.listeners.delete(listener);
+ 86:         };
+ 87:     }
+ 88:     
+ 89:     /**
+ 90:      * Subscribe to specific state property changes.
+ 91:      * @param {string} path - Dot-notation path to property
+ 92:      * @param {Function} listener - Callback function (newValue, oldValue) => void
+ 93:      * @returns {Function} Unsubscribe function
+ 94:      */
+ 95:     subscribeToProperty(path, listener) {
+ 96:         const propertyListener = (newState, oldState) => {
+ 97:             const newValue = this._getPropertyByPath(newState, path);
+ 98:             const oldValue = this._getPropertyByPath(oldState, path);
+ 99:             
+100:             if (newValue !== oldValue) {
+101:                 listener(newValue, oldValue);
+102:             }
+103:         };
+104:         
+105:         return this.subscribe(propertyListener);
+106:     }
+107:     
+108:     batchUpdate(updateFn, source = 'batch') {
+109:         const originalNotify = this._notifyListeners;
+110:         const updates = [];
+111:         
+112:         this._notifyListeners = (newState, oldState, updateSource) => {
+113:             updates.push({ newState, oldState, source: updateSource });
+114:         };
+115:         
+116:         try {
+117:             updateFn();
+118:         } finally {
+119:             this._notifyListeners = originalNotify;
+120:             
+121:             if (updates.length > 0) {
+122:                 const finalUpdate = updates[updates.length - 1];
+123:                 this._notifyListeners(finalUpdate.newState, updates[0].oldState, source);
+124:             }
+125:         }
+126:     }
+127:     
+128:     reset() {
+129:         const initialState = {
+130:             pollingIntervals: {},
+131:             activeStepKeyForLogsPanel: null,
+132:             isAnySequenceRunning: false,
+133:             focusedElementBeforePopup: null,
+134:             ui: {
+135:                 compactMode: false,
+136:                 autoOpenLogOverlay: true
+137:             },
+138:             stepTimers: {},
+139:             selectedStepsOrder: [],
+140: 
+141:             processInfo: {},
+142:             performanceMetrics: {
+143:                 apiResponseTimes: [],
+144:                 errorCounts: {},
+145:                 lastUpdate: null
+146:             },
+147:             cacheStats: {
+148:                 hits: 0,
+149:                 misses: 0,
+150:                 hitRate: 0
+151:             }
+152:         };
+153:         
+154:         this.setState(initialState, 'reset');
+155:         console.info('[AppState] State reset to initial values');
+156:     }
+157:     
+158:     getStats() {
+159:         return {
+160:             listenerCount: this.listeners.size,
+161:             stateChangeCount: this.stateChangeCount,
+162:             lastStateChange: this.lastStateChange,
+163:             isDestroyed: this.isDestroyed,
+164:             stateSize: JSON.stringify(this.state).length
+165:         };
+166:     }
+167:     
+168:     destroy() {
+169:         console.info('[AppState] Destroying state manager');
+170:         
+171:         this.listeners.clear();
+172:         this.state = {};
+173:         this.isDestroyed = true;
+174:     }
+175:     
+176:     _deepClone(obj) {
+177:         if (typeof structuredClone === 'function') {
+178:             try {
+179:                 return structuredClone(obj);
+180:             } catch (error) {
+181:                 console.warn('[AppState] structuredClone failed, falling back to manual clone:', error);
+182:             }
+183:         }
+184: 
+185:         if (obj === null || typeof obj !== 'object') {
+186:             return obj;
+187:         }
 188: 
-189: .workflow-wrapper.compact-mode.logs-active .step-details-panel {
-190:     opacity: 0;
-191:     pointer-events: none;
-192:     transform: translateX(30px);
-193:  }
-194: 
-195: /* Unified controls section compatibility with slideshow mode */
-196: .workflow-wrapper.slideshow-mode ~ .unified-controls-section,
-197: .unified-controls-section + .workflow-wrapper.slideshow-mode {
-198:     /* Ensure proper spacing and visibility during slideshow */
-199:     z-index: 1;
-200:     position: relative;
-201:  }
+189:         if (obj instanceof Date) {
+190:             return new Date(obj.getTime());
+191:         }
+192: 
+193:         if (Array.isArray(obj)) {
+194:             return obj.map(item => this._deepClone(item));
+195:         }
+196: 
+197:         const cloned = {};
+198:         for (const key in obj) {
+199:             if (Object.prototype.hasOwnProperty.call(obj, key)) {
+200:                 cloned[key] = this._deepClone(obj[key]);
+201:             }
+202:         }
+203:         return cloned;
+204:     }
+205:     
+206:     _mergeDeep(target, source) {
+207:         const result = this._deepClone(target);
+208:         
+209:         for (const key in source) {
+210:             if (source.hasOwnProperty(key)) {
+211:                 if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+212:                     result[key] = this._mergeDeep(result[key] || {}, source[key]);
+213:                 } else {
+214:                     result[key] = source[key];
+215:                 }
+216:             }
+217:         }
+218:         
+219:         return result;
+220:     }
+221:     
+222:     _stateChanged(oldState, newState) {
+223:         return !this._areValuesEqual(oldState, newState);
+224:     }
+225: 
+226:     _areValuesEqual(a, b, visited = new WeakMap()) {
+227:         if (Object.is(a, b)) {
+228:             return true;
+229:         }
+230: 
+231:         if (typeof a !== typeof b) {
+232:             return false;
+233:         }
+234: 
+235:         if (a === null || b === null) {
+236:             return false;
+237:         }
+238: 
+239:         if (typeof a !== 'object') {
+240:             return false;
+241:         }
+242: 
+243:         if (visited.has(a) && visited.get(a) === b) {
+244:             return true;
+245:         }
+246:         visited.set(a, b);
+247: 
+248:         const aKeys = Object.keys(a);
+249:         const bKeys = Object.keys(b);
+250:         if (aKeys.length !== bKeys.length) {
+251:             return false;
+252:         }
+253: 
+254:         for (const key of aKeys) {
+255:             if (!Object.prototype.hasOwnProperty.call(b, key)) {
+256:                 return false;
+257:             }
+258:             if (!this._areValuesEqual(a[key], b[key], visited)) {
+259:                 return false;
+260:             }
+261:         }
+262: 
+263:         return true;
+264:     }
+265:     
+266:     _getPropertyByPath(obj, path) {
+267:         return path.split('.').reduce((current, key) => {
+268:             return current && current[key] !== undefined ? current[key] : undefined;
+269:         }, obj);
+270:     }
+271:     
+272:     _notifyListeners(newState, oldState, source) {
+273:         this.listeners.forEach(listener => {
+274:             try {
+275:                 listener(newState, oldState, source);
+276:             } catch (error) {
+277:                 console.error('[AppState] Listener error:', error);
+278:             }
+279:         });
+280:     }
+281: }
+282: 
+283: export const appState = new AppState();
+284: 
+285: window.addEventListener('beforeunload', () => {
+286:     appState.destroy();
+287: });
+288: 
+289: if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+290:     window.appState = appState;
+291:     
+292:     appState.subscribe((newState, oldState, source) => {
+293:         console.debug(`[AppState] Change from ${source}:`, {
+294:             newState: newState,
+295:             oldState: oldState
+296:         });
+297:     });
+298: }
+299: 
+300: export default appState;
 ```
 
 ## File: static/apiService.js
@@ -32052,202 +31722,157 @@ app_new.py
 177: }
 ```
 
-## File: static/sequenceManager.js
+## File: static/state.js
 ```javascript
-  1: import { POLLING_INTERVAL } from './constants.js';
-  2: import * as ui from './uiUpdater.js';
-  3: import { runStepAPI } from './apiService.js';
-  4: import { showSequenceSummaryUI } from './popupManager.js';
-  5: import { formatElapsedTime } from './utils.js';
-  6: import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
-  7: 
-  8: import { appState } from './state/AppState.js';
-  9: 
- 10: import { soundEvents } from './soundManager.js';
- 11: 
- 12: /**
- 13:  * Executes and tracks a single step within a sequence.
- 14:  * This helper function encapsulates all logic for one step, from initiation to completion.
- 15:  * @private
- 16:  * @param {string} stepKey - The unique key for the step.
- 17:  * @param {string} sequenceName - The name of the parent sequence.
- 18:  * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
- 19:  * @param {number} totalSteps - The total number of steps in the sequence.
- 20:  * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
- 21:  */
- 22: async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
- 23:     const stepConfig = ui.getStepsConfig()[stepKey];
- 24:     const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
- 25: 
- 26:     console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
- 27: 
- 28:     ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
- 29:         Math.round(((currentStepNum - 1) / totalSteps) * 100)
- 30:     );
- 31: 
- 32:     if (stepKey !== 'clear_disk_cache') {
- 33:         ui.openLogPanelUI(stepKey, true);
- 34:         ui.setActiveStepForLogPanelUI(stepKey);
- 35:         
- 36:         if (isSequenceAutoScrollEnabled()) {
- 37:             setTimeout(() => {
- 38:                 scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
- 39:             }, 0);
- 40:         }
- 41:     }
- 42: 
- 43:     const stepInitiated = await runStepAPI(stepKey);
- 44:     if (!stepInitiated) {
- 45:         console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
- 46:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
- 47:             Math.round(((currentStepNum - 1) / totalSteps) * 100), true
- 48:         );
- 49:         return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
- 50:     }
- 51: 
- 52:     ui.startStepTimer(stepKey);
- 53:     console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
- 54: 
- 55:     try {
- 56:         ui.setActiveStepForLogPanelUI(stepKey);
- 57:     } catch (e) {
- 58:         console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
- 59:     }
- 60: 
- 61:     let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
- 62:     if (timerData && timerData.startTime) {
- 63:         console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
- 64:     } else {
- 65:         console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
- 66:     }
- 67: 
- 68:     console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
- 69:     const stepCompleted = await waitForStepCompletionInSequence(stepKey);
- 70: 
- 71:     ui.stopStepTimer(stepKey);
- 72:     console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
- 73: 
- 74:     timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
- 75:     const duration = (timerData?.elapsedTimeFormatted) || "N/A";
- 76: 
- 77:     console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
- 78:         timerData,
- 79:         duration,
- 80:         startTime: timerData?.startTime,
- 81:         elapsedTimeFormatted: timerData?.elapsedTimeFormatted
- 82:     });
+  1: // Import new immutable state management
+  2: import { appState } from './state/AppState.js';
+  3: 
+  4: export const PROCESS_INFO_CLIENT = new Proxy({}, {
+  5:     get(_target, prop) {
+  6:         if (typeof prop !== 'string') return undefined;
+  7:         return appState.getStateProperty(`processInfo.${prop}`);
+  8:     },
+  9:     set(_target, prop, value) {
+ 10:         if (typeof prop !== 'string') return false;
+ 11:         appState.setState({ processInfo: { [prop]: value } }, 'process_info_update');
+ 12:         return true;
+ 13:     },
+ 14:     ownKeys() {
+ 15:         const root = appState.getStateProperty('processInfo') || {};
+ 16:         return Reflect.ownKeys(root);
+ 17:     },
+ 18:     getOwnPropertyDescriptor(_target, prop) {
+ 19:         const root = appState.getStateProperty('processInfo') || {};
+ 20:         if (Object.prototype.hasOwnProperty.call(root, prop)) {
+ 21:             return { enumerable: true, configurable: true };
+ 22:         }
+ 23:         return undefined;
+ 24:     }
+ 25: });
+ 26: 
+ 27: // Legacy exports for backward compatibility (deprecated - use appState instead)
+ 28: export let pollingIntervals = {};
+ 29: export let activeStepKeyForLogsPanel = null;
+ 30: export let stepTimers = {};
+ 31: export let selectedStepsOrder = [];
+ 32: export let isAnySequenceRunning = false;
+ 33: export let focusedElementBeforePopup = null;
+ 34: export let autoOpenLogOverlay = true;
+ 35: 
+ 36: 
+ 37: // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
+ 38: export const REMOTE_SEQUENCE_STEP_KEYS = [
+ 39:     "STEP1",
+ 40:     "STEP2",
+ 41:     "STEP3",
+ 42:     "STEP4",
+ 43:     "STEP5",
+ 44:     "STEP6",
+ 45:     "STEP7"
+ 46: ];
+ 47: 
+ 48: // Modern state management functions using AppState
+ 49: export function setActiveStepKeyForLogs(key) {
+ 50:     activeStepKeyForLogsPanel = key; // Legacy
+ 51:     appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
+ 52: }
+ 53: export function getActiveStepKeyForLogs() {
+ 54:     return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
+ 55: }
+ 56: 
+ 57: export function addStepTimer(stepKey, timerData) {
+ 58:     stepTimers[stepKey] = timerData; // Legacy
+ 59:     appState.setState({
+ 60:         stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
+ 61:     }, 'addStepTimer');
+ 62: }
+ 63: export function getStepTimer(stepKey) {
+ 64:     return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
+ 65: }
+ 66: export function clearStepTimerInterval(stepKey) {
+ 67:     const timer = getStepTimer(stepKey);
+ 68:     if (timer && timer.intervalId) {
+ 69:         clearInterval(timer.intervalId);
+ 70:         const updatedTimer = { ...timer, intervalId: null };
+ 71:         addStepTimer(stepKey, updatedTimer);
+ 72:     }
+ 73: }
+ 74: export function deleteStepTimer(stepKey) {
+ 75:     if (getStepTimer(stepKey)) {
+ 76:         clearStepTimerInterval(stepKey);
+ 77:         delete stepTimers[stepKey]; // Legacy
+ 78:         const currentTimers = appState.getStateProperty('stepTimers') || {};
+ 79:         const { [stepKey]: removed, ...remainingTimers } = currentTimers;
+ 80:         appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
+ 81:     }
+ 82: }
  83: 
- 84:     if (!stepCompleted) {
- 85:         console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
- 86: 
- 87:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
- 88:             Math.round((currentStepNum / totalSteps) * 100), true
- 89:         );
- 90:         return { name: stepDisplayName, success: false, duration };
- 91:     }
- 92: 
- 93:     console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
- 94: 
- 95:     soundEvents.stepSuccess();
- 96: 
- 97:     return { name: stepDisplayName, success: true, duration };
+ 84: export function setSelectedStepsOrder(order) {
+ 85:     selectedStepsOrder = order; // Legacy
+ 86:     appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
+ 87: }
+ 88: export function getSelectedStepsOrder() {
+ 89:     return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
+ 90: }
+ 91: 
+ 92: export function setIsAnySequenceRunning(running) {
+ 93:     isAnySequenceRunning = running; // Legacy
+ 94:     appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
+ 95: }
+ 96: export function getIsAnySequenceRunning() {
+ 97:     return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
  98: }
  99: 
-100: export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
-101:     console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
-102:     ui.updateGlobalUIForSequenceState(true);
-103:     ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
-104: 
-105:     const sequenceStart = Date.now();
-106: 
-107:     const sequenceResults = [];
-108:     const totalStepsInThisSequence = stepsToExecute.length;
-109:     const isAutoModeSequence = sequenceName === "AutoMode";
-110:     let sequenceFailed = false;
-111: 
-112:     if (isAutoModeSequence) {
-113:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
-114:     }
-115: 
-116:     for (let i = 0; i < stepsToExecute.length; i++) {
-117:         const stepKey = stepsToExecute[i];
-118:         const currentStepNum = i + 1;
-119: 
-120:         const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
-121:         sequenceResults.push(result);
+100: export function setFocusedElementBeforePopup(element) {
+101:     focusedElementBeforePopup = element; // Legacy
+102:     appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
+103: }
+104: export function getFocusedElementBeforePopup() {
+105:     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
+106: }
+107: 
+108: export function setAutoOpenLogOverlay(enabled) {
+109:     autoOpenLogOverlay = !!enabled;
+110:     const currentUI = appState.getStateProperty('ui') || {};
+111:     appState.setState({ ui: { ...currentUI, autoOpenLogOverlay: autoOpenLogOverlay } }, 'setAutoOpenLogOverlay');
+112: }
+113: 
+114: export function getAutoOpenLogOverlay() {
+115:     const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
+116:     return typeof uiValue === 'boolean' ? uiValue : autoOpenLogOverlay;
+117: }
+118: 
+119: export function setAutoModeLogPanelOpened(opened) {
+120:     appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
+121: }
 122: 
-123:         if (!result.success) {
-124:             sequenceFailed = true;
-125:             break; // Exit the loop immediately on failure
-126:         }
-127: 
-128:         if (i < stepsToExecute.length - 1) {
-129:             const nextStepKey = stepsToExecute[i + 1];
-130:             if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
-131:                 try {
-132:                     ui.openLogPanelUI(nextStepKey, true);
-133:                     ui.setActiveStepForLogPanelUI(nextStepKey);
-134:                     
-135:                     if (isSequenceAutoScrollEnabled()) {
-136:                         setTimeout(() => {
-137:                             scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
-138:                         }, 0);
-139:                     }
-140:                 } catch (e) {
-141:                     console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
-142:                 }
-143:             }
-144:             ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
-145:                 Math.round((currentStepNum / totalStepsInThisSequence) * 100)
-146:             );
-147:         }
-148:     }
-149: 
-150:     console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
-151: 
-152:     if (sequenceFailed) {
-153:     } else {
-154:         ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
-155:         soundEvents.workflowCompletion();
-156:     }
-157: 
-158:     if (sequenceResults.length > 0) {
-159:         const overallDuration = formatElapsedTime(new Date(sequenceStart));
-160:         showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
-161:     } else {
-162:         console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
-163:     }
-164: 
-165:     ui.updateGlobalUIForSequenceState(false);
-166:     if (isAutoModeSequence) {
-167:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
-168:     }
-169: }
-170: 
-171: function waitForStepCompletionInSequence(stepKey) {
-172:     return new Promise((resolve) => {
-173:         const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
-174:         console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
-175: 
-176:         const checkInterval = setInterval(() => {
-177:             const data = appState.getStateProperty(`processInfo.${stepKey}`);
-178: 
-179:             if (!data) {
-180:                 return;
-181:             }
-182: 
-183:             if (data.status === 'completed') {
-184:                 console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
-185:                 clearInterval(checkInterval);
-186:                 resolve(true);
-187:             } else if (data.status === 'failed' || data.return_code === -9) {
-188:                 console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
-189:                 clearInterval(checkInterval);
-190:                 resolve(false);
-191:             }
-192:             }, POLLING_INTERVAL / 2);
-193:     });
-194: }
+123: export function getAutoModeLogPanelOpened() {
+124:     return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
+125: }
+126: 
+127: export function addPollingInterval(stepKey, id) {
+128:     pollingIntervals[stepKey] = id; // Legacy
+129:     appState.setState({
+130:         pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
+131:     }, 'addPollingInterval');
+132: }
+133: export function clearPollingInterval(stepKey) {
+134:     if (pollingIntervals[stepKey]) {
+135:         clearInterval(pollingIntervals[stepKey]);
+136:         delete pollingIntervals[stepKey]; // Legacy
+137:     }
+138:     const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
+139:     const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
+140:     appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
+141: }
+142: export function getPollingInterval(stepKey) {
+143:     return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
+144: }
+145: 
+146: 
+147: 
+148: // Export the appState for direct access to modern state management
+149: export { appState };
 ```
 
 ## File: app_new.py
@@ -33317,6 +32942,298 @@ app_new.py
 1063:     )
 ```
 
+## File: static/css/layout.css
+```css
+ 1: .workflow-wrapper {
+ 2:     display: flex;
+ 3:     width: 100%;
+ 4:     max-width: 1600px;
+ 5:     flex-grow: 1;
+ 6: }
+ 7: 
+ 8: /* Local Downloads panel animation (class-based for max browser compatibility) */
+ 9: .local-downloads-section {
+10:     opacity: 0;
+11:     transform: translateX(30px) scale(0.98);
+12:     transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+13:                 transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+14: }
+15: 
+16: .local-downloads-section.downloads-visible {
+17:     opacity: 1;
+18:     transform: translateX(0) scale(1);
+19: }
+20: 
+21: @media (prefers-reduced-motion: reduce) {
+22:     .local-downloads-section { transition: none !important; transform: none !important; }
+23: }
+24: 
+25: /* Keep vertical scrollbar always present to avoid layout jank during height changes */
+26: html, body { overflow-y: scroll; }
+27: 
+28: .steps-column {
+29:     flex: 1 1 100%;
+30:     padding: 10px 20px;
+31:     display: flex;
+32:     flex-direction: column;
+33:     align-items: center;
+34:     transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+35:     opacity: 1;
+36:     scroll-margin-top: 0;
+37: }
+38: 
+39: /* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
+40: .workflow-wrapper.compact-mode .steps-column {
+41:     display: grid;
+42:     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+43:     grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
+44:     gap: 16px 16px; /* row gap, column gap */
+45:     align-items: start; /* cards height adapt to content by default */
+46:     align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
+47:     justify-items: center; /* center cards if column wider than minmax */
+48:     padding: 10px 20px;
+49:     transition: opacity 0.5s ease-in-out;
+50: }
+51: 
+52: /* Desktop optimization: uniformize row heights to avoid subtle misalignment */
+53: @media (min-width: 1200px) {
+54:   .workflow-wrapper.compact-mode .steps-column {
+55:     align-items: start;
+56:   }
+57: }
+58: 
+59: 
+60: .workflow-wrapper.compact-mode .step-details-panel {
+61:     position: fixed;
+62:     right: 16px;
+63:     top: 120px;
+64:     width: min(30vw, 420px);
+65:     height: calc(100vh - 140px);
+66:     z-index: 19;
+67:     opacity: 0;
+68:     pointer-events: none;
+69:     transform: translateX(30px);
+70:     transition: opacity 0.3s ease, transform 0.3s ease;
+71:  }
+72: 
+73: .workflow-wrapper.compact-mode.details-active .step-details-panel {
+74:     opacity: 1;
+75:     pointer-events: auto;
+76:     transform: translateX(0);
+77:  }
+78: 
+79: .workflow-wrapper.compact-mode.details-active .steps-column {
+80:     margin-right: min(30vw, 420px);
+81:     padding-right: 16px;
+82:  }
+83: 
+84: /* Unified controls section compatibility with slideshow mode */
+85: .workflow-wrapper.slideshow-mode ~ .unified-controls-section,
+86: .unified-controls-section + .workflow-wrapper.slideshow-mode {
+87:     /* Ensure proper spacing and visibility during slideshow */
+88:     z-index: 1;
+89:     position: relative;
+90:  }
+```
+
+## File: static/sequenceManager.js
+```javascript
+  1: import { POLLING_INTERVAL } from './constants.js';
+  2: import * as ui from './uiUpdater.js';
+  3: import { runStepAPI } from './apiService.js';
+  4: import { showSequenceSummaryUI } from './popupManager.js';
+  5: import { formatElapsedTime } from './utils.js';
+  6: import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
+  7: 
+  8: import { appState } from './state/AppState.js';
+  9: 
+ 10: import { soundEvents } from './soundManager.js';
+ 11: 
+ 12: /**
+ 13:  * Executes and tracks a single step within a sequence.
+ 14:  * This helper function encapsulates all logic for one step, from initiation to completion.
+ 15:  * @private
+ 16:  * @param {string} stepKey - The unique key for the step.
+ 17:  * @param {string} sequenceName - The name of the parent sequence.
+ 18:  * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
+ 19:  * @param {number} totalSteps - The total number of steps in the sequence.
+ 20:  * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
+ 21:  */
+ 22: async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
+ 23:     const stepConfig = ui.getStepsConfig()[stepKey];
+ 24:     const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
+ 25: 
+ 26:     console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
+ 27: 
+ 28:     ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
+ 29:         Math.round(((currentStepNum - 1) / totalSteps) * 100)
+ 30:     );
+ 31: 
+ 32:     if (stepKey !== 'clear_disk_cache') {
+ 33:         ui.openLogPanelUI(stepKey);
+ 34:         ui.setActiveStepForLogPanelUI(stepKey);
+ 35:         
+ 36:         if (isSequenceAutoScrollEnabled()) {
+ 37:             setTimeout(() => {
+ 38:                 scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
+ 39:             }, 0);
+ 40:         }
+ 41:     }
+ 42: 
+ 43:     const stepInitiated = await runStepAPI(stepKey);
+ 44:     if (!stepInitiated) {
+ 45:         console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
+ 46:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
+ 47:             Math.round(((currentStepNum - 1) / totalSteps) * 100), true
+ 48:         );
+ 49:         return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
+ 50:     }
+ 51: 
+ 52:     ui.startStepTimer(stepKey);
+ 53:     console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
+ 54: 
+ 55:     try {
+ 56:         ui.setActiveStepForLogPanelUI(stepKey);
+ 57:     } catch (e) {
+ 58:         console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
+ 59:     }
+ 60: 
+ 61:     let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+ 62:     if (timerData && timerData.startTime) {
+ 63:         console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
+ 64:     } else {
+ 65:         console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
+ 66:     }
+ 67: 
+ 68:     console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
+ 69:     const stepCompleted = await waitForStepCompletionInSequence(stepKey);
+ 70: 
+ 71:     ui.stopStepTimer(stepKey);
+ 72:     console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
+ 73: 
+ 74:     timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+ 75:     const duration = (timerData?.elapsedTimeFormatted) || "N/A";
+ 76: 
+ 77:     console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
+ 78:         timerData,
+ 79:         duration,
+ 80:         startTime: timerData?.startTime,
+ 81:         elapsedTimeFormatted: timerData?.elapsedTimeFormatted
+ 82:     });
+ 83: 
+ 84:     if (!stepCompleted) {
+ 85:         console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
+ 86: 
+ 87:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
+ 88:             Math.round((currentStepNum / totalSteps) * 100), true
+ 89:         );
+ 90:         return { name: stepDisplayName, success: false, duration };
+ 91:     }
+ 92: 
+ 93:     console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
+ 94: 
+ 95:     soundEvents.stepSuccess();
+ 96: 
+ 97:     return { name: stepDisplayName, success: true, duration };
+ 98: }
+ 99: 
+100: export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
+101:     console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
+102:     ui.updateGlobalUIForSequenceState(true);
+103:     ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
+104: 
+105:     const sequenceStart = Date.now();
+106: 
+107:     const sequenceResults = [];
+108:     const totalStepsInThisSequence = stepsToExecute.length;
+109:     const isAutoModeSequence = sequenceName === "AutoMode";
+110:     let sequenceFailed = false;
+111: 
+112:     if (isAutoModeSequence) {
+113:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
+114:     }
+115: 
+116:     for (let i = 0; i < stepsToExecute.length; i++) {
+117:         const stepKey = stepsToExecute[i];
+118:         const currentStepNum = i + 1;
+119: 
+120:         const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
+121:         sequenceResults.push(result);
+122: 
+123:         if (!result.success) {
+124:             sequenceFailed = true;
+125:             break; // Exit the loop immediately on failure
+126:         }
+127: 
+128:         if (i < stepsToExecute.length - 1) {
+129:             const nextStepKey = stepsToExecute[i + 1];
+130:             if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
+131:                 try {
+132:                     ui.openLogPanelUI(nextStepKey);
+133:                     ui.setActiveStepForLogPanelUI(nextStepKey);
+134:                     
+135:                     if (isSequenceAutoScrollEnabled()) {
+136:                         setTimeout(() => {
+137:                             scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
+138:                         }, 0);
+139:                     }
+140:                 } catch (e) {
+141:                     console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
+142:                 }
+143:             }
+144:             ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
+145:                 Math.round((currentStepNum / totalStepsInThisSequence) * 100)
+146:             );
+147:         }
+148:     }
+149: 
+150:     console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
+151: 
+152:     if (sequenceFailed) {
+153:     } else {
+154:         ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
+155:         soundEvents.workflowCompletion();
+156:     }
+157: 
+158:     if (sequenceResults.length > 0) {
+159:         const overallDuration = formatElapsedTime(new Date(sequenceStart));
+160:         showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
+161:     } else {
+162:         console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
+163:     }
+164: 
+165:     ui.updateGlobalUIForSequenceState(false);
+166:     if (isAutoModeSequence) {
+167:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
+168:     }
+169: }
+170: 
+171: function waitForStepCompletionInSequence(stepKey) {
+172:     return new Promise((resolve) => {
+173:         const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
+174:         console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
+175: 
+176:         const checkInterval = setInterval(() => {
+177:             const data = appState.getStateProperty(`processInfo.${stepKey}`);
+178: 
+179:             if (!data) {
+180:                 return;
+181:             }
+182: 
+183:             if (data.status === 'completed') {
+184:                 console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
+185:                 clearInterval(checkInterval);
+186:                 resolve(true);
+187:             } else if (data.status === 'failed' || data.return_code === -9) {
+188:                 console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
+189:                 clearInterval(checkInterval);
+190:                 resolve(false);
+191:             }
+192:             }, POLLING_INTERVAL / 2);
+193:     });
+194: }
+```
+
 ## File: static/eventHandlers.js
 ```javascript
   1: import * as dom from './domElements.js';
@@ -33329,657 +33246,253 @@ app_new.py
   8: import { scrollToStepImmediate } from './scrollManager.js';
   9: import { soundEvents } from './soundManager.js';
  10: import { appState } from './state/AppState.js';
- 11: 
- 12: function getIsAnySequenceRunning() {
- 13:     return !!appState.getStateProperty('isAnySequenceRunning');
- 14: }
- 15: 
- 16: function getSelectedStepsOrder() {
- 17:     return appState.getStateProperty('selectedStepsOrder') || [];
- 18: }
- 19: 
- 20: function setSelectedStepsOrder(order) {
- 21:     const safeOrder = Array.isArray(order) ? [...order] : [];
- 22:     appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
- 23: }
- 24: 
- 25: function resolveElement(getterFn, legacyValue = null) {
- 26:     if (typeof getterFn === 'function') {
- 27:         try {
- 28:             return getterFn();
- 29:         } catch (_) {
- 30:             return legacyValue;
- 31:         }
- 32:     }
- 33:     return legacyValue;
- 34: }
- 35: 
- 36: function resolveCollection(getterFn, legacyValue = null) {
- 37:     const resolved = resolveElement(getterFn, legacyValue);
- 38:     if (!resolved) return [];
- 39:     return Array.from(resolved);
- 40: }
- 41: 
- 42: export function initializeEventHandlers() {
- 43:     const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
- 44:     if (closeLogButton) {
- 45:         closeLogButton.addEventListener('click', ui.closeLogPanelUI);
- 46:     }
- 47: 
- 48:     const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
- 49:     runButtons.forEach(button => {
- 50:         button.addEventListener('click', async () => {
- 51:             try {
- 52:                 if (getIsAnySequenceRunning()) {
- 53:                     showNotification("Une séquence est déjà en cours. Veuillez attendre sa fin.", 'warning');
- 54:                     return;
- 55:                 }
- 56:                 const stepKey = button.dataset.step;
- 57:                 ui.updateMainLogOutputUI('');
- 58:                 const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
- 59:                 if (specificLogContainer) specificLogContainer.style.display = 'none';
- 60:                 ui.openLogPanelUI(stepKey);
- 61: 
- 62:                 scrollToStepImmediate(stepKey, { scrollDelay: 0 });
- 63: 
- 64:                 soundEvents.workflowStart();
- 65: 
- 66:                 await api.runStepAPI(stepKey);
- 67:             } catch (error) {
- 68:                 console.error('[EVENT] Error in run button handler:', error);
- 69:                 showNotification("Erreur lors de l'exécution de l'étape", 'error');
- 70:             }
- 71:         });
- 72:     });
- 73: 
- 74:     const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
- 75:     cancelButtons.forEach(button => {
- 76:         button.addEventListener('click', async () => {
- 77:             try {
- 78:                 const stepKey = button.dataset.step;
- 79:                 await api.cancelStepAPI(stepKey);
- 80:             } catch (error) {
- 81:                 console.error('[EVENT] Error in cancel button handler:', error);
- 82:                 showNotification("Erreur lors de l'annulation de l'étape", 'error');
- 83:             }
- 84:         });
- 85:     });
- 86: 
- 87:     const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
- 88:     specificLogButtons.forEach(button => {
- 89:         button.addEventListener('click', async () => {
- 90:             const stepKey = button.dataset.step;
- 91:             const logIndex = button.dataset.logIndex;
- 92:             const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
- 93: 
- 94:             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
- 95:                 ui.openLogPanelUI(stepKey);
- 96:                 try {
- 97:                     const statusResponse = await fetch(`/status/${stepKey}`);
- 98:                     if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
- 99:                     const statusData = await statusResponse.json();
-100:                     ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');
-101:                 } catch (error) {
-102:                     console.error("Erreur chargement statut pour log panel:", error);
-103:                     ui.updateMainLogOutputUI(`<i>Erreur chargement log principal: ${error.message}</i>`);
-104:                 }
-105:             }
-106:             // Pass the clicked button to enable loading state (spinner + disabled)
-107:             await api.fetchSpecificLogAPI(stepKey, logIndex, button.textContent.trim(), button);
-108:         });
-109:     });
-110: 
-111:     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
-112:     if (runAllButton) {
-113:         runAllButton.addEventListener('click', async () => {
-114:             if (getIsAnySequenceRunning()) {
-115:                 showNotification("Séquence déjà en cours.", 'warning'); return;
-116:             }
-117:             // Play workflow start sound for complete sequence 1-6
-118:             soundEvents.workflowStart();
-119:             await runStepSequence(defaultSequenceableStepsKeys, "Séquence 0-4");
-120:         });
-121:     }
-122: 
-123:     const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
-124:     customSequenceCheckboxes.forEach(checkbox => {
-125:         checkbox.addEventListener('change', (event) => {
-126:             const stepKey = event.target.dataset.stepKey;
-127:             const stepCard = document.getElementById(`step-${stepKey}`);
-128:             const orderNumberEl = document.getElementById(`order-${stepKey}`);
-129:             let currentOrder = getSelectedStepsOrder();
-130: 
-131:             // Play checkbox interaction sound
-132:             soundEvents.checkboxInteraction();
-133: 
-134:             if (event.target.checked) {
-135:                 if (!currentOrder.includes(stepKey)) {
-136:                     currentOrder.push(stepKey);
-137:                     if (stepCard) stepCard.classList.add('custom-sequence-selected');
-138:                 }
-139:             } else {
-140:                 const index = currentOrder.indexOf(stepKey);
-141:                 if (index > -1) currentOrder.splice(index, 1);
-142:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
-143:             }
-144:             setSelectedStepsOrder(currentOrder);
-145:             document.querySelectorAll('.step-selection-order-number').forEach(el => { el.textContent = ''; });
-146:             getSelectedStepsOrder().forEach((sk, idx) => {
-147:                 const orderEl = document.getElementById(`order-${sk}`);
-148:                 if (orderEl) orderEl.textContent = idx + 1;
-149:             });
-150:             ui.updateCustomSequenceButtonsUI();
-151:         });
-152:     });
-153: 
-154:     const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
-155:     if (clearCustomSequenceButton) {
-156:         clearCustomSequenceButton.addEventListener('click', () => {
-157:             setSelectedStepsOrder([]);
-158:             customSequenceCheckboxes.forEach(cb => {
-159:                 cb.checked = false;
-160:                 const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
-161:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
-162:                 const orderEl = document.getElementById(`order-${cb.dataset.stepKey}`);
-163:                 if (orderEl) orderEl.textContent = '';
-164:             });
-165:             ui.updateCustomSequenceButtonsUI();
-166:         });
-167:     }
-168: 
-169:     const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
-170:     if (runCustomSequenceButton) {
-171:         runCustomSequenceButton.addEventListener('click', () => {
-172:             if (getSelectedStepsOrder().length === 0) {
-173:                 showNotification("Veuillez sélectionner au moins une étape.", 'warning');
-174:                 return;
-175:             }
-176:             if (getIsAnySequenceRunning()) {
-177:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
-178:             }
-179:             showCustomSequenceConfirmUI();
-180:         });
-181:     }
-182: 
-183:     const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
-184:     const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
-185:     if (confirmRunCustomSequenceButton) {
-186:         confirmRunCustomSequenceButton.addEventListener('click', async () => {
-187:             closePopupUI(customSequenceConfirmOverlay);
-188:             if (getIsAnySequenceRunning()) {
-189:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
-190:             }
-191:             // Loading state on confirm button and disable run-custom while executing
-192:             try {
-193:                 confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
-194:                 confirmRunCustomSequenceButton.disabled = true;
-195:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = true;
-196: 
-197:                 // Play workflow start sound for custom sequence
-198:                 soundEvents.workflowStart();
-199:                 await runStepSequence(getSelectedStepsOrder(), "Séquence Personnalisée");
-200:             } finally {
-201:                 confirmRunCustomSequenceButton.removeAttribute('data-loading');
-202:                 confirmRunCustomSequenceButton.disabled = false;
-203:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = getIsAnySequenceRunning();
-204:             }
-205:         });
-206:     }
-207: 
-208:     const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
-209:     if (cancelRunCustomSequenceButton) {
-210:         cancelRunCustomSequenceButton.addEventListener('click', () => {
-211:             closePopupUI(customSequenceConfirmOverlay);
-212:         });
-213:     }
-214:     const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
-215:     const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
-216:     if (closeSummaryPopupButton) {
-217:         closeSummaryPopupButton.addEventListener('click', () => {
-218:             closePopupUI(sequenceSummaryOverlay);
-219:         });
-220:     }
-221: 
-222:     if (dom.getSoundToggle()) {
-223:         import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
-224:             const isEnabled = isSoundEnabled();
-225:             dom.getSoundToggle().checked = isEnabled;
-226:             if (dom.getSoundStatus()) {
-227:                 dom.getSoundStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
-228:             }
-229: 
-230:             dom.getSoundToggle().addEventListener('change', (event) => {
-231:                 const enabled = event.target.checked;
-232:                 setSoundEnabled(enabled);
-233:                 if (dom.getSoundStatus()) {
-234:                     dom.getSoundStatus().textContent = enabled ? 'Activé' : 'Désactivé';
-235:                 }
-236:                 console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
-237:             });
-238:         });
-239:     }
-240: }
-```
-
-## File: templates/index_new.html
-```html
-  1: <!DOCTYPE html>
-  2: <html lang="fr">
-  3: 
-  4: <head>
-  5:     <meta charset="UTF-8">
-  6:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  7:     <title>Workflow Manager</title>
-  8:     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
-  9:     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
- 10:     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ cache_buster }}">
- 11:     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v={{ cache_buster }}">
+ 11: import { setAutoOpenLogOverlay, getAutoOpenLogOverlay } from './state.js';
  12: 
- 13:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}?v={{ cache_buster }}">
- 14:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/controls.css') }}?v={{ cache_buster }}">
- 15:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/steps.css') }}?v={{ cache_buster }}">
- 16:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/logs.css') }}?v={{ cache_buster }}">
- 17:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/workflow-buttons.css') }}?v={{ cache_buster }}">
- 18:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/popups.css') }}?v={{ cache_buster }}">
- 19:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
- 20:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
- 21:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
- 22:     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
- 23:     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
- 24: </head>
+ 13: function getIsAnySequenceRunning() {
+ 14:     return !!appState.getStateProperty('isAnySequenceRunning');
+ 15: }
+ 16: 
+ 17: function getSelectedStepsOrder() {
+ 18:     return appState.getStateProperty('selectedStepsOrder') || [];
+ 19: }
+ 20: 
+ 21: function setSelectedStepsOrder(order) {
+ 22:     const safeOrder = Array.isArray(order) ? [...order] : [];
+ 23:     appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
+ 24: }
  25: 
- 26: <body>
- 27:     <div id="notifications-area" aria-live="assertive"></div>
- 28: 
- 29:     <div class="topbar-affix" id="topbar-affix">
- 30:         <div class="unified-controls-section unified-controls--topbar" id="topbar-controls">
- 31:             <div class="workflow-controls">
- 32:                 <div class="sequence-controls">
- 33:                     <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
- 34:                         <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-7)</button>
- 35:                     </div>
- 36:                     <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
- 37:                         <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
- 38:                         <button id="clear-custom-sequence-button" disabled>🗑️ Vider Séquence</button>
- 39:                         <button id="toggle-local-downloads" class="downloads-toggle" aria-pressed="true" title="Afficher/Masquer les Téléchargements Locaux">📥 Téléchargements</button>
- 40:                         <button id="settings-toggle" class="settings-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel" title="Afficher les options">⚙️ Settings</button>
- 41:                     </div>
- 42:                 </div>
- 43:             </div>
- 44: 
- 45:             <div class="global-progress-affix" id="global-progress-affix">
- 46:                 <div class="global-progress-container" id="global-progress-container">
- 47:                     <div id="global-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
- 48:                 </div>
- 49:                 <div id="global-progress-text" aria-live="polite"></div>
- 50:             </div>
- 51:             <div id="settings-panel" class="settings-panel" hidden>
- 52:                 <section class="settings-section" aria-label="Affichage et préférences">
- 53:                     <p class="settings-title">Affichage & Préférences</p>
- 54:                     <div class="settings-row settings-row--stacked">
- 55:                         <div class="theme-selector-container settings-block">
- 56:                             <label for="theme-selector" class="theme-selector-label">Thème:</label>
- 57:                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
- 58:                             </select>
- 59:                         </div>
- 60: 
- 61:                         <div id="sound-control-widget" class="sound-control-widget settings-block">
- 62:                             <label class="btn-like-switch" for="sound-toggle" aria-label="Activer/Désactiver les effets sonores">
- 63:                                 🔊 Effets Sonores
- 64:                                 <input type="checkbox" id="sound-toggle" checked>
- 65:                             </label>
- 66:                         </div>
- 67:                     </div>
- 68:                 </section>
- 69: 
- 70:                         </div>
- 71:         </div>
- 72: 
- 73:     </div>
- 74: 
- 75:     <div id="topbar-spacer" aria-hidden="true"></div>
- 76: 
- 77:     <div class="local-downloads-section card-like-section">
- 78:         <h2>
- 79:             <span class="section-icon">📥</span> Téléchargements Locaux
- 80:         </h2>
- 81:         <div class="local-downloads-list-container">
- 82:             <ul id="local-downloads-list" class="status-list" aria-live="polite">
- 83:                 <li class="placeholder">Aucune activité de téléchargement locale récente.</li>
- 84:             </ul>
- 85:         </div>
- 86:     </div>
- 87: 
- 88:     <div class="workflow-wrapper compact-mode" id="workflow-wrapper">
- 89:         <div class="steps-column" id="steps-column">
- 90:             <section id="workflow-steps" class="workflow-pipeline" role="region" aria-label="Pipeline de traitement">
- 91:                 <div class="pipeline-timeline" role="list">
- 92:                     <div class="timeline-axis" aria-hidden="true"></div>
- 93:                     {% for step_key, config in steps_config.items() %}
- 94:                     {% if config %}
- 95:                     <div class="timeline-row">
- 96:                         <div class="timeline-rail-column" aria-hidden="true">
- 97:                             <div class="timeline-node" data-step="{{ step_key }}"></div>
- 98:                         </div>
- 99:                         <div class="timeline-cards-column">
-100:                             <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0" aria-controls="step-details-panel" aria-expanded="false">
-101:                                 <div class="timeline-content">
-102:                             <div class="timeline-head">
-103:                                 <div class="step-title-group">
-104:                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
-105:                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
-106:                                 </div>
-107:                                 <div class="step-selection-control">
-108:                                     <span class="step-selection-order-number" id="order-{{step_key}}"></span>
-109:                                     <input type="checkbox" class="custom-sequence-checkbox" data-step-key="{{ step_key }}" title="Sélectionner pour séquence personnalisée" aria-label="Sélectionner {{ config.display_name }} pour séquence personnalisée">
-110:                                 </div>
-111:                             </div>
-112:                             <div class="node-actions step-controls">
-113:                                 <button class="run-button" data-step="{{ step_key }}">Lancer</button>
-114:                                 <button class="cancel-button" data-step="{{ step_key }}" disabled>Annuler</button>
-115:                             </div>
-116:                             <div class="timeline-body">
-117:                                 <div class="status-line">
-118:                                     Statut:
-119:                                     <span id="status-{{ step_key }}" class="status-badge status-idle" aria-live="polite">Prêt</span>
-120:                                     <span class="timer" id="timer-{{ step_key }}"></span>
-121:                                 </div>
-122:                                 <div class="step-progress-container" id="progress-container-{{ step_key }}" style="display: none;">
-123:                                     <div class="progress-bar-wrapper">
-124:                                         <div class="progress-bar-step" id="progress-bar-{{ step_key }}" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-125:                                     </div>
-126:                                     <div class="progress-text-step" id="progress-text-{{ step_key }}" aria-live="polite"></div>
-127:                                 </div>
-128:                                 {% if config.specific_logs %}
-129:                                 <div class="specific-log-controls-wrapper">
-130:                                     <h4>Logs Spécifiques :</h4>
-131:                                     <div id="log-panel-specific-buttons-container-{{ step_key }}">
-132:                                         {% for log_conf in config.specific_logs %}
-133:                                         <button class="specific-log-button" data-step="{{ step_key }}" data-log-index="{{ loop.index0 }}">{{ log_conf.name }}</button>
-134:                                         {% endfor %}
-135:                                     </div>
-136:                                 </div>
-137:                                 {% endif %}
-138:                             </div>
-139:                         </div>
-140:                     </div>
-141:                         </div>
-142:                     </div>
-143:                     {% endif %}
-144:                     {% endfor %}
-145:                 </div>
-146:                 <div class="timeline-scroll-spacer" aria-hidden="true"></div>
-147:                 <aside id="step-details-panel" class="step-details-panel" role="complementary" aria-label="Détails de l'étape" hidden>
-148:                     <div class="step-details-header">
-149:                         <div class="step-details-title" id="step-details-title">Détails</div>
-150:                         <button id="close-step-details" class="step-details-close" type="button" aria-label="Fermer le panneau détails">×</button>
-151:                     </div>
-152:                     <div class="step-details-body">
-153:                         <div class="step-details-meta">
-154:                             <span id="step-details-status" class="status-badge status-idle" aria-live="polite">Prêt</span>
-155:                             <span id="step-details-timer" class="timer"></span>
-156:                         </div>
-157:                         <div class="step-details-progress">
-158:                             <div id="step-details-progress-text" class="progress-text-step" aria-live="polite"></div>
-159:                         </div>
-160:                         <div class="step-details-actions">
-161:                             <button id="step-details-run" class="run-button" type="button" disabled>Lancer</button>
-162:                             <button id="step-details-cancel" class="cancel-button" type="button" disabled>Annuler</button>
-163:                             <button id="step-details-open-logs" class="step-details-open-logs" type="button" disabled>Logs</button>
-164:                         </div>
-165:                     </div>
-166:                 </aside>
-167:             </section>
-168:         </div>
-169:         <div class="logs-column" id="logs-column-global">
-170:             <div class="log-panel-header">
-171:                 <div class="log-panel-header-main">
-172:                     <span id="log-panel-title">Logs</span>
-173:                     <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
-174:                 </div>
-175:                 <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
-176:                     <span id="log-panel-context-step">Aucune étape active</span>
-177:                     <span id="log-panel-context-status"></span>
-178:                     <span id="log-panel-context-timer"></span>
-179:                 </div>
-180:                 <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
-181:             </div>
-182:             <div class="log-container" id="main-log-container-panel">
-183:                 <div class="log-header">
-184:                     Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
-185:                 </div>
-186:                 <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
-187:             </div>
-188:             <div class="log-container" id="specific-log-container-panel" style="display:none;">
-189:                 <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
-190:                 <div class="specific-log-path" id="specific-log-path-info-panel"></div>
-191:                 <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
-192:             </div>
-193:         </div>
-194:     </div>
-195: 
-196:     <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
-197:         <div class="popup-content">
-198:             <h3 id="sequence-summary-title">Résumé de la Séquence</h3>
-199:             <ul id="sequence-summary-list" class="popup-list"></ul>
-200:             <button id="close-summary-popup" class="popup-cancel-button">Fermer</button>
-201:         </div>
-202:     </div>
-203:     <div id="custom-sequence-confirm-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-sequence-confirm-title">
-204:         <div class="popup-content">
-205:             <h3 id="custom-sequence-confirm-title">Confirmer la Séquence Personnalisée</h3>
-206:             <p>
-207:                 Les étapes suivantes seront lancées dans cet ordre :
-208:             </p>
-209:             <ul id="custom-sequence-confirm-list" class="popup-list"></ul>
-210:             <div class="popup-buttons">
-211:                 <button id="confirm-run-custom-sequence-button" class="popup-confirm-button">Lancer la Séquence</button>
-212:                 <button id="cancel-run-custom-sequence-button" class="popup-cancel-button">Annuler</button>
-213:             </div>
-214:         </div>
-215:     </div>
-216: 
-217:     <div id="system-monitor-widget" class="system-monitor-widget">
-218:         <div class="monitor-header">
-219:             <span class="monitor-icon">💻</span>
-220:             <span class="monitor-title">Moniteur Système</span>
-221:             <button id="system-monitor-minimize" class="monitor-close" aria-label="Réduire le moniteur" title="Réduire (affichage compact)">×</button>
-222:         </div>
-223:         <div id="monitor-compact-line" class="monitor-compact-line" aria-hidden="true" style="display:none;">
-224:             C: <span id="compact-cpu"></span> · R: <span id="compact-ram"></span> · G: <span id="compact-gpu"></span>
-225:         </div>
-226:         <div class="monitor-item">
-227:             <span class="monitor-label">CPU</span>
-228:             <div class="monitor-bar-container">
-229:                 <div id="cpu-monitor-bar" class="monitor-bar"></div>
-230:             </div>
-231:             <span id="cpu-monitor-value" class="monitor-value">... %</span>
-232:         </div>
-233:         <div class="monitor-item">
-234:             <span class="monitor-label">RAM</span>
-235:             <div class="monitor-bar-container">
-236:                 <div id="ram-monitor-bar" class="monitor-bar"></div>
-237:             </div>
-238:             <span id="ram-monitor-value" class="monitor-value">... %</span>
-239:         </div>
-240:         <div id="ram-monitor-details" class="monitor-details">... / ... GB</div>
-241: 
-242:         <div id="gpu-monitor-section" style="display: none;">
-243:             <div class="monitor-item">
-244:                 <span class="monitor-label">GPU</span>
-245:                 <div class="monitor-bar-container">
-246:                     <div id="gpu-monitor-bar" class="monitor-bar"></div>
-247:                 </div>
-248:                 <span id="gpu-monitor-value" class="monitor-value">... %</span>
-249:             </div>
-250:             <div id="gpu-monitor-details" class="monitor-details">... °C | ... / ... GB</div>
-251:         </div>
-252:         <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
-253:     </div>
-254: 
-255:     
-256:     <script id="steps-config-data" type="application/json">{{ steps_config | tojson | safe }}</script>
-257:     <script src="{{ url_for('static', filename='main.js') }}?v={{ cache_buster }}" type="module" defer></script>
-258: </body>
-259: 
-260: </html>
-```
-
-## File: static/domElements.js
-```javascript
-  1: const _SAFE_STEP_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
-  2: 
-  3: function byId(id) {
-  4:     return document.getElementById(id);
-  5: }
-  6: 
-  7: function bySelectorAll(selector) {
-  8:     return document.querySelectorAll(selector);
-  9: }
- 10: 
- 11: export const getWorkflowWrapper = () => byId('workflow-wrapper');
- 12: export const getStepsColumn = () => byId('steps-column');
- 13: export const getLogsColumnGlobal = () => byId('logs-column-global');
- 14: export const getLogPanelTitle = () => byId('log-panel-title');
- 15: export const getLogPanelSubheader = () => byId('log-panel-subheader');
- 16: export const getLogPanelContextStep = () => byId('log-panel-context-step');
- 17: export const getLogPanelContextStatus = () => byId('log-panel-context-status');
- 18: export const getLogPanelContextTimer = () => byId('log-panel-context-timer');
- 19: export const getLogPanelSpecificButtonsContainer = () => byId('log-panel-specific-buttons-container');
- 20: export const getMainLogContainerPanel = () => byId('main-log-container-panel');
- 21: export const getMainLogOutputPanel = () => byId('main-log-output-panel');
- 22: export const getCurrentStepLogNamePanel = () => byId('current-step-log-name-panel');
- 23: export const getSpecificLogContainerPanel = () => byId('specific-log-container-panel');
- 24: export const getSpecificLogHeaderTextPanel = () => byId('specific-log-header-text-panel');
- 25: export const getSpecificLogPathInfoPanel = () => byId('specific-log-path-info-panel');
- 26: export const getSpecificLogOutputContentPanel = () => byId('specific-log-output-content-panel');
- 27: export const getRunAllButton = () => byId('run-all-steps-button');
- 28: export const getTopbarAffix = () => byId('topbar-affix');
- 29: export const getTopbarControls = () => byId('topbar-controls');
- 30: export const getGlobalProgressAffix = () => byId('global-progress-affix');
- 31: export const getGlobalProgressContainer = () => byId('global-progress-container');
- 32: export const getGlobalProgressBar = () => byId('global-progress-bar');
- 33: export const getGlobalProgressText = () => byId('global-progress-text');
- 34: export const getSequenceSummaryPopupOverlay = () => byId('sequence-summary-popup-overlay');
- 35: export const getSequenceSummaryList = () => byId('sequence-summary-list');
- 36: export const getCloseSummaryPopupButton = () => byId('close-summary-popup');
- 37: export const getRunCustomSequenceButton = () => byId('run-custom-sequence-button');
- 38: export const getClearCustomSequenceButton = () => byId('clear-custom-sequence-button');
- 39: export const getCustomSequenceCheckboxes = () => bySelectorAll('.custom-sequence-checkbox');
- 40: export const getCustomSequenceConfirmPopupOverlay = () => byId('custom-sequence-confirm-popup-overlay');
- 41: export const getCustomSequenceConfirmList = () => byId('custom-sequence-confirm-list');
- 42: export const getConfirmRunCustomSequenceButton = () => byId('confirm-run-custom-sequence-button');
- 43: export const getCancelRunCustomSequenceButton = () => byId('cancel-run-custom-sequence-button');
- 44: export const getNotificationsArea = () => byId('notifications-area');
- 45: 
- 46: // Lazy DOM element getters to ensure elements are available when accessed
- 47: export function getAllStepDivs() {
- 48:     const elements = document.querySelectorAll('.step');
- 49:     console.debug(`[DOM] getAllStepDivs found ${elements.length} elements`);
- 50:     return elements;
- 51: }
- 52: 
- 53: export function getAllRunButtons() {
- 54:     const elements = document.querySelectorAll('.run-button');
- 55:     console.debug(`[DOM] getAllRunButtons found ${elements.length} elements`);
- 56:     return elements;
- 57: }
- 58: 
- 59: export function getAllCancelButtons() {
- 60:     const elements = document.querySelectorAll('.cancel-button');
- 61:     console.debug(`[DOM] getAllCancelButtons found ${elements.length} elements`);
- 62:     return elements;
- 63: }
+ 26: function resolveElement(getterFn, legacyValue = null) {
+ 27:     if (typeof getterFn === 'function') {
+ 28:         try {
+ 29:             return getterFn();
+ 30:         } catch (_) {
+ 31:             return legacyValue;
+ 32:         }
+ 33:     }
+ 34:     return legacyValue;
+ 35: }
+ 36: 
+ 37: function resolveCollection(getterFn, legacyValue = null) {
+ 38:     const resolved = resolveElement(getterFn, legacyValue);
+ 39:     if (!resolved) return [];
+ 40:     return Array.from(resolved);
+ 41: }
+ 42: 
+ 43: export function initializeEventHandlers() {
+ 44:     const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
+ 45:     if (closeLogButton) {
+ 46:         closeLogButton.addEventListener('click', ui.closeLogPanelUI);
+ 47:     }
+ 48: 
+ 49:     const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
+ 50:     runButtons.forEach(button => {
+ 51:         button.addEventListener('click', async () => {
+ 52:             try {
+ 53:                 if (getIsAnySequenceRunning()) {
+ 54:                     showNotification("Une séquence est déjà en cours. Veuillez attendre sa fin.", 'warning');
+ 55:                     return;
+ 56:                 }
+ 57:                 const stepKey = button.dataset.step;
+ 58:                 ui.updateMainLogOutputUI('');
+ 59:                 const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 60:                 if (specificLogContainer) specificLogContainer.style.display = 'none';
+ 61:                 if (getAutoOpenLogOverlay()) {
+ 62:                     ui.openLogPanelUI(stepKey, true);
+ 63:                 }
  64: 
- 65: export function getAllSpecificLogButtons() {
- 66:     const elements = document.querySelectorAll('.specific-log-button');
- 67:     console.debug(`[DOM] getAllSpecificLogButtons found ${elements.length} elements`);
- 68:     return elements;
- 69: }
- 70: 
- 71: // Enhanced step element getter with validation
- 72: export function getStepElement(stepKey) {
- 73:     if (!stepKey) {
- 74:         console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
- 75:         return null;
- 76:     }
- 77: 
- 78:     if (!_SAFE_STEP_KEY_PATTERN.test(String(stepKey))) {
- 79:         console.warn('[DOM] getStepElement called with unsafe stepKey (refusing to query by id):', stepKey);
- 80:         return null;
- 81:     }
- 82: 
- 83:     const element = document.getElementById(`step-${stepKey}`);
- 84:     if (!element) {
- 85:         console.warn(`[DOM] Step element not found: step-${stepKey}`);
- 86:         console.debug('[DOM] Available step elements:',
- 87:             Array.from(document.querySelectorAll('[id^="step-"]')).map(el => el.id));
- 88:     }
+ 65:                 scrollToStepImmediate(stepKey, { scrollDelay: 0 });
+ 66: 
+ 67:                 soundEvents.workflowStart();
+ 68: 
+ 69:                 await api.runStepAPI(stepKey);
+ 70:             } catch (error) {
+ 71:                 console.error('[EVENT] Error in run button handler:', error);
+ 72:                 showNotification("Erreur lors de l'exécution de l'étape", 'error');
+ 73:             }
+ 74:         });
+ 75:     });
+ 76: 
+ 77:     const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
+ 78:     cancelButtons.forEach(button => {
+ 79:         button.addEventListener('click', async () => {
+ 80:             try {
+ 81:                 const stepKey = button.dataset.step;
+ 82:                 await api.cancelStepAPI(stepKey);
+ 83:             } catch (error) {
+ 84:                 console.error('[EVENT] Error in cancel button handler:', error);
+ 85:                 showNotification("Erreur lors de l'annulation de l'étape", 'error');
+ 86:             }
+ 87:         });
+ 88:     });
  89: 
- 90:     return element;
- 91: }
- 92: 
- 93: // Validate DOM structure for debugging
- 94: export function validateDOMStructure() {
- 95:     const results = {
- 96:         stepElements: getAllStepDivs().length,
- 97:         runButtons: getAllRunButtons().length,
- 98:         cancelButtons: getAllCancelButtons().length,
- 99:         workflowWrapper: !!getWorkflowWrapper(),
-100:         stepsColumn: !!getStepsColumn(),
-101:         issues: []
-102:     };
+ 90:     const logsAutoOpenToggle = resolveElement(dom.getLogsAutoOpenToggle, dom.logsAutoOpenToggle);
+ 91:     if (logsAutoOpenToggle) {
+ 92:         const savedPreference = localStorage.getItem('autoOpenLogOverlay');
+ 93:         const initialValue = savedPreference === null ? getAutoOpenLogOverlay() : savedPreference === 'true';
+ 94:         logsAutoOpenToggle.checked = initialValue;
+ 95:         setAutoOpenLogOverlay(initialValue);
+ 96:         logsAutoOpenToggle.addEventListener('change', (event) => {
+ 97:             const enabled = event.target.checked;
+ 98:             localStorage.setItem('autoOpenLogOverlay', enabled.toString());
+ 99:             setAutoOpenLogOverlay(enabled);
+100:             console.log(`[EVENT] Auto log overlay ${enabled ? 'enabled' : 'disabled'} by user`);
+101:         });
+102:     }
 103: 
-104:     // Check for common issues
-105:     if (results.stepElements === 0) {
-106:         results.issues.push('No step elements found (.step)');
-107:     }
-108: 
-109:     if (!results.workflowWrapper) {
-110:         results.issues.push('Workflow wrapper not found (#workflow-wrapper)');
-111:     }
-112: 
-113:     if (!results.stepsColumn) {
-114:         results.issues.push('Steps column not found (#steps-column)');
-115:     }
-116: 
-117:     console.debug('[DOM] Structure validation:', results);
-118:     return results;
-119: }
-120: 
-121: // Legacy exports for backward compatibility (will be deprecated)
-122: export const allStepDivs = getAllStepDivs();
-123: export const allRunButtons = getAllRunButtons();
-124: export const allCancelButtons = getAllCancelButtons();
-125: export const allSpecificLogButtons = getAllSpecificLogButtons();
-126: export const closeLogPanelButton = document.getElementById('close-log-panel');
+104:     const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
+105:     specificLogButtons.forEach(button => {
+106:         button.addEventListener('click', async () => {
+107:             const stepKey = button.dataset.step;
+108:             const logIndex = button.dataset.logIndex;
+109:             const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
+110: 
+111:             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
+112:                 ui.openLogPanelUI(stepKey, true);
+113:                 try {
+114:                     const statusResponse = await fetch(`/status/${stepKey}`);
+115:                     if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
+116:                     const statusData = await statusResponse.json();
+117:                     ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');
+118:                 } catch (error) {
+119:                     console.error("Erreur chargement statut pour log panel:", error);
+120:                     ui.updateMainLogOutputUI(`<i>Erreur chargement log principal: ${error.message}</i>`);
+121:                 }
+122:             }
+123:             // Pass the clicked button to enable loading state (spinner + disabled)
+124:             await api.fetchSpecificLogAPI(stepKey, logIndex, button.textContent.trim(), button);
+125:         });
+126:     });
 127: 
-128: export const localDownloadsList = document.getElementById('local-downloads-list');
-129: 
-130: 
-131: 
-132: // ÉLÉMENTS POUR LE CONTRÔLE SONORE
-133: export const soundToggle = document.getElementById('sound-toggle');
-134: export const soundStatus = document.getElementById('sound-status');
-135: export const soundControlWidget = document.getElementById('sound-control-widget');
-136: 
-137: 
-138: // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
-139: export const settingsToggle = document.getElementById('settings-toggle');
-140: export const settingsPanel = document.getElementById('settings-panel');
-141: 
-142: // New getter functions for lazy DOM access
-143: export const getCloseLogPanelButton = () => byId('close-log-panel');
-144: export const getLocalDownloadsList = () => byId('local-downloads-list');
-145: 
-146: // ÉLÉMENTS POUR LE CONTRÔLE SONORE
-147: export const getSoundToggle = () => byId('sound-toggle');
-148: export const getSoundStatus = () => byId('sound-status');
-149: export const getSoundControlWidget = () => byId('sound-control-widget');
+128:     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+129:     if (runAllButton) {
+130:         runAllButton.addEventListener('click', async () => {
+131:             if (getIsAnySequenceRunning()) {
+132:                 showNotification("Séquence déjà en cours.", 'warning'); return;
+133:             }
+134:             // Play workflow start sound for complete sequence 1-6
+135:             soundEvents.workflowStart();
+136:             await runStepSequence(defaultSequenceableStepsKeys, "Séquence 0-4");
+137:         });
+138:     }
+139: 
+140:     const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+141:     customSequenceCheckboxes.forEach(checkbox => {
+142:         checkbox.addEventListener('change', (event) => {
+143:             const stepKey = event.target.dataset.stepKey;
+144:             const stepCard = document.getElementById(`step-${stepKey}`);
+145:             const orderNumberEl = document.getElementById(`order-${stepKey}`);
+146:             let currentOrder = getSelectedStepsOrder();
+147: 
+148:             // Play checkbox interaction sound
+149:             soundEvents.checkboxInteraction();
 150: 
-151: // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
-152: export const getSettingsToggle = () => byId('settings-toggle');
-153: export const getSettingsPanel = () => byId('settings-panel');
+151:             if (event.target.checked) {
+152:                 if (!currentOrder.includes(stepKey)) {
+153:                     currentOrder.push(stepKey);
+154:                     if (stepCard) stepCard.classList.add('custom-sequence-selected');
+155:                 }
+156:             } else {
+157:                 const index = currentOrder.indexOf(stepKey);
+158:                 if (index > -1) currentOrder.splice(index, 1);
+159:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
+160:             }
+161:             setSelectedStepsOrder(currentOrder);
+162:             document.querySelectorAll('.step-selection-order-number').forEach(el => { el.textContent = ''; });
+163:             getSelectedStepsOrder().forEach((sk, idx) => {
+164:                 const orderEl = document.getElementById(`order-${sk}`);
+165:                 if (orderEl) orderEl.textContent = idx + 1;
+166:             });
+167:             ui.updateCustomSequenceButtonsUI();
+168:         });
+169:     });
+170: 
+171:     const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+172:     if (clearCustomSequenceButton) {
+173:         clearCustomSequenceButton.addEventListener('click', () => {
+174:             setSelectedStepsOrder([]);
+175:             customSequenceCheckboxes.forEach(cb => {
+176:                 cb.checked = false;
+177:                 const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
+178:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
+179:                 const orderEl = document.getElementById(`order-${cb.dataset.stepKey}`);
+180:                 if (orderEl) orderEl.textContent = '';
+181:             });
+182:             ui.updateCustomSequenceButtonsUI();
+183:         });
+184:     }
+185: 
+186:     const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+187:     if (runCustomSequenceButton) {
+188:         runCustomSequenceButton.addEventListener('click', () => {
+189:             if (getSelectedStepsOrder().length === 0) {
+190:                 showNotification("Veuillez sélectionner au moins une étape.", 'warning');
+191:                 return;
+192:             }
+193:             if (getIsAnySequenceRunning()) {
+194:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
+195:             }
+196:             showCustomSequenceConfirmUI();
+197:         });
+198:     }
+199: 
+200:     const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
+201:     const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
+202:     if (confirmRunCustomSequenceButton) {
+203:         confirmRunCustomSequenceButton.addEventListener('click', async () => {
+204:             closePopupUI(customSequenceConfirmOverlay);
+205:             if (getIsAnySequenceRunning()) {
+206:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
+207:             }
+208:             // Loading state on confirm button and disable run-custom while executing
+209:             try {
+210:                 confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
+211:                 confirmRunCustomSequenceButton.disabled = true;
+212:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = true;
+213: 
+214:                 // Play workflow start sound for custom sequence
+215:                 soundEvents.workflowStart();
+216:                 await runStepSequence(getSelectedStepsOrder(), "Séquence Personnalisée");
+217:             } finally {
+218:                 confirmRunCustomSequenceButton.removeAttribute('data-loading');
+219:                 confirmRunCustomSequenceButton.disabled = false;
+220:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = getIsAnySequenceRunning();
+221:             }
+222:         });
+223:     }
+224: 
+225:     const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
+226:     if (cancelRunCustomSequenceButton) {
+227:         cancelRunCustomSequenceButton.addEventListener('click', () => {
+228:             closePopupUI(customSequenceConfirmOverlay);
+229:         });
+230:     }
+231:     const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
+232:     const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
+233:     if (closeSummaryPopupButton) {
+234:         closeSummaryPopupButton.addEventListener('click', () => {
+235:             closePopupUI(sequenceSummaryOverlay);
+236:         });
+237:     }
+238: 
+239:     if (dom.getSoundToggle()) {
+240:         import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
+241:             const isEnabled = isSoundEnabled();
+242:             dom.getSoundToggle().checked = isEnabled;
+243:             if (dom.getSoundStatus()) {
+244:                 dom.getSoundStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
+245:             }
+246: 
+247:             dom.getSoundToggle().addEventListener('change', (event) => {
+248:                 const enabled = event.target.checked;
+249:                 setSoundEnabled(enabled);
+250:                 if (dom.getSoundStatus()) {
+251:                     dom.getSoundStatus().textContent = enabled ? 'Activé' : 'Désactivé';
+252:                 }
+253:                 console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
+254:             });
+255:         });
+256:     }
+257: }
 ```
 
 ## File: static/main.js
@@ -34610,1077 +34123,1484 @@ app_new.py
 624: }
 ```
 
+## File: templates/index_new.html
+```html
+  1: <!DOCTYPE html>
+  2: <html lang="fr">
+  3: 
+  4: <head>
+  5:     <meta charset="UTF-8">
+  6:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  7:     <title>Workflow Manager</title>
+  8:     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
+  9:     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
+ 10:     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ cache_buster }}">
+ 11:     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v={{ cache_buster }}">
+ 12: 
+ 13:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}?v={{ cache_buster }}">
+ 14:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/controls.css') }}?v={{ cache_buster }}">
+ 15:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/steps.css') }}?v={{ cache_buster }}">
+ 16:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/logs.css') }}?v={{ cache_buster }}">
+ 17:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/workflow-buttons.css') }}?v={{ cache_buster }}">
+ 18:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/popups.css') }}?v={{ cache_buster }}">
+ 19:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
+ 20:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
+ 21:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
+ 22:     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
+ 23:     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
+ 24: </head>
+ 25: 
+ 26: <body>
+ 27:     <div id="notifications-area" aria-live="assertive"></div>
+ 28: 
+ 29:     <div class="topbar-affix" id="topbar-affix">
+ 30:         <div class="unified-controls-section unified-controls--topbar" id="topbar-controls">
+ 31:             <div class="workflow-controls">
+ 32:                 <div class="sequence-controls">
+ 33:                     <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
+ 34:                         <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-7)</button>
+ 35:                     </div>
+ 36:                     <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
+ 37:                         <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
+ 38:                         <button id="clear-custom-sequence-button" disabled>🗑️ Vider Séquence</button>
+ 39:                         <button id="toggle-local-downloads" class="downloads-toggle" aria-pressed="true" title="Afficher/Masquer les Téléchargements Locaux">📥 Téléchargements</button>
+ 40:                         <button id="settings-toggle" class="settings-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel" title="Afficher les options">⚙️ Settings</button>
+ 41:                     </div>
+ 42:                 </div>
+ 43:             </div>
+ 44: 
+ 45:             <div class="global-progress-affix" id="global-progress-affix">
+ 46:                 <div class="global-progress-container" id="global-progress-container">
+ 47:                     <div id="global-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+ 48:                 </div>
+ 49:                 <div id="global-progress-text" aria-live="polite"></div>
+ 50:             </div>
+ 51:             <div id="settings-panel" class="settings-panel" hidden>
+ 52:                 <section class="settings-section" aria-label="Affichage et préférences">
+ 53:                     <p class="settings-title">Affichage & Préférences</p>
+ 54:                     <div class="settings-row settings-row--stacked">
+ 55:                         <div class="theme-selector-container settings-block">
+ 56:                             <label for="theme-selector" class="theme-selector-label">Thème:</label>
+ 57:                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
+ 58:                             </select>
+ 59:                         </div>
+ 60: 
+ 61:                         <div id="sound-control-widget" class="sound-control-widget settings-block">
+ 62:                             <label class="btn-like-switch" for="sound-toggle" aria-label="Activer/Désactiver les effets sonores">
+ 63:                                 🔊 Effets Sonores
+ 64:                                 <input type="checkbox" id="sound-toggle" checked>
+ 65:                             </label>
+ 66:                         </div>
+ 67: 
+ 68:                         <div class="settings-block">
+ 69:                             <label class="btn-like-switch" for="logs-auto-open-toggle" aria-label="Activer/Désactiver l'ouverture auto du panneau de logs">
+ 70:                                 📟 Auto-ouverture des logs
+ 71:                                 <input type="checkbox" id="logs-auto-open-toggle" checked>
+ 72:                             </label>
+ 73:                             <small class="settings-helper">Ouvrir automatiquement la popup de logs lors du lancement d'une étape.</small>
+ 74:                         </div>
+ 75:                     </div>
+ 76:                 </section>
+ 77: 
+ 78:                         </div>
+ 79:         </div>
+ 80: 
+ 81:     </div>
+ 82: 
+ 83:     <div id="topbar-spacer" aria-hidden="true"></div>
+ 84: 
+ 85:     <div class="local-downloads-section card-like-section">
+ 86:         <h2>
+ 87:             <span class="section-icon">📥</span> Téléchargements Locaux
+ 88:         </h2>
+ 89:         <div class="local-downloads-list-container">
+ 90:             <ul id="local-downloads-list" class="status-list" aria-live="polite">
+ 91:                 <li class="placeholder">Aucune activité de téléchargement locale récente.</li>
+ 92:             </ul>
+ 93:         </div>
+ 94:     </div>
+ 95: 
+ 96:     <div class="workflow-wrapper compact-mode" id="workflow-wrapper">
+ 97:         <div class="steps-column" id="steps-column">
+ 98:             <section id="workflow-steps" class="workflow-pipeline" role="region" aria-label="Pipeline de traitement">
+ 99:                 <div class="pipeline-timeline" role="list">
+100:                     <div class="timeline-axis" aria-hidden="true"></div>
+101:                     {% for step_key, config in steps_config.items() %}
+102:                     {% if config %}
+103:                     <div class="timeline-row">
+104:                         <div class="timeline-rail-column" aria-hidden="true">
+105:                             <div class="timeline-node" data-step="{{ step_key }}"></div>
+106:                         </div>
+107:                         <div class="timeline-cards-column">
+108:                             <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0" aria-controls="step-details-panel" aria-expanded="false">
+109:                                 <div class="timeline-content">
+110:                             <div class="timeline-head">
+111:                                 <div class="step-title-group">
+112:                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
+113:                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
+114:                                 </div>
+115:                                 <div class="step-selection-control">
+116:                                     <span class="step-selection-order-number" id="order-{{step_key}}"></span>
+117:                                     <input type="checkbox" class="custom-sequence-checkbox" data-step-key="{{ step_key }}" title="Sélectionner pour séquence personnalisée" aria-label="Sélectionner {{ config.display_name }} pour séquence personnalisée">
+118:                                 </div>
+119:                             </div>
+120:                             <div class="node-actions step-controls">
+121:                                 <button class="run-button" data-step="{{ step_key }}">Lancer</button>
+122:                                 <button class="cancel-button" data-step="{{ step_key }}" disabled>Annuler</button>
+123:                             </div>
+124:                             <div class="timeline-body">
+125:                                 <div class="status-line">
+126:                                     Statut:
+127:                                     <span id="status-{{ step_key }}" class="status-badge status-idle" aria-live="polite">Prêt</span>
+128:                                     <span class="timer" id="timer-{{ step_key }}"></span>
+129:                                 </div>
+130:                                 <div class="step-progress-container" id="progress-container-{{ step_key }}" style="display: none;">
+131:                                     <div class="progress-bar-wrapper">
+132:                                         <div class="progress-bar-step" id="progress-bar-{{ step_key }}" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+133:                                     </div>
+134:                                     <div class="progress-text-step" id="progress-text-{{ step_key }}" aria-live="polite"></div>
+135:                                 </div>
+136:                                 {% if config.specific_logs %}
+137:                                 <div class="specific-log-controls-wrapper">
+138:                                     <h4>Logs Spécifiques :</h4>
+139:                                     <div id="log-panel-specific-buttons-container-{{ step_key }}">
+140:                                         {% for log_conf in config.specific_logs %}
+141:                                         <button class="specific-log-button" data-step="{{ step_key }}" data-log-index="{{ loop.index0 }}">{{ log_conf.name }}</button>
+142:                                         {% endfor %}
+143:                                     </div>
+144:                                 </div>
+145:                                 {% endif %}
+146:                             </div>
+147:                         </div>
+148:                     </div>
+149:                         </div>
+150:                     </div>
+151:                     {% endif %}
+152:                     {% endfor %}
+153:                 </div>
+154:                 <div class="timeline-scroll-spacer" aria-hidden="true"></div>
+155:                 <aside id="step-details-panel" class="step-details-panel" role="complementary" aria-label="Détails de l'étape" hidden>
+156:                     <div class="step-details-header">
+157:                         <div class="step-details-title" id="step-details-title">Détails</div>
+158:                         <button id="close-step-details" class="step-details-close" type="button" aria-label="Fermer le panneau détails">×</button>
+159:                     </div>
+160:                     <div class="step-details-body">
+161:                         <div class="step-details-meta">
+162:                             <span id="step-details-status" class="status-badge status-idle" aria-live="polite">Prêt</span>
+163:                             <span id="step-details-timer" class="timer"></span>
+164:                         </div>
+165:                         <div class="step-details-progress">
+166:                             <div id="step-details-progress-text" class="progress-text-step" aria-live="polite"></div>
+167:                         </div>
+168:                         <div class="step-details-actions">
+169:                             <button id="step-details-run" class="run-button" type="button" disabled>Lancer</button>
+170:                             <button id="step-details-cancel" class="cancel-button" type="button" disabled>Annuler</button>
+171:                             <button id="step-details-open-logs" class="step-details-open-logs" type="button" disabled>Logs</button>
+172:                         </div>
+173:                     </div>
+174:                 </aside>
+175:             </section>
+176:         </div>
+177:     </div>
+178: 
+179:     <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
+180:         <div class="popup-content">
+181:             <h3 id="sequence-summary-title">Résumé de la Séquence</h3>
+182:             <ul id="sequence-summary-list" class="popup-list"></ul>
+183:             <button id="close-summary-popup" class="popup-cancel-button">Fermer</button>
+184:         </div>
+185:     </div>
+186:     <div id="custom-sequence-confirm-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-sequence-confirm-title">
+187:         <div class="popup-content">
+188:             <h3 id="custom-sequence-confirm-title">Confirmer la Séquence Personnalisée</h3>
+189:             <p>
+190:                 Les étapes suivantes seront lancées dans cet ordre :
+191:             </p>
+192:             <ul id="custom-sequence-confirm-list" class="popup-list"></ul>
+193:             <div class="popup-buttons">
+194:                 <button id="confirm-run-custom-sequence-button" class="popup-confirm-button">Lancer la Séquence</button>
+195:                 <button id="cancel-run-custom-sequence-button" class="popup-cancel-button">Annuler</button>
+196:             </div>
+197:         </div>
+198:     </div>
+199: 
+200:     <div id="system-monitor-widget" class="system-monitor-widget">
+201:         <div class="monitor-header">
+202:             <span class="monitor-icon">💻</span>
+203:             <span class="monitor-title">Moniteur Système</span>
+204:             <button id="system-monitor-minimize" class="monitor-close" aria-label="Réduire le moniteur" title="Réduire (affichage compact)">×</button>
+205:         </div>
+206:         <div id="monitor-compact-line" class="monitor-compact-line" aria-hidden="true" style="display:none;">
+207:             C: <span id="compact-cpu"></span> · R: <span id="compact-ram"></span> · G: <span id="compact-gpu"></span>
+208:         </div>
+209:         <div class="monitor-item">
+210:             <span class="monitor-label">CPU</span>
+211:             <div class="monitor-bar-container">
+212:                 <div id="cpu-monitor-bar" class="monitor-bar"></div>
+213:             </div>
+214:             <span id="cpu-monitor-value" class="monitor-value">... %</span>
+215:         </div>
+216:         <div class="monitor-item">
+217:             <span class="monitor-label">RAM</span>
+218:             <div class="monitor-bar-container">
+219:                 <div id="ram-monitor-bar" class="monitor-bar"></div>
+220:             </div>
+221:             <span id="ram-monitor-value" class="monitor-value">... %</span>
+222:         </div>
+223:         <div id="ram-monitor-details" class="monitor-details">... / ... GB</div>
+224: 
+225:         <div id="gpu-monitor-section" style="display: none;">
+226:             <div class="monitor-item">
+227:                 <span class="monitor-label">GPU</span>
+228:                 <div class="monitor-bar-container">
+229:                     <div id="gpu-monitor-bar" class="monitor-bar"></div>
+230:                 </div>
+231:                 <span id="gpu-monitor-value" class="monitor-value">... %</span>
+232:             </div>
+233:             <div id="gpu-monitor-details" class="monitor-details">... °C | ... / ... GB</div>
+234:         </div>
+235:         <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
+236:     </div>
+237: 
+238:     <div class="logs-overlay-container popup-overlay" id="logs-column-global">
+239:         <div class="logs-content-wrapper">
+240:             <div class="log-panel-header">
+241:                 <div class="log-panel-header-main">
+242:                     <span id="log-panel-title">Logs</span>
+243:                     <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
+244:                 </div>
+245:                 <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
+246:                     <span id="log-panel-context-step">Aucune étape active</span>
+247:                     <span id="log-panel-context-status"></span>
+248:                     <span id="log-panel-context-timer"></span>
+249:                 </div>
+250:                 <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
+251:             </div>
+252:             <div class="log-container" id="main-log-container-panel">
+253:                 <div class="log-header">
+254:                     Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
+255:                 </div>
+256:                 <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
+257:             </div>
+258:             <div class="log-container" id="specific-log-container-panel" style="display:none;">
+259:                 <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
+260:                 <div class="specific-log-path" id="specific-log-path-info-panel"></div>
+261:                 <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
+262:             </div>
+263:         </div>
+264:     </div>
+265: 
+266: 
+267:     <script id="steps-config-data" type="application/json">{{ steps_config | tojson | safe }}</script>
+268:     <script src="{{ url_for('static', filename='main.js') }}?v={{ cache_buster }}" type="module" defer></script>
+269: </body>
+270: 
+271: </html>
+```
+
+## File: static/domElements.js
+```javascript
+  1: const _SAFE_STEP_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+  2: 
+  3: function byId(id) {
+  4:     return document.getElementById(id);
+  5: }
+  6: 
+  7: function bySelectorAll(selector) {
+  8:     return document.querySelectorAll(selector);
+  9: }
+ 10: 
+ 11: export const getWorkflowWrapper = () => byId('workflow-wrapper');
+ 12: export const getStepsColumn = () => byId('steps-column');
+ 13: export const getLogsColumnGlobal = () => byId('logs-column-global');
+ 14: export const getLogPanelTitle = () => byId('log-panel-title');
+ 15: export const getLogPanelSubheader = () => byId('log-panel-subheader');
+ 16: export const getLogPanelContextStep = () => byId('log-panel-context-step');
+ 17: export const getLogPanelContextStatus = () => byId('log-panel-context-status');
+ 18: export const getLogPanelContextTimer = () => byId('log-panel-context-timer');
+ 19: export const getLogPanelSpecificButtonsContainer = () => byId('log-panel-specific-buttons-container');
+ 20: export const getMainLogContainerPanel = () => byId('main-log-container-panel');
+ 21: export const getMainLogOutputPanel = () => byId('main-log-output-panel');
+ 22: export const getCurrentStepLogNamePanel = () => byId('current-step-log-name-panel');
+ 23: export const getSpecificLogContainerPanel = () => byId('specific-log-container-panel');
+ 24: export const getSpecificLogHeaderTextPanel = () => byId('specific-log-header-text-panel');
+ 25: export const getSpecificLogPathInfoPanel = () => byId('specific-log-path-info-panel');
+ 26: export const getSpecificLogOutputContentPanel = () => byId('specific-log-output-content-panel');
+ 27: export const getRunAllButton = () => byId('run-all-steps-button');
+ 28: export const getTopbarAffix = () => byId('topbar-affix');
+ 29: export const getTopbarControls = () => byId('topbar-controls');
+ 30: export const getGlobalProgressAffix = () => byId('global-progress-affix');
+ 31: export const getGlobalProgressContainer = () => byId('global-progress-container');
+ 32: export const getGlobalProgressBar = () => byId('global-progress-bar');
+ 33: export const getGlobalProgressText = () => byId('global-progress-text');
+ 34: export const getSequenceSummaryPopupOverlay = () => byId('sequence-summary-popup-overlay');
+ 35: export const getSequenceSummaryList = () => byId('sequence-summary-list');
+ 36: export const getCloseSummaryPopupButton = () => byId('close-summary-popup');
+ 37: export const getRunCustomSequenceButton = () => byId('run-custom-sequence-button');
+ 38: export const getClearCustomSequenceButton = () => byId('clear-custom-sequence-button');
+ 39: export const getCustomSequenceCheckboxes = () => bySelectorAll('.custom-sequence-checkbox');
+ 40: export const getCustomSequenceConfirmPopupOverlay = () => byId('custom-sequence-confirm-popup-overlay');
+ 41: export const getCustomSequenceConfirmList = () => byId('custom-sequence-confirm-list');
+ 42: export const getConfirmRunCustomSequenceButton = () => byId('confirm-run-custom-sequence-button');
+ 43: export const getCancelRunCustomSequenceButton = () => byId('cancel-run-custom-sequence-button');
+ 44: export const getNotificationsArea = () => byId('notifications-area');
+ 45: 
+ 46: // Lazy DOM element getters to ensure elements are available when accessed
+ 47: export function getAllStepDivs() {
+ 48:     const elements = document.querySelectorAll('.step');
+ 49:     console.debug(`[DOM] getAllStepDivs found ${elements.length} elements`);
+ 50:     return elements;
+ 51: }
+ 52: 
+ 53: export function getAllRunButtons() {
+ 54:     const elements = document.querySelectorAll('.run-button');
+ 55:     console.debug(`[DOM] getAllRunButtons found ${elements.length} elements`);
+ 56:     return elements;
+ 57: }
+ 58: 
+ 59: export function getAllCancelButtons() {
+ 60:     const elements = document.querySelectorAll('.cancel-button');
+ 61:     console.debug(`[DOM] getAllCancelButtons found ${elements.length} elements`);
+ 62:     return elements;
+ 63: }
+ 64: 
+ 65: export function getAllSpecificLogButtons() {
+ 66:     const elements = document.querySelectorAll('.specific-log-button');
+ 67:     console.debug(`[DOM] getAllSpecificLogButtons found ${elements.length} elements`);
+ 68:     return elements;
+ 69: }
+ 70: 
+ 71: // Enhanced step element getter with validation
+ 72: export function getStepElement(stepKey) {
+ 73:     if (!stepKey) {
+ 74:         console.warn('[DOM] getStepElement called with invalid stepKey:', stepKey);
+ 75:         return null;
+ 76:     }
+ 77: 
+ 78:     if (!_SAFE_STEP_KEY_PATTERN.test(String(stepKey))) {
+ 79:         console.warn('[DOM] getStepElement called with unsafe stepKey (refusing to query by id):', stepKey);
+ 80:         return null;
+ 81:     }
+ 82: 
+ 83:     const element = document.getElementById(`step-${stepKey}`);
+ 84:     if (!element) {
+ 85:         console.warn(`[DOM] Step element not found: step-${stepKey}`);
+ 86:         console.debug('[DOM] Available step elements:',
+ 87:             Array.from(document.querySelectorAll('[id^="step-"]')).map(el => el.id));
+ 88:     }
+ 89: 
+ 90:     return element;
+ 91: }
+ 92: 
+ 93: // Validate DOM structure for debugging
+ 94: export function validateDOMStructure() {
+ 95:     const results = {
+ 96:         stepElements: getAllStepDivs().length,
+ 97:         runButtons: getAllRunButtons().length,
+ 98:         cancelButtons: getAllCancelButtons().length,
+ 99:         workflowWrapper: !!getWorkflowWrapper(),
+100:         stepsColumn: !!getStepsColumn(),
+101:         issues: []
+102:     };
+103: 
+104:     // Check for common issues
+105:     if (results.stepElements === 0) {
+106:         results.issues.push('No step elements found (.step)');
+107:     }
+108: 
+109:     if (!results.workflowWrapper) {
+110:         results.issues.push('Workflow wrapper not found (#workflow-wrapper)');
+111:     }
+112: 
+113:     if (!results.stepsColumn) {
+114:         results.issues.push('Steps column not found (#steps-column)');
+115:     }
+116: 
+117:     console.debug('[DOM] Structure validation:', results);
+118:     return results;
+119: }
+120: 
+121: // Legacy exports for backward compatibility (will be deprecated)
+122: export const allStepDivs = getAllStepDivs();
+123: export const allRunButtons = getAllRunButtons();
+124: export const allCancelButtons = getAllCancelButtons();
+125: export const allSpecificLogButtons = getAllSpecificLogButtons();
+126: export const closeLogPanelButton = document.getElementById('close-log-panel');
+127: 
+128: export const localDownloadsList = document.getElementById('local-downloads-list');
+129: 
+130: 
+131: 
+132: // ÉLÉMENTS POUR LE CONTRÔLE SONORE
+133: export const soundToggle = document.getElementById('sound-toggle');
+134: export const soundStatus = document.getElementById('sound-status');
+135: export const soundControlWidget = document.getElementById('sound-control-widget');
+136: 
+137: 
+138: // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
+139: export const settingsToggle = document.getElementById('settings-toggle');
+140: export const settingsPanel = document.getElementById('settings-panel');
+141: 
+142: // New getter functions for lazy DOM access
+143: export const getCloseLogPanelButton = () => byId('close-log-panel');
+144: export const getLocalDownloadsList = () => byId('local-downloads-list');
+145: 
+146: // ÉLÉMENTS POUR LE CONTRÔLE SONORE
+147: export const getSoundToggle = () => byId('sound-toggle');
+148: export const getSoundStatus = () => byId('sound-status');
+149: export const getSoundControlWidget = () => byId('sound-control-widget');
+150: 
+151: // Toggle auto ouverture logs
+152: export const logsAutoOpenToggle = document.getElementById('logs-auto-open-toggle');
+153: export const getLogsAutoOpenToggle = () => byId('logs-auto-open-toggle');
+154: 
+155: // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
+156: export const getSettingsToggle = () => byId('settings-toggle');
+157: export const getSettingsPanel = () => byId('settings-panel');
+```
+
 ## File: static/uiUpdater.js
 ```javascript
    1: import { formatElapsedTime, showNotification } from './utils.js';
    2: import * as dom from './domElements.js';
    3: import { appState } from './state/AppState.js';
-   4: import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
-   5: 
-   6: const lastProgressTextByStep = {};
-   7: 
-   8: const _lastAutoCenterTsByStep = {};
-   9: const _AUTO_CENTER_THROTTLE_MS = 700;
-  10: 
-  11: import { soundEvents } from './soundManager.js';
-  12: import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
-  13: import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
-  14: 
-  15: let _stepDetailsPanelModulePromise = null;
+   4: import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLogOverlay } from './state.js';
+   5: import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
+   6: 
+   7: const lastProgressTextByStep = {};
+   8: 
+   9: const _lastAutoCenterTsByStep = {};
+  10: const _AUTO_CENTER_THROTTLE_MS = 700;
+  11: 
+  12: import { soundEvents } from './soundManager.js';
+  13: import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
+  14: import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
+  15: import { openPopupUI, closePopupUI } from './popupManager.js';
   16: 
-  17: const STATUS_UI_MAP = {
-  18:     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
-  19:     starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
-  20:     initiated: { label: 'Initialisation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
-  21:     completed: { label: 'Terminé', badgeClass: 'status-completed', chipClass: 'state-success', icon: '✅' },
-  22:     success: { label: 'Terminé', badgeClass: 'status-success', chipClass: 'state-success', icon: '✅' },
-  23:     failed: { label: 'Échec', badgeClass: 'status-failed', chipClass: 'state-error', icon: '❌' },
-  24:     error: { label: 'Erreur', badgeClass: 'status-error', chipClass: 'state-error', icon: '⚠️' },
-  25:     cancelled: { label: 'Annulé', badgeClass: 'status-cancelled', chipClass: 'state-error', icon: '⛔' },
-  26:     warning: { label: 'Attention', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⚠️' },
-  27:     paused: { label: 'En pause', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏸️' },
-  28:     idle: { label: 'Prêt', badgeClass: 'status-idle', chipClass: 'state-idle', icon: '🕒' },
-  29:     pending: { label: 'En attente', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏳' }
-  30: };
-  31: 
-  32: let STEPS_CONFIG_FROM_SERVER = {};
-  33: export function setStepsConfig(config) {
-  34:     STEPS_CONFIG_FROM_SERVER = config;
-  35: }
-  36: 
-  37: function getWorkflowWrapperElement() {
-  38:     return typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
-  39: }
-  40: 
-  41: function getLogsColumnElement() {
-  42:     return typeof dom.getLogsColumnGlobal === 'function' ? dom.getLogsColumnGlobal() : dom.logsColumnGlobal;
-  43: }
-  44: 
-  45: function resolveElement(getterFn, legacyValue = null) {
-  46:     if (typeof getterFn === 'function') {
-  47:         try {
-  48:             return getterFn();
-  49:         } catch (_) {
-  50:             return legacyValue || null;
-  51:         }
-  52:     }
-  53:     return legacyValue || null;
-  54: }
-  55: 
-  56: function getIsAnySequenceRunning() {
-  57:     return !!appState.getStateProperty('isAnySequenceRunning');
-  58: }
-  59: 
-  60: function getActiveStepKeyForLogs() {
-  61:     return appState.getStateProperty('activeStepKeyForLogsPanel');
-  62: }
-  63: 
-  64: function setActiveStepKeyForLogs(stepKey) {
-  65:     appState.setState({ activeStepKeyForLogsPanel: stepKey }, 'setActiveStepKeyForLogs');
-  66: }
-  67: 
-  68: function getSelectedStepsOrder() {
-  69:     return appState.getStateProperty('selectedStepsOrder') || [];
-  70: }
-  71: 
-  72: function getProcessInfo(stepKey) {
-  73:     if (!stepKey) return null;
-  74:     return appState.getStateProperty(`processInfo.${stepKey}`) || null;
-  75: }
-  76: 
-  77: function setProcessInfo(stepKey, info) {
-  78:     if (!stepKey) return;
-  79:     appState.setState({ processInfo: { [stepKey]: info } }, 'process_info_update');
-  80: }
-  81: 
-  82: function getStepTimers() {
-  83:     return appState.getStateProperty('stepTimers') || {};
-  84: }
-  85: 
-  86: function getStepTimer(stepKey) {
-  87:     return getStepTimers()[stepKey];
-  88: }
-  89: 
-  90: function setStepTimer(stepKey, timerData, source = 'setStepTimer') {
-  91:     const timers = getStepTimers();
-  92:     appState.setState({ stepTimers: { ...timers, [stepKey]: timerData } }, source);
-  93: }
-  94: 
-  95: function deleteStepTimer(stepKey) {
-  96:     const timers = getStepTimers();
-  97:     if (!timers || !Object.prototype.hasOwnProperty.call(timers, stepKey)) return;
-  98:     const { [stepKey]: _removed, ...remaining } = timers;
-  99:     appState.setState({ stepTimers: remaining }, 'deleteStepTimer');
- 100: }
- 101: 
- 102: function onWrapperTransitionEndOnce(callback, fallbackMs = 500) {
- 103:     const el = getWorkflowWrapperElement();
- 104:     if (!el) { callback(); return; }
- 105:     let called = false;
- 106:     const handler = (e) => {
- 107:         if (called) return;
- 108:         called = true;
- 109:         el.removeEventListener('transitionend', handler);
- 110:         callback();
- 111:     };
- 112:     el.addEventListener('transitionend', handler, { once: true });
- 113:     setTimeout(() => {
- 114:         if (called) return;
- 115:         try { el.removeEventListener('transitionend', handler); } catch (_) {}
- 116:         callback();
- 117:     }, fallbackMs);
- 118: }
- 119: 
- 120: function hideNonActiveSteps(activeStepKey, hidden) {
- 121:     try {
- 122:         const stepDivs = dom.getAllStepDivs();
- 123:         stepDivs.forEach(el => {
- 124:             const isActive = activeStepKey && el.id === `step-${activeStepKey}`;
- 125:             if (!isActive && hidden) {
- 126:                 el.classList.add('steps-hidden');
- 127:             } else if (isActive && hidden) {
- 128:                 el.classList.remove('steps-hidden');
- 129:             } else if (!hidden) {
- 130:                 el.classList.remove('steps-hidden');
- 131:             }
- 132:         });
- 133:     } catch (e) {
- 134:         console.warn('[UI] hideNonActiveSteps error', e);
- 135:     }
- 136: }
- 137: 
- 138: let previousDownloadIds = new Set();
- 139: export function getStepsConfig() {
- 140:     return STEPS_CONFIG_FROM_SERVER;
- 141: }
- 142: 
- 143: function normalizeStatus(status) {
- 144:     return typeof status === 'string' ? status.toLowerCase() : 'idle';
- 145: }
- 146: 
- 147: function getStatusMeta(status) {
- 148:     const normalized = normalizeStatus(status);
- 149:     return STATUS_UI_MAP[normalized] || STATUS_UI_MAP.idle;
- 150: }
- 151: 
- 152: function getStepDisplayNameForLogPanel(stepKey) {
- 153:     if (!stepKey) return '';
- 154:     const config = getStepsConfig();
- 155:     const stepConfig = config ? config[stepKey] : null;
- 156:     if (stepConfig && stepConfig.display_name) return stepConfig.display_name;
- 157: 
- 158:     const stepEl = document.getElementById(`step-${stepKey}`);
- 159:     const datasetName = stepEl && stepEl.dataset ? stepEl.dataset.stepName : null;
- 160:     if (datasetName) return datasetName;
+  17: let _stepDetailsPanelModulePromise = null;
+  18: 
+  19: const STATUS_UI_MAP = {
+  20:     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
+  21:     starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
+  22:     initiated: { label: 'Initialisation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
+  23:     completed: { label: 'Terminé', badgeClass: 'status-completed', chipClass: 'state-success', icon: '✅' },
+  24:     success: { label: 'Terminé', badgeClass: 'status-success', chipClass: 'state-success', icon: '✅' },
+  25:     failed: { label: 'Échec', badgeClass: 'status-failed', chipClass: 'state-error', icon: '❌' },
+  26:     error: { label: 'Erreur', badgeClass: 'status-error', chipClass: 'state-error', icon: '⚠️' },
+  27:     cancelled: { label: 'Annulé', badgeClass: 'status-cancelled', chipClass: 'state-error', icon: '⛔' },
+  28:     warning: { label: 'Attention', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⚠️' },
+  29:     paused: { label: 'En pause', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏸️' },
+  30:     idle: { label: 'Prêt', badgeClass: 'status-idle', chipClass: 'state-idle', icon: '🕒' },
+  31:     pending: { label: 'En attente', badgeClass: 'status-warning', chipClass: 'state-warning', icon: '⏳' }
+  32: };
+  33: 
+  34: let STEPS_CONFIG_FROM_SERVER = {};
+  35: export function setStepsConfig(config) {
+  36:     STEPS_CONFIG_FROM_SERVER = config;
+  37: }
+  38: 
+  39: function getWorkflowWrapperElement() {
+  40:     return typeof dom.getWorkflowWrapper === 'function' ? dom.getWorkflowWrapper() : dom.workflowWrapper;
+  41: }
+  42: 
+  43: function getLogsColumnElement() {
+  44:     return typeof dom.getLogsColumnGlobal === 'function' ? dom.getLogsColumnGlobal() : dom.logsColumnGlobal;
+  45: }
+  46: 
+  47: export function isLogsPanelOpen() {
+  48:     const logsColumn = getLogsColumnElement();
+  49:     if (!logsColumn) return false;
+  50: 
+  51:     if (typeof logsColumn.getAttribute === 'function') {
+  52:         const attrVisible = logsColumn.getAttribute('data-visible');
+  53:         if (attrVisible === 'true') {
+  54:             return true;
+  55:         }
+  56:     }
+  57: 
+  58:     if (logsColumn.dataset && logsColumn.dataset.visible === 'true') {
+  59:         return true;
+  60:     }
+  61: 
+  62:     if (logsColumn.style && typeof logsColumn.style.display === 'string') {
+  63:         return logsColumn.style.display !== 'none';
+  64:     }
+  65: 
+  66:     return false;
+  67: }
+  68: 
+  69: function resolveElement(getterFn, legacyValue = null) {
+  70:     if (typeof getterFn === 'function') {
+  71:         try {
+  72:             return getterFn();
+  73:         } catch (_) {
+  74:             return legacyValue || null;
+  75:         }
+  76:     }
+  77:     return legacyValue || null;
+  78: }
+  79: 
+  80: function getIsAnySequenceRunning() {
+  81:     return !!appState.getStateProperty('isAnySequenceRunning');
+  82: }
+  83: 
+  84: function getActiveStepKeyForLogs() {
+  85:     return appState.getStateProperty('activeStepKeyForLogsPanel');
+  86: }
+  87: 
+  88: function setActiveStepKeyForLogs(stepKey) {
+  89:     if (typeof legacySetActiveStepKeyForLogs === 'function') {
+  90:         legacySetActiveStepKeyForLogs(stepKey);
+  91:     } else {
+  92:         appState.setState({ activeStepKeyForLogsPanel: stepKey }, 'setActiveStepKeyForLogs');
+  93:     }
+  94: }
+  95: 
+  96: function getSelectedStepsOrder() {
+  97:     return appState.getStateProperty('selectedStepsOrder') || [];
+  98: }
+  99: 
+ 100: function getProcessInfo(stepKey) {
+ 101:     if (!stepKey) return null;
+ 102:     return appState.getStateProperty(`processInfo.${stepKey}`) || null;
+ 103: }
+ 104: 
+ 105: function setProcessInfo(stepKey, info) {
+ 106:     if (!stepKey) return;
+ 107:     appState.setState({ processInfo: { [stepKey]: info } }, 'process_info_update');
+ 108: }
+ 109: 
+ 110: function getStepTimers() {
+ 111:     return appState.getStateProperty('stepTimers') || {};
+ 112: }
+ 113: 
+ 114: function getStepTimer(stepKey) {
+ 115:     return getStepTimers()[stepKey];
+ 116: }
+ 117: 
+ 118: function setStepTimer(stepKey, timerData, source = 'setStepTimer') {
+ 119:     const timers = getStepTimers();
+ 120:     appState.setState({ stepTimers: { ...timers, [stepKey]: timerData } }, source);
+ 121: }
+ 122: 
+ 123: function deleteStepTimer(stepKey) {
+ 124:     const timers = getStepTimers();
+ 125:     if (!timers || !Object.prototype.hasOwnProperty.call(timers, stepKey)) return;
+ 126:     const { [stepKey]: _removed, ...remaining } = timers;
+ 127:     appState.setState({ stepTimers: remaining }, 'deleteStepTimer');
+ 128: }
+ 129: 
+ 130: function hideNonActiveSteps(activeStepKey, hidden) {
+ 131:     try {
+ 132:         const stepDivs = dom.getAllStepDivs();
+ 133:         stepDivs.forEach(el => {
+ 134:             const isActive = activeStepKey && el.id === `step-${activeStepKey}`;
+ 135:             if (!isActive && hidden) {
+ 136:                 el.classList.add('steps-hidden');
+ 137:             } else if (isActive && hidden) {
+ 138:                 el.classList.remove('steps-hidden');
+ 139:             } else if (!hidden) {
+ 140:                 el.classList.remove('steps-hidden');
+ 141:             }
+ 142:         });
+ 143:     } catch (e) {
+ 144:         console.warn('[UI] hideNonActiveSteps error', e);
+ 145:     }
+ 146: }
+ 147: 
+ 148: let previousDownloadIds = new Set();
+ 149: export function getStepsConfig() {
+ 150:     return STEPS_CONFIG_FROM_SERVER;
+ 151: }
+ 152: 
+ 153: function normalizeStatus(status) {
+ 154:     return typeof status === 'string' ? status.toLowerCase() : 'idle';
+ 155: }
+ 156: 
+ 157: function getStatusMeta(status) {
+ 158:     const normalized = normalizeStatus(status);
+ 159:     return STATUS_UI_MAP[normalized] || STATUS_UI_MAP.idle;
+ 160: }
  161: 
- 162:     return stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
- 163: }
- 164: 
- 165: function updateLogPanelContextUI(stepKey) {
- 166:     const displayName = stepKey ? getStepDisplayNameForLogPanel(stepKey) : '';
+ 162: function getStepDisplayNameForLogPanel(stepKey) {
+ 163:     if (!stepKey) return '';
+ 164:     const config = getStepsConfig();
+ 165:     const stepConfig = config ? config[stepKey] : null;
+ 166:     if (stepConfig && stepConfig.display_name) return stepConfig.display_name;
  167: 
- 168:     const statusEl = stepKey ? document.getElementById(`status-${stepKey}`) : null;
- 169:     const timerEl = stepKey ? document.getElementById(`timer-${stepKey}`) : null;
- 170: 
- 171:     const contextStepEl = resolveElement(dom.getLogPanelContextStep, dom.logPanelContextStep);
- 172:     const contextStatusEl = resolveElement(dom.getLogPanelContextStatus, dom.logPanelContextStatus);
- 173:     const contextTimerEl = resolveElement(dom.getLogPanelContextTimer, dom.logPanelContextTimer);
+ 168:     const stepEl = document.getElementById(`step-${stepKey}`);
+ 169:     const datasetName = stepEl && stepEl.dataset ? stepEl.dataset.stepName : null;
+ 170:     if (datasetName) return datasetName;
+ 171: 
+ 172:     return stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+ 173: }
  174: 
- 175:     if (contextStepEl) {
- 176:         contextStepEl.textContent = stepKey ? displayName : 'Aucune étape active';
- 177:     }
- 178:     if (contextStatusEl) {
- 179:         contextStatusEl.textContent = statusEl ? (statusEl.textContent || '') : '';
- 180:     }
- 181:     if (contextTimerEl) {
- 182:         contextTimerEl.textContent = timerEl ? (timerEl.textContent || '') : '';
- 183:     }
- 184: }
- 185: 
- 186: function clearLogPanelSpecificButtons() {
- 187:     const container = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
- 188:     if (!container) return;
- 189: 
- 190:     while (container.firstChild) {
- 191:         container.removeChild(container.firstChild);
- 192:     }
- 193: }
- 194: 
- 195: function positionLogsPanelNearActiveStep(stepKey) {
- 196:     if (!stepKey) return;
- 197:     const workflowWrapper = getWorkflowWrapperElement();
- 198:     const logsColumn = getLogsColumnElement();
- 199:     if (!workflowWrapper || !logsColumn) return;
- 200:     if (!workflowWrapper.classList.contains('compact-mode')) return;
- 201: 
- 202:     const activeStepElement = document.getElementById(`step-${stepKey}`);
- 203:     if (!activeStepElement || typeof activeStepElement.getBoundingClientRect !== 'function') return;
+ 175: function updateLogPanelContextUI(stepKey) {
+ 176:     const displayName = stepKey ? getStepDisplayNameForLogPanel(stepKey) : '';
+ 177: 
+ 178:     const statusEl = stepKey ? document.getElementById(`status-${stepKey}`) : null;
+ 179:     const timerEl = stepKey ? document.getElementById(`timer-${stepKey}`) : null;
+ 180: 
+ 181:     const contextStepEl = resolveElement(dom.getLogPanelContextStep, dom.logPanelContextStep);
+ 182:     const contextStatusEl = resolveElement(dom.getLogPanelContextStatus, dom.logPanelContextStatus);
+ 183:     const contextTimerEl = resolveElement(dom.getLogPanelContextTimer, dom.logPanelContextTimer);
+ 184: 
+ 185:     if (contextStepEl) {
+ 186:         contextStepEl.textContent = stepKey ? displayName : 'Aucune étape active';
+ 187:     }
+ 188:     if (contextStatusEl) {
+ 189:         contextStatusEl.textContent = statusEl ? (statusEl.textContent || '') : '';
+ 190:     }
+ 191:     if (contextTimerEl) {
+ 192:         contextTimerEl.textContent = timerEl ? (timerEl.textContent || '') : '';
+ 193:     }
+ 194: }
+ 195: 
+ 196: function clearLogPanelSpecificButtons() {
+ 197:     const container = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
+ 198:     if (!container) return;
+ 199: 
+ 200:     while (container.firstChild) {
+ 201:         container.removeChild(container.firstChild);
+ 202:     }
+ 203: }
  204: 
- 205:     const rect = activeStepElement.getBoundingClientRect();
- 206:     const minTop = 120;
- 207:     const minHeight = 280;
- 208:     const bottomPadding = 20;
- 209: 
- 210:     const maxTop = Math.max(minTop, (window.innerHeight || 800) - minHeight - bottomPadding);
- 211:     const targetTop = Math.max(minTop, Math.min(Math.round(rect.top), maxTop));
+ 205: function updateStepStateChip(stepKey, status) {
+ 206:     const chip = document.getElementById(`state-chip-${stepKey}`);
+ 207:     if (!chip) return;
+ 208:     const meta = getStatusMeta(status);
+ 209:     chip.className = `step-state-chip ${meta.chipClass}`;
+ 210:     chip.textContent = `${meta.icon} ${meta.label}`;
+ 211: }
  212: 
- 213:     logsColumn.style.top = `${targetTop}px`;
- 214:     logsColumn.style.height = `${Math.max(minHeight, (window.innerHeight || 800) - targetTop - bottomPadding)}px`;
- 215: }
- 216: 
- 217: function updateStepStateChip(stepKey, status) {
- 218:     const chip = document.getElementById(`state-chip-${stepKey}`);
- 219:     if (!chip) return;
- 220:     const meta = getStatusMeta(status);
- 221:     chip.className = `step-state-chip ${meta.chipClass}`;
- 222:     chip.textContent = `${meta.icon} ${meta.label}`;
- 223: }
- 224: 
- 225: export function startStepTimer(stepKey) {
- 226:     const existingTimer = getStepTimer(stepKey);
- 227:     if (existingTimer && existingTimer.intervalId) {
- 228:         clearInterval(existingTimer.intervalId);
- 229:     }
- 230: 
- 231:     const startTime = Date.now();
- 232:     setStepTimer(stepKey, {
- 233:         startTime: startTime,
- 234:         startTimeDate: new Date(startTime),
- 235:         intervalId: null,
- 236:         elapsedTimeFormatted: "0s"
- 237:     }, 'startStepTimer');
- 238: 
- 239:     if (stepKey !== 'clear_disk_cache') {
- 240:         domBatcher.scheduleUpdate(`timer-init-${stepKey}`, () => {
- 241:             const timerEl = document.getElementById(`timer-${stepKey}`);
- 242:             if (timerEl) timerEl.textContent = "(0s)";
- 243:         });
- 244:     }
- 245: 
- 246:     const newIntervalId = setInterval(() => {
- 247:         const currentTimer = getStepTimer(stepKey);
- 248:         if (!currentTimer || (!currentTimer.startTime && !currentTimer.startTimeDate)) {
- 249:             if (currentTimer && currentTimer.intervalId) clearInterval(currentTimer.intervalId);
- 250:             return;
- 251:         }
+ 213: export function startStepTimer(stepKey) {
+ 214:     const existingTimer = getStepTimer(stepKey);
+ 215:     if (existingTimer && existingTimer.intervalId) {
+ 216:         clearInterval(existingTimer.intervalId);
+ 217:     }
+ 218: 
+ 219:     const startTime = Date.now();
+ 220:     setStepTimer(stepKey, {
+ 221:         startTime: startTime,
+ 222:         startTimeDate: new Date(startTime),
+ 223:         intervalId: null,
+ 224:         elapsedTimeFormatted: "0s"
+ 225:     }, 'startStepTimer');
+ 226: 
+ 227:     if (stepKey !== 'clear_disk_cache') {
+ 228:         domBatcher.scheduleUpdate(`timer-init-${stepKey}`, () => {
+ 229:             const timerEl = document.getElementById(`timer-${stepKey}`);
+ 230:             if (timerEl) timerEl.textContent = "(0s)";
+ 231:         });
+ 232:     }
+ 233: 
+ 234:     const newIntervalId = setInterval(() => {
+ 235:         const currentTimer = getStepTimer(stepKey);
+ 236:         if (!currentTimer || (!currentTimer.startTime && !currentTimer.startTimeDate)) {
+ 237:             if (currentTimer && currentTimer.intervalId) clearInterval(currentTimer.intervalId);
+ 238:             return;
+ 239:         }
+ 240: 
+ 241:         const startTimeToUse = currentTimer.startTime ? new Date(currentTimer.startTime) : currentTimer.startTimeDate;
+ 242:         const elapsedTimeStr = formatElapsedTime(startTimeToUse);
+ 243:         setStepTimer(stepKey, { ...currentTimer, elapsedTimeFormatted: elapsedTimeStr }, 'timer_tick');
+ 244: 
+ 245:         if (stepKey !== 'clear_disk_cache') {
+ 246:             domBatcher.scheduleUpdate(`timer-update-${stepKey}`, () => {
+ 247:                 const timerEl = document.getElementById(`timer-${stepKey}`);
+ 248:                 if (timerEl) timerEl.textContent = `(${elapsedTimeStr})`;
+ 249:             });
+ 250:         }
+ 251:     }, 1000);
  252: 
- 253:         const startTimeToUse = currentTimer.startTime ? new Date(currentTimer.startTime) : currentTimer.startTimeDate;
- 254:         const elapsedTimeStr = formatElapsedTime(startTimeToUse);
- 255:         setStepTimer(stepKey, { ...currentTimer, elapsedTimeFormatted: elapsedTimeStr }, 'timer_tick');
- 256: 
- 257:         if (stepKey !== 'clear_disk_cache') {
- 258:             domBatcher.scheduleUpdate(`timer-update-${stepKey}`, () => {
- 259:                 const timerEl = document.getElementById(`timer-${stepKey}`);
- 260:                 if (timerEl) timerEl.textContent = `(${elapsedTimeStr})`;
- 261:             });
- 262:         }
- 263:     }, 1000);
- 264: 
- 265:     const currentTimerData = getStepTimer(stepKey);
- 266:     if (currentTimerData) {
- 267:         setStepTimer(stepKey, { ...currentTimerData, intervalId: newIntervalId }, 'timer_interval_set');
- 268:     }
- 269: }
- 270: 
- 271: export function stopStepTimer(stepKey) {
- 272:     const timerData = getStepTimer(stepKey);
- 273:     if (timerData && timerData.intervalId) {
- 274:         clearInterval(timerData.intervalId);
- 275:         setStepTimer(stepKey, { ...timerData, intervalId: null }, 'timer_interval_cleared');
- 276:     }
- 277:     const updatedTimerData = getStepTimer(stepKey);
- 278:     if (updatedTimerData && (updatedTimerData.startTime || updatedTimerData.startTimeDate)) {
- 279:         const startTimeToUse = updatedTimerData.startTime ? new Date(updatedTimerData.startTime) : updatedTimerData.startTimeDate;
- 280:         const elapsedTimeStr = formatElapsedTime(startTimeToUse);
- 281:         setStepTimer(stepKey, { ...updatedTimerData, elapsedTimeFormatted: elapsedTimeStr }, 'timer_stopped');
- 282:         if (stepKey !== 'clear_disk_cache') {
- 283:             const timerEl = document.getElementById(`timer-${stepKey}`);
- 284:             if (timerEl) timerEl.textContent = `(Terminé en ${elapsedTimeStr})`;
- 285:         }
- 286:     }
- 287: }
- 288: 
- 289: export function resetStepTimerDisplay(stepKey) {
- 290:     if (stepKey !== 'clear_disk_cache') {
- 291:         const timerEl = document.getElementById(`timer-${stepKey}`);
- 292:         if (timerEl) timerEl.textContent = "";
- 293:     }
- 294:     deleteStepTimer(stepKey);
- 295: }
+ 253:     const currentTimerData = getStepTimer(stepKey);
+ 254:     if (currentTimerData) {
+ 255:         setStepTimer(stepKey, { ...currentTimerData, intervalId: newIntervalId }, 'timer_interval_set');
+ 256:     }
+ 257: }
+ 258: 
+ 259: export function stopStepTimer(stepKey) {
+ 260:     const timerData = getStepTimer(stepKey);
+ 261:     if (timerData && timerData.intervalId) {
+ 262:         clearInterval(timerData.intervalId);
+ 263:         setStepTimer(stepKey, { ...timerData, intervalId: null }, 'timer_interval_cleared');
+ 264:     }
+ 265:     const updatedTimerData = getStepTimer(stepKey);
+ 266:     if (updatedTimerData && (updatedTimerData.startTime || updatedTimerData.startTimeDate)) {
+ 267:         const startTimeToUse = updatedTimerData.startTime ? new Date(updatedTimerData.startTime) : updatedTimerData.startTimeDate;
+ 268:         const elapsedTimeStr = formatElapsedTime(startTimeToUse);
+ 269:         setStepTimer(stepKey, { ...updatedTimerData, elapsedTimeFormatted: elapsedTimeStr }, 'timer_stopped');
+ 270:         if (stepKey !== 'clear_disk_cache') {
+ 271:             const timerEl = document.getElementById(`timer-${stepKey}`);
+ 272:             if (timerEl) timerEl.textContent = `(Terminé en ${elapsedTimeStr})`;
+ 273:         }
+ 274:     }
+ 275: }
+ 276: 
+ 277: export function resetStepTimerDisplay(stepKey) {
+ 278:     if (stepKey !== 'clear_disk_cache') {
+ 279:         const timerEl = document.getElementById(`timer-${stepKey}`);
+ 280:         if (timerEl) timerEl.textContent = "";
+ 281:     }
+ 282:     deleteStepTimer(stepKey);
+ 283: }
+ 284: 
+ 285: export function updateGlobalUIForSequenceState(isRunning) {
+ 286:     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+ 287:     const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+ 288:     const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+ 289:     const customSequenceCheckboxes = resolveElement(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes) || [];
+ 290: 
+ 291:     if (runAllButton) runAllButton.disabled = isRunning;
+ 292:     if (runCustomSequenceButton) runCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+ 293:     if (clearCustomSequenceButton) clearCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
+ 294: 
+ 295:     customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
  296: 
- 297: export function updateGlobalUIForSequenceState(isRunning) {
- 298:     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
- 299:     const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
- 300:     const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
- 301:     const customSequenceCheckboxes = resolveElement(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes) || [];
- 302: 
- 303:     if (runAllButton) runAllButton.disabled = isRunning;
- 304:     if (runCustomSequenceButton) runCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
- 305:     if (clearCustomSequenceButton) clearCustomSequenceButton.disabled = isRunning || getSelectedStepsOrder().length === 0;
- 306: 
- 307:     customSequenceCheckboxes.forEach(cb => cb.disabled = isRunning);
- 308: 
- 309:     Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
- 310:         const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
- 311:         const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKeyConfig}"]`);
- 312:         const stepInfo = getProcessInfo(stepKeyConfig);
+ 297:     Object.keys(STEPS_CONFIG_FROM_SERVER).forEach(stepKeyConfig => {
+ 298:         const runButton = document.querySelector(`.run-button[data-step="${stepKeyConfig}"]`);
+ 299:         const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKeyConfig}"]`);
+ 300:         const stepInfo = getProcessInfo(stepKeyConfig);
+ 301: 
+ 302:         if (runButton) runButton.disabled = isRunning;
+ 303: 
+ 304:         if (cancelButton) {
+ 305:             if (stepInfo && ['running', 'starting', 'initiated'].includes(stepInfo.status)) {
+ 306:                 cancelButton.disabled = false;
+ 307:             } else {
+ 308:                 cancelButton.disabled = true;
+ 309:             }
+ 310:         }
+ 311:     });
+ 312: }
  313: 
- 314:         if (runButton) runButton.disabled = isRunning;
- 315: 
- 316:         if (cancelButton) {
- 317:             if (stepInfo && ['running', 'starting', 'initiated'].includes(stepInfo.status)) {
- 318:                 cancelButton.disabled = false;
- 319:             } else {
- 320:                 cancelButton.disabled = true;
- 321:             }
- 322:         }
- 323:     });
- 324: }
- 325: 
- 326: export function setActiveStepForLogPanelUI(stepKey) {
- 327:     console.log(`[UI] setActiveStepForLogPanelUI, new active step for logs: ${stepKey}`);
- 328:     setActiveStepKeyForLogs(stepKey);
- 329: 
- 330:     const allStepDivs = dom.getAllStepDivs();
- 331:     allStepDivs.forEach(s => {
- 332:         s.classList.remove('active-for-log-panel');
- 333:     });
- 334:     if (stepKey && stepKey !== 'clear_disk_cache') {
- 335:         const activeStepElement = document.getElementById(`step-${stepKey}`);
- 336:         if (activeStepElement) {
- 337:             activeStepElement.classList.add('active-for-log-panel');
- 338: 
- 339:             const workflowWrapper = getWorkflowWrapperElement();
- 340:             const logsOpen = workflowWrapper && workflowWrapper.classList.contains('logs-active');
- 341:             if (logsOpen) {
- 342:                 hideNonActiveSteps(stepKey, true);
- 343:             }
- 344:             if (isAutoScrollEnabled() && !logsOpen) {
- 345:                 console.log(`[UI] Auto-scrolling to active step: ${stepKey}`);
- 346:                 scrollToActiveStep(stepKey);
- 347:             }
- 348:         }
- 349:     }
- 350: 
- 351:     clearLogPanelSpecificButtons();
- 352: 
- 353:     if (stepKey) {
- 354:         const config = getStepsConfig();
- 355:         const stepConfig = config ? config[stepKey] : null;
- 356:         const displayName = stepConfig ? stepConfig.display_name : stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
- 357:         console.log(`[UI] setActiveStepForLogPanelUI, displayName for logs: ${displayName}`);
- 358: 
- 359:         const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
- 360:         const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
- 361:         if(logPanelTitle) logPanelTitle.textContent = `Logs: ${displayName}`;
- 362:         if(currentStepLogName) currentStepLogName.textContent = displayName;
- 363:         updateLogPanelContextUI(stepKey);
- 364: 
- 365:         const buttonsContainer = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
- 366:         if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && buttonsContainer) {
- 367:             stepConfig.specific_logs.forEach((logConf, index) => {
- 368:                 const button = document.createElement('button');
- 369:                 button.className = 'specific-log-button';
- 370:                 button.textContent = logConf.name;
- 371:                 button.dataset.step = stepKey;
- 372:                 button.dataset.logIndex = index;
- 373:                 button.addEventListener('click', async () => {
- 374:                     const apiModule = await import('./apiService.js');
- 375:                     await apiModule.fetchSpecificLogAPI(stepKey, index, logConf.name);
- 376:                 });
- 377:                 buttonsContainer.appendChild(button);
- 378:             });
- 379:         }
- 380:     } else {
- 381:         const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
- 382:         const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
- 383:         if(logPanelTitle) logPanelTitle.textContent = "Logs";
- 384:         if(currentStepLogName) currentStepLogName.textContent = "Aucune étape active";
- 385:         updateLogPanelContextUI(null);
- 386:     }
- 387: }
- 388: 
- 389: async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
- 390:     console.log(`[UI] fetchAndDisplayLogsForPanel called for: ${stepKeyToFocus}. Current active log panel: ${getActiveStepKeyForLogs()}`);
- 391:     if (!stepKeyToFocus) return;
- 392: 
- 393:     const stepConfig = getStepsConfig()[stepKeyToFocus];
- 394:     const displayName = stepConfig ? (stepConfig.display_name || stepKeyToFocus) : stepKeyToFocus;
- 395: 
- 396:     const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
- 397:     const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
- 398:     const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
- 399: 
- 400:     if (mainLogOutputPanel) {
- 401:         mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
- 402:     }
+ 314: export function setActiveStepForLogPanelUI(stepKey) {
+ 315:     console.log(`[UI] setActiveStepForLogPanelUI, new active step for logs: ${stepKey}`);
+ 316:     setActiveStepKeyForLogs(stepKey);
+ 317: 
+ 318:     const allStepDivs = dom.getAllStepDivs();
+ 319:     allStepDivs.forEach(s => {
+ 320:         s.classList.remove('active-for-log-panel');
+ 321:     });
+ 322:     if (stepKey && stepKey !== 'clear_disk_cache') {
+ 323:         const activeStepElement = document.getElementById(`step-${stepKey}`);
+ 324:         if (activeStepElement) {
+ 325:             activeStepElement.classList.add('active-for-log-panel');
+ 326: 
+ 327:             const logsOpen = isLogsPanelOpen();
+ 328:             if (logsOpen) {
+ 329:                 hideNonActiveSteps(stepKey, true);
+ 330:             }
+ 331:             if (isAutoScrollEnabled() && !logsOpen) {
+ 332:                 console.log(`[UI] Auto-scrolling to active step: ${stepKey}`);
+ 333:                 scrollToActiveStep(stepKey);
+ 334:             }
+ 335:         }
+ 336:     }
+ 337: 
+ 338:     clearLogPanelSpecificButtons();
+ 339: 
+ 340:     if (stepKey) {
+ 341:         const config = getStepsConfig();
+ 342:         const stepConfig = config ? config[stepKey] : null;
+ 343:         const displayName = stepConfig ? stepConfig.display_name : stepKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+ 344:         console.log(`[UI] setActiveStepForLogPanelUI, displayName for logs: ${displayName}`);
+ 345: 
+ 346:         const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
+ 347:         const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
+ 348:         if(logPanelTitle) logPanelTitle.textContent = `Logs: ${displayName}`;
+ 349:         if(currentStepLogName) currentStepLogName.textContent = displayName;
+ 350:         updateLogPanelContextUI(stepKey);
+ 351: 
+ 352:         const buttonsContainer = resolveElement(dom.getLogPanelSpecificButtonsContainer, dom.logPanelSpecificButtonsContainer);
+ 353:         if (stepConfig && stepConfig.specific_logs && stepConfig.specific_logs.length > 0 && buttonsContainer) {
+ 354:             stepConfig.specific_logs.forEach((logConf, index) => {
+ 355:                 const button = document.createElement('button');
+ 356:                 button.className = 'specific-log-button';
+ 357:                 button.textContent = logConf.name;
+ 358:                 button.dataset.step = stepKey;
+ 359:                 button.dataset.logIndex = index;
+ 360:                 button.addEventListener('click', async () => {
+ 361:                     const apiModule = await import('./apiService.js');
+ 362:                     await apiModule.fetchSpecificLogAPI(stepKey, index, logConf.name);
+ 363:                 });
+ 364:                 buttonsContainer.appendChild(button);
+ 365:             });
+ 366:         }
+ 367:     } else {
+ 368:         const logPanelTitle = resolveElement(dom.getLogPanelTitle, dom.logPanelTitle);
+ 369:         const currentStepLogName = resolveElement(dom.getCurrentStepLogNamePanel, dom.currentStepLogNamePanel);
+ 370:         if(logPanelTitle) logPanelTitle.textContent = "Logs";
+ 371:         if(currentStepLogName) currentStepLogName.textContent = "Aucune étape active";
+ 372:         updateLogPanelContextUI(null);
+ 373:     }
+ 374: }
+ 375: 
+ 376: async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
+ 377:     console.log(`[UI] fetchAndDisplayLogsForPanel called for: ${stepKeyToFocus}. Current active log panel: ${getActiveStepKeyForLogs()}`);
+ 378:     if (!stepKeyToFocus) return;
+ 379: 
+ 380:     const stepConfig = getStepsConfig()[stepKeyToFocus];
+ 381:     const displayName = stepConfig ? (stepConfig.display_name || stepKeyToFocus) : stepKeyToFocus;
+ 382: 
+ 383:     const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+ 384:     const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+ 385:     const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 386: 
+ 387:     if (mainLogOutputPanel) {
+ 388:         mainLogOutputPanel.textContent = `Chargement des logs pour ${displayName}...`;
+ 389:     }
+ 390: 
+ 391:     if(mainLogContainer) mainLogContainer.style.display = 'flex';
+ 392:     if(specificLogContainer) specificLogContainer.style.display = 'none';
+ 393: 
+ 394:     try {
+ 395:         const response = await fetch(`/status/${stepKeyToFocus}`);
+ 396:         if (!response.ok) {
+ 397:             console.error(`[UI] fetchAndDisplayLogsForPanel - fetch failed for ${stepKeyToFocus}: ${response.status}`);
+ 398:             throw new Error(`Erreur ${response.status} lors de la récupération des logs pour ${displayName}`);
+ 399:         }
+ 400:         const data = await response.json();
+ 401:         setProcessInfo(stepKeyToFocus, { ...(getProcessInfo(stepKeyToFocus) || {}), ...data });
+ 402:         console.log(`[UI] fetchAndDisplayLogsForPanel - response for: ${stepKeyToFocus}, Log content length: ${data.log ? data.log.length : 'N/A'}`);
  403: 
- 404:     if(mainLogContainer) mainLogContainer.style.display = 'flex';
- 405:     if(specificLogContainer) specificLogContainer.style.display = 'none';
- 406: 
- 407:     try {
- 408:         const response = await fetch(`/status/${stepKeyToFocus}`);
- 409:         if (!response.ok) {
- 410:             console.error(`[UI] fetchAndDisplayLogsForPanel - fetch failed for ${stepKeyToFocus}: ${response.status}`);
- 411:             throw new Error(`Erreur ${response.status} lors de la récupération des logs pour ${displayName}`);
- 412:         }
- 413:         const data = await response.json();
- 414:         setProcessInfo(stepKeyToFocus, { ...(getProcessInfo(stepKeyToFocus) || {}), ...data });
- 415:         console.log(`[UI] fetchAndDisplayLogsForPanel - response for: ${stepKeyToFocus}, Log content length: ${data.log ? data.log.length : 'N/A'}`);
- 416: 
- 417:         if (getActiveStepKeyForLogs() === stepKeyToFocus && mainLogOutputPanel) {
- 418:             console.log(`[UI] fetchAndDisplayLogsForPanel - Updating main log for ${stepKeyToFocus} with ${data.log ? data.log.length : 0} lines.`);
- 419:             updateMainLogOutputUI(data.log.join(''));
- 420:         } else {
- 421:             console.log(`[UI] fetchAndDisplayLogsForPanel - Log focus changed. Current: ${getActiveStepKeyForLogs()}, Fetched for: ${stepKeyToFocus}. Not updating main log panel.`);
- 422:         }
- 423:     } catch (error) {
- 424:         console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
- 425:         const logPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
- 426:         if (getActiveStepKeyForLogs() === stepKeyToFocus && logPanel) {
- 427:             logPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
- 428:         }
- 429:     }
- 430: }
- 431: 
- 432: export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
- 433:     const workflowWrapper = getWorkflowWrapperElement();
- 434:     if (!workflowWrapper) {
- 435:         console.warn('[UI] openLogPanelUI aborted: workflow wrapper missing.');
- 436:         return;
- 437:     }
- 438: 
- 439:     const currentActiveLogStep = getActiveStepKeyForLogs();
- 440:     const isPanelOpen = workflowWrapper.classList.contains('logs-active');
- 441:     console.log(`[UI] openLogPanelUI called for: ${stepKeyToFocus}, forceOpen: ${forceOpen}, currentActive: ${currentActiveLogStep}, isPanelOpen: ${isPanelOpen}`);
- 442: 
- 443:     if (forceOpen) {
- 444:         console.log(`[UI] Forcing panel open/update for ${stepKeyToFocus}`);
- 445:         workflowWrapper.classList.add('logs-entering');
- 446:         setActiveStepForLogPanelUI(stepKeyToFocus);
- 447:         hideNonActiveSteps(stepKeyToFocus, true);
- 448:         requestAnimationFrame(() => {
- 449:             workflowWrapper.classList.add('logs-active');
- 450:             onWrapperTransitionEndOnce(() => {
- 451:                 workflowWrapper.classList.remove('logs-entering');
- 452:             }, 500);
- 453:         });
- 454:         positionLogsPanelNearActiveStep(stepKeyToFocus);
- 455:         fetchAndDisplayLogsForPanel(stepKeyToFocus);
- 456:         return;
- 457:     }
- 458: 
- 459:     if (isPanelOpen && currentActiveLogStep && currentActiveLogStep !== stepKeyToFocus) {
- 460:         console.log(`[UI] Log panel already open for ${currentActiveLogStep}, switching to ${stepKeyToFocus}.`);
- 461:         setActiveStepForLogPanelUI(stepKeyToFocus);
- 462:         hideNonActiveSteps(stepKeyToFocus, true);
- 463:         positionLogsPanelNearActiveStep(stepKeyToFocus);
- 464:         fetchAndDisplayLogsForPanel(stepKeyToFocus);
- 465:         return;
- 466:     }
- 467: 
- 468:     if (isPanelOpen && currentActiveLogStep === stepKeyToFocus) {
- 469:         console.log(`[UI] Panel already open for ${stepKeyToFocus}. Refreshing its content.`);
- 470:         fetchAndDisplayLogsForPanel(stepKeyToFocus);
- 471:         return;
- 472:     }
- 473: 
- 474:     console.log(`[UI] Opening panel for ${stepKeyToFocus} (or was closed/open for null).`);
- 475:     workflowWrapper.classList.add('logs-entering');
- 476:     setActiveStepForLogPanelUI(stepKeyToFocus);
- 477:     hideNonActiveSteps(stepKeyToFocus, true);
- 478:     requestAnimationFrame(() => {
- 479:         workflowWrapper.classList.add('logs-active');
- 480:         onWrapperTransitionEndOnce(() => {
- 481:             workflowWrapper.classList.remove('logs-entering');
- 482:         }, 500);
- 483:     });
- 484:     positionLogsPanelNearActiveStep(stepKeyToFocus);
- 485:     fetchAndDisplayLogsForPanel(stepKeyToFocus);
- 486: }
- 487: 
- 488: export function closeLogPanelUI() {
- 489:     const workflowWrapper = getWorkflowWrapperElement();
- 490:     if (!workflowWrapper) {
- 491:         console.warn('[CLOSE_LOG] Workflow wrapper missing; aborting close sequence.');
- 492:         setActiveStepForLogPanelUI(null);
- 493:         const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
- 494:         const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
- 495:         if (mainLogOutputPanel) mainLogOutputPanel.textContent = "";
- 496:         if (specificLogContainer) specificLogContainer.style.display = 'none';
- 497:         const logsColumn = getLogsColumnElement();
- 498:         if (logsColumn) {
- 499:             logsColumn.style.removeProperty('top');
- 500:             logsColumn.style.removeProperty('height');
- 501:         }
- 502:         clearLogPanelSpecificButtons();
- 503:         return;
- 504:     }
- 505: 
- 506:     console.log('[CLOSE_LOG] Starting closeLogPanelUI, current classes:', workflowWrapper.className);
- 507:     workflowWrapper.classList.add('logs-leaving');
- 508:     console.log('[CLOSE_LOG] Added logs-leaving class, new classes:', workflowWrapper.className);
- 509: 
- 510:     requestAnimationFrame(() => {
- 511:         console.log('[CLOSE_LOG] In RAF, removing logs-active class, current classes:', workflowWrapper.className);
- 512:         workflowWrapper.classList.remove('logs-active');
- 513: 
- 514:         onWrapperTransitionEndOnce(() => {
- 515:             console.log('[CLOSE_LOG] Cleanup - removing logs-leaving class, current classes:', workflowWrapper.className);
- 516:             workflowWrapper.classList.remove('logs-leaving');
- 517:             hideNonActiveSteps(null, false);
- 518:         }, 500);
- 519:     });
- 520: 
- 521:     setActiveStepForLogPanelUI(null);
- 522:     const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
- 523:     const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
- 524:     if(mainLogOutputPanel) mainLogOutputPanel.textContent = "";
- 525:     if(specificLogContainer) specificLogContainer.style.display = 'none';
- 526: 
- 527:     const logsColumn = getLogsColumnElement();
- 528:     if (logsColumn) {
- 529:         logsColumn.style.removeProperty('top');
- 530:         logsColumn.style.removeProperty('height');
- 531:     }
- 532:     clearLogPanelSpecificButtons();
- 533: }
+ 404:         if (getActiveStepKeyForLogs() === stepKeyToFocus && mainLogOutputPanel) {
+ 405:             console.log(`[UI] fetchAndDisplayLogsForPanel - Updating main log for ${stepKeyToFocus} with ${data.log ? data.log.length : 0} lines.`);
+ 406:             updateMainLogOutputUI(data.log.join(''));
+ 407:         } else {
+ 408:             console.log(`[UI] fetchAndDisplayLogsForPanel - Log focus changed. Current: ${getActiveStepKeyForLogs()}, Fetched for: ${stepKeyToFocus}. Not updating main log panel.`);
+ 409:         }
+ 410:     } catch (error) {
+ 411:         console.error(`[UI] fetchAndDisplayLogsForPanel - CATCH error for ${stepKeyToFocus}:`, error);
+ 412:         const logPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+ 413:         if (getActiveStepKeyForLogs() === stepKeyToFocus && logPanel) {
+ 414:             logPanel.textContent = `Erreur: ${error?.message || 'Erreur inconnue'}`;
+ 415:         }
+ 416:     }
+ 417: }
+ 418: 
+ 419: export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
+ 420:     const logsColumn = getLogsColumnElement();
+ 421:     if (!logsColumn) {
+ 422:         console.warn('[UI] openLogPanelUI aborted: logs overlay missing.');
+ 423:         return;
+ 424:     }
+ 425: 
+ 426:     const workflowWrapper = getWorkflowWrapperElement();
+ 427: 
+ 428:     const currentActiveLogStep = getActiveStepKeyForLogs();
+ 429:     const isPanelOpen = isLogsPanelOpen();
+ 430:     const shouldAutoOpen = forceOpen || getAutoOpenLogOverlay();
+ 431:     console.log(`[UI] openLogPanelUI called for: ${stepKeyToFocus}, forceOpen: ${forceOpen}, currentActive: ${currentActiveLogStep}, isPanelOpen: ${isPanelOpen}`);
+ 432: 
+ 433:     if (shouldAutoOpen) {
+ 434:         console.log(`[UI] Forcing panel open/update for ${stepKeyToFocus}`);
+ 435:         setActiveStepForLogPanelUI(stepKeyToFocus);
+ 436:         hideNonActiveSteps(stepKeyToFocus, true);
+ 437:         if (workflowWrapper) {
+ 438:             workflowWrapper.classList.add('logs-active');
+ 439:         }
+ 440:         openPopupUI(logsColumn);
+ 441:         fetchAndDisplayLogsForPanel(stepKeyToFocus);
+ 442:         return;
+ 443:     }
+ 444: 
+ 445:     // Auto-open disabled: uniquement stocker l'étape active pour une ouverture manuelle ultérieure
+ 446:     setActiveStepForLogPanelUI(stepKeyToFocus);
+ 447:     return;
+ 448: 
+ 449:     if (isPanelOpen && currentActiveLogStep && currentActiveLogStep !== stepKeyToFocus) {
+ 450:         console.log(`[UI] Log panel already open for ${currentActiveLogStep}, switching to ${stepKeyToFocus}.`);
+ 451:         setActiveStepForLogPanelUI(stepKeyToFocus);
+ 452:         hideNonActiveSteps(stepKeyToFocus, true);
+ 453:         fetchAndDisplayLogsForPanel(stepKeyToFocus);
+ 454:         return;
+ 455:     }
+ 456: 
+ 457:     if (isPanelOpen && currentActiveLogStep === stepKeyToFocus) {
+ 458:         console.log(`[UI] Panel already open for ${stepKeyToFocus}. Refreshing its content.`);
+ 459:         fetchAndDisplayLogsForPanel(stepKeyToFocus);
+ 460:         return;
+ 461:     }
+ 462: 
+ 463:     console.log(`[UI] Opening panel for ${stepKeyToFocus} (or was closed/open for null).`);
+ 464:     setActiveStepForLogPanelUI(stepKeyToFocus);
+ 465:     hideNonActiveSteps(stepKeyToFocus, true);
+ 466:     if (workflowWrapper) {
+ 467:         workflowWrapper.classList.add('logs-active');
+ 468:     }
+ 469:     openPopupUI(logsColumn);
+ 470:     fetchAndDisplayLogsForPanel(stepKeyToFocus);
+ 471: }
+ 472: 
+ 473: export function closeLogPanelUI() {
+ 474:     const logsColumn = getLogsColumnElement();
+ 475:     const workflowWrapper = getWorkflowWrapperElement();
+ 476:     if (!logsColumn) {
+ 477:         console.warn('[CLOSE_LOG] Logs overlay missing; aborting close sequence.');
+ 478:         setActiveStepForLogPanelUI(null);
+ 479:         const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+ 480:         const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 481:         if (mainLogOutputPanel) mainLogOutputPanel.textContent = "";
+ 482:         if (specificLogContainer) specificLogContainer.style.display = 'none';
+ 483:         clearLogPanelSpecificButtons();
+ 484:         return;
+ 485:     }
+ 486: 
+ 487:     console.log('[CLOSE_LOG] Closing logs overlay.');
+ 488:     closePopupUI(logsColumn);
+ 489:     hideNonActiveSteps(null, false);
+ 490:     if (workflowWrapper) {
+ 491:         workflowWrapper.classList.remove('logs-active');
+ 492:     }
+ 493:     setActiveStepForLogPanelUI(null);
+ 494: 
+ 495:     const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+ 496:     const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 497:     if (mainLogOutputPanel) mainLogOutputPanel.textContent = "";
+ 498:     if (specificLogContainer) specificLogContainer.style.display = 'none';
+ 499:     clearLogPanelSpecificButtons();
+ 500: }
+ 501: 
+ 502: export function updateStepCardUI(stepKey, data) {
+ 503:     console.group(`[PROGRESS DEBUG] updateStepCardUI - ${stepKey}`);
+ 504:     console.log('Raw data received:', {
+ 505:         progress_current: data.progress_current,
+ 506:         progress_total: data.progress_total,
+ 507:         progress_current_fractional: data.progress_current_fractional,
+ 508:         status: data.status,
+ 509:         progress_text: data.progress_text,
+ 510:         timestamp: new Date().toISOString()
+ 511:     });
+ 512: 
+ 513:     performanceOptimizer.measureDomUpdate(`updateStepCard-${stepKey}`, () => {
+ 514:         try {
+ 515:             const statusEl = document.getElementById(`status-${stepKey}`);
+ 516:             const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
+ 517:             const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
+ 518:             const workflowWrapper = getWorkflowWrapperElement();
+ 519: 
+ 520:             const normalizedStatus = normalizeStatus(data.status || 'idle');
+ 521:             const statusMeta = getStatusMeta(normalizedStatus);
+ 522: 
+ 523:             if (statusEl) {
+ 524:                 statusEl.textContent = statusMeta.label;
+ 525:                 statusEl.className = `status-badge ${statusMeta.badgeClass}`;
+ 526:             }
+ 527: 
+ 528:             const stepCardEl = document.getElementById(`step-${stepKey}`);
+ 529:             if (stepCardEl) {
+ 530:                 stepCardEl.setAttribute('data-status', normalizedStatus);
+ 531:             }
+ 532: 
+ 533:             updateStepStateChip(stepKey, normalizedStatus);
  534: 
- 535: export function updateStepCardUI(stepKey, data) {
- 536:     console.group(`[PROGRESS DEBUG] updateStepCardUI - ${stepKey}`);
- 537:     console.log('Raw data received:', {
- 538:         progress_current: data.progress_current,
- 539:         progress_total: data.progress_total,
- 540:         progress_current_fractional: data.progress_current_fractional,
- 541:         status: data.status,
- 542:         progress_text: data.progress_text,
- 543:         timestamp: new Date().toISOString()
- 544:     });
- 545: 
- 546:     performanceOptimizer.measureDomUpdate(`updateStepCard-${stepKey}`, () => {
- 547:         try {
- 548:             const statusEl = document.getElementById(`status-${stepKey}`);
- 549:             const runButton = document.querySelector(`.run-button[data-step="${stepKey}"]`);
- 550:             const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
- 551:             const workflowWrapper = getWorkflowWrapperElement();
+ 535:             if (runButton && cancelButton) {
+ 536:                 const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
+ 537:                 runButton.disabled = isCurrentlyRunningOrStarting || getIsAnySequenceRunning();
+ 538:                 cancelButton.disabled = !isCurrentlyRunningOrStarting;
+ 539:             }
+ 540: 
+ 541:             const logsOpen = isLogsPanelOpen();
+ 542:             if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+ 543:                 if (getActiveStepKeyForLogs() !== stepKey) {
+ 544:                     setActiveStepForLogPanelUI(stepKey);
+ 545:                     hideNonActiveSteps(stepKey, true);
+ 546:                 }
+ 547:             }
+ 548: 
+ 549:             if (logsOpen && getActiveStepKeyForLogs() === stepKey) {
+ 550:                 updateLogPanelContextUI(stepKey);
+ 551:             }
  552: 
- 553:             const normalizedStatus = normalizeStatus(data.status || 'idle');
- 554:             const statusMeta = getStatusMeta(normalizedStatus);
- 555: 
- 556:             if (statusEl) {
- 557:                 statusEl.textContent = statusMeta.label;
- 558:                 statusEl.className = `status-badge ${statusMeta.badgeClass}`;
- 559:             }
- 560: 
- 561:             const stepCardEl = document.getElementById(`step-${stepKey}`);
- 562:             if (stepCardEl) {
- 563:                 stepCardEl.setAttribute('data-status', normalizedStatus);
- 564:             }
- 565: 
- 566:             updateStepStateChip(stepKey, normalizedStatus);
- 567: 
- 568:             if (runButton && cancelButton) {
- 569:                 const isCurrentlyRunningOrStarting = ['running', 'starting', 'initiated'].includes(normalizedStatus);
- 570:                 runButton.disabled = isCurrentlyRunningOrStarting || getIsAnySequenceRunning();
- 571:                 cancelButton.disabled = !isCurrentlyRunningOrStarting;
- 572:             }
- 573: 
- 574:             const logsOpen = workflowWrapper && workflowWrapper.classList.contains('logs-active');
- 575:             if (logsOpen && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
- 576:                 if (getActiveStepKeyForLogs() !== stepKey) {
- 577:                     setActiveStepForLogPanelUI(stepKey);
- 578:                     hideNonActiveSteps(stepKey, true);
- 579:                 }
- 580:             }
- 581: 
- 582:             if (logsOpen && getActiveStepKeyForLogs() === stepKey) {
- 583:                 updateLogPanelContextUI(stepKey);
- 584:             }
- 585: 
- 586:             if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && getStepTimer(stepKey))) {
- 587:                 stopStepTimer(stepKey);
- 588:             } else if (normalizedStatus === 'idle' && !getStepTimer(stepKey)) {
- 589:                 resetStepTimerDisplay(stepKey);
- 590:             } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !getStepTimer(stepKey)?.intervalId) {
- 591:                 // TODO: Implement proper timer resumption after page reload
- 592:                 // Date: 2026-01-19
- 593:                 // Owner: kidpixel
- 594:                 // Issue: startStepTimer doesn't resume from existing startTime
- 595:                 // Solution needed: Backend should provide duration_str for running steps
- 596:             }
- 597: 
- 598:             const progressContainer = document.getElementById(`progress-container-${stepKey}`);
- 599:             const progressBar = document.getElementById(`progress-bar-${stepKey}`);
- 600:             const progressTextEl = document.getElementById(`progress-text-${stepKey}`);
- 601: 
- 602:             let percentage = 0;
- 603: 
- 604:             if (progressContainer && progressBar && progressTextEl) {
- 605:                 if (data.progress_total > 0) {
- 606:                     let currentProgress = data.progress_current_fractional || data.progress_current;
- 607: 
- 608:                     if (data.progress_current_fractional === null && data.progress_text) {
- 609:                         const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
- 610:                         if (!isSpecialRunning) {
- 611:                             const percentMatch = data.progress_text.match(/(\d+)%/);
- 612:                             if (percentMatch) {
- 613:                                 const textPercent = parseInt(percentMatch[1]);
- 614:                                 currentProgress = (textPercent / 100) * data.progress_total;
- 615:                                 console.log(`[PROGRESS FALLBACK] ${stepKey}: Extracted ${textPercent}% from text, using fractional: ${currentProgress}`);
- 616:                             }
- 617:                         }
- 618:                     }
- 619: 
- 620:                     percentage = Math.round((currentProgress / data.progress_total) * 100);
- 621:                     percentage = Math.min(percentage, 100);
- 622: 
- 623:                     if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
- 624:                         if (percentage >= 100) {
- 625:                             percentage = 99;
- 626:                         }
- 627:                         if (data.progress_total > 0 && data.progress_current === data.progress_total) {
- 628:                             percentage = Math.min(percentage, 99);
- 629:                         }
- 630:                     }
- 631: 
- 632:                     console.log(`[PROGRESS CALC] ${stepKey}:`, {
- 633:                         progress_current: data.progress_current,
- 634:                         progress_current_fractional: data.progress_current_fractional,
- 635:                         progress_total: data.progress_total,
- 636:                         currentProgress: currentProgress,
- 637:                         calculatedPercentage: (currentProgress / data.progress_total) * 100,
- 638:                         finalPercentage: percentage,
- 639:                         status: data.status,
- 640:                         progress_text: data.progress_text
- 641:                     });
- 642: 
- 643:                     let displayCurrent = data.progress_current;
- 644:                     if ((!displayCurrent || displayCurrent === 0) && typeof data.progress_current_fractional === 'number' && data.progress_current_fractional > 0) {
- 645:                         const frac = Math.max(0, Math.min(data.progress_total, data.progress_current_fractional));
- 646:                         displayCurrent = Math.min(data.progress_total, Math.floor(frac) + 1);
- 647:                     }
- 648: 
- 649:                     progressContainer.style.display = 'block';
- 650:                     progressBar.style.backgroundColor = 'var(--blue)';
- 651:                     progressBar.style.width = `${percentage}%`;
- 652:                     progressBar.textContent = `${percentage}%`;
- 653:                     progressBar.setAttribute('aria-valuenow', percentage);
- 654: 
- 655:                     if (['running','starting','initiated'].includes(normalizedStatus)) {
- 656:                         progressBar.setAttribute('data-active', 'true');
- 657:                     } else {
- 658:                         progressBar.removeAttribute('data-active');
+ 553:             if (['completed', 'failed'].includes(normalizedStatus) || (normalizedStatus === 'idle' && getStepTimer(stepKey))) {
+ 554:                 stopStepTimer(stepKey);
+ 555:             } else if (normalizedStatus === 'idle' && !getStepTimer(stepKey)) {
+ 556:                 resetStepTimerDisplay(stepKey);
+ 557:             } else if (['running', 'starting', 'initiated'].includes(normalizedStatus) && !getStepTimer(stepKey)?.intervalId) {
+ 558:                 // TODO: Implement proper timer resumption after page reload
+ 559:                 // Date: 2026-01-19
+ 560:                 // Owner: kidpixel
+ 561:                 // Issue: startStepTimer doesn't resume from existing startTime
+ 562:                 // Solution needed: Backend should provide duration_str for running steps
+ 563:             }
+ 564: 
+ 565:             const progressContainer = document.getElementById(`progress-container-${stepKey}`);
+ 566:             const progressBar = document.getElementById(`progress-bar-${stepKey}`);
+ 567:             const progressTextEl = document.getElementById(`progress-text-${stepKey}`);
+ 568: 
+ 569:             let percentage = 0;
+ 570: 
+ 571:             if (progressContainer && progressBar && progressTextEl) {
+ 572:                 if (data.progress_total > 0) {
+ 573:                     let currentProgress = data.progress_current_fractional || data.progress_current;
+ 574: 
+ 575:                     if (data.progress_current_fractional === null && data.progress_text) {
+ 576:                         const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
+ 577:                         if (!isSpecialRunning) {
+ 578:                             const percentMatch = data.progress_text.match(/(\d+)%/);
+ 579:                             if (percentMatch) {
+ 580:                                 const textPercent = parseInt(percentMatch[1]);
+ 581:                                 currentProgress = (textPercent / 100) * data.progress_total;
+ 582:                                 console.log(`[PROGRESS FALLBACK] ${stepKey}: Extracted ${textPercent}% from text, using fractional: ${currentProgress}`);
+ 583:                             }
+ 584:                         }
+ 585:                     }
+ 586: 
+ 587:                     percentage = Math.round((currentProgress / data.progress_total) * 100);
+ 588:                     percentage = Math.min(percentage, 100);
+ 589: 
+ 590:                     if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+ 591:                         if (percentage >= 100) {
+ 592:                             percentage = 99;
+ 593:                         }
+ 594:                         if (data.progress_total > 0 && data.progress_current === data.progress_total) {
+ 595:                             percentage = Math.min(percentage, 99);
+ 596:                         }
+ 597:                     }
+ 598: 
+ 599:                     console.log(`[PROGRESS CALC] ${stepKey}:`, {
+ 600:                         progress_current: data.progress_current,
+ 601:                         progress_current_fractional: data.progress_current_fractional,
+ 602:                         progress_total: data.progress_total,
+ 603:                         currentProgress: currentProgress,
+ 604:                         calculatedPercentage: (currentProgress / data.progress_total) * 100,
+ 605:                         finalPercentage: percentage,
+ 606:                         status: data.status,
+ 607:                         progress_text: data.progress_text
+ 608:                     });
+ 609: 
+ 610:                     let displayCurrent = data.progress_current;
+ 611:                     if ((!displayCurrent || displayCurrent === 0) && typeof data.progress_current_fractional === 'number' && data.progress_current_fractional > 0) {
+ 612:                         const frac = Math.max(0, Math.min(data.progress_total, data.progress_current_fractional));
+ 613:                         displayCurrent = Math.min(data.progress_total, Math.floor(frac) + 1);
+ 614:                     }
+ 615: 
+ 616:                     progressContainer.style.display = 'block';
+ 617:                     progressBar.style.backgroundColor = 'var(--blue)';
+ 618:                     progressBar.style.width = `${percentage}%`;
+ 619:                     progressBar.textContent = `${percentage}%`;
+ 620:                     progressBar.setAttribute('aria-valuenow', percentage);
+ 621: 
+ 622:                     if (['running','starting','initiated'].includes(normalizedStatus)) {
+ 623:                         progressBar.setAttribute('data-active', 'true');
+ 624:                     } else {
+ 625:                         progressBar.removeAttribute('data-active');
+ 626:                     }
+ 627: 
+ 628:                     const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
+ 629:                     if (data.progress_text && data.progress_text.trim()) {
+ 630:                         lastProgressTextByStep[stepKey] = data.progress_text;
+ 631:                     }
+ 632:                     const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
+ 633:                     progressTextEl.textContent = subText;
+ 634: 
+ 635:                     const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
+ 636:                     if (shouldAutoCenter) {
+ 637:                         const logsOpenNow = isLogsPanelOpen();
+ 638:                         if (!logsOpenNow) {
+ 639:                             const now = performance.now();
+ 640:                             const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
+ 641:                             if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
+ 642:                                 _lastAutoCenterTsByStep[stepKey] = now;
+ 643:                                 requestAnimationFrame(() => {
+ 644:                                     scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
+ 645:                                 });
+ 646:                             }
+ 647:                         }
+ 648:                     }
+ 649: 
+ 650:                     if (candidateText && ['running','starting','initiated'].includes(data.status)) {
+ 651:                         progressTextEl.setAttribute('data-processing', 'true');
+ 652:                     } else {
+ 653:                         progressTextEl.removeAttribute('data-processing');
+ 654:                     }
+ 655: 
+ 656:                     if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+ 657:                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+ 658:                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
  659:                     }
- 660: 
- 661:                     const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
- 662:                     if (data.progress_text && data.progress_text.trim()) {
- 663:                         lastProgressTextByStep[stepKey] = data.progress_text;
- 664:                     }
- 665:                     const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
- 666:                     progressTextEl.textContent = subText;
- 667: 
- 668:                     const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
- 669:                     if (shouldAutoCenter) {
- 670:                         const logsOpenNow = workflowWrapper && workflowWrapper.classList.contains('logs-active');
- 671:                         if (!logsOpenNow) {
- 672:                             const now = performance.now();
- 673:                             const lastTs = _lastAutoCenterTsByStep[stepKey] || 0;
- 674:                             if ((now - lastTs) > _AUTO_CENTER_THROTTLE_MS) {
- 675:                                 _lastAutoCenterTsByStep[stepKey] = now;
- 676:                                 requestAnimationFrame(() => {
- 677:                                     scrollToActiveStep(stepKey, { behavior: 'auto', scrollDelay: 0 });
- 678:                                 });
- 679:                             }
- 680:                         }
- 681:                     }
- 682: 
- 683:                     if (candidateText && ['running','starting','initiated'].includes(data.status)) {
- 684:                         progressTextEl.setAttribute('data-processing', 'true');
- 685:                     } else {
- 686:                         progressTextEl.removeAttribute('data-processing');
- 687:                     }
- 688: 
- 689:                     if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
- 690:                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
- 691:                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
- 692:                     }
- 693:                 } else if (data.status === 'completed' && data.progress_total === 0) {
- 694:                     percentage = 0;
- 695:                     console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
- 696:                 } else if (data.status === 'completed' && data.progress_total > 0) {
- 697:                     percentage = 100;
- 698:                     console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
- 699:                 } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
- 700:                     percentage = 0;
- 701:                     console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
- 702:                 }
- 703:             } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
- 704:                 progressContainer.style.display = 'block';
- 705:                 progressBar.style.backgroundColor = 'var(--blue)';
- 706:                 progressBar.setAttribute('data-active', 'true');
- 707:                 const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
- 708:                 if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
- 709:                 progressTextEl.textContent = runningText;
- 710: 
- 711:                 if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
- 712:                     const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
- 713:                     const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
- 714:                     try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
- 715:                 }
- 716: 
- 717:                 if (runningText && runningText.trim()) {
- 718:                     progressTextEl.setAttribute('data-processing', 'true');
- 719:                 } else {
- 720:                     progressTextEl.removeAttribute('data-processing');
- 721:                 }
- 722:             } else if (data.status === 'completed') {
- 723:                 progressContainer.style.display = 'block';
- 724:                 progressBar.style.backgroundColor = 'var(--green)';
- 725:                 progressBar.removeAttribute('data-active');
- 726: 
- 727:                 if (data.progress_total === 0) {
- 728:                     let noWorkText = "Aucun élément à traiter";
- 729:                     if (data.progress_text && data.progress_text.trim() !== "") {
- 730:                         noWorkText = data.progress_text;
- 731:                     }
- 732:                     progressTextEl.textContent = noWorkText;
- 733:                     progressBar.style.width = '10%';
- 734:                     progressBar.textContent = '✓';
- 735:                 } else {
- 736:                     let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
- 737:                     if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
- 738:                         baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
- 739:                     }
- 740:                     const config = STEPS_CONFIG_FROM_SERVER[stepKey];
- 741:                     if (config && config.post_completion_message_ui) {
- 742:                         progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
- 743:                     } else {
- 744:                         progressTextEl.textContent = baseCompletionText;
- 745:                     }
+ 660:                 } else if (data.status === 'completed' && data.progress_total === 0) {
+ 661:                     percentage = 0;
+ 662:                     console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
+ 663:                 } else if (data.status === 'completed' && data.progress_total > 0) {
+ 664:                     percentage = 100;
+ 665:                     console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
+ 666:                 } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
+ 667:                     percentage = 0;
+ 668:                     console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
+ 669:                 }
+ 670:             } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
+ 671:                 progressContainer.style.display = 'block';
+ 672:                 progressBar.style.backgroundColor = 'var(--blue)';
+ 673:                 progressBar.setAttribute('data-active', 'true');
+ 674:                 const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
+ 675:                 if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
+ 676:                 progressTextEl.textContent = runningText;
+ 677: 
+ 678:                 if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+ 679:                     const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+ 680:                     const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
+ 681:                     try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
+ 682:                 }
+ 683: 
+ 684:                 if (runningText && runningText.trim()) {
+ 685:                     progressTextEl.setAttribute('data-processing', 'true');
+ 686:                 } else {
+ 687:                     progressTextEl.removeAttribute('data-processing');
+ 688:                 }
+ 689:             } else if (data.status === 'completed') {
+ 690:                 progressContainer.style.display = 'block';
+ 691:                 progressBar.style.backgroundColor = 'var(--green)';
+ 692:                 progressBar.removeAttribute('data-active');
+ 693: 
+ 694:                 if (data.progress_total === 0) {
+ 695:                     let noWorkText = "Aucun élément à traiter";
+ 696:                     if (data.progress_text && data.progress_text.trim() !== "") {
+ 697:                         noWorkText = data.progress_text;
+ 698:                     }
+ 699:                     progressTextEl.textContent = noWorkText;
+ 700:                     progressBar.style.width = '10%';
+ 701:                     progressBar.textContent = '✓';
+ 702:                 } else {
+ 703:                     let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
+ 704:                     if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
+ 705:                         baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
+ 706:                     }
+ 707:                     const config = STEPS_CONFIG_FROM_SERVER[stepKey];
+ 708:                     if (config && config.post_completion_message_ui) {
+ 709:                         progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
+ 710:                     } else {
+ 711:                         progressTextEl.textContent = baseCompletionText;
+ 712:                     }
+ 713: 
+ 714:                     if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+ 715:                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+ 716:                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
+ 717:                     }
+ 718:                     delete lastProgressTextByStep[stepKey];
+ 719:                 }
+ 720:             } else if (data.status === 'failed') {
+ 721:                 progressContainer.style.display = 'block';
+ 722:                 progressBar.style.backgroundColor = 'var(--red)';
+ 723:                 let failureText = `Échec`;
+ 724:                 if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
+ 725:                 if (data.progress_text) failureText += `: ${data.progress_text}`;
+ 726:                 progressTextEl.textContent = failureText;
+ 727:                 progressBar.removeAttribute('data-active');
+ 728:                 progressTextEl.removeAttribute('data-processing');
+ 729: 
+ 730:                 if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+ 731:                     const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+ 732:                     try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
+ 733:                 }
+ 734:                 delete lastProgressTextByStep[stepKey];
+ 735:             } else if (data.status === 'starting' || data.status === 'initiated') {
+ 736:                 progressContainer.style.display = 'block';
+ 737:                 progressBar.style.width = `0%`;
+ 738:                 progressBar.textContent = `0%`;
+ 739:                 progressBar.style.backgroundColor = 'var(--blue)';
+ 740:                 progressBar.setAttribute('data-active', 'true');
+ 741:                 progressTextEl.textContent = "Démarrage...";
+ 742:             } else {
+ 743:                 progressContainer.style.display = 'none';
+ 744:                 progressBar.setAttribute('aria-valuenow', 0);
+ 745:             }
  746: 
- 747:                     if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
- 748:                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
- 749:                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
- 750:                     }
- 751:                     delete lastProgressTextByStep[stepKey];
- 752:                 }
- 753:             } else if (data.status === 'failed') {
- 754:                 progressContainer.style.display = 'block';
- 755:                 progressBar.style.backgroundColor = 'var(--red)';
- 756:                 let failureText = `Échec`;
- 757:                 if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
- 758:                 if (data.progress_text) failureText += `: ${data.progress_text}`;
- 759:                 progressTextEl.textContent = failureText;
- 760:                 progressBar.removeAttribute('data-active');
- 761:                 progressTextEl.removeAttribute('data-processing');
- 762: 
- 763:                 if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
- 764:                     const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
- 765:                     try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
- 766:                 }
- 767:                 delete lastProgressTextByStep[stepKey];
- 768:             } else if (data.status === 'starting' || data.status === 'initiated') {
- 769:                 progressContainer.style.display = 'block';
- 770:                 progressBar.style.width = `0%`;
- 771:                 progressBar.textContent = `0%`;
- 772:                 progressBar.style.backgroundColor = 'var(--blue)';
- 773:                 progressBar.setAttribute('data-active', 'true');
- 774:                 progressTextEl.textContent = "Démarrage...";
- 775:             } else {
- 776:                 progressContainer.style.display = 'none';
- 777:                 progressBar.setAttribute('aria-valuenow', 0);
- 778:             }
- 779: 
- 780:             const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
- 781:             if (workflowWrapper) {
- 782:                 if (anyRunning) {
- 783:                     workflowWrapper.classList.add('any-step-running');
- 784:                     if (['running','starting','initiated'].includes(data.status)) {
- 785:                         workflowWrapper.setAttribute('data-active-step', stepKey);
- 786:                     } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
- 787:                         workflowWrapper.removeAttribute('data-active-step');
- 788:                     }
- 789:                 } else {
- 790:                     workflowWrapper.classList.remove('any-step-running');
- 791:                     workflowWrapper.removeAttribute('data-active-step');
- 792:                 }
- 793:             }
- 794: 
- 795:             try {
- 796:                 if (!_stepDetailsPanelModulePromise) {
- 797:                     _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
- 798:                 }
- 799:                 _stepDetailsPanelModulePromise
- 800:                     .then((mod) => {
- 801:                         if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
- 802:                             mod.refreshStepDetailsPanelIfOpen(stepKey);
- 803:                         }
- 804:                     })
- 805:                     .catch((e) => {
- 806:                         console.debug('[UI] Step details module not available:', e);
- 807:                     });
- 808:             } catch (_) {}
- 809:         } catch (_) {}
- 810: 
- 811:         console.groupEnd();
- 812:     });
- 813: }
- 814: 
- 815: export function updateCustomSequenceButtonsUI() {
- 816:     const hasSelection = getSelectedStepsOrder().length > 0;
- 817:     if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
- 818:     if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
- 819: }
- 820: 
- 821: export function updateGlobalProgressUI(text, percentage, isError = false) {
- 822:     if(dom.globalProgressAffix) dom.globalProgressAffix.style.display = 'flex';
- 823:     if(dom.globalProgressContainer) dom.globalProgressContainer.style.display = 'block';
- 824:     if(dom.globalProgressText) {
- 825:         dom.globalProgressText.style.display = 'block';
- 826:         dom.globalProgressText.textContent = text;
- 827:         dom.globalProgressText.style.color = isError ? 'var(--red)' : 'var(--text-secondary)';
- 828:     }
- 829:     if(dom.globalProgressBar) {
- 830:         dom.globalProgressBar.style.width = `${percentage}%`;
- 831:         dom.globalProgressBar.textContent = `${percentage}%`;
- 832:         dom.globalProgressBar.setAttribute('aria-valuenow', percentage);
- 833:         dom.globalProgressBar.style.backgroundColor = isError ? 'var(--red)' : 'var(--green)';
- 834:     }
- 835: }
- 836: 
- 837: export function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
- 838:     domBatcher.scheduleUpdate('specific-log-ui', () => {
- 839:         const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
- 840:         const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
- 841:         const outputContent = resolveElement(dom.getSpecificLogOutputContentPanel, dom.specificLogOutputContentPanel);
- 842:         const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
- 843:         const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
- 844: 
- 845:         if(headerText) headerText.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
- 846:         if(pathInfo) pathInfo.textContent = path ? `(Source: ${path})` : "";
- 847:         if (isError) {
- 848:             if(outputContent) {
- 849:                 const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
- 850:                 outputContent.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
- 851:             }
- 852:         } else {
- 853:             const styledContent = parseAndStyleLogContent(content);
- 854:             if(outputContent) outputContent.innerHTML = styledContent;
- 855:         }
- 856:         if(specificLogContainer) specificLogContainer.style.display = 'flex';
- 857:         if(mainLogContainer) mainLogContainer.style.display = 'none';
- 858:         if(outputContent) outputContent.scrollTop = 0;
- 859:     });
- 860: }
- 861: 
- 862: const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
- 863: 
- 864: const _LOG_TIMESTAMP_PATTERN = /^(?:\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2})/;
- 865: const _LOG_ERROR_PATTERN = /(?:erreur|error|échec|failed|exception|critical|fatal|crash)/i;
- 866: const _LOG_WARNING_PATTERN = /(?:warning|attention|avertissement|warn|caution|deprecated)/i;
- 867: const _LOG_SUCCESS_PATTERN = /(?:success|réussi|terminé|completed|finished|done|✓|✔|ok\b)/i;
- 868: const _LOG_INFO_PATTERN = /(?:info|information|démarrage|starting|lancement|initiated|status)/i;
- 869: const _LOG_DEBUG_PATTERN = /(?:debug|trace|verbose|détail)/i;
- 870: const _LOG_COMMAND_PATTERN = /^(?:commande:|command:|executing:|exécution:|\$|>)/i;
- 871: const _LOG_PROGRESS_PATTERN = /(?:\d+%|\d+\/\d+|progress|progression|chargement|loading|téléchargement|downloading)/i;
- 872: 
- 873: const _LOG_PATTERNS = [
- 874:     {
- 875:         regex: _LOG_ERROR_PATTERN,
- 876:         type: 'error'
- 877:     },
- 878:     {
- 879:         regex: _LOG_WARNING_PATTERN,
- 880:         type: 'warning'
- 881:     },
- 882:     {
- 883:         regex: _LOG_SUCCESS_PATTERN,
- 884:         type: 'success'
- 885:     },
- 886:     {
- 887:         regex: _LOG_PROGRESS_PATTERN,
- 888:         type: 'progress'
- 889:     },
- 890:     {
- 891:         regex: _LOG_COMMAND_PATTERN,
- 892:         type: 'command'
- 893:     },
- 894:     {
- 895:         regex: _LOG_INFO_PATTERN,
- 896:         type: 'info'
- 897:     },
- 898:     {
- 899:         regex: _LOG_TIMESTAMP_PATTERN,
- 900:         type: 'info'
- 901:     },
- 902:     {
- 903:         regex: _LOG_DEBUG_PATTERN,
- 904:         type: 'debug'
- 905:     }
- 906: ];
- 907: 
- 908: const _COMPILED_LOG_PATTERNS = _LOG_PATTERNS.map(p => ({
- 909:     ...p,
- 910:     regex: new RegExp(p.regex.source, p.regex.flags)
- 911: }));
+ 747:             const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
+ 748:             if (workflowWrapper) {
+ 749:                 if (anyRunning) {
+ 750:                     workflowWrapper.classList.add('any-step-running');
+ 751:                     if (['running','starting','initiated'].includes(data.status)) {
+ 752:                         workflowWrapper.setAttribute('data-active-step', stepKey);
+ 753:                     } else if (!document.querySelector(`.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]`)) {
+ 754:                         workflowWrapper.removeAttribute('data-active-step');
+ 755:                     }
+ 756:                 } else {
+ 757:                     workflowWrapper.classList.remove('any-step-running');
+ 758:                     workflowWrapper.removeAttribute('data-active-step');
+ 759:                 }
+ 760:             }
+ 761: 
+ 762:             try {
+ 763:                 if (!_stepDetailsPanelModulePromise) {
+ 764:                     _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
+ 765:                 }
+ 766:                 _stepDetailsPanelModulePromise
+ 767:                     .then((mod) => {
+ 768:                         if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
+ 769:                             mod.refreshStepDetailsPanelIfOpen(stepKey);
+ 770:                         }
+ 771:                     })
+ 772:                     .catch((e) => {
+ 773:                         console.debug('[UI] Step details module not available:', e);
+ 774:                     });
+ 775:             } catch (_) {}
+ 776:         } catch (_) {}
+ 777: 
+ 778:         console.groupEnd();
+ 779:     });
+ 780: }
+ 781: 
+ 782: export function updateCustomSequenceButtonsUI() {
+ 783:     const hasSelection = getSelectedStepsOrder().length > 0;
+ 784:     if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
+ 785:     if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
+ 786: }
+ 787: 
+ 788: export function updateGlobalProgressUI(text, percentage, isError = false) {
+ 789:     if(dom.globalProgressAffix) dom.globalProgressAffix.style.display = 'flex';
+ 790:     if(dom.globalProgressContainer) dom.globalProgressContainer.style.display = 'block';
+ 791:     if(dom.globalProgressText) {
+ 792:         dom.globalProgressText.style.display = 'block';
+ 793:         dom.globalProgressText.textContent = text;
+ 794:         dom.globalProgressText.style.color = isError ? 'var(--red)' : 'var(--text-secondary)';
+ 795:     }
+ 796:     if(dom.globalProgressBar) {
+ 797:         dom.globalProgressBar.style.width = `${percentage}%`;
+ 798:         dom.globalProgressBar.textContent = `${percentage}%`;
+ 799:         dom.globalProgressBar.setAttribute('aria-valuenow', percentage);
+ 800:         dom.globalProgressBar.style.backgroundColor = isError ? 'var(--red)' : 'var(--green)';
+ 801:     }
+ 802: }
+ 803: 
+ 804: export function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
+ 805:     domBatcher.scheduleUpdate('specific-log-ui', () => {
+ 806:         const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
+ 807:         const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
+ 808:         const outputContent = resolveElement(dom.getSpecificLogOutputContentPanel, dom.specificLogOutputContentPanel);
+ 809:         const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 810:         const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+ 811: 
+ 812:         if(headerText) headerText.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
+ 813:         if(pathInfo) pathInfo.textContent = path ? `(Source: ${path})` : "";
+ 814:         if (isError) {
+ 815:             if(outputContent) {
+ 816:                 const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
+ 817:                 outputContent.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
+ 818:             }
+ 819:         } else {
+ 820:             const styledContent = parseAndStyleLogContent(content);
+ 821:             if(outputContent) outputContent.innerHTML = styledContent;
+ 822:         }
+ 823:         if(specificLogContainer) specificLogContainer.style.display = 'flex';
+ 824:         if(mainLogContainer) mainLogContainer.style.display = 'none';
+ 825:         if(outputContent) outputContent.scrollTop = 0;
+ 826:     });
+ 827: }
+ 828: 
+ 829: const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
+ 830: 
+ 831: const _LOG_TIMESTAMP_PATTERN = /^(?:\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2})/;
+ 832: const _LOG_ERROR_PATTERN = /(?:erreur|error|échec|failed|exception|critical|fatal|crash)/i;
+ 833: const _LOG_WARNING_PATTERN = /(?:warning|attention|avertissement|warn|caution|deprecated)/i;
+ 834: const _LOG_SUCCESS_PATTERN = /(?:success|réussi|terminé|completed|finished|done|✓|✔|ok\b)/i;
+ 835: const _LOG_INFO_PATTERN = /(?:info|information|démarrage|starting|lancement|initiated|status)/i;
+ 836: const _LOG_DEBUG_PATTERN = /(?:debug|trace|verbose|détail)/i;
+ 837: const _LOG_COMMAND_PATTERN = /^(?:commande:|command:|executing:|exécution:|\$|>)/i;
+ 838: const _LOG_PROGRESS_PATTERN = /(?:\d+%|\d+\/\d+|progress|progression|chargement|loading|téléchargement|downloading)/i;
+ 839: 
+ 840: const _LOG_PATTERNS = [
+ 841:     {
+ 842:         regex: _LOG_ERROR_PATTERN,
+ 843:         type: 'error'
+ 844:     },
+ 845:     {
+ 846:         regex: _LOG_WARNING_PATTERN,
+ 847:         type: 'warning'
+ 848:     },
+ 849:     {
+ 850:         regex: _LOG_SUCCESS_PATTERN,
+ 851:         type: 'success'
+ 852:     },
+ 853:     {
+ 854:         regex: _LOG_PROGRESS_PATTERN,
+ 855:         type: 'progress'
+ 856:     },
+ 857:     {
+ 858:         regex: _LOG_COMMAND_PATTERN,
+ 859:         type: 'command'
+ 860:     },
+ 861:     {
+ 862:         regex: _LOG_INFO_PATTERN,
+ 863:         type: 'info'
+ 864:     },
+ 865:     {
+ 866:         regex: _LOG_TIMESTAMP_PATTERN,
+ 867:         type: 'info'
+ 868:     },
+ 869:     {
+ 870:         regex: _LOG_DEBUG_PATTERN,
+ 871:         type: 'debug'
+ 872:     }
+ 873: ];
+ 874: 
+ 875: const _COMPILED_LOG_PATTERNS = _LOG_PATTERNS.map(p => ({
+ 876:     ...p,
+ 877:     regex: new RegExp(p.regex.source, p.regex.flags)
+ 878: }));
+ 879: 
+ 880: /**
+ 881:  * Parse and style log content with CSS classes for different log types.
+ 882:  * Escapes all HTML to prevent XSS.
+ 883:  * 
+ 884:  * @param {string} rawContent - Raw log content
+ 885:  * @returns {string} - Styled HTML content
+ 886:  */
+ 887: export function parseAndStyleLogContent(rawContent) {
+ 888:     if (!rawContent || typeof rawContent !== 'string') {
+ 889:         return rawContent || '';
+ 890:     }
+ 891: 
+ 892: const lines = rawContent.split('\n');
+ 893:     const styledLines = new Array(lines.length);
+ 894: 
+ 895:     for (let i = 0; i < lines.length; i++) {
+ 896:         const line = lines[i];
+ 897:         if (line === '' || _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN.test(line)) {
+ 898:             styledLines[i] = line;
+ 899:             continue;
+ 900:         }
+ 901: 
+ 902:         const escapedLine = DOMUpdateUtils.escapeHtml(line);
+ 903: 
+ 904:         let logType = 'default';
+ 905:         for (let j = 0; j < _COMPILED_LOG_PATTERNS.length; j++) {
+ 906:             const pattern = _COMPILED_LOG_PATTERNS[j];
+ 907:             if (pattern.regex.test(line)) {
+ 908:                 logType = pattern.type;
+ 909:                 break;
+ 910:             }
+ 911:         }
  912: 
- 913: /**
- 914:  * Parse and style log content with CSS classes for different log types.
- 915:  * Escapes all HTML to prevent XSS.
- 916:  * 
- 917:  * @param {string} rawContent - Raw log content
- 918:  * @returns {string} - Styled HTML content
- 919:  */
- 920: export function parseAndStyleLogContent(rawContent) {
- 921:     if (!rawContent || typeof rawContent !== 'string') {
- 922:         return rawContent || '';
- 923:     }
- 924: 
- 925: const lines = rawContent.split('\n');
- 926:     const styledLines = new Array(lines.length);
- 927: 
- 928:     for (let i = 0; i < lines.length; i++) {
- 929:         const line = lines[i];
- 930:         if (line === '' || _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN.test(line)) {
- 931:             styledLines[i] = line;
- 932:             continue;
- 933:         }
- 934: 
- 935:         const escapedLine = DOMUpdateUtils.escapeHtml(line);
- 936: 
- 937:         let logType = 'default';
- 938:         for (let j = 0; j < _COMPILED_LOG_PATTERNS.length; j++) {
- 939:             const pattern = _COMPILED_LOG_PATTERNS[j];
- 940:             if (pattern.regex.test(line)) {
- 941:                 logType = pattern.type;
- 942:                 break;
- 943:             }
- 944:         }
- 945: 
- 946:         styledLines[i] = logType !== 'default'
- 947:             ? `<span class="log-line log-${logType}">${escapedLine}</span>`
- 948:             : escapedLine;
- 949:     }
- 950: 
- 951:     return styledLines.join('\n');
- 952: }
- 953: 
- 954: export function updateMainLogOutputUI(htmlContent) {
- 955:     if(dom.mainLogOutputPanel) {
- 956: const styledContent = parseAndStyleLogContent(htmlContent);
- 957:         dom.mainLogOutputPanel.innerHTML = styledContent;
- 958:     }
- 959:     if(dom.mainLogOutputPanel) dom.mainLogOutputPanel.scrollTop = dom.mainLogOutputPanel.scrollHeight;
- 960: 
- 961:     if(dom.mainLogContainerPanel) dom.mainLogContainerPanel.style.display = 'flex';
- 962:     if(dom.specificLogContainerPanel) dom.specificLogContainerPanel.style.display = 'none';
- 963: }
- 964: 
- 965: export function updateLocalDownloadsListUI(downloadsData) {
- 966:     if (!dom.getLocalDownloadsList()) return;
- 967:     dom.getLocalDownloadsList().innerHTML = '';
- 968:     if (!downloadsData || downloadsData.length === 0) {
- 969:         const li = document.createElement('li');
- 970:         li.textContent = 'Aucune activité de téléchargement locale récente.';
- 971:         li.classList.add('placeholder');
- 972:         dom.getLocalDownloadsList().appendChild(li);
- 973:         return;
- 974:     }
- 975: 
- 976: const currentDownloadIds = new Set();
- 977:     downloadsData.forEach(download => {
- 978:         if (download.id) {
- 979:             currentDownloadIds.add(download.id);
- 980: if (!previousDownloadIds.has(download.id) &&
- 981:                 (download.status === 'pending' || download.status === 'downloading')) {
- 982:                 console.log(`[SOUND] New CSV download detected: ${download.filename}`);
- 983:                 soundEvents.csvDownloadInitiation();
- 984: 
- 985: const filename = download.filename && download.filename !== 'Détermination en cours...'
- 986:                     ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
- 987:                     : 'nouveau fichier';
- 988:                 showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
- 989:             }
- 990:         }
- 991:     });
- 992: 
- 993: previousDownloadIds = currentDownloadIds;
+ 913:         styledLines[i] = logType !== 'default'
+ 914:             ? `<span class="log-line log-${logType}">${escapedLine}</span>`
+ 915:             : escapedLine;
+ 916:     }
+ 917: 
+ 918:     return styledLines.join('\n');
+ 919: }
+ 920: 
+ 921: export function updateMainLogOutputUI(htmlContent) {
+ 922:     const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
+ 923:     const mainLogContainerPanel = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+ 924:     const specificLogContainerPanel = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 925: 
+ 926:     if (mainLogOutputPanel) {
+ 927:         const styledContent = parseAndStyleLogContent(htmlContent);
+ 928:         mainLogOutputPanel.innerHTML = styledContent;
+ 929:         mainLogOutputPanel.scrollTop = mainLogOutputPanel.scrollHeight;
+ 930:     }
+ 931: 
+ 932:     if (mainLogContainerPanel) mainLogContainerPanel.style.display = 'flex';
+ 933:     if (specificLogContainerPanel) specificLogContainerPanel.style.display = 'none';
+ 934: }
+ 935: 
+ 936: export function updateLocalDownloadsListUI(downloadsData) {
+ 937:     if (!dom.getLocalDownloadsList()) return;
+ 938:     dom.getLocalDownloadsList().innerHTML = '';
+ 939:     if (!downloadsData || downloadsData.length === 0) {
+ 940:         const li = document.createElement('li');
+ 941:         li.textContent = 'Aucune activité de téléchargement locale récente.';
+ 942:         li.classList.add('placeholder');
+ 943:         dom.getLocalDownloadsList().appendChild(li);
+ 944:         return;
+ 945:     }
+ 946: 
+ 947: const currentDownloadIds = new Set();
+ 948:     downloadsData.forEach(download => {
+ 949:         if (download.id) {
+ 950:             currentDownloadIds.add(download.id);
+ 951: if (!previousDownloadIds.has(download.id) &&
+ 952:                 (download.status === 'pending' || download.status === 'downloading')) {
+ 953:                 console.log(`[SOUND] New CSV download detected: ${download.filename}`);
+ 954:                 soundEvents.csvDownloadInitiation();
+ 955: 
+ 956: const filename = download.filename && download.filename !== 'Détermination en cours...'
+ 957:                     ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
+ 958:                     : 'nouveau fichier';
+ 959:                 showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
+ 960:             }
+ 961:         }
+ 962:     });
+ 963: 
+ 964: previousDownloadIds = currentDownloadIds;
+ 965: 
+ 966:     downloadsData.forEach(download => {
+ 967:         const li = document.createElement('li');
+ 968:         li.classList.add(`download-status-${download.status}`);
+ 969: 
+ 970:         const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
+ 971:         const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
+ 972:         const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
+ 973:         const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
+ 974: 
+ 975:         const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
+ 976:         const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
+ 977:         let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
+ 978:         let progressText = '';
+ 979:         if (download.status === 'downloading' && typeof download.progress === 'number') {
+ 980:             progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
+ 981:         }
+ 982:         if (download.message) {
+ 983:             const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
+ 984:             const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
+ 985:             statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
+ 986:         }
+ 987:         li.innerHTML = `${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}`;
+ 988:         dom.getLocalDownloadsList().appendChild(li);
+ 989:     });
+ 990: }
+ 991: 
+ 992: export function updateClearCacheGlobalButtonState(status, message = '') {
+ 993:     if (!dom.clearCacheGlobalButton) return;
  994: 
- 995:     downloadsData.forEach(download => {
- 996:         const li = document.createElement('li');
- 997:         li.classList.add(`download-status-${download.status}`);
+ 995:     dom.clearCacheGlobalButton.classList.remove('idle', 'running', 'completed', 'failed');
+ 996:     const textSpan = dom.clearCacheGlobalButton.querySelector('.button-text');
+ 997:     const currentStepInfo = getProcessInfo('clear_disk_cache');
  998: 
- 999:         const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
-1000:         const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
-1001:         const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
-1002:         const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
-1003: 
-1004:         const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
-1005:         const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
-1006:         let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
-1007:         let progressText = '';
-1008:         if (download.status === 'downloading' && typeof download.progress === 'number') {
-1009:             progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
-1010:         }
-1011:         if (download.message) {
-1012:             const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
-1013:             const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
-1014:             statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
-1015:         }
-1016:         li.innerHTML = `${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}`;
-1017:         dom.getLocalDownloadsList().appendChild(li);
-1018:     });
-1019: }
-1020: 
-1021: export function updateClearCacheGlobalButtonState(status, message = '') {
-1022:     if (!dom.clearCacheGlobalButton) return;
-1023: 
-1024:     dom.clearCacheGlobalButton.classList.remove('idle', 'running', 'completed', 'failed');
-1025:     const textSpan = dom.clearCacheGlobalButton.querySelector('.button-text');
-1026:     const currentStepInfo = getProcessInfo('clear_disk_cache');
-1027: 
-1028: const isOtherSequenceRunning = getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
-1029: 
-1030: 
-1031:     switch (status) {
-1032:         case 'idle':
-1033:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-1034:             if (textSpan) textSpan.textContent = "Vider le Cache";
-1035:             dom.clearCacheGlobalButton.classList.add('idle');
+ 999: const isOtherSequenceRunning = getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
+1000: 
+1001: 
+1002:     switch (status) {
+1003:         case 'idle':
+1004:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+1005:             if (textSpan) textSpan.textContent = "Vider le Cache";
+1006:             dom.clearCacheGlobalButton.classList.add('idle');
+1007:             break;
+1008:         case 'starting':
+1009:         case 'initiated':
+1010:             dom.clearCacheGlobalButton.disabled = true;
+1011:             if (textSpan) textSpan.textContent = "Lancement...";
+1012:             dom.clearCacheGlobalButton.classList.add('running');
+1013:             break;
+1014:         case 'running':
+1015:             dom.clearCacheGlobalButton.disabled = true;
+1016:             if (textSpan) textSpan.textContent = "Nettoyage...";
+1017:             dom.clearCacheGlobalButton.classList.add('running');
+1018:             break;
+1019:         case 'completed':
+1020:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+1021:             if (textSpan) textSpan.textContent = "Cache Vidé";
+1022:             dom.clearCacheGlobalButton.classList.add('completed');
+1023:             showNotification("Nettoyage du cache disque terminé avec succès.", "success");
+1024:             setTimeout(() => updateClearCacheGlobalButtonState('idle'), 5000);
+1025:             break;
+1026:         case 'failed':
+1027:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+1028:             if (textSpan) textSpan.textContent = "Échec Nettoyage";
+1029:             dom.clearCacheGlobalButton.classList.add('failed');
+1030:             let notifMessage = "Échec du nettoyage du cache disque.";
+1031:             if (message && typeof message === 'string' && message.trim() !== '' && !message.startsWith('<')) {
+1032:                 notifMessage += ` Détail: ${message.substring(0,100)}`;
+1033:             }
+1034:             showNotification(notifMessage, "error");
+1035:             setTimeout(() => updateClearCacheGlobalButtonState('idle'), 8000);
 1036:             break;
-1037:         case 'starting':
-1038:         case 'initiated':
-1039:             dom.clearCacheGlobalButton.disabled = true;
-1040:             if (textSpan) textSpan.textContent = "Lancement...";
-1041:             dom.clearCacheGlobalButton.classList.add('running');
-1042:             break;
-1043:         case 'running':
-1044:             dom.clearCacheGlobalButton.disabled = true;
-1045:             if (textSpan) textSpan.textContent = "Nettoyage...";
-1046:             dom.clearCacheGlobalButton.classList.add('running');
-1047:             break;
-1048:         case 'completed':
-1049:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-1050:             if (textSpan) textSpan.textContent = "Cache Vidé";
-1051:             dom.clearCacheGlobalButton.classList.add('completed');
-1052:             showNotification("Nettoyage du cache disque terminé avec succès.", "success");
-1053:             setTimeout(() => updateClearCacheGlobalButtonState('idle'), 5000);
-1054:             break;
-1055:         case 'failed':
-1056:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-1057:             if (textSpan) textSpan.textContent = "Échec Nettoyage";
-1058:             dom.clearCacheGlobalButton.classList.add('failed');
-1059:             let notifMessage = "Échec du nettoyage du cache disque.";
-1060:             if (message && typeof message === 'string' && message.trim() !== '' && !message.startsWith('<')) {
-1061:                 notifMessage += ` Détail: ${message.substring(0,100)}`;
-1062:             }
-1063:             showNotification(notifMessage, "error");
-1064:             setTimeout(() => updateClearCacheGlobalButtonState('idle'), 8000);
-1065:             break;
-1066:         default:
-1067:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-1068:             if (textSpan) textSpan.textContent = "Vider le Cache";
-1069:             dom.clearCacheGlobalButton.classList.add('idle');
-1070:     }
-1071: }
+1037:         default:
+1038:             dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
+1039:             if (textSpan) textSpan.textContent = "Vider le Cache";
+1040:             dom.clearCacheGlobalButton.classList.add('idle');
+1041:     }
+1042: }
 ```

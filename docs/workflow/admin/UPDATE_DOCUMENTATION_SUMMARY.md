@@ -4,6 +4,12 @@
 
 Ce document résume les mises à jour apportées à la documentation pour refléter les optimisations v4.1 incluant les améliorations de progression, le mode CPU-only pour le tracking, et les optimisations audio ffmpeg.
 
+## 2026-01-25 — Documentation CSV monitor (SQLite + heuristiques) (COMPLET)
+- ✅ **CSV_DOWNLOADS_MANAGEMENT.md** : ajout d'une sous-section dédiée au `DownloadHistoryRepository` (WAL, permissions partagées, règles `upsert/replace_all`) et à la séquence Webhook-only décrivant `DRY_RUN_DOWNLOADS`.
+- ✅ **Normalisation d'URLs** : description détaillée des heuristiques `_normalize_url` (html.unescape, double décodage `amp%3B`, tri des query params, collapse `dl`, suppression des fragments) + tableau d'exemples Dropbox/proxy R2.
+- ✅ **Monitoring Webhook** : encart séquentiel explicitant les filtres (status, heuristique archive `.zip`), les garde-fous `tracked_urls/handled_in_this_pass` et le comportement dry-run.
+- 🎯 Objectif : documenter les fonctions Radon F du `CSVService` pour faciliter la maintenance (SQLite multi-workers + politique Dropbox-only).
+
 ## 2026-01-24 — Migration Audit Logs Overlay vers Documentation Pérenne (COMPLET)
 - ✅ **ARCHITECTURE_COMPLETE_FR.md** : Ajout d’une sous-section “Panneau de logs en overlay” décrivant la Lightbox indépendante (Option A), le toggle “📟 Auto-ouverture des logs”, la synchronisation AppState/Timeline et l’absence de layout shifting.
 - ✅ **GUIDE_DEMARRAGE_RAPIDE.md** : Enrichissement de la section “Logs — rendu et auto-scroll” pour documenter le comportement overlay, la persistance localStorage, le respect de `getAutoOpenLogOverlay()` par les séquences et l’implémentation `openPopupUI`/`closePopupUI`.

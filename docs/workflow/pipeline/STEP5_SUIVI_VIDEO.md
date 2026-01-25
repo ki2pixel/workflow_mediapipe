@@ -1,35 +1,174 @@
-## Spécifications Techniques
+# Documentation Technique - Étape 5 : Suivi Vidéo et Blendshapes
+
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: critical complexity in STEP5 workers (radon F/E), especially `process_video_worker.py` and `run_tracking_manager.py`.
+
+---
+
+## Purpose & Pipeline Role
+
+### Objectif
+L'Étape 5 effectue le suivi vidéo en temps réel avec détection de visages, extraction de landmarks faciaux et génération de blendshapes ARKit. Cette étape combine plusieurs moteurs de tracking (MediaPipe, OpenCV, OpenSeeFace, EOS) pour fournir une analyse faciale complète frame par frame.
+
+### Rôle dans le Pipeline
+- **Position** : Cinquième étape du pipeline (STEP5)
+- **Prérequis** : Vidéos standardisées (STEP2) et analyses audio (STEP4)
+- **Sortie** : JSON dense avec tracked_objects, landmarks, et blendshapes par frame
+- **Étape suivante** : Réduction JSON (STEP6)
+
+### Valeur Ajoutée
+- **Multi-moteurs** : Support MediaPipe, OpenCV YuNet, OpenSeeFace, EOS 3DMM
+- **GPU optionnel** : Accélération sélective pour MediaPipe et InsightFace
+- **Blendshapes ARKit** : 52 blendshapes standard pour animation 3D
+- **Multiprocessing** : Traitement parallèle avec workers configurables
+- **Export dense** : Structure JSON optimisée pour les analyses suivantes
+
+---
+
+## Inputs & Outputs
+
+### Inputs
+- **Vidéos standardisées** : Fichiers vidéo à 25 FPS de STEP2
+- **Analyses audio** : JSON diarization de STEP4 pour détection de parole
+- **Configuration** : Moteur de tracking, paramètres GPU/CPU
+
+### Outputs
+- **JSON tracking** : Structure frame par frame avec tracked_objects
+- **Landmarks faciaux** : 468 points MediaPipe ou équivalents
+- **Blendshapes** : 52 coefficients ARKit par visage détecté
+- **Logs détaillés** : Journal de tracking dans `logs/step5/`
+
+---
+
+## Command & Environment
+
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step5/run_tracking_manager.py --input-dir projets_extraits/ --engine mediapipe --workers 15
+```
 
 ### Environnement Virtuel
 - **Environnement utilisé** : `tracking_env/` (spécialisé MediaPipe)
 - **Activation** : `source tracking_env/bin/activate`
 - **Isolation** : Environnement dédié pour MediaPipe et OpenCV
 
-### Technologies et Bibliothèques Principales
+---
 
-#### MediaPipe et Computer Vision
+## Dependencies
+
+### Bibliothèques Principales
 ```python
-import mediapipe as mp                    # Framework de ML pour vision
-from mediapipe.tasks import python       # API Python MediaPipe
-from mediapipe.tasks.python import vision # Tâches de vision
+import mediapipe as mp                    # Framework ML pour vision
 import cv2                               # OpenCV pour traitement d'image
 import numpy as np                       # Calculs numériques
+import onnxruntime                       # ONNX pour modèles optimisés
+import multiprocessing                    # Multi-processing
 ```
 
-#### Traitement Parallèle et Optimisations
-```python
-from concurrent.futures import ThreadPoolExecutor  # Multi-threading
-import multiprocessing                              # Multi-processing
-import threading                                    # Synchronisation
-import queue                                        # Communication inter-threads
+### Dépendances Externes
+- **MediaPipe** : Face Landmarker avec support GPU
+- **OpenCV** : YuNet et autres détecteurs
+- **ONNX Runtime** : Modèles optimisés (FaceMesh, EOS)
+- **CUDA** : Accélération GPU optionnelle
+
+---
+
+## Configuration
+
+### Variables d'Environnement
+- **STEP5_TRACKING_ENGINE** : `mediapipe`, `opencv_yunet_pyfeat`, `openseeface`, `eos`
+- **STEP5_ENABLE_GPU** : Activation GPU (défaut: 0)
+- **STEP5_GPU_ENGINES** : Moteurs autorisés en GPU
+- **TRACKING_CPU_WORKERS** : Nombre de workers CPU (défaut: 15)
+- **STEP5_BLENDSHAPES_THROTTLE_N** : Throttling blendshapes
+- **STEP5_EXPORT_VERBOSE_FIELDS** : Contrôle verbosité export
+
+### Configuration par Moteur
+```json
+{
+  "mediapipe": {
+    "max_faces": 5,
+    "min_detection_confidence": 0.5,
+    "model_complexity": 1
+  },
+  "opencv_yunet_pyfeat": {
+    "max_faces": 5,
+    "yunet_max_width": 640
+  }
+}
 ```
 
-#### Modules Personnalisés
+---
+
+## Known Hotspots
+
+### Complexité Backend (Critique)
+- **`process_video_worker.py`** : Complexité critique (radon F) dans `main` et `process_frame_chunk`
+- **`run_tracking_manager.py`** : Complexité critique (radon F) dans `main`
+- **`face_engines.py`** : Complexité élevée (radon E) dans `detect` (InsightFace, EOS)
+- **Points d'attention** : Gestion multiprocessing, lazy imports MediaPipe, profiling
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit de tracking** : FPS traités par worker
+- **Utilisation GPU** : % GPU et mémoire VRAM
+- **Précision détection** : Nombre de visages détectés
+- **Taux de succès** : % frames traitées avec succès
+
+### Patterns de Logging
 ```python
-from utils.tracking_optimizations import apply_tracking_and_management
-from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
-from utils.resource_manager import safe_video_processing
+# Logs de progression
+logger.info(f"Tracking {video_path} - {current}/{total}")
+
+# Logs profiling (toutes les 20 frames)
+if frame_count % 20 == 0:
+    logger.info(f"[PROFILING] Engine: {engine}, FPS: {fps:.2f}")
+
+# Logs GPU
+logger.info(f"ONNX providers: {onnxruntime.get_providers()}")
+
+# Logs d'erreur
+logger.error(f"Échec tracking {video_path}: {error}")
 ```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **GPU OOM** : Basculement automatique sur CPU
+2. **Modèle non chargé** : Retry avec téléchargement du modèle
+3. **Worker crash** : Redémarrage automatique du worker
+4. **Timeout** : Augmentation du délai ou réduction workers
+
+### Procédures de Récupération
+```bash
+# Réessayer avec CPU uniquement
+STEP5_ENABLE_GPU=0 python workflow_scripts/step5/run_tracking_manager.py
+
+# Réduire les workers
+TRACKING_CPU_WORKERS=4 python workflow_scripts/step5/run_tracking_manager.py
+
+# Validation post-tracking
+python scripts/validate_step5_output.py
+```
+
+---
+
+## Related Documentation
+
+- **Pipeline Overview** : `../README.md`
+- **GPU Usage Guide** : `../pipeline/STEP5_GPU_USAGE.md`
+- **OpenCV YuNet/PyFeat** : `../pipeline/STEP5_OPENCV_YUNET_PYFEAT.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
+
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.*
 
 ### Formats d'Entrée et de Sortie
 

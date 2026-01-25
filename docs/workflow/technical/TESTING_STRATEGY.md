@@ -1,7 +1,35 @@
 # Stratégie de Tests — Backend, Intégration et Frontend (ESM/Node)
 
+> **🔴 Known Hotspot** – Critical complexity (radon F) in STEP5 workers and CSV monitoring. Tests must prioritize coverage of `process_video_worker.py`, `run_tracking_manager.py`, and `CSVService._check_csv_for_downloads`. See `../complexity_report.txt` for detailed analysis.
+
 ## Vue d’ensemble
 Cette stratégie vise une couverture robuste tout en restant légère côté frontend. Elle combine `pytest` pour Python et des tests ESM/Node ciblés pour des utilitaires frontend.
+
+---
+
+## 🔴 Critical Testing Priorities (Based on Radon Analysis)
+
+### High-Complexity Areas Requiring Enhanced Test Coverage
+
+#### STEP5 Workers (Radon F)
+- **`process_video_worker.py`** : Complexité critique dans `main` et `process_frame_chunk`
+- **`run_tracking_manager.py`** : Complexité critique dans `main`
+- **Tests requis** :
+  - Tests de charge avec workers multiples
+  - Tests de timeout et recovery
+  - Tests GPU/CPU fallback
+  - Tests de gestion mémoire (OOM)
+
+#### CSV Service (Radon F)
+- **`CSVService._check_csv_for_downloads()`** : Complexité critique
+- **`CSVService._normalize_url()`** : Complexité critique
+- **Tests requis** :
+  - Tests avec gros fichiers CSV (>10MB)
+  - Tests d'URL edge cases (double-encodage, caractères spéciaux)
+  - Tests de concurrence (multi-threading)
+  - Tests de performance et timeout
+
+---
 
 ## Structure
 - `tests/unit/` — Tests unitaires des services (e.g., `MonitoringService`, `MySQLService`).

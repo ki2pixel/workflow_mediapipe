@@ -1,6 +1,10 @@
 # Documentation Technique - Étape 3 : Détection de Scènes
 
-## Description Fonctionnelle
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: high complexity in `run_transnet.py` and `transnetv2_pytorch.py` (radon E/D), requiring careful monitoring.
+
+---
+
+## Purpose & Pipeline Role
 
 ### Objectif
 L'Étape 3 utilise le modèle TransNetV2 basé sur PyTorch pour détecter automatiquement les changements de scène dans les vidéos. Cette analyse temporelle identifie les transitions visuelles significatives, créant une segmentation précise du contenu vidéo en scènes distinctes.
@@ -18,29 +22,66 @@ L'Étape 3 utilise le modèle TransNetV2 basé sur PyTorch pour détecter automa
 - **Format standardisé** : Sortie CSV compatible avec les outils de post-production
 - **Métriques temporelles** : Conversion automatique frames ↔ timecodes
 
-## Améliorations Récentes (v4.1)
+---
 
-### Amélioration de l'Affichage de la Progression (2025-10-08 16:45:30+02:00)
+## Inputs & Outputs
 
-#### Nouvelles Fonctionnalités
-- **Affichage du nom du fichier en cours de traitement** : Le nom du fichier actuellement analysé est maintenant affiché en temps réel
-- **Comptage précis des vidéos** : Affichage du numéro de la vidéo en cours de traitement sur le nombre total (ex: 2/5)
-- **Gestion des états intermédiaires** : Meilleure gestion des états de progression pendant le traitement
-- **Correction des erreurs de syntaxe** : Résolution des problèmes d'affichage dans le code frontend
+### Inputs
+- **Vidéos standardisées** : Fichiers vidéo à 25 FPS de STEP2
+- **Configuration** : Paramètres TransNetV2 via JSON ou variables d'environnement
+- **Métadonnées** : Informations de framerate pour conversion temps/frame
 
-#### Détails Techniques
-- Support des messages de progression simples sans pourcentage
-- Mise en cache du nom du dernier fichier traité pour éviter le clignotement
-- Meilleure gestion des erreurs et des états de progression
-- Support des formats de log variés pour une meilleure compatibilité
+### Outputs
+- **Fichiers CSV** : Scènes détectées avec timestamps et numéros de frame
+- **Logs détaillés** : Journal de détection dans `logs/step3/`
+- **Métriques** : Nombre de scènes, temps de traitement, utilisation GPU/CPU
 
-### Optimisations de Performance TransNetV2 (2025-10-06 10:19:24+02:00)
+---
 
-#### Configuration JSON Dédiée
-L'étape 3 supporte désormais un fichier de configuration JSON pour un tuning fin des paramètres :
+## Command & Environment
 
-**Fichier** : `config/step3_transnet.json`
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step3/run_transnet.py --input-dir projets_extraits/ --config config/step3_transnet.json
+```
 
+### Environnement Virtuel
+- **Environnement utilisé** : `transnet_env/` (environnement spécialisé)
+- **Activation** : `source transnet_env/bin/activate`
+- **Partage** : Isolé pour éviter les conflits PyTorch/TensorFlow
+
+---
+
+## Dependencies
+
+### Bibliothèques Principales
+```python
+import torch              # PyTorch pour TransNetV2
+import torchvision        # Transformations et modèles
+import numpy as np        # Calcul numérique
+import pandas as pd       # Manipulation CSV
+import cv2                # Traitement vidéo OpenCV
+import json               # Configuration
+```
+
+### Dépendances Externes
+- **TransNetV2** : Modèle pré-entraîné pour la détection de scènes
+- **PyTorch** : Framework deep learning (version compatible CUDA)
+- **OpenCV** : Lecture et décodage vidéo
+
+---
+
+## Configuration
+
+### Variables d'Environnement
+- **STEP3_THRESHOLD** : Seuil de détection (défaut: 0.5)
+- **STEP3_WINDOW_SIZE** : Taille de la fenêtre d'analyse (défaut: 100)
+- **STEP3_STRIDE** : Pas d'analyse (défaut: 50)
+- **STEP3_DEVICE** : 'auto', 'cuda', ou 'cpu'
+- **STEP3_BATCH_SIZE** : Taille du lot pour traitement par lots
+
+### Configuration JSON
 ```json
 {
   "threshold": 0.5,
@@ -48,6 +89,75 @@ L'étape 3 supporte désormais un fichier de configuration JSON pour un tuning f
   "stride": 50,
   "padding": 25,
   "device": "auto",
+  "batch_size": 1
+}
+```
+
+---
+
+## Known Hotspots
+
+### Complexité Backend (Critique)
+- **`run_transnet.py`** : Complexité élevée (radon E) dans la fonction `main`
+- **`transnetv2_pytorch.py`** : Complexité élevée (radon D) dans `forward`
+- **Points d'attention** : Gestion mémoire GPU, traitement par lots, validation des entrées
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit de détection** : Images/seconde traitées
+- **Utilisation GPU** : % GPU et mémoire VRAM
+- **Précision** : Qualité des détections (validation manuelle)
+- **Temps par vidéo** : Durée moyenne de traitement
+
+### Patterns de Logging
+```python
+# Logs de progression
+logger.info(f"Détection scènes {video_path} - {current}/{total}")
+
+# Logs GPU
+logger.info(f"GPU memory: {torch.cuda.memory_allocated()/1024**3:.2f}GB")
+
+# Logs d'erreur
+logger.error(f"Échec détection {video_path}: {error}")
+```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **GPU mémoire insuffisante** : Basculement sur CPU ou réduction batch_size
+2. **Modèle non chargé** : Retry avec téléchargement du modèle
+3. **Format vidéo incompatible** : Logging et passage au fichier suivant
+4. **Timeout** : Augmentation du délai ou traitement par lots plus petits
+
+### Procédures de Récupération
+```bash
+# Réessayer avec CPU uniquement
+STEP3_DEVICE=cpu python workflow_scripts/step3/run_transnet.py
+
+# Réduire la taille des lots
+STEP3_BATCH_SIZE=1 python workflow_scripts/step3/run_transnet.py
+
+# Validation post-détection
+python scripts/validate_step3_output.py
+```
+
+---
+
+## Related Documentation
+
+- **Pipeline Overview** : `../README.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **GPU Usage Guide** : `../pipeline/STEP5_GPU_USAGE.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
+
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.*
   "ffmpeg_threads": 4,
   "mixed_precision": true,
   "amp_dtype": "float16",

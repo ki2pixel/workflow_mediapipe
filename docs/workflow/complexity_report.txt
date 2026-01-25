@@ -1,0 +1,111 @@
+services/filesystem_service.py
+    M 108:4 FilesystemService.open_path_in_explorer - C
+    M 58:4 FilesystemService.find_cache_folder_by_number - C
+    M 195:4 FilesystemService.list_today_cache_folders - C
+services/cache_service.py
+    M 183:4 CacheService.get_cached_frontend_config - D
+services/results_archiver.py
+    M 210:4 ResultsArchiver.load_video_metadata - C
+    M 120:4 ResultsArchiver.archive_project_analysis - C
+services/performance_service.py
+    M 234:4 PerformanceService.get_performance_trends - C
+services/visualization_service.py
+    M 27:4 VisualizationService.get_available_projects - E
+    M 638:4 VisualizationService._get_video_metadata - D
+    M 525:4 VisualizationService._load_tracking_data - D
+    M 421:4 VisualizationService._load_audio_data - C
+    M 699:4 VisualizationService._probe_video_file - C
+    C 20:0 VisualizationService - C
+    M 196:4 VisualizationService.get_project_timeline - C
+services/workflow_service.py
+    M 112:4 WorkflowService.get_step_log_file - C
+services/download_service.py
+    M 68:4 DownloadService.download_dropbox_file - D
+services/csv_service.py
+    M 662:4 CSVService._check_csv_for_downloads - F
+    M 203:4 CSVService._normalize_url - F
+    M 324:4 CSVService._load_structured_history - C
+    M 365:4 CSVService.migrate_history_to_local_time - C
+services/report_service.py
+    M 261:4 ReportService.generate_monthly_archive_report - F
+    M 32:4 ReportService.analyze_monthly_report_html - E
+    M 612:4 ReportService.generate_project_report - D
+    C 23:0 ReportService - C
+services/lemonfox_audio_service.py
+    M 72:4 LemonfoxAudioService._apply_speech_smoothing - C
+    M 231:4 LemonfoxAudioService._call_lemonfox_api - C
+    M 389:4 LemonfoxAudioService._build_frame_timeline - C
+    M 648:4 LemonfoxAudioService.process_video_with_lemonfox - C
+    M 146:4 LemonfoxAudioService._validate_project_and_video - C
+    C 68:0 LemonfoxAudioService - C
+services/webhook_service.py
+    F 67:0 _validate_and_format - D
+services/monitoring_service.py
+    M 322:4 MonitoringService.is_system_healthy - C
+services/deprecated/airtable_service.py
+    M 279:4 AirtableService.fetch_records - D
+    M 133:4 AirtableService.test_connection - D
+    C 30:0 AirtableService - C
+    M 69:4 AirtableService._get_table - C
+services/deprecated/mysql_service.py
+    M 120:4 MySQLService.test_connection - C
+routes/api_routes.py
+    F 596:0 lemonfox_audio_analysis - C
+workflow_scripts/step3/run_transnet.py
+    F 247:0 main - E
+    F 479:0 _process_single_video - D
+    F 59:0 detect_scenes_with_pytorch - D
+workflow_scripts/step3/transnetv2_pytorch.py
+    C 13:0 TransNetV2 - C
+    M 15:4 TransNetV2.__init__ - C
+    M 56:4 TransNetV2.forward - C
+workflow_scripts/step5/face_engines.py
+    M 800:4 InsightFaceEngine.detect - E
+    M 115:4 OpenSeeFaceEngine.__init__ - E
+    M 1537:4 EosFaceEngine.detect - E
+    M 611:4 InsightFaceEngine.__init__ - D
+    M 478:4 OpenSeeFaceEngine.detect - D
+    M 1173:4 OpenCVYuNetPyFeatEngine.detect - D
+    C 610:0 InsightFaceEngine - C
+    M 326:4 OpenSeeFaceEngine._resolve_model_path - C
+    C 1100:0 OpenCVYuNetPyFeatEngine - C
+    M 1439:4 EosFaceEngine._ensure_eos_assets_loaded - C
+workflow_scripts/step5/process_video_worker.py
+    F 399:0 main - F
+    M 114:4 FrameProcessor.process_frame - E
+    C 92:0 FrameProcessor - C
+    F 263:0 process_video_multithreaded - C
+workflow_scripts/step5/onnx_facemesh_detector.py
+    M 118:4 ONNXFaceMeshDetector.detect_landmarks - D
+    C 12:0 ONNXFaceMeshDetector - C
+workflow_scripts/step5/run_tracking_manager.py
+    F 491:0 main - F
+    F 316:0 launch_worker_process - E
+    F 168:0 _discover_system_cuda_lib_paths - C
+workflow_scripts/step5/object_detector_registry.py
+    M 156:4 ObjectDetectorRegistry.resolve_model_path - C
+workflow_scripts/step5/process_video_worker_multiprocessing.py
+    F 315:0 process_frame_chunk - F
+    F 96:0 init_worker_process - F
+    F 592:0 process_video_multiprocessing - D
+workflow_scripts/step2/convert_videos.py
+    F 74:0 _parse_ffprobe_fps - C
+    F 341:0 main - C
+workflow_scripts/step4/run_audio_analysis.py
+    F 471:0 main - F
+    F 337:0 analyze_audio_file - D
+workflow_scripts/step6/json_reducer.py
+    F 106:0 process_directory - C
+    F 36:0 reduce_video_json - C
+workflow_scripts/step7/finalize_and_copy.py
+    F 232:0 _normalize_project_docs_structure - D
+    F 52:0 find_projects_to_finalize - C
+    F 283:0 restore_archived_analysis - C
+    F 329:0 finalize_project - C
+workflow_scripts/step1/extract_archives.py
+    F 372:0 extract_archive - C
+    F 131:0 get_project_folder_name - C
+    F 60:0 reset_processed_archives_if_needed - C
+
+80 blocks (classes, functions, methods) analyzed.
+Average complexity: D (22.925)

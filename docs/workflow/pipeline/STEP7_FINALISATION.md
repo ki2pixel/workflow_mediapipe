@@ -1,6 +1,10 @@
 # Documentation Technique - Étape 7 : Finalisation
 
-## Description Fonctionnelle
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: moderate complexity (radon D) in `finalize_and_copy.py`; file system operations and NTFS compatibility handling.
+
+---
+
+## Purpose & Pipeline Role
 
 ### Objectif
 L'Étape 7 constitue la phase finale du pipeline de traitement vidéo MediaPipe. Elle consolide tous les résultats générés par les étapes précédentes, valide l'intégrité des données, organise les fichiers dans une structure finale cohérente, et effectue le transfert vers la destination de stockage définitive avec nettoyage des fichiers temporaires.
@@ -22,32 +26,143 @@ L'Étape 7 constitue la phase finale du pipeline de traitement vidéo MediaPipe.
 - **Restauration optionnelle** : Possibilité de restaurer les analyses archivées dans le dossier de sortie final
 - **Traçabilité** : Logging complet des opérations de finalisation pour audit
 
-## Spécifications Techniques
+---
+
+## Inputs & Outputs
+
+### Inputs
+- **Projets complets** : Dossiers avec vidéos, CSV scènes, JSON audio, JSON tracking réduits
+- **Métadonnées** : Informations de provenance et timestamps des traitements
+- **Configuration** : Destination de stockage, options de préservation
+
+### Outputs
+- **Archives finales** : Structure organisée dans la destination de stockage
+- **Rapport de finalisation** : Résumé des opérations et validation
+- **Logs détaillés** : Journal de finalisation dans `logs/step7/`
+- **Archives préservées** : `ARCHIVES_DIR` maintenu intact
+
+---
+
+## Command & Environment
+
+### Commande WorkflowCommandsConfig
+```python
+# Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
+python workflow_scripts/step7/finalize_and_copy.py --source-dir projets_extraits/ --dest-dir /mnt/archives/final/
+```
 
 ### Environnement Virtuel
 - **Environnement utilisé** : `env/` (environnement principal)
 - **Activation** : `source env/bin/activate`
 - **Partage** : Utilisé également par les étapes 1 et 2
 
-### Technologies et Bibliothèques Principales
+---
 
-#### Manipulation de Fichiers et Système
+## Dependencies
+
+### Bibliothèques Principales
 ```python
 import shutil       # Opérations de copie et déplacement de fichiers/dossiers
 import os           # Interface système d'exploitation
 from pathlib import Path  # Manipulation moderne des chemins
+import json         # Manipulation des métadonnées
+import logging      # Journalisation des opérations
 ```
 
-#### Compatibilité NTFS/fuseblk (copies sans métadonnées POSIX)
+### Dépendances Externes
+- **rsync** : Synchronisation avancée (optionnelle)
+- **cp** : Commande système copie (fallback)
+- **NTFS/FUSE** : Support des systèmes de fichiers hétérogènes
 
-Sur des destinations montées en NTFS via FUSE (`fuseblk`), les opérations `chmod/utime` échouent fréquemment (`EPERM`). Pour garantir la finalisation sans erreurs, la stratégie suivante est appliquée:
+---
 
-1. Détection du support `chmod` sur la destination (création d'un fichier temporaire + tentative `os.chmod`).
-2. Si supporté: copie standard via `shutil.copytree()` (préservation métadonnées POSIX).
-3. Sinon (mode « sans métadonnées »):
-   - Essai `rsync -a --no-perms --no-owner --no-group --no-times` (supprime les warnings `utime`).
-   - À défaut, `cp -r --no-preserve=mode,ownership`.
-   - À défaut, fallback Python (parcours `os.walk` + `shutil.copyfile`, sans `copystat`).
+## Configuration
+
+### Variables d'Environnement
+- **ARCHIVES_DIR** : Répertoire des archives persistantes (défaut: `archives/`)
+- **STEP7_DESTINATION** : Destination de stockage finale
+- **STEP7_PRESERVE_METADATA** : Préservation métadonnées POSIX (true/false)
+- **STEP7_VALIDATE_INTEGRITY** : Validation intégrité fichiers (true/false)
+- **STEP7_CLEANUP_TEMP** : Nettoyage fichiers temporaires (true/false)
+
+### Compatibilité NTFS/FUSE
+Sur les destinations NTFS via FUSE (`fuseblk`), les opérations `chmod/utime` échouent. La stratégie appliquée :
+1. Détection support `chmod` sur la destination
+2. Si supporté : copie standard via `shutil.copytree()`
+3. Sinon : mode « sans métadonnées » avec `rsync --no-perms --no-owner --no-group --no-times`
+4. Fallback Python avec `shutil.copyfile` sans `copystat`
+
+---
+
+## Known Hotspots
+
+### Complexité Backend
+- **`finalize_and_copy.py`** : Complexité modérée (radon D) dans `finalize_project` et `_normalize_project_docs_structure`
+- **Points d'attention** : Gestion permissions NTFS, validation intégrité, nettoyage sécurisé
+
+---
+
+## Metrics & Monitoring
+
+### Indicateurs de Performance
+- **Débit de finalisation** : Projets/seconde traités
+- **Taux de succès** : % projets finalisés avec succès
+- **Intégrité** : Validation des structures finales
+- **Espace libéré** : Volume de fichiers temporaires supprimés
+
+### Patterns de Logging
+```python
+# Logs de progression
+logger.info(f"Finalisation {project_name} - {current}/{total}")
+
+# Logs de validation
+logger.info(f"Validation intégrité: {valid_files}/{total_files} fichiers validés")
+
+# Logs NTFS/FUSE
+logger.warning(f"Mode sans métadonnées POSIX activé pour {destination}")
+
+# Logs d'erreur
+logger.error(f"Échec finalisation {project_name}: {error}")
+```
+
+---
+
+## Failure & Recovery
+
+### Modes d'Échec Communs
+1. **Permissions NTFS** : Basculement automatique mode sans métadonnées
+2. **Espace insuffisant** : Pause et alerte utilisateur
+3. **Fichiers manquants** : Logging et passage au projet suivant
+4. **Corruption données** : Validation échouée, retry possible
+
+### Procédures de Récupération
+```bash
+# Réessayer avec validation désactivée
+STEP7_VALIDATE_INTEGRITY=0 python workflow_scripts/step7/finalize_and_copy.py
+
+# Forcer mode sans métadonnées
+STEP7_PRESERVE_METADATA=0 python workflow_scripts/step7/finalize_and_copy.py
+
+# Validation post-finalisation
+python scripts/validate_step7_output.py
+
+# Restauration depuis archives
+python workflow_scripts/step7/finalize_and_copy.py --restore-from-archives
+```
+
+---
+
+## Related Documentation
+
+- **Pipeline Overview** : `../README.md`
+- **Results Archiver** : `../features/RESULTS_ARCHIVER_SERVICE.md`
+- **Testing Strategy** : `../technical/TESTING_STRATEGY.md`
+- **WorkflowState Integration** : `../core/ARCHITECTURE_COMPLETE_FR.md`
+- **Security Guidelines** : `../technical/SECURITY.md`
+
+---
+
+*Generated with Code-Doc protocol – see `../cloc_stats.json` and `../complexity_report.txt`.*
 
 Implications:
 - Le contenu est préservé intégralement; les permissions/propriétaires/timestamps ne sont pas conservés (comportement attendu sur NTFS).

@@ -1,8 +1,39 @@
-# Portail de Documentation Workflow MediaPipe v4.1
+# Portail de Documentation Workflow MediaPipe v4.2
+
+> **Code-Doc Metrics** – 38 files, 9,064 LOC Markdown; complexity hotspots in CSV/STEP5 workers. See `cloc_stats.json` and `complexity_report.txt` for detailed analysis.
 
 ## Vue d'ensemble
 
 Ce portail de documentation HTML fournit une interface complète et interactive pour explorer la documentation du système de workflow MediaPipe. Il offre une expérience de navigation fluide avec des fonctionnalités avancées pour faciliter la consultation et la recherche d'informations.
+
+## Architecture Snapshot (Code-Doc Analysis)
+
+### Documentation Structure
+```
+docs/workflow/
+├── admin/                     # Administration & audits (5 files)
+├── config/                    # Configuration & deployment (3 files)
+├── core/                      # Core documentation (4 files)
+├── features/                  # Feature documentation (2 files)
+├── lemonfox-ai/               # Lemonfox AI integration (1 file)
+├── pipeline/                  # 7-step pipeline docs (11 files)
+├── technical/                 # Technical deep-dives (9 files)
+├── README.md                  # This file
+├── overview.md                # System overview
+└── index.md                   # Portal index
+```
+
+### Code Metrics Summary
+- **Total Files**: 38 text files (Markdown, Shell, JSON)
+- **Primary Language**: Markdown (9,064 LOC, 2564 blanks)
+- **Supporting Code**: Shell scripts (486 LOC), JSON config (24 LOC)
+- **Complexity Distribution**:
+  - **Critical (F)**: CSV monitoring, STEP5 workers
+  - **High (E/D)**: STEP3 TransNet, STEP5 engines
+  - **Moderate (C)**: STEP2 conversion, STEP4 Lemonfox, STEP7 finalization
+  - **Low (A/B)**: STEP1 extraction, STEP6 JSON reduction
+
+---
 
 ## 🏗️ Structure Organisée (Nouvelle v4.1)
 
