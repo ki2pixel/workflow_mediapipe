@@ -1,0 +1,11 @@
+{
+  "video_path": "/home/kidpixel/workflow_mediapipe/projets_extraits/212 Camille/docs/Le chef Etchebest félicite cette restauratrice pour son omelette_TAT_M6.mp4",
+  "video_stem": "Le chef Etchebest félicite cette restauratrice pour son omelette_TAT_M6",
+  "video_hash": "effb0dcdf6478214519fedb20515e2315c303598d09d347c31625613353bef93",
+  "created_at": "2026-01-26T10:02:18.106670+00:00",
+  "copied": {
+    "scenes": "/home/kidpixel/workflow_mediapipe/archives/212 Camille 2026-01-26_10-02-18/effb0dcdf6478214519fedb20515e2315c303598d09d347c31625613353bef93/Le chef Etchebest félicite cette restauratrice pour son omelette_TAT_M6_scenes.csv",
+    "audio": "/home/kidpixel/workflow_mediapipe/archives/212 Camille 2026-01-26_10-02-18/effb0dcdf6478214519fedb20515e2315c303598d09d347c31625613353bef93/Le chef Etchebest félicite cette restauratrice pour son omelette_TAT_M6_audio.json",
+    "tracking": "/home/kidpixel/workflow_mediapipe/archives/212 Camille 2026-01-26_10-02-18/effb0dcdf6478214519fedb20515e2315c303598d09d347c31625613353bef93/Le chef Etchebest félicite cette restauratrice pour son omelette_TAT_M6_tracking.json"
+  }
+}

@@ -129,6 +129,27 @@ domBatcher.scheduleUpdate(() => {
 - Monitoring : webhook JSON unique, `CSVService` normalise les URLs et écrit dans SQLite (`download_history.sqlite3`).
 - Historique : migrations via script dédié (`scripts/migrate_download_history_to_sqlite.py`).
 
+### Politique d’utilisation des Skills
+1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre. Elle définit l’architecture MediaPipe (services/state, venv spécialisés). Si elle couvre la tâche demandée, aucune skill globale ne doit être utilisée.
+2. **Catalogue local étendu** : Après `workflow-operator`, utiliser en priorité les skills workspace suivantes selon la tâche :
+   - **pipeline-diagnostics** : vérifications `.env`, venvs, drivers, SQLite avant exécutions STEP1→STEP7.
+   - **step5-gpu-ops** : sélection moteur STEP5, tuning CPU/GPU, profiling, diagnostics JSON.
+   - **step4-audio-orchestrator** : opérations Lemonfox/Pyannote, profils CUDA, gestion OOM.
+   - **csv-monitoring-sme** : supervision `CSVService`, historique SQLite, politique Dropbox-only.
+   - **frontend-timeline-designer** : structure Timeline connectée, AppState, auto-scroll, Step Details.
+   - **logs-overlay-conductor** : overlay logs Phases 2‑4, auto-open toggle, focus trap.
+   - **workflow-docs-updater-plus** : synchronisation docs `docs/workflow/*` + Memory Bank.
+   - **tests-suite-guardian** : exécution/maintenance des suites backend/frontend (pytest, npm, scripts STEP3/STEP5).
+3. **Fallback contrôlé sur les skills globales** (`/home/kidpixel/.codeium/skills/`) :
+   - **Backends Python** : `python-backend-architect`, `python-coding-standards`, `python-cleanup`, `python-db-migrations` — seulement après avoir appliqué les skills locales pertinentes et pour des décisions intra-fichier (typage strict, migrations, nettoyage ciblé).
+   - **Frontends & UI** : `frontend-design`, `modern-vanilla-web`, `css-layout-development`, `ui-component-builder`, `interaction-design-patterns`, `html-tools` — utilisables lorsque l’UI dépasse le périmètre couvert par `frontend-timeline-designer` ou `logs-overlay-conductor`, tout en respectant les patterns locaux.
+   - **Docs & Process** : `code-doc`, `creating-windsurf-rules`, `architecture-tools`, `canvas-design`, `algorithmic-art`, `pdf-toolbox`, `media-ai-pipeline`, `devops-sre-security`, `engineering-features-for-machine-learning`, `postgres-expert`, `slack-gif-creator` — uniquement si aucune skill locale ne couvre la portée et après validation que le besoin sort du pipeline MediaPipe.
+4. **Exclusions** : Bannir l’usage d’une skill globale lorsqu’elle proposerait un scaffolding, une convention dossier ou une stack incompatible avec ce document. Documenter le refus dans `decisionLog.md` si la pression vient d’une contrainte externe.
+5. **Hiérarchie de résolution** :
+   - `workflow-operator` → skills locales pertinentes → règles de ce document → documentation `docs/workflow/*`.
+   - Ensuite seulement, compléter avec la skill globale adaptée pour rester DRY.
+6. **Traçabilité** : Lorsqu’une skill globale est mobilisée, mentionner laquelle et expliquer pourquoi aucune skill locale n’était suffisante (PR ou compte-rendu), afin de garder l’audit lisible.
+
 ## Common Tasks
 ### Ajouter un nouveau service backend
 1. Créer `services/<name>_service.py` avec dépendances injectées.
@@ -157,5 +178,5 @@ domBatcher.scheduleUpdate(() => {
 - Exporter des JSON STEP5 tronqués ou non densifiés.
 
 ## Notes finales
-- Maintenir ce document <12 000 caractères (actuellement ~5.5 k). Réviser après toute évolution majeure (nouveau moteur STEP5, changement AppState, refonte UI).
+- Maintenir ce document <12 000 caractères (actuellement ~6 k). Réviser après toute évolution majeure (nouveau moteur STEP5, changement AppState, refonte UI).
 - Pour toute question, consulter les audits récents (`docs/workflow/audits/`) avant d’ajouter une règle.
