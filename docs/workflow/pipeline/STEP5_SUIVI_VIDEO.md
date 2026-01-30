@@ -110,6 +110,86 @@ import multiprocessing                    # Multi-processing
 
 ---
 
+## Multiprocessing Hotspots (Radon F)
+
+### Architecture Workers
+- **`process_video_worker_multiprocessing.py`** : Orchestrateur principal (Score F: 315 lignes)
+- **`init_worker_process`** : Initialisation worker (Score F: 96 lignes) 
+- **`process_frame_chunk`** : Traitement par chunk (Score F: 315 lignes)
+- **`process_video_worker.py main`** : Worker principal (Score F: 399 lignes)
+
+### Points chauds (Complexité F)
+- **Gestion des chunks** : Découpage vidéo en segments pour traitement parallèle
+- **Synchronisation IPC** : Communication inter-processus et partage d'état
+- **Gestion erreurs** : Recovery et fallback en cas d'échec worker
+- **Optimisations** : Profiling toutes les 20 frames, throttling configurables
+
+### Patterns de Communication
+```python
+# Structure IPC typique
+worker_queue = multiprocessing.Queue()
+result_queue = multiprocessing.Queue()
+
+# Chunk processing
+def process_frame_chunk(frames_chunk, config):
+    # Traitement parallèle avec logging intégré
+    # Gestion OOM et recovery automatique
+```
+
+### Recommandations Refactoring
+- **Documenter les patterns IPC** : Échanges entre manager et workers
+- **Simplifier `process_frame_chunk`** : Extraire helpers spécialisés
+- **Monitoring continu** : Logs `[PROFILING]` pour tuning performance
+
+---
+
+## Workers Multiprocessing
+
+### Architecture
+- **`process_video_worker_multiprocessing.py`** : Orchestrateur principal
+- **`init_worker_process`** : Initialisation worker multiprocessing
+- **`process_frame_chunk`** : Traitement par chunk
+- **`process_video_worker.py main`** : Worker principal
+
+### Complexité Radon
+- **Tous les workers** : Score F (complexité critique)
+- **Causes** : Gestion IPC, chunking, error recovery, profiling
+- **Impact** : Cœur du pipeline de suivi vidéo
+
+### Patterns de Communication
+```python
+# Structure IPC typique
+worker_queue = multiprocessing.Queue()
+result_queue = multiprocessing.Queue()
+
+# Chunk processing
+def process_frame_chunk(frames_chunk, config):
+    # Traitement parallèle avec logging intégré
+    # Gestion OOM et recovery automatique
+```
+
+### Recommandations
+- **Documenter les patterns IPC** : Échanges entre manager et workers
+- **Simplifier `process_frame_chunk`** : Extraire helpers spécialisés
+- **Monitoring continu** : Logs `[PROFILING]` pour tuning performance
+
+---
+
+## Known Hotspots
+
+### Backend Complexity (Radon Analysis)
+- **`process_video_worker.py main`** (Score F) : 399 lignes, orchestration worker
+- **`process_frame_chunk`** (Score F) : 315 lignes, traitement chunks parallèles  
+- **`init_worker_process`** (Score F) : 96 lignes, initialisation multiprocessing
+- **`run_tracking_manager.py main`** (Score F) : 491 lignes, gestion STEP5
+
+### Impact sur la Performance
+- **Multiprocessing** : Parallélisme efficace mais complexité élevée
+- **GPU Management** : Lazy imports et configuration CUDA
+- **Memory Management** : Gestion OOM et nettoyage ressources
+
+---
+
 ## Metrics & Monitoring
 
 ### Indicateurs de Performance

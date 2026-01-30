@@ -60,3 +60,6 @@ workflow_scripts/step5/models/engines/insightface/glintr100.onnx
 # Fichiers système
 .DS_Store
 Thumbs.db
+
+# archives
+archives

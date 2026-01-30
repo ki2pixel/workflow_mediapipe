@@ -1,6 +1,6 @@
 # 🔄 Pipeline Workflow
 
-> **Metrics Snapshot** (cloc 2026-01-25) – 115 source files, 106 991 LOC (code only). Python leads (54 files / 15 043 LOC), followed by JavaScript (24 / 5 641 LOC) and CSS (17 / 3 539 LOC). Complexity hotspots (Radon) currently sit in CSV ingestion and STEP5 workers; see `../cloc_stats.json` & `../complexity_report.txt` for raw exports.
+> **Metrics Snapshot** (cloc 2026-01-26) – 115 source files, 106 991 LOC (code only). Python leads (54 files / 15 043 LOC), followed by JavaScript (24 / 5 641 LOC) and CSS (17 / 3 594 LOC). Complexity hotspots (Radon) identified in CSV ingestion (Score F) and STEP5 workers (Score F); see [COMPLEXITY_ANALYSIS.md](../core/COMPLEXITY_ANALYSIS.md) for detailed analysis.
 
 ## Overview
 

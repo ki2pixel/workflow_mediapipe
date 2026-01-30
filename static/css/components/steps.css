@@ -471,9 +471,16 @@
     width: 100%;
     max-width: var(--pipeline-card-max-width);
     margin: 0 auto;
+    transform: translateX(calc(-1 * var(--pipeline-card-alignment-offset)));
     display: flex;
     flex-direction: column;
     gap: var(--pipeline-gap);
+}
+
+@media (max-width: 768px) {
+    .pipeline-timeline {
+        transform: none;
+    }
 }
 
 .timeline-scroll-spacer {

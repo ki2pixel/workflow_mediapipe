@@ -25,36 +25,33 @@ alwaysApply: true
 9. [Anti-Patterns](#anti-patterns)
 
 ## Tech Stack
-- **Backend** : Flask + services Python 3.10, exécuté depuis `/mnt/venv_ext4/env`. Toute logique métier vit dans `services/` (pas dans les routes).
-- **Frontend** : JavaScript natif modulaire (`static/` + `templates/`), DOM géré via `DOMBatcher` et état via `AppState`. Pas de frameworks SPA.
-- **Config** : `.env` → `config/settings.py` → `WorkflowCommandsConfig`. Secrets uniquement via env vars.
-- **Environnements spécialisés** : `env/`, `transnet_env/`, `audio_env/`, `tracking_env/` pour isoler les dépendances pipeline.
+- **Backend** : Flask services Python 3.10 (venv `/mnt/venv_ext4/env`), logique métier confinée à `services/`.
+- **Frontend** : JS natif (`static/`, `templates/`) avec `DOMBatcher` + `AppState`; aucun framework SPA.
+- **Config** : `.env` → `config/settings.py` → `WorkflowCommandsConfig`, jamais de secrets en dur.
+- **Environnements spécialisés** : `env/`, `transnet_env/`, `audio_env/`, `tracking_env/` pour cloisonner les dépendances.
 
 ## Project Structure
-- `services/`: classes/fonctions pures (pas d'accès Flask). Exemple : `FilesystemService` pour I/O disque sécurisé.
-- `routes/`: validation I/O + appel service, instrumentation via `PerformanceService`.
-- `workflow_scripts/`: exécutables par étape (respecter `WorkflowCommandsConfig`).
-- `static/` + `templates/`: UI Timeline connectée, overlay logs, Step Details.
-- `docs/workflow/`: source de vérité pour la documentation pipeline/audits.
+- `services/` : classes/fonctions pures (aucun accès Flask) ex: `FilesystemService` pour I/O sécurisée.
+- `routes/` : validation I/O, instrumentation `PerformanceService`, appel service.
+- `workflow_scripts/` : exécutables par étape alignés sur `WorkflowCommandsConfig`.
+- `static/` + `templates/` : Timeline, overlay logs, Step Details.
+- `docs/workflow/` : référence unique des specs/audits.
 
 ## Code Style
-- **Clean Code** : supprimer immédiatement tout code mort commenté; les commentaires restants doivent expliquer le *pourquoi* métier plutôt que le *comment* évident.
+- **Clean Code** : supprimer le code mort; commenter seulement le *pourquoi* métier.
 
 ### Backend
-- Routes minces : validation, mesure (`@measure_api`), appel service, réponse JSON. Pas de logique métier dans Flask.
-- State unique : manipuler les steps/séquences uniquement via `WorkflowState` (RLock). Aucune globale type `PROCESS_INFO`.
-- Config : obtenir commandes/paths via `WorkflowCommandsConfig`. Pas de chemins hardcodés; `CACHE_ROOT_DIR` obligatoire pour stockage temporaire.
-- I/O : tous les accès disque passent par `FilesystemService.open_path_in_explorer()` et respectent les verrous.
-- Logging : `progress_text` = texte brut + JSON streaming (pas de structures libres).
+- Routes minces : validation, `@measure_api`, appel service, réponse JSON (aucune logique métier côté Flask).
+- State unique : steps/séquences gérés via `WorkflowState` (RLock), jamais de globales type `PROCESS_INFO`.
+- Config : récupérer commandes/paths via `WorkflowCommandsConfig`, bannir les chemins en dur; `CACHE_ROOT_DIR` requis pour le stockage temporaire.
+- I/O : passage obligé par `FilesystemService.open_path_in_explorer()` avec verrous.
+- Logging : `progress_text` reste texte brut + JSON streaming structuré.
 
 ### Frontend
-- `AppState.setState()` immuable, comparer via diff superficiel; ne jamais muter `state` directement.
-- DOM updates : toujours via `DOMBatcher.scheduleUpdate()` + helpers `DOMUpdateUtils.escapeHtml()` (interdiction `innerHTML` avec données dynamiques).
-- Polling : uniquement via `PollingManager` (backoff adaptatif). Pas de `setInterval` dispersé.
-- Composants critiques :
-  - **Logs Overlay** : focus trap + sync Timeline + fermeture automatique.
-  - **Step Details Panel** : `aside` contrôlé par AppState, navigation clavier.
-  - **FromSmash / téléchargements externes** : lecture seule, jamais de téléchargement automatique.
+- `AppState.setState()` reste immuable (diff superficiel, aucun `state` muté).
+- DOM : `DOMBatcher.scheduleUpdate()` + `DOMUpdateUtils.escapeHtml()` (pas d'`innerHTML` non échappé).
+- Polling : `PollingManager` uniquement, bannir les `setInterval` isolés.
+- Composants clés : Logs Overlay (focus trap, sync timeline, fermeture auto), Step Details Panel (`aside` contrôlé AppState), FromSmash/téléchargements externes en lecture seule.
 
 ## Core Patterns
 ### Services
@@ -131,7 +128,8 @@ domBatcher.scheduleUpdate(() => {
 
 ### Politique d’utilisation des Skills
 1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre. Elle définit l’architecture MediaPipe (services/state, venv spécialisés). Si elle couvre la tâche demandée, aucune skill globale ne doit être utilisée.
-2. **Catalogue local étendu** : Après `workflow-operator`, utiliser en priorité les skills workspace suivantes selon la tâche :
+2. **Debugging systématique** : Pour toute tâche de debugging (bug, crash, performance, erreur), charger immédiatement `.windsurf/skills/debugging-strategies/SKILL.md` après `workflow-operator` afin d’appliquer la méthodologie locale (reproduction, collecte, hypothèse, test).
+3. **Catalogue local étendu** : Après `workflow-operator`, utiliser en priorité les skills workspace suivantes selon la tâche :
    - **pipeline-diagnostics** : vérifications `.env`, venvs, drivers, SQLite avant exécutions STEP1→STEP7.
    - **step5-gpu-ops** : sélection moteur STEP5, tuning CPU/GPU, profiling, diagnostics JSON.
    - **step4-audio-orchestrator** : opérations Lemonfox/Pyannote, profils CUDA, gestion OOM.
@@ -140,15 +138,15 @@ domBatcher.scheduleUpdate(() => {
    - **logs-overlay-conductor** : overlay logs Phases 2‑4, auto-open toggle, focus trap.
    - **workflow-docs-updater-plus** : synchronisation docs `docs/workflow/*` + Memory Bank.
    - **tests-suite-guardian** : exécution/maintenance des suites backend/frontend (pytest, npm, scripts STEP3/STEP5).
-3. **Fallback contrôlé sur les skills globales** (`/home/kidpixel/.codeium/skills/`) :
+4. **Fallback contrôlé sur les skills globales** (`/home/kidpixel/.codeium/skills/`) :
    - **Backends Python** : `python-backend-architect`, `python-coding-standards`, `python-cleanup`, `python-db-migrations` — seulement après avoir appliqué les skills locales pertinentes et pour des décisions intra-fichier (typage strict, migrations, nettoyage ciblé).
    - **Frontends & UI** : `frontend-design`, `modern-vanilla-web`, `css-layout-development`, `ui-component-builder`, `interaction-design-patterns`, `html-tools` — utilisables lorsque l’UI dépasse le périmètre couvert par `frontend-timeline-designer` ou `logs-overlay-conductor`, tout en respectant les patterns locaux.
    - **Docs & Process** : `code-doc`, `creating-windsurf-rules`, `architecture-tools`, `canvas-design`, `algorithmic-art`, `pdf-toolbox`, `media-ai-pipeline`, `devops-sre-security`, `engineering-features-for-machine-learning`, `postgres-expert`, `slack-gif-creator` — uniquement si aucune skill locale ne couvre la portée et après validation que le besoin sort du pipeline MediaPipe.
-4. **Exclusions** : Bannir l’usage d’une skill globale lorsqu’elle proposerait un scaffolding, une convention dossier ou une stack incompatible avec ce document. Documenter le refus dans `decisionLog.md` si la pression vient d’une contrainte externe.
-5. **Hiérarchie de résolution** :
+5. **Exclusions** : Bannir l’usage d’une skill globale lorsqu’elle proposerait un scaffolding, une convention dossier ou une stack incompatible avec ce document. Documenter le refus dans `decisionLog.md` si la pression vient d’une contrainte externe.
+6. **Hiérarchie de résolution** :
    - `workflow-operator` → skills locales pertinentes → règles de ce document → documentation `docs/workflow/*`.
    - Ensuite seulement, compléter avec la skill globale adaptée pour rester DRY.
-6. **Traçabilité** : Lorsqu’une skill globale est mobilisée, mentionner laquelle et expliquer pourquoi aucune skill locale n’était suffisante (PR ou compte-rendu), afin de garder l’audit lisible.
+7. **Traçabilité** : Lorsqu’une skill globale est mobilisée, mentionner laquelle et expliquer pourquoi aucune skill locale n’était suffisante (PR ou compte-rendu), afin de garder l’audit lisible.
 
 ## Common Tasks
 ### Ajouter un nouveau service backend
