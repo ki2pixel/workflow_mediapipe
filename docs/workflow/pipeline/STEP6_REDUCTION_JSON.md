@@ -1,13 +1,20 @@
-# Documentation Technique - Étape 6 : Réduction JSON
+# Documentation Technique - Étape 6 : Réduction JSON et Analytics
 
-> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: low complexity (radon C) in `json_reducer.py`; straightforward data processing.
+> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: critical complexity (radon F) in `json_reducer.py` with new analytics features and enrichment logic.
 
 ---
 
 ## Purpose & Pipeline Role
 
 ### Objectif
-L'Étape 6 est une étape intermédiaire cruciale qui optimise les fichiers de métadonnées générés par les analyses vidéo et audio. Son rôle est de réduire la taille de ces fichiers JSON en ne conservant que les informations strictement nécessaires pour les scripts After Effects, améliorant ainsi les performances et la fluidité du processus de post-production.
+L'Étape 6 réduit la taille des fichiers JSON de tracking (STEP5) tout en enrichissant les données avec des analytics, des résumés d'expressions et l'alignement temporel audio/vidéo. Elle génère un fichier `*_tracking.json` standardisé pour After Effects avec des métriques avancées.
+
+### Nouvelles Fonctionnalités (v4.2)
+- **Tracking Analytics** : Histogramme de confidence, statistiques par objet
+- **Expression Summary** : Résumé léger des blendshapes (gated par `STEP6_INCLUDE_EXPRESSION_SUMMARY`)
+- **Temporal Alignment** : Warnings mismatch audio/vidéo via `temporal_alignment`
+- **Sortie Standardisée** : `*_tracking.json` avec champs essentiels (confidence, fps, total_frames)
+- **Écriture Atomique** : Sauvegarde sécurisée avec fichier temporaire + rename
 
 ### Rôle dans le Pipeline
 - **Position** : Étape intermédiaire entre le suivi vidéo (STEP5) et la finalisation (STEP7)
@@ -19,6 +26,8 @@ L'Étape 6 est une étape intermédiaire cruciale qui optimise les fichiers de m
 - **Optimisation des performances** : Réduit significativement le temps de chargement et de traitement des données dans After Effects
 - **Réduction de la taille des fichiers** : Économise de l'espace de stockage et facilite le transfert des données
 - **Standardisation des données** : Garantit que seuls les champs pertinents sont présents, évitant les erreurs d'interprétation
+- **Analytics avancés** : Fournit des métriques de confidence et résumés d'expressions pour la post-production
+- **Alignement temporel** : Détecte et signale les désynchronisations audio/vidéo
 - **Automatisation complète** : S'intègre de manière transparente dans le workflow sans intervention manuelle
 
 ---
@@ -31,8 +40,10 @@ L'Étape 6 est une étape intermédiaire cruciale qui optimise les fichiers de m
 - **Configuration** : Paramètres de réduction via variables d'environnement
 
 ### Outputs
-- **JSON réduits** : Fichiers allégés avec champs essentiels uniquement
+- **JSON tracking standardisé** : Fichier `*_tracking.json` avec analytics et enrichissement
+- **JSON audio réduit** : Fichier `_audio.json` avec champs essentiels uniquement
 - **Taille optimisée** : Réduction de 74-95% selon `STEP5_EXPORT_VERBOSE_FIELDS`
+- **Analytics** : Histogramme confidence, statistiques par objet, expression summary
 - **Logs détaillés** : Journal de réduction dans `logs/step6/`
 
 ---
@@ -74,6 +85,9 @@ import logging      # Journalisation des opérations
 - **STEP5_EXPORT_VERBOSE_FIELDS** : Contrôle la verbosité des exports STEP5 (false par défaut)
 - **STEP6_KEYWORD_FILTER** : Mot-clé pour filtrer les projets (défaut: 'Camille')
 - **STEP6_LOG_LEVEL** : Niveau de logging (INFO, DEBUG, WARNING)
+- **STEP6_INCLUDE_TRACKING_ANALYTICS** : Active les analytics de tracking (false par défaut)
+- **STEP6_INCLUDE_EXPRESSION_SUMMARY** : Active le résumé d'expressions (false par défaut)
+- **STEP6_EXPRESSION_KEYS** : Liste des clés de blendshapes à inclure (configurable)
 
 ### Paramètres de Configuration
 - `--base_dir` : Chemin de base du projet
@@ -83,11 +97,34 @@ import logging      # Journalisation des opérations
 
 ---
 
-## Known Hotspots
+## Complexité (Radon Analysis)
 
-### Complexité Backend
-- **`json_reducer.py`** : Complexité faible (radon C) dans `process_directory` et `reduce_video_json`
-- **Points d'attention** : Validation de structure JSON, gestion des fichiers corrompus
+### Points Critiques (Score F)
+- `reduce_video_json()` : Logique complexe de réduction + enrichissement analytics
+- `_compute_tracking_analytics()` : Calculs statistiques par objet (histogramme confidence)
+- `process_directory()` : Gestion multiprocessing des fichiers avec écriture atomique
+- `_compute_expression_summary()` : Résumé léger des blendshapes (gated)
+
+### Architecture
+```python
+def reduce_video_json(input_path: str, output_path: str) -> None:
+    # Réduction dense + enrichissement analytics + écriture atomique
+    tracking_data = _extract_top_level_metadata(tracking_json)
+    if _reduced_tracking_needs_enrichment(tracking_data):
+        tracking_data = _merge_reduced_tracking(tracking_data, audio_json)
+        tracking_data = _compute_temporal_alignment(tracking_data)
+        if STEP6_INCLUDE_TRACKING_ANALYTICS:
+            tracking_data = _compute_tracking_analytics(tracking_data)
+        if STEP6_INCLUDE_EXPRESSION_SUMMARY:
+            tracking_data = _compute_expression_summary(tracking_data)
+    _write_atomic_json(tracking_data, output_path)
+```
+
+### Flux de Données
+1. **Chargement** : Parsing JSON STEP5 avec validation
+2. **Enrichissement** : Fusion audio + calcul analytics si activés
+3. **Réduction** : Suppression champs volumineux (landmarks, eos.*)
+4. **Écriture** : Fichier temporaire + rename atomique
 
 ---
 

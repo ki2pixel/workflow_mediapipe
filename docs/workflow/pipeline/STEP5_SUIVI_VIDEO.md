@@ -100,6 +100,34 @@ import multiprocessing                    # Multi-processing
 
 ---
 
+## Complexité (Radon Analysis)
+
+### Points Critiques (Score F/E/D/C)
+
+#### Workers Multiprocessing (Score F)
+- **`process_video_worker.main()`** : Score F - 399 lignes, boucle de traitement frame par frame
+- **`process_frame_chunk()`** : Score F - 315 lignes, gestion chunks, synchronisation IPC
+- **`init_worker_process()`** : Score F - 96 lignes, initialisation worker, chargement .env
+- **`process_video_multiprocessing()`** : Score D - 592 lignes, orchestration complète
+
+#### Moteurs de Tracking (Score E/D)
+- **`InsightFaceEngine.detect()`** : Score E - 800 lignes, GPU/CPU, fallback object detector
+- **`OpenSeeFaceEngine.detect()`** : Score D - 478 lignes, modèles externes, blendshapes
+- **`EosFaceEngine.detect()`** : Score E - 1537 lignes, calculs 3D, assets EOS
+- **`OpenCVYuNetPyFeatEngine.detect()`** : Score D - 1173 lignes, hybride YuNet + py-feat
+
+#### Gestion Manager (Score F)
+- **`run_tracking_manager.main()`** : Score F - 491 lignes, orchestration globale, configuration
+- **`launch_worker_process()`** : Score E - 316 lignes, lancement subprocess, injection CUDA
+- **`_discover_system_cuda_lib_paths()`** : Score C - 168 lignes, détection chemins CUDA
+
+#### Frame Processing (Score E)
+- **`FrameProcessor.process_frame()`** : Score E - 114 lignes, traitement frame individuel
+- **Détection multi-moteurs** : Appel moteur, formatage JSON, gestion erreurs
+- **Profiling intégré** : Logs toutes les 20 frames, métriques performance
+
+---
+
 ## Known Hotspots
 
 ### Complexité Backend (Critique)

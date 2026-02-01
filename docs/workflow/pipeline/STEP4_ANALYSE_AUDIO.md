@@ -33,8 +33,33 @@ L'Étape 4 effectue une analyse audio avancée des vidéos en utilisant la diari
 
 ### Outputs
 - **JSON audio** : Analyse diarization frame par frame
+- **Speaker embeddings** (optionnel) : Vecteurs par locuteur si `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1`
 - **Logs détaillés** : Journal d'analyse dans `logs/step4/`
 - **Métriques** : Nombre de locuteurs, temps de parole, utilisation GPU/CPU
+
+#### Structure JSON (avec embeddings)
+```json
+{
+  "video_filename": "clip.mp4",
+  "total_frames": 250,
+  "fps": 25.0,
+  "speaker_embeddings": {
+    "model_id": "pyannote/embedding",
+    "embedding_dim": 256,
+    "normalized": true,
+    "device": "cuda",
+    "vectors_by_label": {
+      "SPEAKER_00": [0.1234, -0.5678, ...],
+      "SPEAKER_01": [0.9876, -0.4321, ...]
+    },
+    "num_segments_by_label": {
+      "SPEAKER_00": 12,
+      "SPEAKER_01": 8
+    }
+  },
+  "frames_analysis": [...]
+}
+```
 
 ---
 
@@ -80,6 +105,10 @@ import json               # Configuration et sorties
 - **HUGGINGFACE_HUB_TOKEN** : Token pour modèles Pyannote
 - **AUDIO_PARTIAL_SUCCESS_OK** : Permettre succès partiel (1/0)
 - **LEMONFOX_API_KEY** : Clé API alternative (optionnelle)
+- **AUDIO_INCLUDE_SPEAKER_EMBEDDINGS** : `1` pour inclure les embeddings locuteurs dans le JSON (défaut: `0`)
+- **AUDIO_SPEAKER_EMBEDDINGS_MODEL_ID** : Modèle d'embeddings (défaut: `pyannote/embedding`)
+- **AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC** : Durée min segment pour embeddings (défaut: `0.5`)
+- **AUDIO_SPEAKER_EMBEDDINGS_MAX_SEGMENTS_PER_SPEAKER** : Max segments par locuteur (défaut: `10`)
 
 ### Configuration JSON (optimal_tv_config.json)
 ```json

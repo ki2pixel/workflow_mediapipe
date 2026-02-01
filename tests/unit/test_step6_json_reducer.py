@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -150,10 +151,13 @@ def test_compute_temporal_alignment_emits_warnings_on_mismatch():
     assert any(str(w).startswith("fps_mismatch") for w in warnings)
 
 
-def test_process_directory_writes_tracking_suffix_and_alignment(tmp_path: Path):
+def test_process_directory_writes_tracking_suffix_and_alignment(tmp_path: Path, monkeypatch):
     # Given: a docs/ folder with a video + legacy tracking .json + audio json
     repo_root = Path(__file__).resolve().parents[2]
     mod = _load_json_reducer_module(repo_root)
+
+    # Ensure analytics are enabled for this test (default is enabled, but keep test deterministic)
+    monkeypatch.setenv("STEP6_INCLUDE_TRACKING_ANALYTICS", "1")
 
     project_dir = tmp_path / "Camille Test"
     docs_dir = project_dir / "docs"
@@ -208,12 +212,15 @@ def test_process_directory_writes_tracking_suffix_and_alignment(tmp_path: Path):
     reduced = json.loads(tracking_out.read_text(encoding="utf-8"))
     assert isinstance(reduced.get("frames_analysis"), list)
     assert reduced.get("temporal_alignment") is not None
+    assert reduced.get("tracking_analytics") is not None
 
 
-def test_process_directory_enriches_reduced_tracking_from_legacy_when_needed(tmp_path: Path):
+def test_process_directory_enriches_reduced_tracking_from_legacy_when_needed(tmp_path: Path, monkeypatch):
     # Given: a docs/ folder with a reduced tracking JSON missing bbox/confidence and a legacy raw JSON with them
     repo_root = Path(__file__).resolve().parents[2]
     mod = _load_json_reducer_module(repo_root)
+
+    monkeypatch.setenv("STEP6_INCLUDE_TRACKING_ANALYTICS", "1")
 
     project_dir = tmp_path / "Camille Enrich"
     docs_dir = project_dir / "docs"
@@ -287,6 +294,50 @@ def test_process_directory_enriches_reduced_tracking_from_legacy_when_needed(tmp
     assert obj.get("bbox_width") == 10
     assert obj.get("bbox_height") == 20
     assert obj.get("active_speakers") == ["S1"]
+
+
+def test_reduce_video_json_can_emit_expression_summary_when_enabled(monkeypatch):
+    repo_root = Path(__file__).resolve().parents[2]
+    mod = _load_json_reducer_module(repo_root)
+
+    monkeypatch.setenv("STEP6_INCLUDE_EXPRESSION_SUMMARY", "1")
+    monkeypatch.setenv("STEP6_EXPRESSION_KEYS", "jawOpen, mouthSmileLeft")
+
+    raw = {
+        "fps": 25.0,
+        "total_frames": 1,
+        "frames": [
+            {
+                "frame": 1,
+                "tracked_objects": [
+                    {
+                        "id": "face_1",
+                        "centroid_x": 123.4,
+                        "source": "face_landmarker",
+                        "label": "face",
+                        "confidence": 0.87,
+                        "bbox_width": 50,
+                        "bbox_height": 60,
+                        "blendshapes": {"jawOpen": 0.12, "mouthSmileLeft": 0.3},
+                    }
+                ],
+            }
+        ],
+    }
+
+    reduced = mod.reduce_video_json(raw)
+
+    assert reduced is not None
+    summary = reduced.get("expression_summary")
+    assert isinstance(summary, dict)
+    assert summary.get("keys") == ["jawOpen", "mouthSmileLeft"]
+    objects = summary.get("objects")
+    assert isinstance(objects, dict)
+    face_summary = objects.get("face_1")
+    assert isinstance(face_summary, dict)
+    assert face_summary.get("count") == 1
+    assert face_summary.get("mean") == {"jawOpen": 0.12, "mouthSmileLeft": 0.3}
+    assert face_summary.get("max") == {"jawOpen": 0.12, "mouthSmileLeft": 0.3}
 
 
 def test_process_directory_without_audio_does_not_crash(tmp_path: Path):

@@ -33,6 +33,37 @@ class VisualizationService:
 
 ---
 
+## Complexité (Radon Analysis)
+
+### Points Critiques (Score E/D/C)
+
+#### `get_available_projects()` (Score E)
+- **Complexité** : 27 lignes, scan filesystem, cache mémoire
+- **Défis** : Performance gros projets, filtrage, gestion cache
+- **Impact** : UX du sélecteur de projets, temps de chargement initial
+
+#### `_get_video_metadata()` (Score D)
+- **Complexité** : 28 lignes, parsing FFmpeg, gestion timeouts
+- **Défis** : Métadonnées variées, erreurs I/O, validation types
+- **Impact** : Service critique pour toutes les visualisations
+
+#### `_load_tracking_data()` (Score D)  
+- **Complexité** : 25 lignes, parsing JSON dense, validation structure
+- **Défis** : Gros fichiers, tracking objects variés, streaming optimisé
+- **Impact** : Performance visualisation tracking, gestion mémoire
+
+#### `_load_audio_data()` (Score C)
+- **Complexité** : 22 lignes, mapping speaker labels, validation temporelle
+- **Défis** : Sources multiples (Lemonfox/Pyannote), cohérence frames
+- **Impact** : Qualité données audio pour timeline
+
+#### `get_project_timeline()` (Score C)
+- **Complexité** : 22 lignes, orchestration multi-sources, agrégation
+- **Défis** : Synchronisation données hétérogènes, gestion erreurs
+- **Impact** : Timeline complète pour frontend, fiabilité affichage
+
+---
+
 ## API Principale
 
 ### get_project_timeline(project_name: str) -> dict

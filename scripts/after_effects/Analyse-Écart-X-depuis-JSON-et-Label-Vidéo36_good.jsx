@@ -22,6 +22,8 @@
 var CONFIG = {
 	// Seuils et paramètres
 	SPREAD_THRESHOLD: 200,  // Seuil de dispersion pour déclencher un label différent
+	ENABLE_CONFIDENCE_WEIGHTING: true,
+	CONFIDENCE_WEIGHT: 0.35,
 	
 	// Labels de couleur After Effects
 	LABEL_HIGH_SPREAD: 12,  // Label pour visages avec forte dispersion
@@ -263,6 +265,22 @@ function calculateStats(numberArray) {
 		average: sum / numberArray.length,
 		count: numberArray.length
 	};
+}
+
+function clamp01(v) {
+	if (v === null || v === undefined) return 0;
+	var f = parseFloat(v);
+	if (isNaN(f)) return 0;
+	if (f < 0) return 0;
+	if (f > 1) return 1;
+	return f;
+}
+
+function computePresenceScore(presence, avg_confidence) {
+	if (!CONFIG.ENABLE_CONFIDENCE_WEIGHTING) return presence;
+	var w = parseFloat(CONFIG.CONFIDENCE_WEIGHT);
+	if (isNaN(w) || w < 0) w = 0;
+	return presence * (1 + (clamp01(avg_confidence) * w));
 }
 
 function findMaxFrameNumberInJsonContent(content) {
@@ -692,7 +710,11 @@ function loadVideoTrackingData(videoJsonFile) {
 		if (videoJsonFile.length && videoJsonFile.length < CONFIG.MAX_FULL_JSON_READ_BYTES) {
 			var root = readAndParseJsonRoot(videoJsonFile.fsName);
 			if (root && root.frames_analysis && (root.frames_analysis instanceof Array)) {
-				return indexReducedTrackingFrames(root.frames_analysis);
+				var idx = indexReducedTrackingFrames(root.frames_analysis);
+				idx.tracking_analytics = root.tracking_analytics || null;
+				idx.expression_summary = root.expression_summary || null;
+				idx.temporal_alignment = root.temporal_alignment || null;
+				return idx;
 			}
 		}
 	} catch (e) {
@@ -827,6 +849,13 @@ function optimizedScanEngine(content) {
 		writeToLog("Lecture du fichier VIDÉO " + safeVideoJsonPath + "...");
 		var videoScanResult = loadVideoTrackingData(videoJsonFile);
 		var videoDataByFrame = videoScanResult.dataByFrame;
+		if (videoScanResult && videoScanResult.temporal_alignment && videoScanResult.temporal_alignment.warnings && videoScanResult.temporal_alignment.warnings.length > 0) {
+			writeToLog("  [WARN] temporal_alignment: " + videoScanResult.temporal_alignment.warnings.join(", "));
+		}
+		if (videoScanResult && videoScanResult.tracking_analytics && videoScanResult.tracking_analytics.global) {
+			var g = videoScanResult.tracking_analytics.global;
+			writeToLog("  tracking_analytics: frames_total=" + g.frames_total + ", frames_with_objects=" + g.frames_with_objects + ", objects_total=" + g.objects_total);
+		}
 		var videoJsonMaxFrame = videoScanResult.maxFrame || 0;
 		var videoMaxFrame = videoJsonMaxFrame || 0;
 		if (videoMaxFrame === 0) {
@@ -907,15 +936,20 @@ function optimizedScanEngine(content) {
 								source: obj.source,
 								label: obj.label,
 								x_values: [],
+								confidence_values: [],
 								audio_confirm_count: 0,
 								bbox_surfaces: [],
 								total_bbox_surface: 0,
-								avg_bbox_surface: 0
+								avg_bbox_surface: 0,
+								total_confidence: 0,
+								avg_confidence: 0
 							};
 						}
 						objectsInLayer[obj.id].x_values.push(obj.centroid_x);
 						objectsInLayer[obj.id].bbox_surfaces.push(obj.bbox_surface);
 						objectsInLayer[obj.id].total_bbox_surface += obj.bbox_surface;
+						objectsInLayer[obj.id].confidence_values.push(obj.confidence);
+						objectsInLayer[obj.id].total_confidence += obj.confidence;
 						var isEligibleForAudioConfirm = (obj.source === "face_landmarker") || (obj.source === "object_detector" && obj.label === "person");
 						if (isEligibleForAudioConfirm && audioInfoOnFrame && audioInfoOnFrame.is_speech_present && obj.video_speakers.length > 0) {
 							var activeSpeakerLabels = normalizeToStringArray(audioInfoOnFrame.active_speaker_labels);
@@ -953,15 +987,17 @@ function optimizedScanEngine(content) {
 			for (var id in objectsInLayer) {
 				var obj = objectsInLayer[id];
 				obj.avg_bbox_surface = obj.bbox_surfaces.length > 0 ? obj.total_bbox_surface / obj.bbox_surfaces.length : 0;
+				obj.avg_confidence = obj.confidence_values.length > 0 ? obj.total_confidence / obj.confidence_values.length : 0;
 				var presence = obj.x_values.length;
+				var presenceScore = computePresenceScore(presence, obj.avg_confidence);
 				
 				if (obj.source === "face_landmarker") {
 					// Priorité 1 : Confirmation audio (uniquement si confirmations > 0)
 					if (obj.audio_confirm_count > 0) {
 						// Tie-breakers : 1) audio_confirm_count 2) présence 3) bbox
 						if (obj.audio_confirm_count > maxAudioConfirm ||
-							(obj.audio_confirm_count === maxAudioConfirm && presence > (bestAudioCandidate ? bestAudioCandidate.x_values.length : 0)) ||
-							(obj.audio_confirm_count === maxAudioConfirm && presence === (bestAudioCandidate ? bestAudioCandidate.x_values.length : 0) && obj.avg_bbox_surface > maxAudioBboxSurface)) {
+							(obj.audio_confirm_count === maxAudioConfirm && presenceScore > (bestAudioCandidate ? computePresenceScore(bestAudioCandidate.x_values.length, bestAudioCandidate.avg_confidence) : 0)) ||
+							(obj.audio_confirm_count === maxAudioConfirm && presenceScore === (bestAudioCandidate ? computePresenceScore(bestAudioCandidate.x_values.length, bestAudioCandidate.avg_confidence) : 0) && obj.avg_bbox_surface > maxAudioBboxSurface)) {
 							bestAudioCandidate = obj;
 							maxAudioConfirm = obj.audio_confirm_count;
 							maxAudioBboxSurface = obj.avg_bbox_surface;
@@ -969,37 +1005,60 @@ function optimizedScanEngine(content) {
 					}
 					
 					// Priorité 2 : Face la plus présente avec bbox comme critère secondaire
-					if (presence > maxFacePresence || 
-						(presence === maxFacePresence && obj.avg_bbox_surface > maxFaceBboxSurface)) {
+					if (presenceScore > maxFacePresence || 
+						(presenceScore === maxFacePresence && obj.avg_bbox_surface > maxFaceBboxSurface)) {
 						bestFaceCandidate = obj;
-						maxFacePresence = presence;
+						maxFacePresence = presenceScore;
 						maxFaceBboxSurface = obj.avg_bbox_surface;
 					}
 				} else if (obj.source === "object_detector" && obj.label === "person") {
 					// Priorité 1 bis : Confirmation audio sur une personne (si aucune face parlante n'est disponible)
 					if (obj.audio_confirm_count > 0) {
 						if (obj.audio_confirm_count > maxAudioPersonConfirm ||
-							(obj.audio_confirm_count === maxAudioPersonConfirm && presence > (bestAudioPersonCandidate ? bestAudioPersonCandidate.x_values.length : 0))) {
+							(obj.audio_confirm_count === maxAudioPersonConfirm && presenceScore > (bestAudioPersonCandidate ? computePresenceScore(bestAudioPersonCandidate.x_values.length, bestAudioPersonCandidate.avg_confidence) : 0))) {
 							bestAudioPersonCandidate = obj;
 							maxAudioPersonConfirm = obj.audio_confirm_count;
 						}
 					}
 
-					if (presence > maxPersonPresence) {
+					if (presenceScore > maxPersonPresence) {
 						bestPersonCandidate = obj;
-						maxPersonPresence = presence;
+						maxPersonPresence = presenceScore;
 					}
 				}
 
-				if (presence > maxFallbackPresence) {
+				if (presenceScore > maxFallbackPresence) {
 					bestFallbackCandidate = obj;
-					maxFallbackPresence = presence;
+					maxFallbackPresence = presenceScore;
 				}
 			}
 			var targetObject = bestAudioCandidate || bestAudioPersonCandidate || bestFaceCandidate || bestPersonCandidate || bestFallbackCandidate;
 			var reason = bestAudioCandidate ? "(basé sur confirmation audio - face)" : (bestAudioPersonCandidate ? "(basé sur confirmation audio - person)" : (bestFaceCandidate ? "(face la plus présente)" : (bestPersonCandidate ? "(personne la plus présente)" : "(fallback)")));
 			var bboxInfo = targetObject.avg_bbox_surface > 0 ? " - bbox=" + Math.round(targetObject.avg_bbox_surface) + "px²" : "";
-			writeToLog("  - Cible : " + targetObject.id + " " + reason + bboxInfo);
+			var confInfo = " - conf=" + clamp01(targetObject.avg_confidence).toFixed(3);
+			writeToLog("  - Cible : " + targetObject.id + " " + reason + bboxInfo + confInfo);
+			if (videoScanResult && videoScanResult.tracking_analytics && videoScanResult.tracking_analytics.objects && videoScanResult.tracking_analytics.objects[targetObject.id]) {
+				var tObj = videoScanResult.tracking_analytics.objects[targetObject.id];
+				if (tObj.avg_confidence !== undefined && tObj.avg_confidence !== null) {
+					writeToLog("  - analytics: avg_confidence=" + tObj.avg_confidence);
+				}
+				if (tObj.presence_ratio !== undefined && tObj.presence_ratio !== null) {
+					writeToLog("  - analytics: presence_ratio=" + tObj.presence_ratio);
+				}
+			}
+			if (videoScanResult && videoScanResult.expression_summary && videoScanResult.expression_summary.objects && videoScanResult.expression_summary.objects[targetObject.id]) {
+				var eObj = videoScanResult.expression_summary.objects[targetObject.id];
+				if (eObj.mean) {
+					for (var kMean in eObj.mean) {
+						writeToLog("  - expression_mean[" + kMean + "]=" + eObj.mean[kMean]);
+					}
+				}
+				if (eObj.max) {
+					for (var kMax in eObj.max) {
+						writeToLog("  - expression_max[" + kMax + "]=" + eObj.max[kMax]);
+					}
+				}
+			}
 
 			var stats = calculateStats(targetObject.x_values);
 			var centerToAim = stats.average;

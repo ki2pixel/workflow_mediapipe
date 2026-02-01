@@ -35,6 +35,214 @@ AUDIO_SUFFIX = "_audio.json"
 DEFAULT_FPS = 25.0
 
 
+def _should_include_speaker_embeddings() -> bool:
+    return (os.getenv("AUDIO_INCLUDE_SPEAKER_EMBEDDINGS") or "0") == "1"
+
+
+def _get_speaker_embeddings_model_id() -> str:
+    return (os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MODEL_ID") or "pyannote/embedding").strip()
+
+
+def _get_speaker_embeddings_min_segment_sec() -> float:
+    raw = os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC")
+    if raw is None:
+        return 0.5
+    try:
+        value = float(raw)
+        return value if value > 0 else 0.5
+    except Exception:
+        return 0.5
+
+
+def _get_speaker_embeddings_max_segments_per_speaker() -> int:
+    raw = os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MAX_SEGMENTS_PER_SPEAKER")
+    if raw is None:
+        return 10
+    try:
+        value = int(raw)
+        return value if value > 0 else 10
+    except Exception:
+        return 10
+
+
+def _extract_audio_ffmpeg(input_video: Path, output_wav: Path) -> bool:
+    try:
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(input_video),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-f",
+            "wav",
+            "-acodec",
+            "pcm_s16le",
+            str(output_wav),
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"speaker embeddings: ffmpeg extraction a échoué: {e}")
+        return False
+
+
+def _load_pyannote_embedding_model(model_id: str, hf_token: str):
+    from pyannote.audio import Model
+    try:
+        return Model.from_pretrained(model_id, token=hf_token)
+    except TypeError as type_err:
+        if "token" not in str(type_err):
+            raise
+        return Model.from_pretrained(model_id, use_auth_token=hf_token)
+
+
+def _compute_speaker_embeddings_from_audio(
+    *,
+    input_media: Path,
+    segments: List[Tuple[float, float, str]],
+    hf_token: str,
+) -> Dict[str, Any]:
+    if not segments:
+        return {}
+
+    try:
+        import torch
+        from pyannote.audio import Inference
+        from pyannote.core import Segment
+    except Exception as import_e:
+        logger.warning(f"speaker embeddings: dépendances indisponibles: {import_e}")
+        return {}
+
+    env_disable_gpu = os.getenv("AUDIO_DISABLE_GPU", "0") == "1"
+    device = "cuda" if (torch.cuda.is_available() and not env_disable_gpu) else "cpu"
+
+    model_id = _get_speaker_embeddings_model_id()
+    min_segment_sec = _get_speaker_embeddings_min_segment_sec()
+    max_segments = _get_speaker_embeddings_max_segments_per_speaker()
+
+    try:
+        model = _load_pyannote_embedding_model(model_id, hf_token)
+    except Exception as e:
+        logger.warning(f"speaker embeddings: impossible de charger le modèle '{model_id}': {e}")
+        return {}
+
+    try:
+        if hasattr(model, "to"):
+            model.to(torch.device(device))
+    except Exception:
+        pass
+
+    try:
+        inference = Inference(model, window="whole")
+    except Exception as e:
+        logger.warning(f"speaker embeddings: Inference init échouée: {e}")
+        return {}
+
+    by_speaker: Dict[str, List[Tuple[float, float, float]]] = {}
+    for start_sec, end_sec, speaker_label in segments:
+        if not speaker_label:
+            continue
+        try:
+            start_f = float(start_sec)
+            end_f = float(end_sec)
+        except Exception:
+            continue
+        if end_f <= start_f:
+            continue
+        dur = end_f - start_f
+        if dur < min_segment_sec:
+            continue
+        by_speaker.setdefault(str(speaker_label), []).append((start_f, end_f, dur))
+
+    if not by_speaker:
+        return {}
+
+    tmp_dir_root = "/dev/shm" if os.path.isdir("/dev/shm") else None
+    with tempfile.TemporaryDirectory(dir=tmp_dir_root) as tmp_dir:
+        wav_path = Path(tmp_dir) / f"{input_media.stem}_embeddings.wav"
+        if not _extract_audio_ffmpeg(input_media, wav_path):
+            return {}
+
+        dev_file = {"audio": str(wav_path)}
+        vectors_by_label: Dict[str, List[float]] = {}
+        num_segments_by_label: Dict[str, int] = {}
+        embedding_dim: Optional[int] = None
+
+        for speaker_label, speaker_segments in by_speaker.items():
+            speaker_segments.sort(key=lambda item: item[2], reverse=True)
+            speaker_segments = speaker_segments[:max_segments]
+
+            sum_vec: Optional[List[float]] = None
+            count = 0
+
+            for start_f, end_f, _dur in speaker_segments:
+                try:
+                    emb = inference.crop(dev_file, Segment(start_f, end_f))
+                except Exception:
+                    continue
+
+                data = getattr(emb, "data", emb)
+                try:
+                    if hasattr(data, "detach"):
+                        data = data.detach().cpu().numpy()
+                except Exception:
+                    pass
+
+                try:
+                    if hasattr(data, "shape") and len(getattr(data, "shape", [])) >= 2:
+                        vec = data.mean(axis=0)
+                    else:
+                        vec = data
+                    vec = vec.tolist() if hasattr(vec, "tolist") else list(vec)
+                except Exception:
+                    continue
+
+                try:
+                    norm = math.sqrt(sum((float(x) * float(x)) for x in vec))
+                    if norm > 0:
+                        vec = [float(x) / norm for x in vec]
+                    vec = [round(float(x), 4) for x in vec]
+                except Exception:
+                    continue
+
+                if embedding_dim is None:
+                    embedding_dim = len(vec)
+                if sum_vec is None:
+                    sum_vec = [0.0 for _ in range(len(vec))]
+                if len(sum_vec) != len(vec):
+                    continue
+
+                for i, x in enumerate(vec):
+                    sum_vec[i] += float(x)
+                count += 1
+
+            if sum_vec is None or count <= 0:
+                continue
+
+            avg = [round(v / float(count), 4) for v in sum_vec]
+            vectors_by_label[speaker_label] = avg
+            num_segments_by_label[speaker_label] = count
+
+        if not vectors_by_label:
+            return {}
+
+        return {
+            "model_id": model_id,
+            "embedding_dim": embedding_dim or 0,
+            "normalized": True,
+            "device": device,
+            "vectors_by_label": vectors_by_label,
+            "num_segments_by_label": num_segments_by_label,
+        }
+
+
 @dataclass
 class LemonfoxTranscriptionResult:
     """Result from Lemonfox API transcription."""
@@ -579,7 +787,8 @@ class LemonfoxAudioService:
         fps: float,
         total_frames: int,
         timeline: Dict[int, set],
-        speech_frames: set
+        speech_frames: set,
+        speaker_embeddings: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Write STEP4-compatible JSON atomically.
@@ -590,6 +799,7 @@ class LemonfoxAudioService:
             fps: Frames per second
             total_frames: Total number of frames
             timeline: Frame timeline (frame_num -> set of speakers)
+            speaker_embeddings: Optional speaker embeddings data
             
         Returns:
             True if successful, False otherwise
@@ -604,6 +814,8 @@ class LemonfoxAudioService:
                 f.write(f'  "video_filename": "{video_filename}",\n')
                 f.write(f'  "total_frames": {total_frames},\n')
                 f.write(f'  "fps": {round(fps, 2)},\n')
+                if isinstance(speaker_embeddings, dict) and speaker_embeddings:
+                    f.write(f'  "speaker_embeddings": {json.dumps(speaker_embeddings, ensure_ascii=False)},\n')
                 f.write('  "frames_analysis": [\n')
                 
                 # Write frame-by-frame analysis
@@ -776,6 +988,53 @@ class LemonfoxAudioService:
             transcription, total_frames, fps
         )
         
+        speaker_embeddings: Dict[str, Any] = {}
+        if _should_include_speaker_embeddings():
+            hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HF_AUTH_TOKEN")
+            if not hf_token:
+                logger.warning("speaker embeddings: HUGGINGFACE_HUB_TOKEN/HF_AUTH_TOKEN absent, embeddings ignorés")
+            else:
+                segments_for_embeddings: List[Tuple[float, float, str]] = []
+                source_segments = transcription.segments or []
+                if not source_segments and transcription.words:
+                    source_segments = transcription.words
+
+                speaker_map: Dict[str, str] = {}
+                speaker_counter = 0
+                for item in source_segments:
+                    raw_speaker = item.get("speaker")
+                    if raw_speaker and raw_speaker not in speaker_map:
+                        speaker_map[raw_speaker] = f"SPEAKER_{speaker_counter:02d}"
+                        speaker_counter += 1
+
+                for item in source_segments:
+                    start = item.get("start")
+                    end = item.get("end")
+                    raw_speaker = item.get("speaker")
+                    if start is None or end is None:
+                        continue
+                    try:
+                        start_f = float(start)
+                        end_f = float(end)
+                    except Exception:
+                        continue
+
+                    if not raw_speaker:
+                        continue
+                    speaker_label = speaker_map.get(raw_speaker)
+                    if not speaker_label:
+                        continue
+                    segments_for_embeddings.append((start_f, end_f, speaker_label))
+
+                try:
+                    speaker_embeddings = _compute_speaker_embeddings_from_audio(
+                        input_media=video_path,
+                        segments=segments_for_embeddings,
+                        hf_token=hf_token,
+                    )
+                except Exception as e:
+                    logger.warning(f"speaker embeddings: erreur inattendue (ignorée): {e}")
+        
         # Step 5: Write output JSON atomically
         output_path = video_path.with_name(f"{video_path.stem}{AUDIO_SUFFIX}")
         success = LemonfoxAudioService._write_step4_json_atomically(
@@ -784,7 +1043,8 @@ class LemonfoxAudioService:
             fps=fps,
             total_frames=total_frames,
             timeline=timeline,
-            speech_frames=speech_frames
+            speech_frames=speech_frames,
+            speaker_embeddings=speaker_embeddings,
         )
         
         if not success:

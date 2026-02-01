@@ -212,9 +212,29 @@ Malgré les contraintes techniques (Windows, ES3, limitation mémoire AE), ces s
 - `pytest -q tests/unit/test_step6_json_reducer.py` (inclut un test d’enrichissement legacy + test `speaker_stats`).
 
 ### Notes (différé)
-- **Embeddings locuteurs** : les sorties STEP4 actuelles (Pyannote + Lemonfox wrapper) ne persistents pas d’`speaker_embeddings` dans le JSON `*_audio.json` consommé côté AE. Implémentation à faire côté STEP4/Lemonfox + contrat JSON.
+- **Embeddings locuteurs** : les sorties STEP4 actuelles (Pyannote + Lemonfox wrapper) ne persistents pas d’`speaker_embeddings` dans le JSON `*_audio.json` consommé côté AE. **Implémenté (2026-01-30)** : activation via `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1`, extraction Pyannote, préservation par STEP6 reducer.
 - **Support multi-faces / layout** : le script AE `Analyse-Écart-X...jsx` sélectionne actuellement une cible unique (face/person) avec tie-breakers (présence, bbox, audio confirm). Un mode multi-cibles nécessiterait un contrat explicite (liste de cibles, split screen, règles de composition) et n’est pas livré dans cette passe.
 
 ---
+
+## 9. Implémentation (2026-02-01) — Points Priorité Basse ✅
+
+### Changements livrés
+- `workflow_scripts/step6/json_reducer.py`
+  - Ajout `tracking_analytics` (léger) dans `*_tracking.json` : histogramme de confidence + stats par objet (`avg_confidence`, `presence_ratio`, `avg_bbox_surface`, etc.).
+  - Ajout `expression_summary` (léger) dérivé de `blendshapes` (si présents) pour éviter tout export lourd côté AE.
+  - Variables d'environnement :
+    - `STEP6_INCLUDE_TRACKING_ANALYTICS` (défaut: activé)
+    - `STEP6_INCLUDE_EXPRESSION_SUMMARY` (défaut: désactivé)
+    - `STEP6_EXPRESSION_KEYS` (défaut: `jawOpen`)
+- `scripts/after_effects/Analyse-Écart-X-depuis-JSON-et-Label-Vidéo36_good.jsx`
+  - Pondération des décisions par `confidence` (moyenne par objet sur la durée du calque) via `ENABLE_CONFIDENCE_WEIGHTING` + `CONFIDENCE_WEIGHT`.
+  - Lecture (si parsing JSON complet possible) de `tracking_analytics` + `expression_summary`, et log des métriques utiles pour diagnostiquer la qualité du recentrage.
+  - Fallback streaming STEP5 conservé (aucune dépendance à ces champs si le JSON complet n'est pas parsable).
+- `tests/unit/test_step6_json_reducer.py`
+  - Tests ajoutés pour `tracking_analytics` et `expression_summary`.
+
+### Validation
+- `pytest -q tests/unit/test_step6_json_reducer.py`
 
 *Document généré le 30 janvier 2026 - Analyse des scripts After Effects dans le contexte du pipeline MediaPipe v4.x*

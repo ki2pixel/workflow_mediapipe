@@ -24,6 +24,14 @@ _TRACKING_ENRICH_FIELDS = (
     "label",
 )
 
+_CONFIDENCE_HISTOGRAM_BUCKETS = (
+    (0.0, 0.25),
+    (0.25, 0.5),
+    (0.5, 0.75),
+    (0.75, 0.9),
+    (0.9, 1.0000001),
+)
+
 
 def _extract_top_level_metadata(data: Dict[str, Any]) -> Tuple[Optional[float], Optional[int]]:
     fps = None
@@ -116,6 +124,15 @@ def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     new_frames_data: List[Dict[str, Any]] = []
     max_frame_seen: int = 0
+
+    expression_summary_enabled = (
+        os.environ.get("STEP6_INCLUDE_EXPRESSION_SUMMARY", "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+    expression_keys_raw = os.environ.get("STEP6_EXPRESSION_KEYS", "jawOpen").strip()
+    expression_keys = [k.strip() for k in expression_keys_raw.split(",") if k.strip()]
+    expression_stats: Dict[str, Dict[str, Any]] = {}
+
     for frame in frames_in or []:
         new_tracked_objects = []
         if "tracked_objects" in frame and frame["tracked_objects"] is not None:
@@ -146,6 +163,42 @@ def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                         isinstance(obj["speaking_sources"]["audio"], dict)):
                     new_obj["active_speakers"] = obj["speaking_sources"]["audio"].get("active_speakers", [])
 
+                if expression_summary_enabled:
+                    obj_id = obj.get("id")
+                    blend = obj.get("blendshapes")
+                    if isinstance(obj_id, str) and obj_id and isinstance(blend, dict) and blend:
+                        stats = expression_stats.get(obj_id)
+                        if stats is None:
+                            stats = {"count": 0, "sum": {}, "max": {}}
+                            expression_stats[obj_id] = stats
+                        stats["count"] = int(stats.get("count", 0) or 0) + 1
+
+                        sum_map = stats.get("sum")
+                        if not isinstance(sum_map, dict):
+                            sum_map = {}
+                            stats["sum"] = sum_map
+                        max_map = stats.get("max")
+                        if not isinstance(max_map, dict):
+                            max_map = {}
+                            stats["max"] = max_map
+
+                        for key in expression_keys:
+                            if key not in blend:
+                                continue
+                            try:
+                                val = float(blend.get(key))
+                            except Exception:
+                                continue
+                            sum_map[key] = float(sum_map.get(key, 0.0) or 0.0) + val
+                            prev_max = max_map.get(key)
+                            if prev_max is None:
+                                max_map[key] = val
+                            else:
+                                try:
+                                    max_map[key] = max(float(prev_max), val)
+                                except Exception:
+                                    max_map[key] = val
+
                 new_tracked_objects.append(new_obj)
 
         frame_num = frame.get("frame")
@@ -168,7 +221,246 @@ def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         out["fps"] = fps
     if total_frames is not None:
         out["total_frames"] = total_frames
+
+    if expression_summary_enabled and expression_stats:
+        summary_objects: Dict[str, Any] = {}
+        for obj_id, stats in expression_stats.items():
+            try:
+                count = int(stats.get("count") or 0)
+            except Exception:
+                count = 0
+            if count <= 0:
+                continue
+            sum_map = stats.get("sum")
+            max_map = stats.get("max")
+            if not isinstance(sum_map, dict) or not isinstance(max_map, dict):
+                continue
+
+            mean_map: Dict[str, Any] = {}
+            for key, raw_sum in sum_map.items():
+                try:
+                    mean_map[key] = round(float(raw_sum) / float(count), 4)
+                except Exception:
+                    continue
+
+            rounded_max: Dict[str, Any] = {}
+            for key, raw_max in max_map.items():
+                try:
+                    rounded_max[key] = round(float(raw_max), 4)
+                except Exception:
+                    continue
+
+            if mean_map or rounded_max:
+                summary_objects[obj_id] = {
+                    "count": count,
+                    "mean": mean_map,
+                    "max": rounded_max,
+                }
+
+        if summary_objects:
+            out["expression_summary"] = {
+                "keys": expression_keys,
+                "objects": summary_objects,
+            }
     return out
+
+
+def _compute_tracking_analytics(reduced_tracking: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    frames = reduced_tracking.get("frames_analysis")
+    if not isinstance(frames, list) or not frames:
+        return None
+
+    total_frames_raw = reduced_tracking.get("total_frames")
+    total_frames: Optional[int]
+    try:
+        total_frames = int(total_frames_raw) if total_frames_raw is not None else None
+    except Exception:
+        total_frames = None
+
+    if total_frames is None:
+        max_frame_seen = 0
+        for frame in frames:
+            if not isinstance(frame, dict):
+                continue
+            frame_num = frame.get("frame")
+            try:
+                if frame_num is not None:
+                    max_frame_seen = max(max_frame_seen, int(frame_num))
+            except Exception:
+                continue
+        total_frames = max_frame_seen if max_frame_seen > 0 else None
+
+    frames_with_objects = 0
+    objects_per_frame_sum = 0
+    confidence_histogram: Dict[str, int] = {}
+    objects_stats: Dict[str, Dict[str, Any]] = {}
+
+    for bucket_min, bucket_max in _CONFIDENCE_HISTOGRAM_BUCKETS:
+        label = f"{bucket_min:.2f}-{min(bucket_max, 1.0):.2f}"
+        confidence_histogram[label] = 0
+
+    for frame in frames:
+        if not isinstance(frame, dict):
+            continue
+        tracked = frame.get("tracked_objects")
+        if not isinstance(tracked, list) or not tracked:
+            continue
+        frames_with_objects += 1
+        objects_per_frame_sum += len(tracked)
+
+        for obj in tracked:
+            if not isinstance(obj, dict):
+                continue
+            obj_id = obj.get("id")
+            if not isinstance(obj_id, str) or not obj_id:
+                continue
+
+            stats = objects_stats.get(obj_id)
+            if stats is None:
+                stats = {
+                    "presence_frames": 0,
+                    "confidence_sum": 0.0,
+                    "confidence_count": 0,
+                    "bbox_surface_sum": 0.0,
+                    "bbox_surface_count": 0,
+                    "centroid_x_min": None,
+                    "centroid_x_max": None,
+                    "source": obj.get("source"),
+                    "label": obj.get("label"),
+                }
+                objects_stats[obj_id] = stats
+
+            stats["presence_frames"] = int(stats.get("presence_frames", 0) or 0) + 1
+
+            conf = obj.get("confidence")
+            conf_f: Optional[float]
+            try:
+                conf_f = float(conf) if conf is not None else None
+            except Exception:
+                conf_f = None
+            if conf_f is not None:
+                if conf_f < 0.0:
+                    conf_f = 0.0
+                if conf_f > 1.0:
+                    conf_f = 1.0
+                stats["confidence_sum"] = float(stats.get("confidence_sum", 0.0) or 0.0) + conf_f
+                stats["confidence_count"] = int(stats.get("confidence_count", 0) or 0) + 1
+
+                for bucket_min, bucket_max in _CONFIDENCE_HISTOGRAM_BUCKETS:
+                    if bucket_min <= conf_f < bucket_max:
+                        label = f"{bucket_min:.2f}-{min(bucket_max, 1.0):.2f}"
+                        confidence_histogram[label] = int(confidence_histogram.get(label, 0) or 0) + 1
+                        break
+
+            bbox_w = obj.get("bbox_width")
+            bbox_h = obj.get("bbox_height")
+            try:
+                bbox_w_f = float(bbox_w) if bbox_w is not None else None
+                bbox_h_f = float(bbox_h) if bbox_h is not None else None
+            except Exception:
+                bbox_w_f = None
+                bbox_h_f = None
+            if bbox_w_f is not None and bbox_h_f is not None:
+                surface = max(0.0, bbox_w_f) * max(0.0, bbox_h_f)
+                stats["bbox_surface_sum"] = float(stats.get("bbox_surface_sum", 0.0) or 0.0) + surface
+                stats["bbox_surface_count"] = int(stats.get("bbox_surface_count", 0) or 0) + 1
+
+            cx = obj.get("centroid_x")
+            try:
+                cx_f = float(cx) if cx is not None else None
+            except Exception:
+                cx_f = None
+            if cx_f is not None:
+                cx_min = stats.get("centroid_x_min")
+                cx_max = stats.get("centroid_x_max")
+                try:
+                    stats["centroid_x_min"] = cx_f if cx_min is None else min(float(cx_min), cx_f)
+                except Exception:
+                    stats["centroid_x_min"] = cx_f
+                try:
+                    stats["centroid_x_max"] = cx_f if cx_max is None else max(float(cx_max), cx_f)
+                except Exception:
+                    stats["centroid_x_max"] = cx_f
+
+    objects_out: Dict[str, Any] = {}
+    for obj_id, stats in objects_stats.items():
+        try:
+            presence_frames = int(stats.get("presence_frames") or 0)
+        except Exception:
+            presence_frames = 0
+
+        conf_count = 0
+        try:
+            conf_count = int(stats.get("confidence_count") or 0)
+        except Exception:
+            conf_count = 0
+        avg_conf: Optional[float] = None
+        if conf_count > 0:
+            try:
+                avg_conf = float(stats.get("confidence_sum") or 0.0) / float(conf_count)
+            except Exception:
+                avg_conf = None
+
+        bbox_count = 0
+        try:
+            bbox_count = int(stats.get("bbox_surface_count") or 0)
+        except Exception:
+            bbox_count = 0
+        avg_bbox_surface: Optional[float] = None
+        if bbox_count > 0:
+            try:
+                avg_bbox_surface = float(stats.get("bbox_surface_sum") or 0.0) / float(bbox_count)
+            except Exception:
+                avg_bbox_surface = None
+
+        cx_spread: Optional[float] = None
+        cx_min = stats.get("centroid_x_min")
+        cx_max = stats.get("centroid_x_max")
+        try:
+            if cx_min is not None and cx_max is not None:
+                cx_spread = float(cx_max) - float(cx_min)
+        except Exception:
+            cx_spread = None
+
+        presence_ratio: Optional[float] = None
+        if total_frames is not None and total_frames > 0:
+            presence_ratio = presence_frames / float(total_frames)
+
+        obj_out: Dict[str, Any] = {
+            "presence_frames": presence_frames,
+            "source": stats.get("source"),
+            "label": stats.get("label"),
+        }
+        if presence_ratio is not None:
+            obj_out["presence_ratio"] = round(float(presence_ratio), 4)
+        if avg_conf is not None:
+            obj_out["avg_confidence"] = round(float(avg_conf), 4)
+        if avg_bbox_surface is not None:
+            obj_out["avg_bbox_surface"] = round(float(avg_bbox_surface), 2)
+        if cx_spread is not None:
+            obj_out["centroid_x_spread"] = round(float(cx_spread), 2)
+
+        objects_out[obj_id] = obj_out
+
+    frames_total_count = total_frames if total_frames is not None else len(frames)
+    avg_objects_per_frame: Optional[float] = None
+    if frames_with_objects > 0:
+        avg_objects_per_frame = objects_per_frame_sum / float(frames_with_objects)
+
+    global_out: Dict[str, Any] = {
+        "frames_total": frames_total_count,
+        "frames_with_objects": frames_with_objects,
+        "objects_total": len(objects_stats),
+        "confidence_histogram": confidence_histogram,
+    }
+    if avg_objects_per_frame is not None:
+        global_out["avg_objects_per_frame"] = round(float(avg_objects_per_frame), 4)
+
+    return {
+        "schema_version": 1,
+        "global": global_out,
+        "objects": objects_out,
+    }
 
 
 def reduce_audio_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -224,6 +516,10 @@ def reduce_audio_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "unique_speakers": sorted(list(speaker_frame_counts.keys())),
             "speaker_frame_counts": speaker_frame_counts,
         }
+
+    speaker_embeddings = data.get("speaker_embeddings")
+    if isinstance(speaker_embeddings, dict) and speaker_embeddings:
+        out["speaker_embeddings"] = speaker_embeddings
     return out
 
 
@@ -421,6 +717,10 @@ def process_directory(base_path: str, keyword: str = "Camille"):
     et traite les paires de fichiers JSON trouvées dans les sous-dossiers "docs".
     """
     base = Path(base_path)
+    tracking_analytics_enabled = (
+        os.environ.get("STEP6_INCLUDE_TRACKING_ANALYTICS", "1").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
     logger.info(f"Démarrage du scan dans : {base}")
     if not base.is_dir():
         logger.error(f"Erreur : Le répertoire de base '{base_path}' n'existe pas.")
@@ -526,6 +826,11 @@ def process_directory(base_path: str, keyword: str = "Camille"):
                     temporal = _compute_temporal_alignment(reduced_tracking, reduced_audio)
                     if temporal:
                         reduced_tracking["temporal_alignment"] = temporal
+
+                    if tracking_analytics_enabled:
+                        analytics = _compute_tracking_analytics(reduced_tracking)
+                        if analytics:
+                            reduced_tracking["tracking_analytics"] = analytics
 
                     _write_json_atomically(tracking_out, reduced_tracking)
                     logger.info("    - Tracking réduit avec succès: %s", tracking_out.name)

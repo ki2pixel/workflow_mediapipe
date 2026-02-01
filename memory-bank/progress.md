@@ -7,7 +7,12 @@
 ## Statut Actuel
 Aucune tâche active.
 
+### Février 2026
+- [2026-02-01 18:35:00] **Documentation Services Critiques (COMPLET)** : Exécution du workflow docs-updater avec audit structurel complet. Audit métrique : 110,181 lignes (Python: 16,005, JavaScript: 5,641), 94 blocs analysés avec complexité moyenne D (24.1). Création de 3 documentations critiques : `WORKFLOW_SERVICE.md` (orchestrateur central), `STEP6_REDUCTION_JSON.md` (mis à jour avec analytics v4.2), `VISUALIZATION_SERVICE.md` (métriques et rapports). Identification des points chauds radon F/E : CSVService, LemonfoxAudioService, STEP5 workers, STEP6 reducer. Mise à jour Memory Bank avec décision log.
+
 ### Janvier 2026
+- [2026-02-01 18:10:00] **Post-production — Recommandations Priorité Basse AE (COMPLET)** : Implémentation des points Priorité Basse de `AFTER_EFFECTS_SCRIPTS_ANALYSIS.md`. STEP6: ajout `tracking_analytics` (histogramme de confidence + stats par objet) et `expression_summary` (léger, dérivé blendshapes, gated), flags `STEP6_INCLUDE_TRACKING_ANALYTICS`, `STEP6_INCLUDE_EXPRESSION_SUMMARY`, `STEP6_EXPRESSION_KEYS`. AE (`Analyse-Écart-X...jsx`): pondération sélection cibles par confidence (avg par objet, `ENABLE_CONFIDENCE_WEIGHTING` + `CONFIDENCE_WEIGHT`) et logs optionnels analytics/expression summary. Tests: `pytest -q tests/unit/test_step6_json_reducer.py` (OK).
+- [2026-01-30 14:43:00] **Embeddings locuteurs STEP4 (COMPLET)** : Implémentation des embeddings locuteurs dans STEP4 (Pyannote + Lemonfox) avec flag `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1`. Extraction Pyannote via `pyannote/embedding` modèle, format JSON compact normalisé (vectors par label, métadonnées), préservation par STEP6 reducer, robustesse avec fallbacks silencieux. Tests unitaires : 4 tests STEP4 + 2 tests STEP6 (Given/When/Then). Documentation mise à jour dans `STEP4_ANALYSE_AUDIO.md` et `AFTER_EFFECTS_SCRIPTS_ANALYSIS.md`.
 - [2026-01-30 02:36:00] **Post-production — STEP6 reducer enrichi + AE streaming fallback (COMPLET)** : Implémentation des actions Priorité Haute de `docs/workflow/post_production/AFTER_EFFECTS_SCRIPTS_ANALYSIS.md`. STEP6: sortie tracking standardisée en `*_tracking.json`, enrichissement champs essentiels (`confidence`, `fps`, `total_frames`) + métadonnée `temporal_alignment` (warnings mismatch audio/vidéo) + écriture atomique + skip schémas inattendus. AE (`Analyse-Écart-X...jsx`): priorisation `*_tracking.json` (STEP6), fallback STEP5 en parsing streaming (lecture `readln()` + buffer) pour éviter les crashs mémoire. Tests ajoutés: `pytest -q tests/unit/test_step6_json_reducer.py` (OK).
 - [2026-01-24 15:25:00] **Frontend — Toggle auto-ouverture logs + séquences (COMPLET)** : Ajout du contrôle Settings 📟 pour activer/désactiver l’ouverture automatique de la popup (`templates/index_new.html`, `static/eventHandlers.js`), import/synchronisation AppState+localStorage, respect de la préférence côté `openLogPanelUI` et `sequenceManager` (plus de forçage lors des séquences). Documentation audit mise à jour (`docs/workflow/audits/Ergonomie-Amelioree-Pour-Les-Logs.md`).
 - [2026-01-24 14:40:00] **Frontend — Logs Overlay Phase 4 Option A (COMPLET)** : Implémentation de la lightbox centrée pour le panneau de logs (`static/css/components/logs.css`) avec animations, responsive mobile et bouton de fermeture renforcé, plus durcissement de `isLogsPanelOpen()` pour supporter les tests DOM. Validation via `npm run test:frontend`.
@@ -105,6 +110,4 @@ Aucune tâche active.
 3. **Septembre 2025 et antérieur** — Mise en place des standards v4.1 (A11y, XSS), diagnostics système, architecture services, isolation des environnements et gestion d’état frontend. Les entrées exhaustives sont conservées dans l’archive.
 
 ## Prochaines Étapes
-- Implémentation des tests unitaires pour CSVService.
-- Ajout de tests d'intégration pour le monitoring.
-- Mise en place d'une rotation des logs.
+Aucune tâche prévue.

@@ -10,6 +10,25 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## Février 2026
+
+- [2026-02-01 18:35:00] **Documentation Services Critiques** : Création de la documentation pour les services complexes identifiés par l'audit radon F/E. Ajout de `WORKFLOW_SERVICE.md` (orchestrateur central, 16,005 LOC), mise à jour de `STEP6_REDUCTION_JSON.md` (nouvelles fonctionnalités analytics, complexité F), et création de `VISUALIZATION_SERVICE.md` (métriques et rapports, complexité E/D). L'audit a révélé 94 blocs avec complexité moyenne D (24.1), nécessitant une documentation complète pour les points chauds.
+
+## Janvier 2026
+
+## 2026-01-30 14:43:00+01:00: Embeddings locuteurs STEP4 — Implémentation complète
+- **Décision** : Implémenter la persistance des embeddings locuteurs dans STEP4 (Pyannote + Lemonfox) pour After Effects, avec activation par variable d'environnement et format JSON compact.
+- **Raison** : Le point "Embeddings locuteurs" était identifié comme Priorité Moyenne dans `AFTER_EFFECTS_SCRIPTS_ANALYSIS.md`. Les scripts AE ne pouvaient pas exploiter les riches données audio de STEP4 car les embeddings n'étaient pas persistés dans le JSON `*_audio.json`.
+- **Implémentation** :
+  - **STEP4 Pyannote** (`run_audio_analysis.py`) : Extraction via `pyannote/embedding` modèle, agrégation par locuteur (moyenne des N segments les plus longs), normalisation L2, arrondi 4 décimales. Flag `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1`.
+  - **STEP4 Lemonfox** (`lemonfox_audio_service.py`) : Extraction Pyannote en fallback (même code), mapping des labels SPEAKER_XX, écriture atomique JSON avec embeddings.
+  - **STEP6 reducer** (`json_reducer.py`) : Préservation du bloc `speaker_embeddings` dans la sortie réduite pour AE.
+  - **Variables d'environnement** : `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS`, `AUDIO_SPEAKER_EMBEDDINGS_MODEL_ID`, `AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC`, `AUDIO_SPEAKER_EMBEDDINGS_MAX_SEGMENTS_PER_SPEAKER`.
+  - **Robustesse** : Fallbacks silencieux si Pyannote indisponible, si erreur, ou si payload vide. Compatible streaming JSON (écrit avant `frames_analysis`).
+  - **Tests unitaires** : 4 tests STEP4 (`test_step4_speaker_embeddings.py`) + 2 tests STEP6 (`test_step6_json_reducer_speaker_embeddings.py`) avec Given/When/Then.
+  - **Documentation** : Mise à jour `STEP4_ANALYSE_AUDIO.md` (variables + structure JSON) et note dans `AFTER_EFFECTS_SCRIPTS_ANALYSIS.md`.
+- **Impact** : Les embeddings locuteurs sont désormais disponibles pour After Effects via `*_audio.json` (ou `*_tracking.json` après STEP6), activables par variable d'environnement. Format compact et normalisé garantissant compatibilité AE et non-régression du pipeline existant.
+
 ## 2026-01-24 15:25:00+01:00: Frontend — Auto-ouverture du panneau de logs contrôlable
 - **Décision** : Introduire un toggle “📟 Auto-ouverture des logs” dans le panneau Settings pour permettre aux opérateurs de désactiver l’ouverture automatique de l’overlay pendant les exécutions d’étapes ou de séquences.
 - **Raison** : Limiter l’encombrement visuel lors des démos/monitorings tout en conservant un accès manuel direct aux logs (boutons “Logs” et Step Details).
