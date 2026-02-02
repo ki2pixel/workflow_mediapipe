@@ -1,17 +1,21 @@
 #target aftereffects
 
 // ===================================================================================
-// SCRIPT FINAL : Recadrage Statique Intelligent v4.5 (Support Bbox Intégré)
-// Date : 26/08/2025
-// Nouveautés v4.5 :
-// - Intégration des données bbox_width et bbox_height pour optimiser la sélection d'objets
-// - Priorisation intelligente basée sur la surface des bounding boxes (bbox_surface = width × height)
-// - Amélioration de la logique de sélection : en cas d'égalité, privilégie les objets avec les plus grandes bbox
-// - Logs enrichis avec informations de surface bbox pour un meilleur débogage
+// SCRIPT FINAL : Recadrage Statique Intelligent v4.7 (Analytics & Pondération Confiance)
+// Date : 01/02/2026
+// Nouveautés v4.7 :
+// - Pondération des décisions par confidence moyenne (ENABLE_CONFIDENCE_WEIGHTING + CONFIDENCE_WEIGHT)
+// - Lecture des analytics STEP6 (tracking_analytics) et expression_summary si disponibles
+// - Priorisation STEP6 *_tracking.json comme source primaire avec fallback streaming STEP5
+// - Support embeddings locuteurs STEP4 (via speaker_labels) pour matching audio/vidéo
+// - Logs enrichis avec métriques analytics (avg_confidence, presence_ratio, bbox_surface)
+// Hérite de v4.5 :
+// - Intégration des données bbox_width/height et calcul surface pour tie-breaker
+// - Priorisation basée sur surface des bounding boxes (bbox_surface = width × height)
+// - Parser streaming robuste pour éviter les crashs mémoire sur JSON massifs
 // Hérite de v4.4 :
 // - Correction majeure du parser manuscrit pour extraire correctement les chaînes de caractères.
-// - La logique de hiérarchie et de labellisation est maintenant pleinement fonctionnelle.
-// - Amélioration de la robustesse de la détection automatique des fichiers.
+// - Logique de hiérarchie et de labellisation pleinement fonctionnelle.
 // ===================================================================================
 
 
