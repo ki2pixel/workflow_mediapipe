@@ -42,7 +42,8 @@ export const REMOTE_SEQUENCE_STEP_KEYS = [
     "STEP4",
     "STEP5",
     "STEP6",
-    "STEP7"
+    "STEP7",
+    "STEP8"
 ];
 
 // Modern state management functions using AppState

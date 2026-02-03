@@ -3,7 +3,7 @@
 
 """
 Script de finalisation et copie des projets vers la destination finale.
-Étape 7 (Ubuntu)
+Étape 8 (Ubuntu)
 \- Archive d'abord les artefacts d'analyse (scènes/tracking/audio) avant suppression
 \- Copie ensuite le dossier du projet vers la destination finale
 """
@@ -28,9 +28,7 @@ from services.results_archiver import ResultsArchiver, SCENES_SUFFIX, AUDIO_SUFF
 
 # --- Configuration ---
 WORK_DIR = Path(os.getcwd())
-# --- MODIFICATION: Changer la destination ---
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/mnt/cache"))
-# --- FIN DE LA MODIFICATION ---
 FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
 BASE_DIR = ROOT_DIR
 LOG_DIR = BASE_DIR / "logs" / "step8"
@@ -137,14 +135,16 @@ def _select_output_dir(preferred: Path, base_dir: Path) -> Path:
 
 def _safe_rmtree(path: Path) -> None:
     """Supprime un dossier en consignant proprement les erreurs de permissions."""
+
     def _onerror(func, p, exc_info):
         logging.error(f"Suppression échouée sur '{p}': {exc_info[1]}")
+
     shutil.rmtree(path, onerror=_onerror)
 
 
 def _destination_supports_chmod(dest_dir: Path) -> bool:
     """Détecte si le FS destination supporte chmod (NTFS typiquement renvoie EPERM).
-    
+
     Si on ne peut pas créer de fichier, la question du chmod est secondaire; laisser True.
     """
     try:
@@ -179,10 +179,19 @@ def _copy_project_tree(src: Path, dst: Path) -> None:
     logging.info("Destination ne supporte pas chmod — copie sans préservation des permissions.")
     # 1) rsync si disponible
     try:
-        subprocess.run([
-            "rsync", "-a", "--no-perms", "--no-owner", "--no-group", "--no-times",
-            f"{str(src)}/", f"{str(dst)}/"
-        ], check=True)
+        subprocess.run(
+            [
+                "rsync",
+                "-a",
+                "--no-perms",
+                "--no-owner",
+                "--no-group",
+                "--no-times",
+                f"{str(src)}/",
+                f"{str(dst)}/",
+            ],
+            check=True,
+        )
         return
     except FileNotFoundError:
         logging.info("rsync non disponible, tentative via cp --no-preserve")
@@ -192,10 +201,14 @@ def _copy_project_tree(src: Path, dst: Path) -> None:
     # 2) cp --no-preserve si disponible (fusionner le contenu dans dst)
     try:
         dst.mkdir(parents=True, exist_ok=True)
-        subprocess.run([
-            "bash", "-lc",
-            f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'"
-        ], check=True)
+        subprocess.run(
+            [
+                "bash",
+                "-lc",
+                f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'",
+            ],
+            check=True,
+        )
         return
     except subprocess.CalledProcessError as e:
         logging.warning(f"cp --no-preserve a échoué: {e}")
@@ -214,10 +227,7 @@ def _copy_project_tree(src: Path, dst: Path) -> None:
 
 
 def _compute_alternative_output_dir(existing_dst: Path) -> Path:
-    """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé.
-
-    Ex.: /mnt/cache/33 Camille -> /mnt/cache/33 Camille__finalized_YYYYmmdd_HHMMSS[_n]
-    """
+    """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé."""
     base = existing_dst.parent
     name = existing_dst.name
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -230,11 +240,6 @@ def _compute_alternative_output_dir(existing_dst: Path) -> Path:
 
 
 def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
-    """Ensure destination project has a docs/ subfolder containing media and related files.
-
-    If files are currently at the project root (common when previous steps didn't use a docs/
-    directory), move recognized media and analysis files into docs/.
-    """
     docs_dir = dst_project_dir / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -281,11 +286,6 @@ def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
 
 
 def restore_archived_analysis(project_name: str, output_project_dir: Path) -> None:
-    """Restore archived analysis artifacts into the destination project docs/ folder.
-
-    For each detected video file in docs/, attempt to retrieve archived artifacts
-    (scenes CSV, audio JSON, tracking JSON) using ResultsArchiver and copy them next to the video.
-    """
     try:
         docs_dir = output_project_dir / "docs"
         docs_dir.mkdir(parents=True, exist_ok=True)
@@ -326,8 +326,8 @@ def restore_archived_analysis(project_name: str, output_project_dir: Path) -> No
     except Exception as e:
         logging.warning(f"Restauration des analyses archivées échouée (projet={project_name}): {e}")
 
+
 def finalize_project(project_dir):
-    """Copie un projet vers la destination finale et supprime la source."""
     try:
         project_name = project_dir.name
         logging.info(f"Finalisation du projet: {project_name}")
@@ -339,7 +339,7 @@ def finalize_project(project_dir):
             if arch_summary and not arch_summary.get("error"):
                 logging.info(
                     "Archivage des analyses terminé: %s",
-                    json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False)
+                    json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False),
                 )
             else:
                 logging.warning(f"Archivage des analyses non effectué ou en erreur: {arch_summary}")
@@ -355,9 +355,7 @@ def finalize_project(project_dir):
             _safe_rmtree(output_project_dir)
             if output_project_dir.exists():
                 alt_dir = _compute_alternative_output_dir(output_project_dir)
-                logging.warning(
-                    f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'"
-                )
+                logging.warning(f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'")
                 output_project_dir = alt_dir
 
         try:
@@ -384,10 +382,6 @@ def finalize_project(project_dir):
             pass
         _safe_rmtree(project_dir)
         logging.info(f"Dossier source '{project_dir}' supprimé avec succès.")
-        # --- FIN suppression ---
-
-        # --- MODIFICATION: Suppression de la création du fichier metadata_final.json ---
-        # --- FIN DE LA MODIFICATION ---
 
         logging.info(f"Finalisation terminée pour '{project_name}'")
         print(f"Finalisation terminée pour '{project_name}'")
@@ -399,17 +393,14 @@ def finalize_project(project_dir):
 
 
 def main():
-    """Fonction principale du script."""
-    logging.info(f"--- Démarrage du script de Finalisation et Nettoyage ---")
+    logging.info("--- Démarrage du script de Finalisation et Nettoyage ---")
 
     global OUTPUT_DIR
     try:
         OUTPUT_DIR = _select_output_dir(OUTPUT_DIR, BASE_DIR)
         logging.info(f"Le répertoire de destination est: {OUTPUT_DIR.resolve()}")
     except Exception as e:
-        logging.critical(
-            f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}"
-        )
+        logging.critical(f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}")
         sys.exit(1)
 
     projects = find_projects_to_finalize()
@@ -426,7 +417,7 @@ def main():
         if finalize_project(project):
             successful_count += 1
 
-    logging.info(f"--- Finalisation terminée ---")
+    logging.info("--- Finalisation terminée ---")
     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")
 
     if successful_count < total_projects:

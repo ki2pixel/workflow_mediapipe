@@ -6,10 +6,11 @@ description: Maintain and execute the backend/frontend test suites with environm
 # Tests Suite Guardian
 
 ## Portée
-- Backends : `pytest`, scripts `run_step3_tests.sh`, `run_step5_tests.sh`, `run_main_tests.sh`.
+- Backends : `pytest`, scripts `run_step3_tests.sh`, `run_step5_tests.sh`, `run_main_tests.sh`, `run_step7_tests.sh`, `run_step8_tests.sh`.
 - Frontend : `npm run test:frontend` (Node/ESM tests : DOMBatcher, logs overlay, Step Details, focus trap).
 - Guides : `tests/fixtures`, `conftest.py`, `diagnose_tests.sh`, `fix_backend_tests.sh`, `validate_tests.sh`.
 - Ressource annexe : `resources/test_execution_matrix.md` (qui résume commandes, environnements, pré-requis, checklist pré-run).
+- Nouveautés STEP7/8 : 28 tests WorkflowCommandsConfig + 2 tests finalisation STEP8 intégrés à la suite principale.
 
 ## Procédure Générale
 1. Activer l’environnement `/mnt/venv_ext4/env`.
@@ -19,6 +20,8 @@ description: Maintain and execute the backend/frontend test suites with environm
    - `bash scripts/run_main_tests.sh` pour la suite principale backend.
    - `bash scripts/run_step3_tests.sh` depuis `transnet_env` si dépendances installées.
    - `bash scripts/run_step5_tests.sh` depuis `tracking_env_slim`.
+   - `bash scripts/run_step7_tests.sh` depuis `env` pour les tests STEP7.
+   - `bash scripts/run_step8_tests.sh` depuis `env` pour les tests STEP8.
    - `npm run test:frontend` pour la suite UI.
 5. Consulter les rapports (`.pytest_cache`, `logs/tests/` si définis).
 

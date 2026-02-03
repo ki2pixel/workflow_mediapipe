@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class WorkflowCommandsConfig:
     """Centralized workflow commands configuration.
     
-    This class provides configuration for all 7 workflow steps, including:
+    This class provides configuration for all 8 workflow steps, including:
     - Command line arguments
     - Working directories
     - Log file locations
@@ -50,7 +50,7 @@ class WorkflowCommandsConfig:
     def _ensure_log_directories(self) -> None:
         """Ensure all log directories exist."""
         self.logs_base_dir.mkdir(exist_ok=True)
-        for step in range(1, 8):
+        for step in range(1, 9):
             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
     
     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
@@ -67,6 +67,7 @@ class WorkflowCommandsConfig:
             "STEP5": self._get_step5_config(),
             "STEP6": self._get_step6_config(),
             "STEP7": self._get_step7_config(),
+            "STEP8": self._get_step8_config(),
         }
     
     def _get_step1_config(self) -> Dict[str, Any]:
@@ -193,6 +194,9 @@ class WorkflowCommandsConfig:
             str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
             "--log_dir", str(step4_log_dir),
         ]
+
+        if step4_script_name == "run_audio_analysis.py" and self.hf_token:
+            cmd.extend(["--hf_auth_token", str(self.hf_token)])
         
         return {
             "display_name": "4. Analyse audio",
@@ -312,27 +316,68 @@ class WorkflowCommandsConfig:
         }
     
     def _get_step7_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 7: Finalization.
-        
+        """Get configuration for Step 7: AE JSON preprocessing.
+
         Returns:
             Step 7 configuration dictionary
         """
         step7_log_dir = self.logs_base_dir / "step7"
-        
+
         return {
-            "display_name": "7. Finalisation",
+            "display_name": "7. Pré-traitement AE",
             "cmd": [
                 str(config.get_venv_python("env")),
-                str(self.base_path / "workflow_scripts" / "step7" / "finalize_and_copy.py")
+                str(self.base_path / "workflow_scripts" / "step7" / "preprocess_ae_json.py"),
+                "--log_dir", str(step7_log_dir),
+                "--work_dir", str(self.base_path / "projets_extraits"),
+            ],
+            "cwd": str(self.base_path / "projets_extraits"),
+            "specific_logs": [
+                {
+                    "name": "Log Pré-traitement AE",
+                    "type": "directory_latest",
+                    "path": step7_log_dir,
+                    "pattern": "*.log",
+                    "lines": 150,
+                }
+            ],
+            "progress_patterns": {
+                "total": re.compile(r"TOTAL_AE_PREPROCESS:\s*(\d+)", re.IGNORECASE),
+                "current": re.compile(r"PREPROCESS_AE:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+                "internal": re.compile(
+                    r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
+                    re.IGNORECASE,
+                ),
+                "current_success_line_pattern": re.compile(
+                    r"Succès: pré-traitement AE terminé pour (.*?)$", re.IGNORECASE
+                ),
+                "current_item_text_from_success_line": True,
+            },
+            "post_completion_message_ui": "Pré-traitement AE terminé.",
+        }
+
+    def _get_step8_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 8: Finalization.
+
+        Returns:
+            Step 8 configuration dictionary
+        """
+        step8_log_dir = self.logs_base_dir / "step8"
+
+        return {
+            "display_name": "8. Finalisation",
+            "cmd": [
+                str(config.get_venv_python("env")),
+                str(self.base_path / "workflow_scripts" / "step8" / "finalize_and_copy.py"),
             ],
             "cwd": str(self.base_path / "projets_extraits"),
             "specific_logs": [
                 {
                     "name": "Log Finalisation",
                     "type": "directory_latest",
-                    "path": step7_log_dir,
+                    "path": step8_log_dir,
                     "pattern": "*.log",
-                    "lines": 150
+                    "lines": 150,
                 }
             ],
             "progress_patterns": {
@@ -340,9 +385,9 @@ class WorkflowCommandsConfig:
                 "current_success_line_pattern": re.compile(
                     r"Finalisation terminée pour '(.*?)'", re.IGNORECASE
                 ),
-                "current_item_text_from_success_line": True
+                "current_item_text_from_success_line": True,
             },
-            "post_completion_message_ui": "Finalisation des projets terminée."
+            "post_completion_message_ui": "Finalisation des projets terminée.",
         }
     
     # ========== Public API ==========

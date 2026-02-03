@@ -9,12 +9,14 @@ Le réducteur STEP6 consolide les métadonnées des étapes précédentes (audio
 - **Expression Summary** : Résumé léger des blendshapes (optionnel)
 - **Alignement temporel** : Validation et warnings audio/vidéo
 
-## Complexité
-- **Score Radon** : F (3 méthodes critiques)
+## Complexité (Mise à jour v4.2)
+- **Score Radon** : F (5 méthodes F/E)
 - **Méthodes chaudes** : 
-  - `reduce_video_json()` (F) : Traitement principal
-  - `_compute_tracking_analytics()` (F) : Calcul analytics
-  - `process_directory()` (E) : Gestion batch
+  - `reduce_video_json()` (F) : Pipeline principal de réduction
+  - `_compute_tracking_analytics()` (F) : Histogrammes confidence et stats
+  - `process_directory()` (E) : Orchestration multi-projets
+  - `_merge_reduced_tracking()` (E) : Fusion données multi-sources
+  - `_compute_temporal_alignment()` (C) : Validation cohérence audio/vidéo
 
 ## Configuration
 ```bash

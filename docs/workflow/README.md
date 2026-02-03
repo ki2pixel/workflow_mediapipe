@@ -44,14 +44,15 @@ La documentation a été réorganisée thématiquement pour une navigation intui
 - **[GUIDE_DEMARRAGE_RAPIDE.md](core/GUIDE_DEMARRAGE_RAPIDE.md)** — Guide de démarrage rapide
 - **[REFERENCE_RAPIDE_DEVELOPPEURS.md](core/REFERENCE_RAPIDE_DEVELOPPEURS.md)** — Référence développeurs
 
-### 🔄 Pipeline Workflow (Étapes 1-7)
+### 🔄 Pipeline Workflow (Étapes 1-8)
 - **[STEP1_EXTRACTION.md](pipeline/STEP1_EXTRACTION.md)** — Extraction d'archives
 - **[STEP2_CONVERSION.md](pipeline/STEP2_CONVERSION.md)** — Conversion vidéo
 - **[STEP3_DETECTION_SCENES.md](pipeline/STEP3_DETECTION_SCENES.md)** — Détection de scènes
 - **[STEP4_ANALYSE_AUDIO.md](pipeline/STEP4_ANALYSE_AUDIO.md)** — Analyse audio
 - **[STEP5_SUIVI_VIDEO.md](pipeline/STEP5_SUIVI_VIDEO.md)** — Suivi vidéo
 - **[STEP6_REDUCTION_JSON.md](pipeline/STEP6_REDUCTION_JSON.md)** — Réduction JSON
-- **[STEP7_FINALISATION.md](pipeline/STEP7_FINALISATION.md)** — Finalisation
+- **[STEP7_PRETRAITEMENT_AE.md](pipeline/STEP7_PRETRAITEMENT_AE.md)** — Pré-traitement AE (JSON optimisé)
+- **[STEP8_FINALISATION.md](pipeline/STEP8_FINALISATION.md)** — Finalisation
 
 ### 🛠️ Technical Documentation
 - **[API_INSTRUMENTATION.md](technical/API_INSTRUMENTATION.md)** — Instrumentation API
@@ -71,21 +72,11 @@ La documentation a été réorganisée thématiquement pour une navigation intui
 
 ### 📋 Practical Guides
 - **[FRONTEND_GUIDE_RACCourcis_A11Y_LOADERS.md](guides/FRONTEND_GUIDE_RACCourcis_A11Y_LOADERS.md)** — Guide frontend A11y
-- **[LIGHTBOX_DEBUGGING_GUIDE.md](guides/LIGHTBOX_DEBUGGING_GUIDE.md)** — Debug lightbox
-- **[CLICK_EVENT_FIXES_GUIDE.md](guides/CLICK_EVENT_FIXES_GUIDE.md)** — Fixes clics
 
 ### 🗂️ Administration & Maintenance
 - **[UPDATE_DOCUMENTATION_SUMMARY.md](admin/UPDATE_DOCUMENTATION_SUMMARY.md)** — Historique mises à jour
 - **[MIGRATION_STATUS.md](admin/MIGRATION_STATUS.md)** — Statut migrations
 - **[AUDIT_TECHNIQUE_2026_01.md](admin/AUDIT_TECHNIQUE_2026_01.md)** — Audit technique
-
-### 🏛️ Web Portal
-- **[Portal HTML](portal/index.html)** — Portail web interactif
-- **[Portal Assets](portal/assets/)** — Styles et JavaScript
-
-### ⚙️ Configuration & Deployment
-- **[Apache Config](config/.htaccess)** — Configuration Apache
-- **[Deployment Scripts](config/deploy.sh)** — Scripts de déploiement
 
 ### 📦 Archives (Historique)
 - **[Deprecated](archives/deprecated/)** — Fonctionnalités obsolètes
@@ -153,7 +144,9 @@ docs/workflow/
 ├── STEP4_LEMONFOX_AUDIO_PLAN.md            # STEP4 Lemonfox (plan)
 ├── STEP5_SUIVI_VIDEO.md               # Documentation Étape 5
 ├── STEP6_REDUCTION_JSON.md            # Documentation Étape 6
-└── STEP7_FINALISATION.md              # Documentation Étape 7
+├── STEP7_PRETRAITEMENT_AE.md          # Documentation Étape 7
+├── STEP8_FINALISATION.md              # Documentation Étape 8
+└── index.md                           # Portail index
 ```
 
 ## Utilisation

@@ -19,21 +19,22 @@ Le système est composé d'un backend **Flask** et d'un frontend **JavaScript** 
 
 ### Maintenabilité v4.1 (documentée)
 - État centralisé avec `WorkflowState` (thread-safe via RLock; API étapes, séquences, téléchargements).
-- Configuration centralisée avec `WorkflowCommandsConfig` (7 étapes, patterns regex, gestion token HF).
+- Configuration centralisée avec `WorkflowCommandsConfig` (8 étapes, patterns regex, gestion token HF).
 - Extraction de la logique de téléchargements dans `DownloadService` (callbacks, validation, dataclass `DownloadResult`).
 - Réduction de la complexité: `execute_csv_download_worker()` ~230 → ~85 lignes (-63%); `run_process_async()` simplifié (~-40 lignes) avec helpers dans `WorkflowService`.
 - Références documentation: `docs/PHASE1_FOUNDATIONS.md`, `docs/PHASE3_PLAN.md`, `docs/REFACTORING_SUMMARY.md`, `docs/COMPLETE_REFACTORING_REPORT.md`, `docs/FINAL_REFACTORING_REPORT.md`.
 - Statut: documenté; validation codebase en cours côté `WorkflowService` (voir `docs/MIGRATION_STATUS.md`).
 
 ### Pipeline de Traitement
-Le cœur du système est un pipeline en 7 étapes, chacune utilisant un environnement virtuel Python optimisé :
+Le cœur du système est un pipeline en 8 étapes, chacune utilisant un environnement virtuel Python optimisé :
 1.  **Extraction** (`env/`): Extrait de manière sécurisée les archives (ZIP, RAR, TAR).
 2.  **Conversion Vidéo** (`env/`): Standardise toutes les vidéos à 25 FPS en utilisant FFmpeg et l'accélération GPU.
 3.  **Détection de Scènes** (`transnet_env/`): Utilise TransNetV2 (PyTorch) pour identifier les changements de scène.
 4.  **Analyse Audio** (`audio_env/`): Utilise Pyannote.audio pour la diarisation des locuteurs.
-5.  **Suivi Vidéo** (`tracking_env/`, `eos_env/`): Détection et suivi des visages/objets avec choix du moteur (MediaPipe, OpenSeeFace, EOS 3DMM, OpenCV YuNet+py-feat).
+5.  **Suivi Vidéo** (`tracking_env/`, `insightface_env/`): Détection et suivi des visages/objets avec MediaPipe CPU par défaut ou InsightFace GPU optionnel.
 6.  **Réduction JSON** (`env/`): Optimise la taille des fichiers de métadonnées JSON générés.
-7.  **Finalisation** (`env/`): Consolide, valide et archive tous les résultats.
+7.  **Pré-traitement AE** (`env/`): Prépare et optimise les données JSON spécifiquement pour After Effects.
+8.  **Finalisation** (`env/`): Consolide, valide et archive tous les résultats.
 
 ### Intégrations Clés
 -   **Webhook JSON** : Source unique pour le monitoring en temps réel des téléchargements (https://webhook.kidpixel.fr/data/webhook_links.json).

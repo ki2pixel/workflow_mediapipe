@@ -122,7 +122,7 @@ Each pipeline step follows consistent sections:
 - **`complexity_report.txt`** – Radon complexity analysis with function-level details  
   *Generated: 2026-01-25 | Tool: radon v6.0.1 | 80 blocks analyzed*
 - **Tree Structure** – Complete directory hierarchy with intelligent exclusions  
-  *Generated: 2026-01-25 | Tool: tree v2.0.2 | Exclusions: architecture-*|archives|audits|guides|legacy|optimization|portal|tests|workflow-execution-interactive*
+  *Generated: 2026-01-25 | Tool: tree v2.0.2 | Exclusions: archives|audits|guides|legacy|optimization|tests*
 
 ### Documentation Updates
 - **Pipeline README** – Metrics snapshot and template overview
@@ -146,11 +146,11 @@ Each pipeline step follows consistent sections:
 tree --version && cloc --version && radon --version
 
 # 2. Structural Analysis (with intelligent exclusions)
-tree docs/workflow -L 2 -I 'architecture-complete-interactive|architecture-systeme|archives|audits|flux-execution|guides|legacy|optimization|portal|tests|workflow-execution-interactive|assets' --dirsfirst
+tree docs/workflow -L 2 -I 'archives|audits|guides|legacy|optimization|tests|assets' --dirsfirst
 
 # 3. Code Metrics Collection
-cloc docs/workflow --exclude-dir=architecture-complete-interactive,architecture-systeme,archives,audits,flux-execution,guides,legacy,optimization,portal,tests,workflow-execution-interactive,assets --json --out=docs/workflow/cloc_stats.json
-cloc docs/workflow --exclude-dir=architecture-complete-interactive,architecture-systeme,archives,audits,flux-execution,guides,legacy,optimization,portal,tests,workflow-execution-interactive,assets
+cloc docs/workflow --exclude-dir=archives,audits,guides,legacy,optimization,tests,assets --json --out=docs/workflow/cloc_stats.json
+cloc docs/workflow --exclude-dir=archives,audits,guides,legacy,optimization,tests,assets
 
 # 4. Complexity Analysis (Backend Code)
 radon cc services routes workflow_scripts -a -nc --exclude 'test*,venv/*' > docs/workflow/complexity_report.txt
@@ -162,7 +162,7 @@ radon cc services routes workflow_scripts -a -nc --exclude 'test*,venv/*' > docs
 #### Exclusion Patterns (Current Configuration)
 - **System Noise**: `__pycache__`, `venv`, `node_modules`, `.git`, `htmlcov`
 - **Project Noise**: `assets`, `media`, `*_output`, `debug`
-- **Documentation Exclusions**: `architecture-*`, `archives`, `audits`, `guides`, `legacy`, `optimization`, `portal`, `tests`, `workflow-execution-interactive`
+- **Documentation Exclusions**: `archives`, `audits`, `guides`, `legacy`, `optimization`, `tests`
 
 ### Quality Assurance
 - **Cross-Reference Validation** – Ensure all complexity callouts reference current analysis

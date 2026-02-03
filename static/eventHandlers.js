@@ -131,9 +131,9 @@ export function initializeEventHandlers() {
             if (getIsAnySequenceRunning()) {
                 showNotification("Séquence déjà en cours.", 'warning'); return;
             }
-            // Play workflow start sound for complete sequence 1-6
+            // Play workflow start sound for complete sequence 1-8
             soundEvents.workflowStart();
-            await runStepSequence(defaultSequenceableStepsKeys, "Séquence 0-4");
+            await runStepSequence(defaultSequenceableStepsKeys, "Séquence 1-8");
         });
     }
 

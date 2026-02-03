@@ -1,8 +1,8 @@
 # Vue d'Ensemble - Workflow MediaPipe v4.2
 
-> **Code-Doc Metrics** – 38 files, 9,064 LOC Markdown; complexity hotspots in CSV/STEP5 workers. See `cloc_stats.json` and `complexity_report.txt` for detailed analysis.
+> **Code-Doc Metrics** – 113 files, 27 573 LOC (Python 14 967, JavaScript 5 643, CSS 3 594); complexity moyenne **D (23.5)**, points chauds dans CSV/STEP5 workers. See `cloc_stats.json` and `complexity_report.txt` for detailed analysis.
 
-> **Workflow MediaPipe** est un système complet d'analyse vidéo automatisée qui traite les fichiers vidéo à travers un pipeline modulaire en 7 étapes. Le système combine des technologies de vision par ordinateur, d'analyse audio et de traitement des données pour générer des métadonnées riches utilisables dans After Effects.
+> **Workflow MediaPipe** est un système complet d'analyse vidéo automatisée qui traite les fichiers vidéo à travers un pipeline modulaire en **8 étapes**. Le système combine des technologies de vision par ordinateur, d'analyse audio et de traitement des données pour générer des métadonnées riches optimisées pour After Effects.
 
 ## Architecture Snapshot (Code-Doc Analysis)
 
@@ -17,19 +17,17 @@ docs/workflow/
 ├── pipeline/                  # 7-step pipeline docs (11 files)
 ├── technical/                 # Technical deep-dives (9 files)
 ├── README.md                  # This file
-├── overview.md                # System overview
-└── index.md                   # Portal index
+└── overview.md                # System overview
 ```
 
 ### Code Metrics Summary
-- **Total Files**: 38 text files (Markdown, Shell, JSON)
-- **Primary Language**: Markdown (9,064 LOC, 2564 blanks)
-- **Supporting Code**: Shell scripts (486 LOC), JSON config (24 LOC)
+- **Total Files**: 113 fichiers actifs (Python 54, JavaScript 24, CSS 17, etc.)
+- **Primary Languages**: Python (14 967 LOC), JavaScript (5 643 LOC), CSS (3 594 LOC)
 - **Complexity Distribution**:
-  - **Critical (F)**: CSV monitoring, STEP5 workers
-  - **High (E/D)**: STEP3 TransNet, STEP5 engines
-  - **Moderate (C)**: STEP2 conversion, STEP4 Lemonfox, STEP7 finalization
-  - **Low (A/B)**: STEP1 extraction, STEP6 JSON reduction
+  - **Critical (F)**: CSV monitoring, STEP5 workers, STEP6 JSON reducer
+  - **High (E/D)**: STEP3 TransNet, STEP5 InsightFace engine, Lemonfox audio
+  - **Moderate (C)**: STEP2 conversion, STEP4 audio analysis, STEP7/8 finalization
+  - **Low (A/B)**: STEP1 extraction, services core
 
 ---
 
@@ -55,11 +53,12 @@ graph TD
     D --> E[Étape 4: Analyse Audio]
     E --> F[Étape 5: Suivi Vidéo]
     F --> G[Étape 6: Réduction JSON]
-    G --> H[Étape 7: Finalisation]
-    H --> I[Résultats Finaux]
+    G --> H[Étape 7: Pré-traitement AE]
+    H --> I[Étape 8: Finalisation]
+    I --> J[Résultats Finaux + Fichiers AE]
 ```
 
-## Les 7 Étapes du Workflow
+## Les 8 Étapes du Workflow
 
 ### Étape 1 - Extraction d'Archives
 Extrait de manière sécurisée les archives (ZIP, RAR, TAR) dans des environnements isolés avec validation des fichiers et détection de menaces.
@@ -74,13 +73,18 @@ Utilise TransNetV2 (PyTorch) pour identifier les changements de scène et géné
 Effectue la diarisation des locuteurs via Pyannote.audio ou Lemonfox API, avec extraction des timestamps et identification des voix.
 
 ### Étape 5 - Analyse du Tracking
-Détecte et suit les objets et personnes dans chaque image, en utilisant des algorithmes de vision par ordinateur avancés (MediaPipe, OpenSeeFace, YuNet, etc.).
+Détecte et suit les visages dans chaque image avec deux moteurs optimisés :
+- **MediaPipe (CPU)** : Moteur par défaut via `tracking_env_slim`, 478 landmarks + blendshapes ARKit
+- **InsightFace (GPU)** : Mode optionnel via `insightface_env` quand `STEP5_ENABLE_GPU=1`, 5 landmarks + expressions faciales
 
 ### Étape 6 - Réduction JSON
-Optimise les fichiers JSON générés pendant les étapes d'analyse vidéo et audio pour n'inclure que les données essentielles requises par After Effects.
+Optimise les fichiers JSON générés pendant les étapes d'analyse vidéo et audio pour n'inclure que les données essentielles requises par After Effects. Produit `*_tracking.json` (source primaire pour AE) avec enrichissement analytics et alignement temporel.
 
-### Étape 7 - Finalisation
-Rassemble tous les résultats des analyses précédentes et prépare le matériel pour l'importation dans After Effects.
+### Étape 7 - Pré-traitement After Effects
+Prépare et optimise les données JSON spécifiquement pour After Effects en générant des fichiers `*_ae.json` pré-indexés et structurés pour une lecture efficace dans les scripts AE.
+
+### Étape 8 - Finalisation
+Rassemble tous les résultats des analyses précédentes, archive les projets avec métadonnées complètes et prépare le matériel final pour la livraison.
 
 ## Fonctionnalités Clés
 
@@ -100,8 +104,9 @@ Rassemble tous les résultats des analyses précédentes et prépare le matérie
 - **Accès rapide** : Interface de recherche et de récupération
 
 ### Sécurité et Performance
-- **Mode CPU-only par défaut** : Stabilité v4.1 avec 15 workers STEP5
-- **Support GPU optionnel** : InsightFace avec validation VRAM (v4.2)
+- **Mode CPU-only par défaut** : MediaPipe CPU via `tracking_env_slim` avec 15 workers
+- **Support GPU optionnel** : InsightFace via `insightface_env` avec validation VRAM
+- **Architecture simplifiée STEP5** : Seulement MediaPipe CPU + InsightFace GPU (moteurs legacy supprimés)
 - **Protection XSS** : Échappement systématique des contenus dynamiques
 - **Tests automatisés** : Suite pytest + Node/ESM complète
 
@@ -109,11 +114,11 @@ Rassemble tous les résultats des analyses précédentes et prépare le matérie
 
 | Environnement | Usage | Dépendances principales |
 |---------------|-------|------------------------|
-| `env/` | Flask + Steps 1,2,6,7 | Flask, FFmpeg, utils |
+| `env/` | Flask + Steps 1,2,6,7,8 | Flask, FFmpeg, utils |
 | `transnet_env/` | Step 3 (Scènes) | PyTorch, TensorFlow |
-| `audio_env/` | Step 4 (Audio) | Pyannote, Torch Audio |
-| `tracking_env/` | Step 5 (Tracking) | MediaPipe, OpenCV |
-| `eos_env/` | Step 5 (EOS 3DMM) | eos-py, scipy |
+| `audio_env/` | Step 4 (Audio) | Pyannote, Torch Audio, Lemonfox |
+| `tracking_env_slim/` | Step 5 (MediaPipe CPU) | MediaPipe, OpenCV (allégé) |
+| `insightface_env/` | Step 5 (InsightFace GPU) | ONNX Runtime GPU, InsightFace |
 
 ## Configuration Principale
 
@@ -128,12 +133,14 @@ FLASK_PORT=5000
 WEBHOOK_JSON_URL=https://webhook.kidpixel.fr/data/webhook_links.json
 
 # STEP5 (Tracking)
-TRACKING_DISABLE_GPU=1          # CPU-only par défaut
+TRACKING_DISABLE_GPU=1          # CPU-only par défaut (MediaPipe)
 TRACKING_CPU_WORKERS=15         # Workers internes
-STEP5_TRACKING_ENGINE=mediapipe_landmarker
+STEP5_TRACKING_ENGINE=          # Vide=MediaPipe, 'insightface'=GPU
+STEP5_ENABLE_GPU=0              # Activer GPU pour InsightFace
 
 # STEP4 (Audio)
 STEP4_USE_LEMONFOX=0           # Pyannote par défaut
+AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1  # Embeddings locuteurs pour AE
 ```
 
 ## Points d'Intégration
@@ -145,10 +152,13 @@ STEP4_USE_LEMONFOX=0           # Pyannote par défaut
 - `/api/system/diagnostics` : Informations système complètes
 
 ### Services Backend
-- `WorkflowState` : Gestion centralisée de l'état
-- `DownloadService` : Gestion des téléchargements
+- `WorkflowState` : Gestion centralisée de l'état (thread-safe)
+- `WorkflowService` : Orchestrateur du pipeline (8 étapes)
+- `DownloadService` : Gestion des téléchargements (SQLite)
 - `PerformanceService` : Instrumentation des API
-- `ResultsArchiver` : Archivage des résultats
+- `ResultsArchiver` : Archivage des résultats (SHA-256)
+- `VisualizationService` : Métriques et rapports HTML
+- `CSVService` : Monitoring webhook (download_history.sqlite3)
 
 ### Frontend Utils
 - `AppState` : Gestion d'état centralisée
@@ -161,8 +171,9 @@ STEP4_USE_LEMONFOX=0           # Pyannote par défaut
 - **Guide de démarrage rapide** : `core/GUIDE_DEMARRAGE_RAPIDE.md`
 - **Architecture complète** : `core/ARCHITECTURE_COMPLETE_FR.md`
 - **Référence développeurs** : `core/REFERENCE_RAPIDE_DEVELOPPEURS.md`
-- **Détails des étapes** : `pipeline/STEP*_*.md`
+- **Détails des étapes** : `pipeline/STEP*_*.md` (1-8)
 - **Fonctionnalités** : `features/*.md`
+- **Scripts After Effects** : `scripts/after_effects/*.jsx`
 
 ## Standards de Qualité
 

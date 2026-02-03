@@ -162,10 +162,1251 @@ workflow_scripts/
     json_reducer.py
   step7/
     finalize_and_copy.py
+    preprocess_ae_json.py
+  step8/
+    finalize_and_copy.py
 app_new.py
 ```
 
 # Files
+
+## File: workflow_scripts/step7/preprocess_ae_json.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: 
+  4: import argparse
+  5: import json
+  6: import logging
+  7: import os
+  8: import sys
+  9: from datetime import datetime
+ 10: from pathlib import Path
+ 11: from typing import Any, Dict, List, Optional, Tuple
+ 12: 
+ 13: 
+ 14: logger = logging.getLogger(__name__)
+ 15: logger.setLevel(logging.INFO)
+ 16: 
+ 17: VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm")
+ 18: AUDIO_SUFFIX = "_audio.json"
+ 19: TRACKING_SUFFIX = "_tracking.json"
+ 20: AE_PREPROCESSED_SUFFIX = "_ae.json"
+ 21: 
+ 22: 
+ 23: DEFAULT_ANALYZER_CONFIG: Dict[str, Any] = {
+ 24:     "SPREAD_THRESHOLD": 200,
+ 25:     "ENABLE_CONFIDENCE_WEIGHTING": True,
+ 26:     "CONFIDENCE_WEIGHT": 0.35,
+ 27:     "LABEL_HIGH_SPREAD": 12,
+ 28:     "LABEL_STABLE": 3,
+ 29: }
+ 30: 
+ 31: 
+ 32: def setup_logging(log_dir: str) -> str:
+ 33:     os.makedirs(log_dir, exist_ok=True)
+ 34:     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+ 35:     log_path = os.path.join(log_dir, f"preprocess_ae_{timestamp}.log")
+ 36: 
+ 37:     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+ 38: 
+ 39:     fh = logging.FileHandler(log_path, encoding="utf-8")
+ 40:     fh.setLevel(logging.INFO)
+ 41:     fh.setFormatter(formatter)
+ 42: 
+ 43:     ch = logging.StreamHandler(sys.stdout)
+ 44:     ch.setLevel(logging.INFO)
+ 45:     ch.setFormatter(formatter)
+ 46: 
+ 47:     logger.handlers.clear()
+ 48:     logger.addHandler(fh)
+ 49:     logger.addHandler(ch)
+ 50:     logger.propagate = False
+ 51: 
+ 52:     logger.info("Log file initialized: %s", log_path)
+ 53:     return log_path
+ 54: 
+ 55: 
+ 56: def _load_json(path: Path) -> Optional[Dict[str, Any]]:
+ 57:     try:
+ 58:         with open(path, "r", encoding="utf-8") as f:
+ 59:             data = json.load(f)
+ 60:         return data if isinstance(data, dict) else None
+ 61:     except Exception as e:
+ 62:         logger.warning("Impossible de lire JSON '%s': %s", path, e)
+ 63:         return None
+ 64: 
+ 65: 
+ 66: def _write_json_atomically(path: Path, payload: Dict[str, Any]) -> None:
+ 67:     tmp_path = path.with_suffix(path.suffix + ".tmp")
+ 68:     with open(tmp_path, "w", encoding="utf-8") as f:
+ 69:         json.dump(payload, f, indent=2, ensure_ascii=False)
+ 70:     os.replace(tmp_path, path)
+ 71: 
+ 72: 
+ 73: def _clamp01(value: Any) -> float:
+ 74:     try:
+ 75:         f = float(value)
+ 76:     except Exception:
+ 77:         return 0.0
+ 78:     if f < 0.0:
+ 79:         return 0.0
+ 80:     if f > 1.0:
+ 81:         return 1.0
+ 82:     return f
+ 83: 
+ 84: 
+ 85: def _normalize_str_list(value: Any) -> List[str]:
+ 86:     if value is None:
+ 87:         return []
+ 88:     if isinstance(value, list):
+ 89:         out: List[str] = []
+ 90:         for v in value:
+ 91:             if isinstance(v, str) and v:
+ 92:                 out.append(v)
+ 93:         return out
+ 94:     if isinstance(value, str) and value:
+ 95:         if "," in value:
+ 96:             parts = [p.strip() for p in value.split(",")]
+ 97:             return [p for p in parts if p]
+ 98:         return [value]
+ 99:     return []
+100: 
+101: 
+102: def _calculate_stats(values: List[float]) -> Dict[str, float]:
+103:     if not values:
+104:         return {"min": 0.0, "max": 0.0, "spread": 0.0, "average": 0.0}
+105:     min_v = values[0]
+106:     max_v = values[0]
+107:     s = 0.0
+108:     for v in values:
+109:         s += v
+110:         if v < min_v:
+111:             min_v = v
+112:         if v > max_v:
+113:             max_v = v
+114:     avg = s / float(len(values))
+115:     return {"min": float(min_v), "max": float(max_v), "spread": float(max_v - min_v), "average": float(avg)}
+116: 
+117: 
+118: def _compute_presence_score(presence: int, avg_confidence: float, config: Dict[str, Any]) -> float:
+119:     if not config.get("ENABLE_CONFIDENCE_WEIGHTING", True):
+120:         return float(presence)
+121:     weight = config.get("CONFIDENCE_WEIGHT", 0.0)
+122:     try:
+123:         w = float(weight)
+124:     except Exception:
+125:         w = 0.0
+126:     if w < 0.0:
+127:         w = 0.0
+128:     return float(presence) * (1.0 + (_clamp01(avg_confidence) * w))
+129: 
+130: 
+131: def _find_audio_json_for_video_json(video_json_path: Path) -> Optional[Path]:
+132:     if not video_json_path.exists():
+133:         return None
+134:     base_name = video_json_path.name
+135:     stem = base_name
+136:     if stem.lower().endswith("_ae.json"):
+137:         stem = stem[: -len("_ae.json")]
+138:     elif stem.lower().endswith("_tracking.json"):
+139:         stem = stem[: -len("_tracking.json")]
+140:     elif stem.lower().endswith(".json"):
+141:         stem = stem[: -len(".json")]
+142: 
+143:     audio_path = video_json_path.parent / f"{stem}{AUDIO_SUFFIX}"
+144:     return audio_path if audio_path.exists() else None
+145: 
+146: 
+147: def _load_ae_or_tracking_index(video_json_path: Path) -> Optional[Dict[str, Any]]:
+148:     root = _load_json(video_json_path)
+149:     if not root:
+150:         return None
+151: 
+152:     if isinstance(root.get("dataByFrame"), dict):
+153:         return root
+154: 
+155:     frames = _extract_frames_analysis(root)
+156:     if not frames:
+157:         return None
+158: 
+159:     data_by_frame, max_frame = _index_reduced_tracking_frames(frames)
+160:     out: Dict[str, Any] = {
+161:         "dataByFrame": {str(k): v for k, v in data_by_frame.items()},
+162:         "maxFrame": max_frame,
+163:     }
+164:     if isinstance(root.get("tracking_analytics"), dict):
+165:         out["tracking_analytics"] = root.get("tracking_analytics")
+166:     if isinstance(root.get("expression_summary"), dict):
+167:         out["expression_summary"] = root.get("expression_summary")
+168:     if isinstance(root.get("temporal_alignment"), dict):
+169:         out["temporal_alignment"] = root.get("temporal_alignment")
+170:     if root.get("fps") is not None:
+171:         out["fps"] = root.get("fps")
+172:     if root.get("total_frames") is not None:
+173:         out["total_frames"] = root.get("total_frames")
+174:     return out
+175: 
+176: 
+177: def _parse_int(value: Any) -> Optional[int]:
+178:     try:
+179:         return int(value)
+180:     except Exception:
+181:         return None
+182: 
+183: 
+184: def _compute_video_frame_scale(video_max_frame: int, reference_max_frame: int) -> float:
+185:     if video_max_frame <= 0 or reference_max_frame <= 0:
+186:         return 1.0
+187:     diff_ratio = abs(float(video_max_frame - reference_max_frame)) / float(reference_max_frame)
+188:     if diff_ratio > 0.05:
+189:         return float(video_max_frame) / float(reference_max_frame)
+190:     return 1.0
+191: 
+192: 
+193: def _to_int_keyed_map(raw_map: Any) -> Dict[int, Any]:
+194:     if not isinstance(raw_map, dict):
+195:         return {}
+196:     out: Dict[int, Any] = {}
+197:     for k, v in raw_map.items():
+198:         ki = _parse_int(k)
+199:         if ki is None:
+200:             continue
+201:         out[ki] = v
+202:     return out
+203: 
+204: 
+205: def _analyze_layer(
+206:     layer_info: Dict[str, Any],
+207:     data_by_frame: Dict[int, List[Dict[str, Any]]],
+208:     audio_by_frame: Dict[int, Dict[str, Any]],
+209:     config: Dict[str, Any],
+210:     video_frame_scale: float,
+211:     video_max_frame: int,
+212: ) -> Optional[Dict[str, Any]]:
+213:     min_frame = _parse_int(layer_info.get("in_frame"))
+214:     max_frame = _parse_int(layer_info.get("out_frame"))
+215:     if min_frame is None or max_frame is None:
+216:         return None
+217: 
+218:     objects_in_layer: Dict[str, Dict[str, Any]] = {}
+219: 
+220:     layer_scale_raw = layer_info.get("video_scale", 1.0)
+221:     try:
+222:         layer_scale = float(layer_scale_raw)
+223:     except Exception:
+224:         layer_scale = 1.0
+225:     if layer_scale <= 0.0:
+226:         layer_scale = 1.0
+227: 
+228:     effective_frame_scale = video_frame_scale * layer_scale
+229: 
+230:     for frame in range(min_frame, max_frame + 1):
+231:         video_frame = frame
+232:         if effective_frame_scale != 1.0:
+233:             mapped = int(round(float(frame) * effective_frame_scale))
+234:             if mapped < 1:
+235:                 mapped = 1
+236:             if video_max_frame > 0 and mapped > video_max_frame:
+237:                 mapped = video_max_frame
+238:             video_frame = mapped
+239: 
+240:         frame_objs = data_by_frame.get(video_frame)
+241:         audio_info = audio_by_frame.get(frame)
+242: 
+243:         if not isinstance(frame_objs, list):
+244:             continue
+245: 
+246:         for obj in frame_objs:
+247:             if not isinstance(obj, dict):
+248:                 continue
+249:             obj_id = obj.get("id")
+250:             if not isinstance(obj_id, str) or not obj_id:
+251:                 continue
+252: 
+253:             source = obj.get("source")
+254:             label = obj.get("label")
+255: 
+256:             cx = obj.get("centroid_x")
+257:             try:
+258:                 cx_f = float(cx)
+259:             except Exception:
+260:                 continue
+261: 
+262:             bbox_surface = 0.0
+263:             try:
+264:                 bbox_surface = float(obj.get("bbox_surface") or 0.0)
+265:             except Exception:
+266:                 bbox_surface = 0.0
+267:             if bbox_surface < 0.0:
+268:                 bbox_surface = 0.0
+269: 
+270:             conf_f = _clamp01(obj.get("confidence"))
+271:             speakers = _normalize_str_list(obj.get("video_speakers"))
+272: 
+273:             if obj_id not in objects_in_layer:
+274:                 objects_in_layer[obj_id] = {
+275:                     "id": obj_id,
+276:                     "source": source,
+277:                     "label": label,
+278:                     "x_values": [],
+279:                     "bbox_surfaces": [],
+280:                     "confidence_values": [],
+281:                     "audio_confirm_count": 0,
+282:                     "total_bbox_surface": 0.0,
+283:                     "total_confidence": 0.0,
+284:                     "avg_bbox_surface": 0.0,
+285:                     "avg_confidence": 0.0,
+286:                     "video_speakers": speakers,
+287:                 }
+288: 
+289:             d = objects_in_layer[obj_id]
+290:             d["x_values"].append(cx_f)
+291:             d["bbox_surfaces"].append(bbox_surface)
+292:             d["confidence_values"].append(conf_f)
+293:             d["total_bbox_surface"] += bbox_surface
+294:             d["total_confidence"] += conf_f
+295: 
+296:             is_eligible_for_audio = (source == "face_landmarker") or (
+297:                 source == "object_detector" and label == "person"
+298:             )
+299:             if is_eligible_for_audio and audio_info and audio_info.get("is_speech_present") and speakers:
+300:                 active_labels = _normalize_str_list(audio_info.get("active_speaker_labels"))
+301:                 if active_labels and (set(active_labels) & set(speakers)):
+302:                     d["audio_confirm_count"] += 1
+303: 
+304:     if not objects_in_layer:
+305:         return None
+306: 
+307:     best_audio_face: Optional[Dict[str, Any]] = None
+308:     best_audio_person: Optional[Dict[str, Any]] = None
+309:     best_face: Optional[Dict[str, Any]] = None
+310:     best_person: Optional[Dict[str, Any]] = None
+311:     best_fallback: Optional[Dict[str, Any]] = None
+312: 
+313:     max_audio_face_confirm = 0
+314:     max_audio_person_confirm = 0
+315:     max_face_presence = -1.0
+316:     max_person_presence = -1.0
+317:     max_fallback_presence = -1.0
+318:     max_audio_face_bbox = 0.0
+319:     max_face_bbox = 0.0
+320: 
+321:     for oid, obj in objects_in_layer.items():
+322:         x_vals: List[float] = obj.get("x_values") or []
+323:         presence = len(x_vals)
+324:         if presence <= 0:
+325:             continue
+326: 
+327:         bbox_count = len(obj.get("bbox_surfaces") or [])
+328:         conf_count = len(obj.get("confidence_values") or [])
+329:         obj["avg_bbox_surface"] = (obj["total_bbox_surface"] / float(bbox_count)) if bbox_count > 0 else 0.0
+330:         obj["avg_confidence"] = (obj["total_confidence"] / float(conf_count)) if conf_count > 0 else 0.0
+331: 
+332:         presence_score = _compute_presence_score(presence, float(obj["avg_confidence"]), config)
+333: 
+334:         source = obj.get("source")
+335:         label = obj.get("label")
+336:         audio_confirm = int(obj.get("audio_confirm_count") or 0)
+337: 
+338:         if source == "face_landmarker":
+339:             if audio_confirm > 0:
+340:                 current_best_score = (
+341:                     _compute_presence_score(
+342:                         len(best_audio_face.get("x_values") or []),
+343:                         float(best_audio_face.get("avg_confidence") or 0.0),
+344:                         config,
+345:                     )
+346:                     if best_audio_face
+347:                     else -1.0
+348:                 )
+349:                 if (
+350:                     audio_confirm > max_audio_face_confirm
+351:                     or (audio_confirm == max_audio_face_confirm and presence_score > current_best_score)
+352:                     or (
+353:                         audio_confirm == max_audio_face_confirm
+354:                         and presence_score == current_best_score
+355:                         and float(obj["avg_bbox_surface"]) > max_audio_face_bbox
+356:                     )
+357:                 ):
+358:                     best_audio_face = obj
+359:                     max_audio_face_confirm = audio_confirm
+360:                     max_audio_face_bbox = float(obj["avg_bbox_surface"])
+361: 
+362:             if presence_score > max_face_presence or (
+363:                 presence_score == max_face_presence and float(obj["avg_bbox_surface"]) > max_face_bbox
+364:             ):
+365:                 best_face = obj
+366:                 max_face_presence = presence_score
+367:                 max_face_bbox = float(obj["avg_bbox_surface"])
+368: 
+369:         elif source == "object_detector" and label == "person":
+370:             if audio_confirm > 0:
+371:                 current_best_score = (
+372:                     _compute_presence_score(
+373:                         len(best_audio_person.get("x_values") or []),
+374:                         float(best_audio_person.get("avg_confidence") or 0.0),
+375:                         config,
+376:                     )
+377:                     if best_audio_person
+378:                     else -1.0
+379:                 )
+380:                 if (
+381:                     audio_confirm > max_audio_person_confirm
+382:                     or (audio_confirm == max_audio_person_confirm and presence_score > current_best_score)
+383:                 ):
+384:                     best_audio_person = obj
+385:                     max_audio_person_confirm = audio_confirm
+386: 
+387:             if presence_score > max_person_presence:
+388:                 best_person = obj
+389:                 max_person_presence = presence_score
+390: 
+391:         if presence_score > max_fallback_presence:
+392:             best_fallback = obj
+393:             max_fallback_presence = presence_score
+394: 
+395:     target = best_audio_face or best_audio_person or best_face or best_person or best_fallback
+396:     if not target:
+397:         return None
+398: 
+399:     stats = _calculate_stats(target.get("x_values") or [])
+400:     spread_threshold = config.get("SPREAD_THRESHOLD", DEFAULT_ANALYZER_CONFIG["SPREAD_THRESHOLD"])
+401:     try:
+402:         spread_threshold_f = float(spread_threshold)
+403:     except Exception:
+404:         spread_threshold_f = float(DEFAULT_ANALYZER_CONFIG["SPREAD_THRESHOLD"])
+405: 
+406:     label_high = int(config.get("LABEL_HIGH_SPREAD", DEFAULT_ANALYZER_CONFIG["LABEL_HIGH_SPREAD"]))
+407:     label_stable = int(config.get("LABEL_STABLE", DEFAULT_ANALYZER_CONFIG["LABEL_STABLE"]))
+408: 
+409:     label_to_apply = label_stable
+410:     if stats["spread"] > spread_threshold_f and target.get("source") == "face_landmarker":
+411:         label_to_apply = label_high
+412: 
+413:     reason = "fallback"
+414:     if best_audio_face and target is best_audio_face:
+415:         reason = "audio_confirm_face"
+416:     elif best_audio_person and target is best_audio_person:
+417:         reason = "audio_confirm_person"
+418:     elif best_face and target is best_face:
+419:         reason = "face_presence"
+420:     elif best_person and target is best_person:
+421:         reason = "person_presence"
+422: 
+423:     return {
+424:         "center_x": stats["average"],
+425:         "spread": stats["spread"],
+426:         "label_color": label_to_apply,
+427:         "selected_id": target.get("id"),
+428:         "reason": reason,
+429:     }
+430: 
+431: 
+432: def analyze_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
+433:     raw_layers = manifest.get("layers")
+434:     if not isinstance(raw_layers, dict):
+435:         raise ValueError("manifest.layers doit être un objet")
+436: 
+437:     cfg = dict(DEFAULT_ANALYZER_CONFIG)
+438:     raw_cfg = manifest.get("config")
+439:     if isinstance(raw_cfg, dict):
+440:         cfg.update(raw_cfg)
+441: 
+442:     comp_max_frame = _parse_int(manifest.get("comp_max_frame")) or 0
+443: 
+444:     loaded_cache: Dict[str, Dict[str, Any]] = {}
+445:     results: Dict[str, Any] = {}
+446: 
+447:     for layer_id, layer_info_raw in raw_layers.items():
+448:         if not isinstance(layer_id, str):
+449:             layer_id = str(layer_id)
+450:         if not isinstance(layer_info_raw, dict):
+451:             continue
+452: 
+453:         json_path_raw = layer_info_raw.get("json_path") or manifest.get("json_path")
+454:         if not isinstance(json_path_raw, str) or not json_path_raw:
+455:             continue
+456:         video_json_path = Path(json_path_raw)
+457: 
+458:         cache_key = str(video_json_path)
+459:         if cache_key not in loaded_cache:
+460:             idx = _load_ae_or_tracking_index(video_json_path)
+461:             if not idx:
+462:                 loaded_cache[cache_key] = {"dataByFrame": {}, "maxFrame": 0, "audioByFrame": {}, "audioMaxFrame": None}
+463:             else:
+464:                 if isinstance(idx.get("audioByFrame"), dict):
+465:                     loaded_cache[cache_key] = idx
+466:                 else:
+467:                     audio_path = _find_audio_json_for_video_json(video_json_path)
+468:                     audio_root = _load_json(audio_path) if audio_path else None
+469:                     audio_by_frame, audio_max_frame = _index_audio_by_frame(audio_root) if audio_root else ({}, None)
+470:                     idx["audioByFrame"] = {str(k): v for k, v in audio_by_frame.items()}
+471:                     idx["audioMaxFrame"] = audio_max_frame
+472:                     loaded_cache[cache_key] = idx
+473: 
+474:         idx = loaded_cache[cache_key]
+475:         data_by_frame = _to_int_keyed_map(idx.get("dataByFrame"))
+476:         audio_by_frame = _to_int_keyed_map(idx.get("audioByFrame"))
+477: 
+478:         video_max_frame = _parse_int(idx.get("maxFrame")) or 0
+479:         audio_max_frame = _parse_int(idx.get("audioMaxFrame"))
+480:         reference_max_frame = audio_max_frame if audio_max_frame is not None else comp_max_frame
+481:         video_frame_scale = _compute_video_frame_scale(video_max_frame, reference_max_frame) if reference_max_frame > 0 else 1.0
+482: 
+483:         res = _analyze_layer(
+484:             layer_info_raw,
+485:             data_by_frame,
+486:             audio_by_frame,
+487:             cfg,
+488:             video_frame_scale,
+489:             video_max_frame,
+490:         )
+491:         if res is not None:
+492:             results[layer_id] = res
+493: 
+494:     return results
+495: 
+496: 
+497: def _extract_frames_analysis(tracking: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+498:     frames = tracking.get("frames_analysis")
+499:     if isinstance(frames, list):
+500:         return frames
+501: 
+502:     frames = tracking.get("frames")
+503:     if isinstance(frames, list):
+504:         return frames
+505: 
+506:     return None
+507: 
+508: 
+509: def _index_reduced_tracking_frames(frames: List[Dict[str, Any]]) -> Tuple[Dict[int, List[Dict[str, Any]]], int]:
+510:     data_by_frame: Dict[int, List[Dict[str, Any]]] = {}
+511:     max_frame_seen = 0
+512: 
+513:     for frame_obj in frames:
+514:         if not isinstance(frame_obj, dict):
+515:             continue
+516:         frame_num = frame_obj.get("frame")
+517:         try:
+518:             frame_i = int(frame_num)
+519:         except Exception:
+520:             continue
+521: 
+522:         max_frame_seen = max(max_frame_seen, frame_i)
+523: 
+524:         tracked = frame_obj.get("tracked_objects")
+525:         if not isinstance(tracked, list):
+526:             continue
+527: 
+528:         out_tracked: List[Dict[str, Any]] = []
+529:         for obj in tracked:
+530:             if not isinstance(obj, dict):
+531:                 continue
+532:             source = obj.get("source")
+533:             label = obj.get("label")
+534:             is_relevant = (source == "face_landmarker") or (source == "object_detector" and label == "person")
+535:             if not is_relevant:
+536:                 continue
+537: 
+538:             obj_id = obj.get("id")
+539:             if not isinstance(obj_id, str) or not obj_id:
+540:                 continue
+541: 
+542:             cx = obj.get("centroid_x")
+543:             try:
+544:                 cx_f = float(cx)
+545:             except Exception:
+546:                 continue
+547: 
+548:             bbox_w = obj.get("bbox_width")
+549:             bbox_h = obj.get("bbox_height")
+550:             try:
+551:                 bbox_w_f = float(bbox_w) if bbox_w is not None else 0.0
+552:             except Exception:
+553:                 bbox_w_f = 0.0
+554:             try:
+555:                 bbox_h_f = float(bbox_h) if bbox_h is not None else 0.0
+556:             except Exception:
+557:                 bbox_h_f = 0.0
+558: 
+559:             bbox_surface = max(0.0, bbox_w_f) * max(0.0, bbox_h_f)
+560: 
+561:             conf = obj.get("confidence")
+562:             try:
+563:                 conf_f = float(conf) if conf is not None else 0.0
+564:             except Exception:
+565:                 conf_f = 0.0
+566:             if conf_f < 0.0:
+567:                 conf_f = 0.0
+568:             if conf_f > 1.0:
+569:                 conf_f = 1.0
+570: 
+571:             speakers = obj.get("active_speakers")
+572:             if not isinstance(speakers, list):
+573:                 speakers = []
+574:             speakers_out: List[str] = []
+575:             for s in speakers:
+576:                 if isinstance(s, str) and s:
+577:                     speakers_out.append(s)
+578: 
+579:             out_tracked.append(
+580:                 {
+581:                     "id": obj_id,
+582:                     "centroid_x": cx_f,
+583:                     "source": source,
+584:                     "label": label,
+585:                     "video_speakers": speakers_out,
+586:                     "bbox_width": bbox_w_f,
+587:                     "bbox_height": bbox_h_f,
+588:                     "bbox_surface": bbox_surface,
+589:                     "confidence": conf_f,
+590:                 }
+591:             )
+592: 
+593:         if out_tracked:
+594:             data_by_frame[frame_i] = out_tracked
+595: 
+596:     return data_by_frame, max_frame_seen
+597: 
+598: 
+599: def _index_audio_by_frame(audio: Dict[str, Any]) -> Tuple[Dict[int, Dict[str, Any]], Optional[int]]:
+600:     frames = audio.get("frames_analysis")
+601:     if not isinstance(frames, list):
+602:         return {}, None
+603: 
+604:     by_frame: Dict[int, Dict[str, Any]] = {}
+605:     max_frame = None
+606: 
+607:     for frame_obj in frames:
+608:         if not isinstance(frame_obj, dict):
+609:             continue
+610:         frame_num = frame_obj.get("frame")
+611:         try:
+612:             frame_i = int(frame_num)
+613:         except Exception:
+614:             continue
+615: 
+616:         audio_info = frame_obj.get("audio_info")
+617:         if not isinstance(audio_info, dict):
+618:             continue
+619: 
+620:         by_frame[frame_i] = audio_info
+621:         if max_frame is None or frame_i > max_frame:
+622:             max_frame = frame_i
+623: 
+624:     return by_frame, max_frame
+625: 
+626: 
+627: def build_ae_payload(tracking: Dict[str, Any], audio: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+628:     frames = _extract_frames_analysis(tracking)
+629:     if not frames:
+630:         return None
+631: 
+632:     data_by_frame, max_frame = _index_reduced_tracking_frames(frames)
+633:     audio_by_frame, audio_max_frame = _index_audio_by_frame(audio) if audio else ({}, None)
+634: 
+635:     fps = tracking.get("fps")
+636:     total_frames = tracking.get("total_frames")
+637: 
+638:     out: Dict[str, Any] = {
+639:         "schema": "ae_preprocessed",
+640:         "schema_version": 1,
+641:         "dataByFrame": {str(k): v for k, v in data_by_frame.items()},
+642:         "maxFrame": max_frame,
+643:         "audioByFrame": {str(k): v for k, v in audio_by_frame.items()},
+644:         "audioMaxFrame": audio_max_frame,
+645:     }
+646: 
+647:     if fps is not None:
+648:         out["fps"] = fps
+649:     if total_frames is not None:
+650:         out["total_frames"] = total_frames
+651: 
+652:     if isinstance(tracking.get("tracking_analytics"), dict):
+653:         out["tracking_analytics"] = tracking.get("tracking_analytics")
+654:     if isinstance(tracking.get("expression_summary"), dict):
+655:         out["expression_summary"] = tracking.get("expression_summary")
+656:     if isinstance(tracking.get("temporal_alignment"), dict):
+657:         out["temporal_alignment"] = tracking.get("temporal_alignment")
+658: 
+659:     if audio and isinstance(audio.get("speaker_embeddings"), dict):
+660:         out["speaker_embeddings"] = audio.get("speaker_embeddings")
+661: 
+662:     return out
+663: 
+664: 
+665: def _find_docs_dirs(work_dir: Path, keyword: str) -> List[Path]:
+666:     if not work_dir.is_dir():
+667:         return []
+668: 
+669:     docs_dirs: List[Path] = []
+670:     for project_dir in work_dir.iterdir():
+671:         if not project_dir.is_dir():
+672:             continue
+673:         if keyword and keyword not in project_dir.name:
+674:             continue
+675:         docs_dir = project_dir / "docs"
+676:         if docs_dir.is_dir():
+677:             docs_dirs.append(docs_dir)
+678:     return docs_dirs
+679: 
+680: 
+681: def _iter_videos_in_docs(docs_dir: Path) -> List[Path]:
+682:     videos: List[Path] = []
+683:     for p in docs_dir.iterdir():
+684:         if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
+685:             videos.append(p)
+686:     return videos
+687: 
+688: 
+689: def _resolve_tracking_paths(docs_dir: Path, stem: str) -> Tuple[Optional[Path], Optional[Path]]:
+690:     reduced = docs_dir / f"{stem}{TRACKING_SUFFIX}"
+691:     legacy = docs_dir / f"{stem}.json"
+692: 
+693:     if reduced.exists():
+694:         return reduced, legacy if legacy.exists() else None
+695:     if legacy.exists():
+696:         return legacy, None
+697:     return None, None
+698: 
+699: 
+700: def preprocess_docs_dir(docs_dir: Path) -> int:
+701:     written = 0
+702:     videos = _iter_videos_in_docs(docs_dir)
+703: 
+704:     for idx, video_path in enumerate(videos, start=1):
+705:         stem = video_path.stem
+706:         tracking_in, _legacy = _resolve_tracking_paths(docs_dir, stem)
+707:         if tracking_in is None:
+708:             logger.info("Tracking introuvable pour '%s'", video_path.name)
+709:             continue
+710: 
+711:         tracking = _load_json(tracking_in)
+712:         if not tracking:
+713:             continue
+714: 
+715:         audio_path = docs_dir / f"{stem}{AUDIO_SUFFIX}"
+716:         audio = _load_json(audio_path) if audio_path.exists() else None
+717: 
+718:         payload = build_ae_payload(tracking, audio)
+719:         if payload is None:
+720:             continue
+721: 
+722:         out_path = docs_dir / f"{stem}{AE_PREPROCESSED_SUFFIX}"
+723:         _write_json_atomically(out_path, payload)
+724:         written += 1
+725: 
+726:         print(
+727:             f"INTERNAL_PROGRESS: {idx}/{len(videos)} items ({int(round((idx / float(len(videos))) * 100))}%) - {video_path.name}"
+728:         )
+729: 
+730:     return written
+731: 
+732: 
+733: def main() -> None:
+734:     parser = argparse.ArgumentParser(description="Étape 7 - Pré-traitement AE (JSON AE-ready)")
+735:     parser.add_argument("--manifest_path", type=str, default=None, help="Mode analyse AE: manifest JSON")
+736:     parser.add_argument("--output_path", type=str, default=None, help="Mode analyse AE: output JSON")
+737:     parser.add_argument(
+738:         "--base_dir",
+739:         type=str,
+740:         default=os.environ.get("BASE_PATH_SCRIPTS", ""),
+741:         help="Chemin base du projet (contenant projets_extraits)",
+742:     )
+743:     parser.add_argument("--work_dir", type=str, default=None, help="Chemin explicite vers projets_extraits")
+744:     parser.add_argument(
+745:         "--keyword",
+746:         type=str,
+747:         default=os.environ.get("FOLDER_KEYWORD", "Camille"),
+748:         help="Mot-clé pour filtrer les dossiers projet",
+749:     )
+750:     parser.add_argument(
+751:         "--log_dir",
+752:         type=str,
+753:         default=str(os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs", "step7")),
+754:         help="Répertoire pour les logs (par défaut logs/step7)",
+755:     )
+756: 
+757:     args = parser.parse_args()
+758: 
+759:     if args.manifest_path:
+760:         if not args.output_path:
+761:             raise SystemExit("--output_path requis lorsque --manifest_path est fourni")
+762:         manifest_path = Path(args.manifest_path)
+763:         out_path = Path(args.output_path)
+764: 
+765:         try:
+766:             with open(manifest_path, "r", encoding="utf-8") as f:
+767:                 manifest = json.load(f)
+768:             if not isinstance(manifest, dict):
+769:                 raise ValueError("Manifest invalide (doit être un objet JSON)")
+770: 
+771:             results = analyze_manifest(manifest)
+772:             _write_json_atomically(out_path, results)
+773:         except Exception as e:
+774:             _write_json_atomically(out_path, {"error": str(e)})
+775:         return
+776: 
+777:     if args.work_dir:
+778:         work_dir = Path(args.work_dir)
+779:     else:
+780:         base_dir = Path(args.base_dir) if args.base_dir else Path(os.getcwd())
+781:         work_dir = base_dir / "projets_extraits"
+782: 
+783:     setup_logging(args.log_dir)
+784: 
+785:     docs_dirs = _find_docs_dirs(work_dir, keyword=args.keyword)
+786:     print(f"TOTAL_AE_PREPROCESS: {len(docs_dirs)}")
+787: 
+788:     for p_idx, docs_dir in enumerate(docs_dirs, start=1):
+789:         logger.info("PREPROCESS_AE: %s/%s: %s", p_idx, len(docs_dirs), docs_dir)
+790:         print(f"PREPROCESS_AE: {p_idx}/{len(docs_dirs)}: {docs_dir.name}")
+791:         preprocess_docs_dir(docs_dir)
+792:         print(f"Succès: pré-traitement AE terminé pour {docs_dir.parent.name}")
+793: 
+794:     logger.info("--- Pré-traitement AE terminé ! ---")
+795: 
+796: 
+797: if __name__ == "__main__":
+798:     main()
+```
+
+## File: workflow_scripts/step8/finalize_and_copy.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: 
+  4: """
+  5: Script de finalisation et copie des projets vers la destination finale.
+  6: Étape 8 (Ubuntu)
+  7: \- Archive d'abord les artefacts d'analyse (scènes/tracking/audio) avant suppression
+  8: \- Copie ensuite le dossier du projet vers la destination finale
+  9: """
+ 10: 
+ 11: import os
+ 12: import errno
+ 13: import sys
+ 14: import json
+ 15: import shutil
+ 16: import logging
+ 17: import subprocess
+ 18: import tempfile
+ 19: from pathlib import Path
+ 20: from datetime import datetime
+ 21: 
+ 22: ROOT_DIR = Path(__file__).resolve().parents[2]
+ 23: if str(ROOT_DIR) not in sys.path:
+ 24:     sys.path.insert(0, str(ROOT_DIR))
+ 25: 
+ 26: from config.settings import config
+ 27: from services.results_archiver import ResultsArchiver, SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX, VIDEO_METADATA_NAME
+ 28: 
+ 29: # --- Configuration ---
+ 30: WORK_DIR = Path(os.getcwd())
+ 31: OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/mnt/cache"))
+ 32: FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
+ 33: BASE_DIR = ROOT_DIR
+ 34: LOG_DIR = BASE_DIR / "logs" / "step8"
+ 35: 
+ 36: # --- Configuration du Logger ---
+ 37: LOG_DIR.mkdir(parents=True, exist_ok=True)
+ 38: log_file = LOG_DIR / f"finalize_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+ 39: 
+ 40: logging.basicConfig(
+ 41:     level=logging.INFO,
+ 42:     format='%(asctime)s - %(levelname)s - %(message)s',
+ 43:     handlers=[
+ 44:         logging.FileHandler(log_file, encoding='utf-8'),
+ 45:         logging.StreamHandler(sys.stdout)
+ 46:     ]
+ 47: )
+ 48: 
+ 49: 
+ 50: def find_projects_to_finalize():
+ 51:     """Trouve tous les projets dans WORK_DIR qui sont prêts à être finalisés."""
+ 52:     projects = []
+ 53:     logging.info(f"Recherche de projets à finaliser dans: {WORK_DIR}")
+ 54: 
+ 55:     for project_dir in WORK_DIR.iterdir():
+ 56:         if not project_dir.is_dir() or project_dir.name.startswith("_temp_"):
+ 57:             continue
+ 58: 
+ 59:         is_ready = False
+ 60:         found_reason = ""
+ 61:         for video_file in project_dir.rglob("*.mp4"):
+ 62:             stem = video_file.stem
+ 63:             scenes_csv = next(project_dir.rglob(f"{stem}{SCENES_SUFFIX}"), None)
+ 64:             tracking_json = next(project_dir.rglob(f"{stem}{TRACKING_SUFFIX}"), None)
+ 65:             audio_json = next(project_dir.rglob(f"{stem}{AUDIO_SUFFIX}"), None)
+ 66:             if FINALIZE_MODE == "strict":
+ 67:                 if scenes_csv and scenes_csv.exists() and tracking_json and tracking_json.exists():
+ 68:                     found_reason = f"artefacts scènes+tracking pour '{video_file.name}'"
+ 69:                     is_ready = True
+ 70:                     break
+ 71:             elif FINALIZE_MODE == "videos":
+ 72:                 found_reason = f"vidéo présente '{video_file.name}'"
+ 73:                 is_ready = True
+ 74:                 break
+ 75:             else:
+ 76:                 if (scenes_csv and scenes_csv.exists()) or (tracking_json and tracking_json.exists()) or (audio_json and audio_json.exists()):
+ 77:                     found_reason = f"au moins un artefact pour '{video_file.name}'"
+ 78:                     is_ready = True
+ 79:                     break
+ 80: 
+ 81:         if is_ready:
+ 82:             logging.info(f"Projet '{project_dir.name}' est prêt ({found_reason}). Mode: {FINALIZE_MODE}")
+ 83:             projects.append(project_dir)
+ 84:         else:
+ 85:             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
+ 86: 
+ 87:     return projects
+ 88: 
+ 89: 
+ 90: def _is_dir_writable(path: Path) -> bool:
+ 91:     """Teste la capacité d'écriture/suppression dans un répertoire cible.
+ 92: 
+ 93:     Plus fiable que os.access() sur des montages FUSE/NTFS.
+ 94:     """
+ 95:     try:
+ 96:         path.mkdir(parents=True, exist_ok=True)
+ 97:         with tempfile.NamedTemporaryFile(dir=str(path), delete=True) as tmp:
+ 98:             tmp.write(b"writable-check")
+ 99:             tmp.flush()
+100:         return True
+101:     except Exception:
+102:         return False
+103: 
+104: 
+105: def _select_output_dir(preferred: Path, base_dir: Path) -> Path:
+106:     """Sélectionne une destination inscriptible, avec repli si nécessaire.
+107: 
+108:     - Utilise `preferred` si inscriptible.
+109:     - Sinon, utilise `FALLBACK_OUTPUT_DIR` si défini et inscriptible.
+110:     - Sinon, utilise `base_dir / "_finalized_output"`.
+111:     """
+112:     if _is_dir_writable(preferred):
+113:         logging.info(f"Destination vérifiée: '{preferred}' est inscriptible")
+114:         return preferred
+115: 
+116:     logging.warning(
+117:         f"La destination préférée '{preferred}' n'est pas inscriptible (montage RO ? permissions ?). "
+118:         "Activation d'une destination de repli."
+119:     )
+120: 
+121:     env_fallback = os.environ.get("FALLBACK_OUTPUT_DIR")
+122:     if env_fallback:
+123:         fb = Path(env_fallback)
+124:         if _is_dir_writable(fb):
+125:             logging.warning(f"Bascule vers FALLBACK_OUTPUT_DIR: '{fb}'")
+126:             return fb
+127:         else:
+128:             logging.warning(f"FALLBACK_OUTPUT_DIR défini mais non inscriptible: '{fb}'")
+129: 
+130:     local_fb = base_dir / "_finalized_output"
+131:     local_fb.mkdir(parents=True, exist_ok=True)
+132:     logging.warning(f"Bascule vers le répertoire de repli local: '{local_fb}'")
+133:     return local_fb
+134: 
+135: 
+136: def _safe_rmtree(path: Path) -> None:
+137:     """Supprime un dossier en consignant proprement les erreurs de permissions."""
+138: 
+139:     def _onerror(func, p, exc_info):
+140:         logging.error(f"Suppression échouée sur '{p}': {exc_info[1]}")
+141: 
+142:     shutil.rmtree(path, onerror=_onerror)
+143: 
+144: 
+145: def _destination_supports_chmod(dest_dir: Path) -> bool:
+146:     """Détecte si le FS destination supporte chmod (NTFS typiquement renvoie EPERM).
+147: 
+148:     Si on ne peut pas créer de fichier, la question du chmod est secondaire; laisser True.
+149:     """
+150:     try:
+151:         dest_dir.mkdir(parents=True, exist_ok=True)
+152:         with tempfile.NamedTemporaryFile(dir=str(dest_dir), delete=True) as tmp:
+153:             try:
+154:                 os.chmod(tmp.name, 0o664)
+155:             except PermissionError:
+156:                 return False
+157:             except OSError as e:
+158:                 err = getattr(e, 'errno', None)
+159:                 if err in (errno.EPERM, errno.EACCES, getattr(errno, 'EOPNOTSUPP', None)):
+160:                     return False
+161:                 raise
+162:     except Exception:
+163:         return True
+164: 
+165: 
+166: def _copy_project_tree(src: Path, dst: Path) -> None:
+167:     """Copie le projet sans préserver les permissions sur FS type NTFS.
+168: 
+169:     Stratégie:
+170:     - Si chmod supporté: utiliser shutil.copytree (comportement standard).
+171:     - Sinon: tenter rsync --no-perms/owner/group; à défaut cp --no-preserve; à défaut copie Python manuelle.
+172:     """
+173:     dst.parent.mkdir(parents=True, exist_ok=True)
+174:     supports_chmod = _destination_supports_chmod(dst)
+175:     if supports_chmod:
+176:         shutil.copytree(src, dst, dirs_exist_ok=True)
+177:         return
+178: 
+179:     logging.info("Destination ne supporte pas chmod — copie sans préservation des permissions.")
+180:     # 1) rsync si disponible
+181:     try:
+182:         subprocess.run(
+183:             [
+184:                 "rsync",
+185:                 "-a",
+186:                 "--no-perms",
+187:                 "--no-owner",
+188:                 "--no-group",
+189:                 "--no-times",
+190:                 f"{str(src)}/",
+191:                 f"{str(dst)}/",
+192:             ],
+193:             check=True,
+194:         )
+195:         return
+196:     except FileNotFoundError:
+197:         logging.info("rsync non disponible, tentative via cp --no-preserve")
+198:     except subprocess.CalledProcessError as e:
+199:         logging.warning(f"rsync a échoué: {e}")
+200: 
+201:     # 2) cp --no-preserve si disponible (fusionner le contenu dans dst)
+202:     try:
+203:         dst.mkdir(parents=True, exist_ok=True)
+204:         subprocess.run(
+205:             [
+206:                 "bash",
+207:                 "-lc",
+208:                 f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'",
+209:             ],
+210:             check=True,
+211:         )
+212:         return
+213:     except subprocess.CalledProcessError as e:
+214:         logging.warning(f"cp --no-preserve a échoué: {e}")
+215: 
+216:     # 3) Fallback Python: os.walk et shutil.copyfile sans copystat
+217:     for root, dirs, files in os.walk(src):
+218:         rel = os.path.relpath(root, src)
+219:         target_dir = dst / rel if rel != "." else dst
+220:         target_dir.mkdir(parents=True, exist_ok=True)
+221:         for d in dirs:
+222:             (target_dir / d).mkdir(parents=True, exist_ok=True)
+223:         for f in files:
+224:             s = Path(root) / f
+225:             t = target_dir / f
+226:             shutil.copyfile(s, t)
+227: 
+228: 
+229: def _compute_alternative_output_dir(existing_dst: Path) -> Path:
+230:     """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé."""
+231:     base = existing_dst.parent
+232:     name = existing_dst.name
+233:     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+234:     candidate = base / f"{name}__finalized_{ts}"
+235:     i = 1
+236:     while candidate.exists():
+237:         candidate = base / f"{name}__finalized_{ts}_{i}"
+238:         i += 1
+239:     return candidate
+240: 
+241: 
+242: def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
+243:     docs_dir = dst_project_dir / "docs"
+244:     docs_dir.mkdir(parents=True, exist_ok=True)
+245: 
+246:     media_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".png", ".jpg", ".jpeg"}
+247:     analysis_suffixes = {SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX}
+248: 
+249:     video_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+250:     video_stems: set[str] = set()
+251:     try:
+252:         for p in dst_project_dir.iterdir():
+253:             if p.is_file() and p.suffix.lower() in video_exts:
+254:                 video_stems.add(p.stem)
+255:         if docs_dir.exists():
+256:             for p in docs_dir.rglob("*"):
+257:                 if p.is_file() and p.suffix.lower() in video_exts:
+258:                     video_stems.add(p.stem)
+259:     except Exception:
+260:         pass
+261: 
+262:     for entry in dst_project_dir.iterdir():
+263:         if entry.name == "docs":
+264:             continue
+265:         if entry.is_file():
+266:             ext = entry.suffix.lower()
+267:             stem = entry.stem
+268:             move = False
+269:             if ext in media_exts:
+270:                 move = True
+271:             else:
+272:                 for suf in analysis_suffixes:
+273:                     if entry.name.endswith(suf) or entry.name == f"{stem}.csv":
+274:                         move = True
+275:                         break
+276:                 if not move and ext == ".json" and stem in video_stems:
+277:                     move = True
+278:             if move:
+279:                 target = docs_dir / entry.name
+280:                 try:
+281:                     if target.exists():
+282:                         target.unlink()
+283:                     shutil.move(str(entry), str(target))
+284:                 except Exception as e:
+285:                     logging.warning(f"Impossible de déplacer '{entry}' vers '{target}': {e}")
+286: 
+287: 
+288: def restore_archived_analysis(project_name: str, output_project_dir: Path) -> None:
+289:     try:
+290:         docs_dir = output_project_dir / "docs"
+291:         docs_dir.mkdir(parents=True, exist_ok=True)
+292: 
+293:         video_exts = (".mp4", ".mov", ".avi", ".mkv", ".webm")
+294:         videos = []
+295:         if docs_dir.exists():
+296:             videos.extend([p for p in docs_dir.rglob("*") if p.is_file() and p.suffix.lower() in video_exts])
+297:         videos.extend([p for p in output_project_dir.iterdir() if p.is_file() and p.suffix.lower() in video_exts])
+298: 
+299:         for v in videos:
+300:             target_dir = docs_dir if v.parent != docs_dir else v.parent
+301:             stem = v.stem
+302: 
+303:             scenes_path = ResultsArchiver.find_analysis_file(project_name, v, SCENES_SUFFIX)
+304:             if scenes_path:
+305:                 dst = target_dir / f"{stem}{SCENES_SUFFIX}"
+306:                 try:
+307:                     shutil.copy2(scenes_path, dst)
+308:                 except Exception as e:
+309:                     logging.warning(f"Restauration scenes échouée {scenes_path} -> {dst}: {e}")
+310: 
+311:             audio_path = ResultsArchiver.find_analysis_file(project_name, v, AUDIO_SUFFIX)
+312:             if audio_path:
+313:                 dst = target_dir / f"{stem}{AUDIO_SUFFIX}"
+314:                 try:
+315:                     shutil.copy2(audio_path, dst)
+316:                 except Exception as e:
+317:                     logging.warning(f"Restauration audio échouée {audio_path} -> {dst}: {e}")
+318: 
+319:             tracking_path = ResultsArchiver.find_analysis_file(project_name, v, TRACKING_SUFFIX)
+320:             if tracking_path:
+321:                 dst = target_dir / f"{stem}{TRACKING_SUFFIX}"
+322:                 try:
+323:                     shutil.copy2(tracking_path, dst)
+324:                 except Exception as e:
+325:                     logging.warning(f"Restauration tracking échouée {tracking_path} -> {dst}: {e}")
+326:     except Exception as e:
+327:         logging.warning(f"Restauration des analyses archivées échouée (projet={project_name}): {e}")
+328: 
+329: 
+330: def finalize_project(project_dir):
+331:     try:
+332:         project_name = project_dir.name
+333:         logging.info(f"Finalisation du projet: {project_name}")
+334:         print(f"Finalisation en cours pour '{project_name}'...")
+335: 
+336:         # 1) Archiver d'abord tous les artefacts d'analyse disponibles
+337:         try:
+338:             arch_summary = ResultsArchiver.archive_project_analysis(project_name)
+339:             if arch_summary and not arch_summary.get("error"):
+340:                 logging.info(
+341:                     "Archivage des analyses terminé: %s",
+342:                     json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False),
+343:                 )
+344:             else:
+345:                 logging.warning(f"Archivage des analyses non effectué ou en erreur: {arch_summary}")
+346:         except Exception as e:
+347:             logging.warning(f"Erreur lors de l'archivage des analyses du projet '{project_name}': {e}")
+348: 
+349:         output_project_dir = OUTPUT_DIR / project_name
+350: 
+351:         if output_project_dir.exists():
+352:             logging.warning(
+353:                 f"Le dossier de destination '{output_project_dir}' existe déjà. Tentative de suppression avant copie."
+354:             )
+355:             _safe_rmtree(output_project_dir)
+356:             if output_project_dir.exists():
+357:                 alt_dir = _compute_alternative_output_dir(output_project_dir)
+358:                 logging.warning(f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'")
+359:                 output_project_dir = alt_dir
+360: 
+361:         try:
+362:             _copy_project_tree(project_dir, output_project_dir)
+363:         except Exception as e:
+364:             logging.error("Erreur lors de la copie du projet: %s", e, exc_info=True)
+365:             raise
+366:         logging.info(f"Projet '{project_name}' copié avec succès vers '{output_project_dir}'")
+367: 
+368:         _normalize_project_docs_structure(output_project_dir)
+369: 
+370:         if os.environ.get("RESTORE_ARCHIVES_TO_OUTPUT", "0") in ("1", "true", "True"):
+371:             try:
+372:                 restore_archived_analysis(project_name, output_project_dir)
+373:             except Exception as e:
+374:                 logging.warning(f"Restauration des analyses archivées échouée: {e}")
+375: 
+376:         # --- Suppression du dossier source (après archivage) ---
+377:         try:
+378:             project_dir.resolve().relative_to(config.ARCHIVES_DIR.resolve())
+379:             logging.error(f"Refus de suppression: '{project_dir}' est sous ARCHIVES_DIR")
+380:             return False
+381:         except Exception:
+382:             pass
+383:         _safe_rmtree(project_dir)
+384:         logging.info(f"Dossier source '{project_dir}' supprimé avec succès.")
+385: 
+386:         logging.info(f"Finalisation terminée pour '{project_name}'")
+387:         print(f"Finalisation terminée pour '{project_name}'")
+388:         return True
+389: 
+390:     except Exception as e:
+391:         logging.error(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}", exc_info=True)
+392:         return False
+393: 
+394: 
+395: def main():
+396:     logging.info("--- Démarrage du script de Finalisation et Nettoyage ---")
+397: 
+398:     global OUTPUT_DIR
+399:     try:
+400:         OUTPUT_DIR = _select_output_dir(OUTPUT_DIR, BASE_DIR)
+401:         logging.info(f"Le répertoire de destination est: {OUTPUT_DIR.resolve()}")
+402:     except Exception as e:
+403:         logging.critical(f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}")
+404:         sys.exit(1)
+405: 
+406:     projects = find_projects_to_finalize()
+407:     total_projects = len(projects)
+408:     logging.info(f"{total_projects} projet(s) à finaliser")
+409:     print(f"{total_projects} projet(s) à finaliser")
+410: 
+411:     if total_projects == 0:
+412:         logging.info("Aucun projet à finaliser. Fin du script.")
+413:         return
+414: 
+415:     successful_count = 0
+416:     for project in projects:
+417:         if finalize_project(project):
+418:             successful_count += 1
+419: 
+420:     logging.info("--- Finalisation terminée ---")
+421:     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")
+422: 
+423:     if successful_count < total_projects:
+424:         sys.exit(1)
+425: 
+426: 
+427: if __name__ == "__main__":
+428:     try:
+429:         main()
+430:     except Exception as e:
+431:         logging.critical(f"Erreur critique non gérée dans le script de finalisation: {e}", exc_info=True)
+432:         sys.exit(1)
+```
 
 ## File: config/__init__.py
 ```python
@@ -400,446 +1641,6 @@ app_new.py
 13:   "warmup_batches": 2,
 14:   "torchscript_auto_fallback": true
 15: }
-```
-
-## File: config/workflow_commands.py
-```python
-  1: #!/usr/bin/env python3
-  2: # -*- coding: utf-8 -*-
-  3: """
-  4: Workflow Commands Configuration
-  5: 
-  6: Centralized configuration for all workflow steps.
-  7: Defines commands, working directories, log paths, and progress patterns.
-  8: """
-  9: 
- 10: import re
- 11: from pathlib import Path
- 12: from typing import Dict, Any, List, Optional
- 13: import logging
- 14: 
- 15: from config.settings import config
- 16: 
- 17: logger = logging.getLogger(__name__)
- 18: 
- 19: 
- 20: class WorkflowCommandsConfig:
- 21:     """Centralized workflow commands configuration.
- 22:     
- 23:     This class provides configuration for all 7 workflow steps, including:
- 24:     - Command line arguments
- 25:     - Working directories
- 26:     - Log file locations
- 27:     - Progress parsing patterns
- 28:     - Display names for UI
- 29:     """
- 30:     
- 31:     def __init__(self, base_path: Path = None, hf_token: str = None):
- 32:         """Initialize workflow commands configuration.
- 33:         
- 34:         Args:
- 35:             base_path: Base path for scripts (defaults to config.BASE_PATH_SCRIPTS)
- 36:             hf_token: HuggingFace authentication token for Step 4
- 37:         """
- 38:         self.base_path = base_path or config.BASE_PATH_SCRIPTS
- 39:         self.hf_token = hf_token
- 40:         
- 41:         # Setup log directories
- 42:         self.logs_base_dir = self.base_path / "logs"
- 43:         self._ensure_log_directories()
- 44:         
- 45:         # Build configuration
- 46:         self._config = self._build_configuration()
- 47:         
- 48:         logger.info(f"WorkflowCommandsConfig initialized with base_path: {self.base_path}")
- 49:     
- 50:     def _ensure_log_directories(self) -> None:
- 51:         """Ensure all log directories exist."""
- 52:         self.logs_base_dir.mkdir(exist_ok=True)
- 53:         for step in range(1, 8):
- 54:             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
- 55:     
- 56:     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
- 57:         """Build the complete workflow commands configuration.
- 58:         
- 59:         Returns:
- 60:             Dictionary mapping step keys to their configuration
- 61:         """
- 62:         return {
- 63:             "STEP1": self._get_step1_config(),
- 64:             "STEP2": self._get_step2_config(),
- 65:             "STEP3": self._get_step3_config(),
- 66:             "STEP4": self._get_step4_config(),
- 67:             "STEP5": self._get_step5_config(),
- 68:             "STEP6": self._get_step6_config(),
- 69:             "STEP7": self._get_step7_config(),
- 70:         }
- 71:     
- 72:     def _get_step1_config(self) -> Dict[str, Any]:
- 73:         """Get configuration for Step 1: Archive Extraction.
- 74:         
- 75:         Returns:
- 76:             Step 1 configuration dictionary
- 77:         """
- 78:         step1_log_dir = self.logs_base_dir / "step1"
- 79:         
- 80:         return {
- 81:             "display_name": "1. Extraction des archives",
- 82:             "cmd": [
- 83:                 str(config.get_venv_python("env")),
- 84:                 str(self.base_path / "workflow_scripts" / "step1" / "extract_archives.py"),
- 85:                 "--source-dir", str(Path.home() / "Téléchargements")
- 86:             ],
- 87:             "cwd": str(self.base_path),
- 88:             "specific_logs": [
- 89:                 {
- 90:                     "name": "Log Extraction",
- 91:                     "type": "directory_latest",
- 92:                     "path": step1_log_dir,
- 93:                     "pattern": "*.log",
- 94:                     "lines": 150
- 95:                 },
- 96:                 {
- 97:                     "name": "Liste Archives Traitées",
- 98:                     "type": "file",
- 99:                     "path": step1_log_dir / "processed_archives.txt",
-100:                     "lines": 50
-101:                 }
-102:             ],
-103:             "progress_patterns": {
-104:                 "total": re.compile(r"Trouvé (\d+) archive\(s\) à traiter", re.IGNORECASE),
-105:                 "current_success_line_pattern": re.compile(
-106:                     r"Extraction terminée pour (.*?)$", re.IGNORECASE
-107:                 ),
-108:                 "current_item_text_from_success_line": True
-109:             }
-110:         }
-111:     
-112:     def _get_step2_config(self) -> Dict[str, Any]:
-113:         """Get configuration for Step 2: Video Conversion.
-114:         
-115:         Returns:
-116:             Step 2 configuration dictionary
-117:         """
-118:         step2_log_dir = self.logs_base_dir / "step2"
-119:         
-120:         return {
-121:             "display_name": "2. Conversion des vidéos",
-122:             "cmd": [
-123:                 str(config.get_venv_python("env")),
-124:                 str(self.base_path / "workflow_scripts" / "step2" / "convert_videos.py")
-125:             ],
-126:             "cwd": str(self.base_path / "projets_extraits"),
-127:             "specific_logs": [
-128:                 {
-129:                     "name": "Log Conversion",
-130:                     "type": "directory_latest",
-131:                     "path": step2_log_dir,
-132:                     "pattern": "*.log",
-133:                     "lines": 200
-134:                 }
-135:             ],
-136:             "progress_patterns": {
-137:                 "total": re.compile(r"TOTAL_VIDEOS_TO_PROCESS:\s*(\d+)", re.IGNORECASE),
-138:                 "current": re.compile(
-139:                     r"--- Traitement de la vidéo \((\d+)/(\d+)\): (.*?) ---", re.IGNORECASE
-140:                 )
-141:             }
-142:         }
-143:     
-144:     def _get_step3_config(self) -> Dict[str, Any]:
-145:         """Get configuration for Step 3: Scene Detection.
-146:         
-147:         Returns:
-148:             Step 3 configuration dictionary
-149:         """
-150:         step3_log_dir = self.logs_base_dir / "step3"
-151:         
-152:         return {
-153:             "display_name": "3. Analyse des transitions",
-154:             "cmd": [
-155:                 str(config.get_venv_python("transnet_env")),
-156:                 str(self.base_path / "workflow_scripts" / "step3" / "run_transnet.py"),
-157:             ],
-158:             "cwd": str(self.base_path / "projets_extraits"),
-159:             "specific_logs": [
-160:                 {
-161:                     "name": "Log Analyse Transitions",
-162:                     "type": "directory_latest",
-163:                     "path": step3_log_dir,
-164:                     "pattern": "*.log",
-165:                     "lines": 150
-166:                 }
-167:             ],
-168:             "progress_patterns": {
-169:                 # Accept both underscore and space variants
-170:                 "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
-171:                 "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
-172:                 "internal_simple": re.compile(
-173:                     r"INTERNAL[_ ]PROGRESS:\s*(\d+)\s*batches\s*-\s*(.*)$", re.IGNORECASE
-174:                 ),
-175:                 "current_success_line_pattern": re.compile(
-176:                     r"Succès:\s*(.*?)(?:\.csv|\.json)\s+créé", re.IGNORECASE
-177:                 ),
-178:                 "current_item_text_from_success_line": True
-179:             }
-180:         }
-181:     
-182:     def _get_step4_config(self) -> Dict[str, Any]:
-183:         """Get configuration for Step 4: Audio Analysis.
-184:         
-185:         Returns:
-186:             Step 4 configuration dictionary
-187:         """
-188:         step4_log_dir = self.logs_base_dir / "step4"
-189: 
-190:         step4_script_name = "run_audio_analysis_lemonfox.py" if config.STEP4_USE_LEMONFOX else "run_audio_analysis.py"
-191:         cmd = [
-192:             str(config.get_venv_python("audio_env")),
-193:             str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
-194:             "--log_dir", str(step4_log_dir),
-195:         ]
-196:         
-197:         return {
-198:             "display_name": "4. Analyse audio",
-199:             "cmd": cmd,
-200:             "cwd": str(self.base_path / "projets_extraits"),
-201:             "specific_logs": [
-202:                 {
-203:                     "name": "Log Analyse Audio",
-204:                     "type": "directory_latest",
-205:                     "path": step4_log_dir,
-206:                     "pattern": "*.log",
-207:                     "lines": 150
-208:                 }
-209:             ],
-210:             "progress_patterns": {
-211:                 "total": re.compile(r"TOTAL_AUDIO_TO_ANALYZE:\s*(\d+)", re.IGNORECASE),
-212:                 "current": re.compile(r"ANALYZING_AUDIO:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
-213:                 "internal": re.compile(
-214:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)",
-215:                     re.IGNORECASE
-216:                 ),
-217:                 "current_success_line_pattern": re.compile(
-218:                     r"Succès: analyse audio terminée pour (.*?)$", re.IGNORECASE
-219:                 ),
-220:                 "current_item_text_from_success_line": True
-221:             }
-222:         }
-223:     
-224:     def _get_step5_config(self) -> Dict[str, Any]:
-225:         """Get configuration for Step 5: Tracking Analysis.
-226:         
-227:         Returns:
-228:             Step 5 configuration dictionary
-229:         """
-230:         step5_log_dir = self.logs_base_dir / "step5"
-231:         
-232:         return {
-233:             "display_name": "5. Analyse du tracking",
-234:             "cmd": [
-235:                 str(config.get_venv_python("tracking_env_slim")),
-236:                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
-237:             ],
-238:             "cwd": str(self.base_path / "projets_extraits"),
-239:             "specific_logs": [
-240:                 {
-241:                     "name": "Log Tracking Manager",
-242:                     "type": "directory_latest",
-243:                     "path": step5_log_dir,
-244:                     "pattern": "manager_tracking*.log",
-245:                     "lines": 100
-246:                 },
-247:                 {
-248:                     "name": "Log Worker CPU",
-249:                     "type": "directory_latest",
-250:                     "path": step5_log_dir,
-251:                     "pattern": "*worker_CPU*.log",
-252:                     "lines": 100
-253:                 },
-254:                 {
-255:                     "name": "Log Worker GPU",
-256:                     "type": "directory_latest",
-257:                     "path": step5_log_dir,
-258:                     "pattern": "*worker_GPU*.log",
-259:                     "lines": 100
-260:                 }
-261:             ],
-262:             "progress_patterns": {
-263:                 "total": re.compile(r"Vidéos à traiter: (\d+)", re.IGNORECASE),
-264:                 "current": re.compile(r"Traitement de (.*?):\s*(\d+)%", re.IGNORECASE),
-265:                 "internal": re.compile(r"(.*?):\s*(\d+)%", re.IGNORECASE),
-266:                 "current_success_line_pattern": re.compile(
-267:                     r"\[Gestionnaire\] Succès pour (.*?)$", re.IGNORECASE
-268:                 ),
-269:                 "current_item_text_from_success_line": True
-270:             },
-271:             "post_completion_message_ui": "Traitement du tracking terminé."
-272:         }
-273:     
-274:     def _get_step6_config(self) -> Dict[str, Any]:
-275:         """Get configuration for Step 6: JSON Reduction.
-276:         
-277:         Returns:
-278:             Step 6 configuration dictionary
-279:         """
-280:         step6_log_dir = self.logs_base_dir / "step6"
-281:         
-282:         return {
-283:             "display_name": "6. Réduction JSON",
-284:             "cmd": [
-285:                 str(config.get_venv_python("env")),
-286:                 str(self.base_path / "workflow_scripts" / "step6" / "json_reducer.py"),
-287:                 "--log_dir", str(step6_log_dir),
-288:                 "--work_dir", str(self.base_path / "projets_extraits")
-289:             ],
-290:             "cwd": str(self.base_path / "projets_extraits"),
-291:             "specific_logs": [
-292:                 {
-293:                     "name": "Log Réduction JSON",
-294:                     "type": "directory_latest",
-295:                     "path": step6_log_dir,
-296:                     "pattern": "*.log",
-297:                     "lines": 150
-298:                 }
-299:             ],
-300:             "progress_patterns": {
-301:                 "total": re.compile(r"TOTAL_JSON_TO_REDUCE:\s*(\d+)", re.IGNORECASE),
-302:                 "current": re.compile(r"REDUCING_JSON:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
-303:                 "internal": re.compile(
-304:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
-305:                     re.IGNORECASE
-306:                 ),
-307:                 "current_success_line_pattern": re.compile(
-308:                     r"Succès: réduction JSON terminée pour (.*?)$", re.IGNORECASE
-309:                 ),
-310:                 "current_item_text_from_success_line": True
-311:             }
-312:         }
-313:     
-314:     def _get_step7_config(self) -> Dict[str, Any]:
-315:         """Get configuration for Step 7: Finalization.
-316:         
-317:         Returns:
-318:             Step 7 configuration dictionary
-319:         """
-320:         step7_log_dir = self.logs_base_dir / "step7"
-321:         
-322:         return {
-323:             "display_name": "7. Finalisation",
-324:             "cmd": [
-325:                 str(config.get_venv_python("env")),
-326:                 str(self.base_path / "workflow_scripts" / "step7" / "finalize_and_copy.py")
-327:             ],
-328:             "cwd": str(self.base_path / "projets_extraits"),
-329:             "specific_logs": [
-330:                 {
-331:                     "name": "Log Finalisation",
-332:                     "type": "directory_latest",
-333:                     "path": step7_log_dir,
-334:                     "pattern": "*.log",
-335:                     "lines": 150
-336:                 }
-337:             ],
-338:             "progress_patterns": {
-339:                 "total": re.compile(r"(\d+) projet\(s\) à finaliser", re.IGNORECASE),
-340:                 "current_success_line_pattern": re.compile(
-341:                     r"Finalisation terminée pour '(.*?)'", re.IGNORECASE
-342:                 ),
-343:                 "current_item_text_from_success_line": True
-344:             },
-345:             "post_completion_message_ui": "Finalisation des projets terminée."
-346:         }
-347:     
-348:     # ========== Public API ==========
-349:     
-350:     def get_config(self) -> Dict[str, Dict[str, Any]]:
-351:         """Get the complete workflow commands configuration.
-352:         
-353:         Returns:
-354:             Dictionary mapping step keys to their configuration
-355:         """
-356:         return self._config.copy()
-357:     
-358:     def get_step_config(self, step_key: str) -> Optional[Dict[str, Any]]:
-359:         """Get configuration for a specific step.
-360:         
-361:         Args:
-362:             step_key: Step identifier (e.g., 'STEP1', 'STEP2')
-363:             
-364:         Returns:
-365:             Step configuration dictionary or None if not found
-366:         """
-367:         return self._config.get(step_key)
-368:     
-369:     def validate_step_key(self, step_key: str) -> bool:
-370:         """Validate if a step key exists in configuration.
-371:         
-372:         Args:
-373:             step_key: Step identifier to validate
-374:             
-375:         Returns:
-376:             True if step key is valid
-377:         """
-378:         return step_key in self._config
-379:     
-380:     def get_all_step_keys(self) -> List[str]:
-381:         """Get all valid step keys.
-382:         
-383:         Returns:
-384:             List of step keys
-385:         """
-386:         return list(self._config.keys())
-387:     
-388:     def get_step_display_name(self, step_key: str) -> Optional[str]:
-389:         """Get display name for a step.
-390:         
-391:         Args:
-392:             step_key: Step identifier
-393:             
-394:         Returns:
-395:             Display name or None if step not found
-396:         """
-397:         step_config = self.get_step_config(step_key)
-398:         return step_config.get('display_name') if step_config else None
-399:     
-400:     def get_step_command(self, step_key: str) -> Optional[List[str]]:
-401:         """Get command line for a step.
-402:         
-403:         Args:
-404:             step_key: Step identifier
-405:             
-406:         Returns:
-407:             Command line as list of strings or None if step not found
-408:         """
-409:         step_config = self.get_step_config(step_key)
-410:         return step_config.get('cmd') if step_config else None
-411:     
-412:     def get_step_cwd(self, step_key: str) -> Optional[str]:
-413:         """Get working directory for a step.
-414:         
-415:         Args:
-416:             step_key: Step identifier
-417:             
-418:         Returns:
-419:             Working directory path or None if step not found
-420:         """
-421:         step_config = self.get_step_config(step_key)
-422:         return step_config.get('cwd') if step_config else None
-423:     
-424:     def update_hf_token(self, hf_token: str) -> None:
-425:         """Update HuggingFace token and rebuild Step 4 configuration.
-426:         
-427:         Args:
-428:             hf_token: New HuggingFace authentication token
-429:         """
-430:         self.hf_token = hf_token
-431:         self._config["STEP4"] = self._get_step4_config()
-432:         logger.info("HuggingFace token updated in configuration")
-433:     
-434:     def __repr__(self) -> str:
-435:         """String representation of configuration."""
-436:         return f"WorkflowCommandsConfig(base_path={self.base_path}, steps={len(self._config)})"
 ```
 
 ## File: routes/__init__.py
@@ -11600,8 +12401,9 @@ app_new.py
  8:     "STEP4",
  9:     "STEP5",
 10:     "STEP6",
-11:     "STEP7"
-12: ];
+11:     "STEP7",
+12:     "STEP8"
+13: ];
 ```
 
 ## File: static/csvDownloadMonitor.js
@@ -18615,7 +19417,7 @@ app_new.py
  33: # --- FIN DE LA MODIFICATION ---
  34: FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
  35: BASE_DIR = ROOT_DIR
- 36: LOG_DIR = BASE_DIR / "logs" / "step7"
+ 36: LOG_DIR = BASE_DIR / "logs" / "step8"
  37: 
  38: # --- Configuration du Logger ---
  39: LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -19021,6 +19823,491 @@ app_new.py
 439:     except Exception as e:
 440:         logging.critical(f"Erreur critique non gérée dans le script de finalisation: {e}", exc_info=True)
 441:         sys.exit(1)
+```
+
+## File: config/workflow_commands.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: """
+  4: Workflow Commands Configuration
+  5: 
+  6: Centralized configuration for all workflow steps.
+  7: Defines commands, working directories, log paths, and progress patterns.
+  8: """
+  9: 
+ 10: import re
+ 11: from pathlib import Path
+ 12: from typing import Dict, Any, List, Optional
+ 13: import logging
+ 14: 
+ 15: from config.settings import config
+ 16: 
+ 17: logger = logging.getLogger(__name__)
+ 18: 
+ 19: 
+ 20: class WorkflowCommandsConfig:
+ 21:     """Centralized workflow commands configuration.
+ 22:     
+ 23:     This class provides configuration for all 8 workflow steps, including:
+ 24:     - Command line arguments
+ 25:     - Working directories
+ 26:     - Log file locations
+ 27:     - Progress parsing patterns
+ 28:     - Display names for UI
+ 29:     """
+ 30:     
+ 31:     def __init__(self, base_path: Path = None, hf_token: str = None):
+ 32:         """Initialize workflow commands configuration.
+ 33:         
+ 34:         Args:
+ 35:             base_path: Base path for scripts (defaults to config.BASE_PATH_SCRIPTS)
+ 36:             hf_token: HuggingFace authentication token for Step 4
+ 37:         """
+ 38:         self.base_path = base_path or config.BASE_PATH_SCRIPTS
+ 39:         self.hf_token = hf_token
+ 40:         
+ 41:         # Setup log directories
+ 42:         self.logs_base_dir = self.base_path / "logs"
+ 43:         self._ensure_log_directories()
+ 44:         
+ 45:         # Build configuration
+ 46:         self._config = self._build_configuration()
+ 47:         
+ 48:         logger.info(f"WorkflowCommandsConfig initialized with base_path: {self.base_path}")
+ 49:     
+ 50:     def _ensure_log_directories(self) -> None:
+ 51:         """Ensure all log directories exist."""
+ 52:         self.logs_base_dir.mkdir(exist_ok=True)
+ 53:         for step in range(1, 9):
+ 54:             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
+ 55:     
+ 56:     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
+ 57:         """Build the complete workflow commands configuration.
+ 58:         
+ 59:         Returns:
+ 60:             Dictionary mapping step keys to their configuration
+ 61:         """
+ 62:         return {
+ 63:             "STEP1": self._get_step1_config(),
+ 64:             "STEP2": self._get_step2_config(),
+ 65:             "STEP3": self._get_step3_config(),
+ 66:             "STEP4": self._get_step4_config(),
+ 67:             "STEP5": self._get_step5_config(),
+ 68:             "STEP6": self._get_step6_config(),
+ 69:             "STEP7": self._get_step7_config(),
+ 70:             "STEP8": self._get_step8_config(),
+ 71:         }
+ 72:     
+ 73:     def _get_step1_config(self) -> Dict[str, Any]:
+ 74:         """Get configuration for Step 1: Archive Extraction.
+ 75:         
+ 76:         Returns:
+ 77:             Step 1 configuration dictionary
+ 78:         """
+ 79:         step1_log_dir = self.logs_base_dir / "step1"
+ 80:         
+ 81:         return {
+ 82:             "display_name": "1. Extraction des archives",
+ 83:             "cmd": [
+ 84:                 str(config.get_venv_python("env")),
+ 85:                 str(self.base_path / "workflow_scripts" / "step1" / "extract_archives.py"),
+ 86:                 "--source-dir", str(Path.home() / "Téléchargements")
+ 87:             ],
+ 88:             "cwd": str(self.base_path),
+ 89:             "specific_logs": [
+ 90:                 {
+ 91:                     "name": "Log Extraction",
+ 92:                     "type": "directory_latest",
+ 93:                     "path": step1_log_dir,
+ 94:                     "pattern": "*.log",
+ 95:                     "lines": 150
+ 96:                 },
+ 97:                 {
+ 98:                     "name": "Liste Archives Traitées",
+ 99:                     "type": "file",
+100:                     "path": step1_log_dir / "processed_archives.txt",
+101:                     "lines": 50
+102:                 }
+103:             ],
+104:             "progress_patterns": {
+105:                 "total": re.compile(r"Trouvé (\d+) archive\(s\) à traiter", re.IGNORECASE),
+106:                 "current_success_line_pattern": re.compile(
+107:                     r"Extraction terminée pour (.*?)$", re.IGNORECASE
+108:                 ),
+109:                 "current_item_text_from_success_line": True
+110:             }
+111:         }
+112:     
+113:     def _get_step2_config(self) -> Dict[str, Any]:
+114:         """Get configuration for Step 2: Video Conversion.
+115:         
+116:         Returns:
+117:             Step 2 configuration dictionary
+118:         """
+119:         step2_log_dir = self.logs_base_dir / "step2"
+120:         
+121:         return {
+122:             "display_name": "2. Conversion des vidéos",
+123:             "cmd": [
+124:                 str(config.get_venv_python("env")),
+125:                 str(self.base_path / "workflow_scripts" / "step2" / "convert_videos.py")
+126:             ],
+127:             "cwd": str(self.base_path / "projets_extraits"),
+128:             "specific_logs": [
+129:                 {
+130:                     "name": "Log Conversion",
+131:                     "type": "directory_latest",
+132:                     "path": step2_log_dir,
+133:                     "pattern": "*.log",
+134:                     "lines": 200
+135:                 }
+136:             ],
+137:             "progress_patterns": {
+138:                 "total": re.compile(r"TOTAL_VIDEOS_TO_PROCESS:\s*(\d+)", re.IGNORECASE),
+139:                 "current": re.compile(
+140:                     r"--- Traitement de la vidéo \((\d+)/(\d+)\): (.*?) ---", re.IGNORECASE
+141:                 )
+142:             }
+143:         }
+144:     
+145:     def _get_step3_config(self) -> Dict[str, Any]:
+146:         """Get configuration for Step 3: Scene Detection.
+147:         
+148:         Returns:
+149:             Step 3 configuration dictionary
+150:         """
+151:         step3_log_dir = self.logs_base_dir / "step3"
+152:         
+153:         return {
+154:             "display_name": "3. Analyse des transitions",
+155:             "cmd": [
+156:                 str(config.get_venv_python("transnet_env")),
+157:                 str(self.base_path / "workflow_scripts" / "step3" / "run_transnet.py"),
+158:             ],
+159:             "cwd": str(self.base_path / "projets_extraits"),
+160:             "specific_logs": [
+161:                 {
+162:                     "name": "Log Analyse Transitions",
+163:                     "type": "directory_latest",
+164:                     "path": step3_log_dir,
+165:                     "pattern": "*.log",
+166:                     "lines": 150
+167:                 }
+168:             ],
+169:             "progress_patterns": {
+170:                 # Accept both underscore and space variants
+171:                 "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
+172:                 "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
+173:                 "internal_simple": re.compile(
+174:                     r"INTERNAL[_ ]PROGRESS:\s*(\d+)\s*batches\s*-\s*(.*)$", re.IGNORECASE
+175:                 ),
+176:                 "current_success_line_pattern": re.compile(
+177:                     r"Succès:\s*(.*?)(?:\.csv|\.json)\s+créé", re.IGNORECASE
+178:                 ),
+179:                 "current_item_text_from_success_line": True
+180:             }
+181:         }
+182:     
+183:     def _get_step4_config(self) -> Dict[str, Any]:
+184:         """Get configuration for Step 4: Audio Analysis.
+185:         
+186:         Returns:
+187:             Step 4 configuration dictionary
+188:         """
+189:         step4_log_dir = self.logs_base_dir / "step4"
+190: 
+191:         step4_script_name = "run_audio_analysis_lemonfox.py" if config.STEP4_USE_LEMONFOX else "run_audio_analysis.py"
+192:         cmd = [
+193:             str(config.get_venv_python("audio_env")),
+194:             str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
+195:             "--log_dir", str(step4_log_dir),
+196:         ]
+197: 
+198:         if step4_script_name == "run_audio_analysis.py" and self.hf_token:
+199:             cmd.extend(["--hf_auth_token", str(self.hf_token)])
+200:         
+201:         return {
+202:             "display_name": "4. Analyse audio",
+203:             "cmd": cmd,
+204:             "cwd": str(self.base_path / "projets_extraits"),
+205:             "specific_logs": [
+206:                 {
+207:                     "name": "Log Analyse Audio",
+208:                     "type": "directory_latest",
+209:                     "path": step4_log_dir,
+210:                     "pattern": "*.log",
+211:                     "lines": 150
+212:                 }
+213:             ],
+214:             "progress_patterns": {
+215:                 "total": re.compile(r"TOTAL_AUDIO_TO_ANALYZE:\s*(\d+)", re.IGNORECASE),
+216:                 "current": re.compile(r"ANALYZING_AUDIO:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+217:                 "internal": re.compile(
+218:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)",
+219:                     re.IGNORECASE
+220:                 ),
+221:                 "current_success_line_pattern": re.compile(
+222:                     r"Succès: analyse audio terminée pour (.*?)$", re.IGNORECASE
+223:                 ),
+224:                 "current_item_text_from_success_line": True
+225:             }
+226:         }
+227:     
+228:     def _get_step5_config(self) -> Dict[str, Any]:
+229:         """Get configuration for Step 5: Tracking Analysis.
+230:         
+231:         Returns:
+232:             Step 5 configuration dictionary
+233:         """
+234:         step5_log_dir = self.logs_base_dir / "step5"
+235:         
+236:         return {
+237:             "display_name": "5. Analyse du tracking",
+238:             "cmd": [
+239:                 str(config.get_venv_python("tracking_env_slim")),
+240:                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
+241:             ],
+242:             "cwd": str(self.base_path / "projets_extraits"),
+243:             "specific_logs": [
+244:                 {
+245:                     "name": "Log Tracking Manager",
+246:                     "type": "directory_latest",
+247:                     "path": step5_log_dir,
+248:                     "pattern": "manager_tracking*.log",
+249:                     "lines": 100
+250:                 },
+251:                 {
+252:                     "name": "Log Worker CPU",
+253:                     "type": "directory_latest",
+254:                     "path": step5_log_dir,
+255:                     "pattern": "*worker_CPU*.log",
+256:                     "lines": 100
+257:                 },
+258:                 {
+259:                     "name": "Log Worker GPU",
+260:                     "type": "directory_latest",
+261:                     "path": step5_log_dir,
+262:                     "pattern": "*worker_GPU*.log",
+263:                     "lines": 100
+264:                 }
+265:             ],
+266:             "progress_patterns": {
+267:                 "total": re.compile(r"Vidéos à traiter: (\d+)", re.IGNORECASE),
+268:                 "current": re.compile(r"Traitement de (.*?):\s*(\d+)%", re.IGNORECASE),
+269:                 "internal": re.compile(r"(.*?):\s*(\d+)%", re.IGNORECASE),
+270:                 "current_success_line_pattern": re.compile(
+271:                     r"\[Gestionnaire\] Succès pour (.*?)$", re.IGNORECASE
+272:                 ),
+273:                 "current_item_text_from_success_line": True
+274:             },
+275:             "post_completion_message_ui": "Traitement du tracking terminé."
+276:         }
+277:     
+278:     def _get_step6_config(self) -> Dict[str, Any]:
+279:         """Get configuration for Step 6: JSON Reduction.
+280:         
+281:         Returns:
+282:             Step 6 configuration dictionary
+283:         """
+284:         step6_log_dir = self.logs_base_dir / "step6"
+285:         
+286:         return {
+287:             "display_name": "6. Réduction JSON",
+288:             "cmd": [
+289:                 str(config.get_venv_python("env")),
+290:                 str(self.base_path / "workflow_scripts" / "step6" / "json_reducer.py"),
+291:                 "--log_dir", str(step6_log_dir),
+292:                 "--work_dir", str(self.base_path / "projets_extraits")
+293:             ],
+294:             "cwd": str(self.base_path / "projets_extraits"),
+295:             "specific_logs": [
+296:                 {
+297:                     "name": "Log Réduction JSON",
+298:                     "type": "directory_latest",
+299:                     "path": step6_log_dir,
+300:                     "pattern": "*.log",
+301:                     "lines": 150
+302:                 }
+303:             ],
+304:             "progress_patterns": {
+305:                 "total": re.compile(r"TOTAL_JSON_TO_REDUCE:\s*(\d+)", re.IGNORECASE),
+306:                 "current": re.compile(r"REDUCING_JSON:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+307:                 "internal": re.compile(
+308:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
+309:                     re.IGNORECASE
+310:                 ),
+311:                 "current_success_line_pattern": re.compile(
+312:                     r"Succès: réduction JSON terminée pour (.*?)$", re.IGNORECASE
+313:                 ),
+314:                 "current_item_text_from_success_line": True
+315:             }
+316:         }
+317:     
+318:     def _get_step7_config(self) -> Dict[str, Any]:
+319:         """Get configuration for Step 7: AE JSON preprocessing.
+320: 
+321:         Returns:
+322:             Step 7 configuration dictionary
+323:         """
+324:         step7_log_dir = self.logs_base_dir / "step7"
+325: 
+326:         return {
+327:             "display_name": "7. Pré-traitement AE",
+328:             "cmd": [
+329:                 str(config.get_venv_python("env")),
+330:                 str(self.base_path / "workflow_scripts" / "step7" / "preprocess_ae_json.py"),
+331:                 "--log_dir", str(step7_log_dir),
+332:                 "--work_dir", str(self.base_path / "projets_extraits"),
+333:             ],
+334:             "cwd": str(self.base_path / "projets_extraits"),
+335:             "specific_logs": [
+336:                 {
+337:                     "name": "Log Pré-traitement AE",
+338:                     "type": "directory_latest",
+339:                     "path": step7_log_dir,
+340:                     "pattern": "*.log",
+341:                     "lines": 150,
+342:                 }
+343:             ],
+344:             "progress_patterns": {
+345:                 "total": re.compile(r"TOTAL_AE_PREPROCESS:\s*(\d+)", re.IGNORECASE),
+346:                 "current": re.compile(r"PREPROCESS_AE:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+347:                 "internal": re.compile(
+348:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
+349:                     re.IGNORECASE,
+350:                 ),
+351:                 "current_success_line_pattern": re.compile(
+352:                     r"Succès: pré-traitement AE terminé pour (.*?)$", re.IGNORECASE
+353:                 ),
+354:                 "current_item_text_from_success_line": True,
+355:             },
+356:             "post_completion_message_ui": "Pré-traitement AE terminé.",
+357:         }
+358: 
+359:     def _get_step8_config(self) -> Dict[str, Any]:
+360:         """Get configuration for Step 8: Finalization.
+361: 
+362:         Returns:
+363:             Step 8 configuration dictionary
+364:         """
+365:         step8_log_dir = self.logs_base_dir / "step8"
+366: 
+367:         return {
+368:             "display_name": "8. Finalisation",
+369:             "cmd": [
+370:                 str(config.get_venv_python("env")),
+371:                 str(self.base_path / "workflow_scripts" / "step8" / "finalize_and_copy.py"),
+372:             ],
+373:             "cwd": str(self.base_path / "projets_extraits"),
+374:             "specific_logs": [
+375:                 {
+376:                     "name": "Log Finalisation",
+377:                     "type": "directory_latest",
+378:                     "path": step8_log_dir,
+379:                     "pattern": "*.log",
+380:                     "lines": 150,
+381:                 }
+382:             ],
+383:             "progress_patterns": {
+384:                 "total": re.compile(r"(\d+) projet\(s\) à finaliser", re.IGNORECASE),
+385:                 "current_success_line_pattern": re.compile(
+386:                     r"Finalisation terminée pour '(.*?)'", re.IGNORECASE
+387:                 ),
+388:                 "current_item_text_from_success_line": True,
+389:             },
+390:             "post_completion_message_ui": "Finalisation des projets terminée.",
+391:         }
+392:     
+393:     # ========== Public API ==========
+394:     
+395:     def get_config(self) -> Dict[str, Dict[str, Any]]:
+396:         """Get the complete workflow commands configuration.
+397:         
+398:         Returns:
+399:             Dictionary mapping step keys to their configuration
+400:         """
+401:         return self._config.copy()
+402:     
+403:     def get_step_config(self, step_key: str) -> Optional[Dict[str, Any]]:
+404:         """Get configuration for a specific step.
+405:         
+406:         Args:
+407:             step_key: Step identifier (e.g., 'STEP1', 'STEP2')
+408:             
+409:         Returns:
+410:             Step configuration dictionary or None if not found
+411:         """
+412:         return self._config.get(step_key)
+413:     
+414:     def validate_step_key(self, step_key: str) -> bool:
+415:         """Validate if a step key exists in configuration.
+416:         
+417:         Args:
+418:             step_key: Step identifier to validate
+419:             
+420:         Returns:
+421:             True if step key is valid
+422:         """
+423:         return step_key in self._config
+424:     
+425:     def get_all_step_keys(self) -> List[str]:
+426:         """Get all valid step keys.
+427:         
+428:         Returns:
+429:             List of step keys
+430:         """
+431:         return list(self._config.keys())
+432:     
+433:     def get_step_display_name(self, step_key: str) -> Optional[str]:
+434:         """Get display name for a step.
+435:         
+436:         Args:
+437:             step_key: Step identifier
+438:             
+439:         Returns:
+440:             Display name or None if step not found
+441:         """
+442:         step_config = self.get_step_config(step_key)
+443:         return step_config.get('display_name') if step_config else None
+444:     
+445:     def get_step_command(self, step_key: str) -> Optional[List[str]]:
+446:         """Get command line for a step.
+447:         
+448:         Args:
+449:             step_key: Step identifier
+450:             
+451:         Returns:
+452:             Command line as list of strings or None if step not found
+453:         """
+454:         step_config = self.get_step_config(step_key)
+455:         return step_config.get('cmd') if step_config else None
+456:     
+457:     def get_step_cwd(self, step_key: str) -> Optional[str]:
+458:         """Get working directory for a step.
+459:         
+460:         Args:
+461:             step_key: Step identifier
+462:             
+463:         Returns:
+464:             Working directory path or None if step not found
+465:         """
+466:         step_config = self.get_step_config(step_key)
+467:         return step_config.get('cwd') if step_config else None
+468:     
+469:     def update_hf_token(self, hf_token: str) -> None:
+470:         """Update HuggingFace token and rebuild Step 4 configuration.
+471:         
+472:         Args:
+473:             hf_token: New HuggingFace authentication token
+474:         """
+475:         self.hf_token = hf_token
+476:         self._config["STEP4"] = self._get_step4_config()
+477:         logger.info("HuggingFace token updated in configuration")
+478:     
+479:     def __repr__(self) -> str:
+480:         """String representation of configuration."""
+481:         return f"WorkflowCommandsConfig(base_path={self.base_path}, steps={len(self._config)})"
 ```
 
 ## File: services/cache_service.py
@@ -28357,111 +29644,112 @@ app_new.py
  42:     "STEP4",
  43:     "STEP5",
  44:     "STEP6",
- 45:     "STEP7"
- 46: ];
- 47: 
- 48: // Modern state management functions using AppState
- 49: export function setActiveStepKeyForLogs(key) {
- 50:     activeStepKeyForLogsPanel = key; // Legacy
- 51:     appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
- 52: }
- 53: export function getActiveStepKeyForLogs() {
- 54:     return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
- 55: }
- 56: 
- 57: export function addStepTimer(stepKey, timerData) {
- 58:     stepTimers[stepKey] = timerData; // Legacy
- 59:     appState.setState({
- 60:         stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
- 61:     }, 'addStepTimer');
- 62: }
- 63: export function getStepTimer(stepKey) {
- 64:     return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
- 65: }
- 66: export function clearStepTimerInterval(stepKey) {
- 67:     const timer = getStepTimer(stepKey);
- 68:     if (timer && timer.intervalId) {
- 69:         clearInterval(timer.intervalId);
- 70:         const updatedTimer = { ...timer, intervalId: null };
- 71:         addStepTimer(stepKey, updatedTimer);
- 72:     }
- 73: }
- 74: export function deleteStepTimer(stepKey) {
- 75:     if (getStepTimer(stepKey)) {
- 76:         clearStepTimerInterval(stepKey);
- 77:         delete stepTimers[stepKey]; // Legacy
- 78:         const currentTimers = appState.getStateProperty('stepTimers') || {};
- 79:         const { [stepKey]: removed, ...remainingTimers } = currentTimers;
- 80:         appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
- 81:     }
- 82: }
- 83: 
- 84: export function setSelectedStepsOrder(order) {
- 85:     selectedStepsOrder = order; // Legacy
- 86:     appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
- 87: }
- 88: export function getSelectedStepsOrder() {
- 89:     return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
- 90: }
- 91: 
- 92: export function setIsAnySequenceRunning(running) {
- 93:     isAnySequenceRunning = running; // Legacy
- 94:     appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
- 95: }
- 96: export function getIsAnySequenceRunning() {
- 97:     return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
- 98: }
- 99: 
-100: export function setFocusedElementBeforePopup(element) {
-101:     focusedElementBeforePopup = element; // Legacy
-102:     appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
-103: }
-104: export function getFocusedElementBeforePopup() {
-105:     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
-106: }
-107: 
-108: export function setAutoOpenLogOverlay(enabled) {
-109:     autoOpenLogOverlay = !!enabled;
-110:     const currentUI = appState.getStateProperty('ui') || {};
-111:     appState.setState({ ui: { ...currentUI, autoOpenLogOverlay: autoOpenLogOverlay } }, 'setAutoOpenLogOverlay');
-112: }
-113: 
-114: export function getAutoOpenLogOverlay() {
-115:     const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
-116:     return typeof uiValue === 'boolean' ? uiValue : autoOpenLogOverlay;
-117: }
-118: 
-119: export function setAutoModeLogPanelOpened(opened) {
-120:     appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
-121: }
-122: 
-123: export function getAutoModeLogPanelOpened() {
-124:     return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
-125: }
-126: 
-127: export function addPollingInterval(stepKey, id) {
-128:     pollingIntervals[stepKey] = id; // Legacy
-129:     appState.setState({
-130:         pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
-131:     }, 'addPollingInterval');
-132: }
-133: export function clearPollingInterval(stepKey) {
-134:     if (pollingIntervals[stepKey]) {
-135:         clearInterval(pollingIntervals[stepKey]);
-136:         delete pollingIntervals[stepKey]; // Legacy
-137:     }
-138:     const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
-139:     const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
-140:     appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
-141: }
-142: export function getPollingInterval(stepKey) {
-143:     return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
-144: }
-145: 
+ 45:     "STEP7",
+ 46:     "STEP8"
+ 47: ];
+ 48: 
+ 49: // Modern state management functions using AppState
+ 50: export function setActiveStepKeyForLogs(key) {
+ 51:     activeStepKeyForLogsPanel = key; // Legacy
+ 52:     appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
+ 53: }
+ 54: export function getActiveStepKeyForLogs() {
+ 55:     return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
+ 56: }
+ 57: 
+ 58: export function addStepTimer(stepKey, timerData) {
+ 59:     stepTimers[stepKey] = timerData; // Legacy
+ 60:     appState.setState({
+ 61:         stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
+ 62:     }, 'addStepTimer');
+ 63: }
+ 64: export function getStepTimer(stepKey) {
+ 65:     return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
+ 66: }
+ 67: export function clearStepTimerInterval(stepKey) {
+ 68:     const timer = getStepTimer(stepKey);
+ 69:     if (timer && timer.intervalId) {
+ 70:         clearInterval(timer.intervalId);
+ 71:         const updatedTimer = { ...timer, intervalId: null };
+ 72:         addStepTimer(stepKey, updatedTimer);
+ 73:     }
+ 74: }
+ 75: export function deleteStepTimer(stepKey) {
+ 76:     if (getStepTimer(stepKey)) {
+ 77:         clearStepTimerInterval(stepKey);
+ 78:         delete stepTimers[stepKey]; // Legacy
+ 79:         const currentTimers = appState.getStateProperty('stepTimers') || {};
+ 80:         const { [stepKey]: removed, ...remainingTimers } = currentTimers;
+ 81:         appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
+ 82:     }
+ 83: }
+ 84: 
+ 85: export function setSelectedStepsOrder(order) {
+ 86:     selectedStepsOrder = order; // Legacy
+ 87:     appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
+ 88: }
+ 89: export function getSelectedStepsOrder() {
+ 90:     return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
+ 91: }
+ 92: 
+ 93: export function setIsAnySequenceRunning(running) {
+ 94:     isAnySequenceRunning = running; // Legacy
+ 95:     appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
+ 96: }
+ 97: export function getIsAnySequenceRunning() {
+ 98:     return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
+ 99: }
+100: 
+101: export function setFocusedElementBeforePopup(element) {
+102:     focusedElementBeforePopup = element; // Legacy
+103:     appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
+104: }
+105: export function getFocusedElementBeforePopup() {
+106:     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
+107: }
+108: 
+109: export function setAutoOpenLogOverlay(enabled) {
+110:     autoOpenLogOverlay = !!enabled;
+111:     const currentUI = appState.getStateProperty('ui') || {};
+112:     appState.setState({ ui: { ...currentUI, autoOpenLogOverlay: autoOpenLogOverlay } }, 'setAutoOpenLogOverlay');
+113: }
+114: 
+115: export function getAutoOpenLogOverlay() {
+116:     const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
+117:     return typeof uiValue === 'boolean' ? uiValue : autoOpenLogOverlay;
+118: }
+119: 
+120: export function setAutoModeLogPanelOpened(opened) {
+121:     appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
+122: }
+123: 
+124: export function getAutoModeLogPanelOpened() {
+125:     return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
+126: }
+127: 
+128: export function addPollingInterval(stepKey, id) {
+129:     pollingIntervals[stepKey] = id; // Legacy
+130:     appState.setState({
+131:         pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
+132:     }, 'addPollingInterval');
+133: }
+134: export function clearPollingInterval(stepKey) {
+135:     if (pollingIntervals[stepKey]) {
+136:         clearInterval(pollingIntervals[stepKey]);
+137:         delete pollingIntervals[stepKey]; // Legacy
+138:     }
+139:     const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
+140:     const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
+141:     appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
+142: }
+143: export function getPollingInterval(stepKey) {
+144:     return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
+145: }
 146: 
 147: 
-148: // Export the appState for direct access to modern state management
-149: export { appState };
+148: 
+149: // Export the appState for direct access to modern state management
+150: export { appState };
 ```
 
 ## File: workflow_scripts/step5/run_tracking_manager.py
@@ -30088,7 +31376,7 @@ app_new.py
   87: LOGS_BASE_DIR = BASE_PATH_SCRIPTS / "logs"
   88: os.makedirs(LOGS_BASE_DIR, exist_ok=True)
   89: 
-  90: for step in range(1, 8):
+  90: for step in range(1, 9):
   91:     os.makedirs(LOGS_BASE_DIR / f"step{step}", exist_ok=True)
   92: 
   93: STEP0_PREP_LOG_DIR = Path(os.environ.get('STEP0_PREP_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step1")))
@@ -30310,1358 +31598,759 @@ app_new.py
  309:     "STEP4",
  310:     "STEP5",
  311:     "STEP6",
- 312:     "STEP7"
- 313: ]
- 314: 
- 315: if PYNVML_AVAILABLE:
- 316:     atexit.register(pynvml.nvmlShutdown)
- 317:     logger.info("pynvml shutdown hook registered")
- 318: def format_duration_seconds(seconds_total: float) -> str:
- 319:     if seconds_total is None or seconds_total < 0: return "N/A"
- 320:     seconds_total = int(seconds_total)
- 321:     hours, remainder = divmod(seconds_total, 3600)
- 322:     minutes, seconds = divmod(remainder, 60)
- 323:     time_str = ""
- 324:     if hours > 0: time_str += f"{hours}h "
- 325:     if minutes > 0 or hours > 0: time_str += f"{minutes}m "
- 326:     time_str += f"{seconds}s"
- 327:     return time_str.strip() if time_str else "0s"
- 328: 
- 329: def create_frontend_safe_config(config_dict: dict) -> dict:
- 330:     frontend_config = {}
- 331:     for step_key, step_data_orig in config_dict.items():
- 332:         frontend_step_data = {}
- 333:         for key, value in step_data_orig.items():
- 334:             if key == "progress_patterns":
- 335:                 pass
- 336:             elif isinstance(value, Path):
- 337:                 frontend_step_data[key] = str(value)
- 338:             elif key == "cmd" and isinstance(value, list):
- 339:                 frontend_step_data[key] = [str(item) for item in value]
- 340:             elif key == "specific_logs" and isinstance(value, list):
- 341:                 safe_logs = []
- 342:                 for log_entry in value:
- 343:                     safe_entry = log_entry.copy()
- 344:                     if 'path' in safe_entry and isinstance(safe_entry['path'], Path):
- 345:                         safe_entry['path'] = str(safe_entry['path'])
- 346:                     safe_logs.append(safe_entry)
- 347:                 frontend_step_data[key] = safe_logs
- 348:             else:
- 349:                 frontend_step_data[key] = value
- 350:         frontend_config[step_key] = frontend_step_data
- 351:     return frontend_config
- 352: 
- 353: def execute_csv_download_worker(dropbox_url, timestamp_str, fallback_url=None, original_filename=None):
- 354:     LOCAL_DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
- 355:     
- 356:     download_id = f"csv_{uuid.uuid4().hex[:8]}"
- 357:     
- 358:     download_info = {
- 359:         'id': download_id,
- 360:         'filename': 'Détermination en cours...',
- 361:         'original_url': dropbox_url,
- 362:         'url': dropbox_url,
- 363:         'url_type': 'dropbox',
- 364:         'status': 'pending',
- 365:         'progress': 0,
- 366:         'message': 'En attente de démarrage...',
- 367:         'timestamp': datetime.now(),
- 368:         'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
- 369:         'csv_timestamp': timestamp_str
- 370:     }
- 371:     
- 372:     CSVService.add_csv_download(download_id, download_info)
- 373:     
- 374:     def progress_callback(status, progress, message):
- 375:         """Callback to update CSVService with download progress."""
- 376:         update_kwargs = {
- 377:             'progress': progress,
- 378:             'message': message,
- 379:             'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
- 380:             'timestamp': datetime.now()
- 381:         }
- 382:         CSVService.update_csv_download(download_id, status, **update_kwargs)
- 383:     
- 384:     try:
- 385:         urls_to_try = [dropbox_url]
- 386:         if fallback_url and str(fallback_url).strip() and str(fallback_url).strip() != str(dropbox_url).strip():
- 387:             urls_to_try.append(str(fallback_url).strip())
- 388: 
- 389:         forced_name = str(original_filename).strip() if original_filename else None
- 390: 
- 391:         result = None
- 392:         last_attempt_url = dropbox_url
- 393:         for attempt_url in urls_to_try:
- 394:             last_attempt_url = attempt_url
- 395:             result = DownloadService.download_dropbox_file(
- 396:                 url=attempt_url,
- 397:                 timestamp=timestamp_str,
- 398:                 output_dir=LOCAL_DOWNLOADS_DIR,
- 399:                 progress_callback=progress_callback,
- 400:                 forced_filename=forced_name
- 401:             )
- 402:             if result and result.success:
- 403:                 break
- 404: 
- 405:         if result and result.success:
- 406:             CSVService.update_csv_download(
- 407:                 download_id,
- 408:                 'completed',
- 409:                 progress=100,
- 410:                 message=result.message,
- 411:                 filename=result.filename,
- 412:                 display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
- 413:                 timestamp=datetime.now()
- 414:             )
- 415:             
- 416:             try:
- 417:                 CSVService.add_to_download_history_with_timestamp(dropbox_url, timestamp_str)
- 418:                 if fallback_url and str(fallback_url).strip():
- 419:                     CSVService.add_to_download_history_with_timestamp(str(fallback_url).strip(), timestamp_str)
- 420:             except Exception as e:
- 421:                 APP_LOGGER.error(f"Error adding to download history: {e}")
- 422:             
- 423:             APP_LOGGER.info(f"CSV DOWNLOAD: File '{result.filename}' downloaded successfully ({result.size_bytes} bytes)")
- 424:         else:
- 425:             CSVService.update_csv_download(
- 426:                 download_id,
- 427:                 'failed',
- 428:                 message=result.message if result else 'N/A',
- 429:                 filename=result.filename if (result and result.filename) else 'N/A',
- 430:                 display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
- 431:                 timestamp=datetime.now()
- 432:             )
- 433:             APP_LOGGER.error(
- 434:                 f"CSV DOWNLOAD: Failed - {(result.message if result else 'N/A')} (last_url={last_attempt_url})"
- 435:             )
- 436:             
- 437:     except Exception as e:
- 438:         error_msg = f"Unexpected error: {str(e)}"
- 439:         APP_LOGGER.error(f"CSV DOWNLOAD: {error_msg}", exc_info=True)
- 440:         CSVService.update_csv_download(
- 441:             download_id,
- 442:             'failed',
- 443:             message=error_msg,
- 444:             display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
- 445:             timestamp=datetime.now()
- 446:         )
- 447:     
- 448:     APP_LOGGER.info(f"CSV DOWNLOAD: Worker for {download_id} completed")
- 449: 
- 450: def csv_monitor_service():
- 451:     """Service de monitoring Webhook qui s'exécute en arrière-plan."""
- 452:     APP_LOGGER.info("WEBHOOK MONITOR: Service démarré.")
- 453: 
- 454:     from services.csv_service import CSVService
- 455: 
- 456:     while True:
- 457:         try:
- 458:             workflow_state.update_csv_monitor_status(
- 459:                 status="checking",
- 460:                 last_check=datetime.now().isoformat(),
- 461:                 error=None
- 462:             )
- 463: 
- 464:             try:
- 465:                 CSVService._check_csv_for_downloads()
- 466:                 APP_LOGGER.debug("Webhook monitor check completed successfully")
- 467:             except Exception as check_error:
- 468:                 APP_LOGGER.error(f"Webhook monitor check error: {check_error}")
- 469:                 workflow_state.update_csv_monitor_status(
- 470:                     status="error",
- 471:                     last_check=datetime.now().isoformat(),
- 472:                     error=str(check_error)
- 473:                 )
- 474:                 time.sleep(WEBHOOK_MONITOR_INTERVAL)
- 475:                 continue
- 476: 
- 477:             workflow_state.update_csv_monitor_status(
- 478:                 status="active",
- 479:                 last_check=datetime.now().isoformat(),
- 480:                 error=None
- 481:             )
- 482: 
- 483:         except Exception as e:
- 484:             error_msg = f"Erreur dans le service CSV monitor: {e}"
- 485:             APP_LOGGER.error(error_msg, exc_info=True)
- 486:             workflow_state.update_csv_monitor_status(
- 487:                 status="error",
- 488:                 last_check=datetime.now().isoformat(),
- 489:                 error=error_msg
- 490:             )
- 491: 
- 492:         time.sleep(WEBHOOK_MONITOR_INTERVAL)
- 493: 
+ 312:     "STEP7",
+ 313:     "STEP8",
+ 314: ]
+ 315: 
+ 316: if PYNVML_AVAILABLE:
+ 317:     atexit.register(pynvml.nvmlShutdown)
+ 318:     logger.info("pynvml shutdown hook registered")
+ 319: def format_duration_seconds(seconds_total: float) -> str:
+ 320:     if seconds_total is None or seconds_total < 0: return "N/A"
+ 321:     seconds_total = int(seconds_total)
+ 322:     hours, remainder = divmod(seconds_total, 3600)
+ 323:     minutes, seconds = divmod(remainder, 60)
+ 324:     time_str = ""
+ 325:     if hours > 0: time_str += f"{hours}h "
+ 326:     if minutes > 0 or hours > 0: time_str += f"{minutes}m "
+ 327:     time_str += f"{seconds}s"
+ 328:     return time_str.strip() if time_str else "0s"
+ 329: 
+ 330: def create_frontend_safe_config(config_dict: dict) -> dict:
+ 331:     frontend_config = {}
+ 332:     for step_key, step_data_orig in config_dict.items():
+ 333:         frontend_step_data = {}
+ 334:         for key, value in step_data_orig.items():
+ 335:             if key == "progress_patterns":
+ 336:                 pass
+ 337:             elif isinstance(value, Path):
+ 338:                 frontend_step_data[key] = str(value)
+ 339:             elif key == "cmd" and isinstance(value, list):
+ 340:                 frontend_step_data[key] = [str(item) for item in value]
+ 341:             elif key == "specific_logs" and isinstance(value, list):
+ 342:                 safe_logs = []
+ 343:                 for log_entry in value:
+ 344:                     safe_entry = log_entry.copy()
+ 345:                     if 'path' in safe_entry and isinstance(safe_entry['path'], Path):
+ 346:                         safe_entry['path'] = str(safe_entry['path'])
+ 347:                     safe_logs.append(safe_entry)
+ 348:                 frontend_step_data[key] = safe_logs
+ 349:             else:
+ 350:                 frontend_step_data[key] = value
+ 351:         frontend_config[step_key] = frontend_step_data
+ 352:     return frontend_config
+ 353: 
+ 354: def execute_csv_download_worker(dropbox_url, timestamp_str, fallback_url=None, original_filename=None):
+ 355:     LOCAL_DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+ 356:     
+ 357:     download_id = f"csv_{uuid.uuid4().hex[:8]}"
+ 358:     
+ 359:     download_info = {
+ 360:         'id': download_id,
+ 361:         'filename': 'Détermination en cours...',
+ 362:         'original_url': dropbox_url,
+ 363:         'url': dropbox_url,
+ 364:         'url_type': 'dropbox',
+ 365:         'status': 'pending',
+ 366:         'progress': 0,
+ 367:         'message': 'En attente de démarrage...',
+ 368:         'timestamp': datetime.now(),
+ 369:         'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+ 370:         'csv_timestamp': timestamp_str
+ 371:     }
+ 372:     
+ 373:     CSVService.add_csv_download(download_id, download_info)
+ 374:     
+ 375:     def progress_callback(status, progress, message):
+ 376:         """Callback to update CSVService with download progress."""
+ 377:         update_kwargs = {
+ 378:             'progress': progress,
+ 379:             'message': message,
+ 380:             'display_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+ 381:             'timestamp': datetime.now()
+ 382:         }
+ 383:         CSVService.update_csv_download(download_id, status, **update_kwargs)
+ 384:     
+ 385:     try:
+ 386:         urls_to_try = [dropbox_url]
+ 387:         if fallback_url and str(fallback_url).strip() and str(fallback_url).strip() != str(dropbox_url).strip():
+ 388:             urls_to_try.append(str(fallback_url).strip())
+ 389: 
+ 390:         forced_name = str(original_filename).strip() if original_filename else None
+ 391: 
+ 392:         result = None
+ 393:         last_attempt_url = dropbox_url
+ 394:         for attempt_url in urls_to_try:
+ 395:             last_attempt_url = attempt_url
+ 396:             result = DownloadService.download_dropbox_file(
+ 397:                 url=attempt_url,
+ 398:                 timestamp=timestamp_str,
+ 399:                 output_dir=LOCAL_DOWNLOADS_DIR,
+ 400:                 progress_callback=progress_callback,
+ 401:                 forced_filename=forced_name
+ 402:             )
+ 403:             if result and result.success:
+ 404:                 break
+ 405: 
+ 406:         if result and result.success:
+ 407:             CSVService.update_csv_download(
+ 408:                 download_id,
+ 409:                 'completed',
+ 410:                 progress=100,
+ 411:                 message=result.message,
+ 412:                 filename=result.filename,
+ 413:                 display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+ 414:                 timestamp=datetime.now()
+ 415:             )
+ 416:             
+ 417:             try:
+ 418:                 CSVService.add_to_download_history_with_timestamp(dropbox_url, timestamp_str)
+ 419:                 if fallback_url and str(fallback_url).strip():
+ 420:                     CSVService.add_to_download_history_with_timestamp(str(fallback_url).strip(), timestamp_str)
+ 421:             except Exception as e:
+ 422:                 APP_LOGGER.error(f"Error adding to download history: {e}")
+ 423:             
+ 424:             APP_LOGGER.info(f"CSV DOWNLOAD: File '{result.filename}' downloaded successfully ({result.size_bytes} bytes)")
+ 425:         else:
+ 426:             CSVService.update_csv_download(
+ 427:                 download_id,
+ 428:                 'failed',
+ 429:                 message=result.message if result else 'N/A',
+ 430:                 filename=result.filename if (result and result.filename) else 'N/A',
+ 431:                 display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+ 432:                 timestamp=datetime.now()
+ 433:             )
+ 434:             APP_LOGGER.error(
+ 435:                 f"CSV DOWNLOAD: Failed - {(result.message if result else 'N/A')} (last_url={last_attempt_url})"
+ 436:             )
+ 437:             
+ 438:     except Exception as e:
+ 439:         error_msg = f"Unexpected error: {str(e)}"
+ 440:         APP_LOGGER.error(f"CSV DOWNLOAD: {error_msg}", exc_info=True)
+ 441:         CSVService.update_csv_download(
+ 442:             download_id,
+ 443:             'failed',
+ 444:             message=error_msg,
+ 445:             display_timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+ 446:             timestamp=datetime.now()
+ 447:         )
+ 448:     
+ 449:     APP_LOGGER.info(f"CSV DOWNLOAD: Worker for {download_id} completed")
+ 450: 
+ 451: def csv_monitor_service():
+ 452:     """Service de monitoring Webhook qui s'exécute en arrière-plan."""
+ 453:     APP_LOGGER.info("WEBHOOK MONITOR: Service démarré.")
+ 454: 
+ 455:     from services.csv_service import CSVService
+ 456: 
+ 457:     while True:
+ 458:         try:
+ 459:             workflow_state.update_csv_monitor_status(
+ 460:                 status="checking",
+ 461:                 last_check=datetime.now().isoformat(),
+ 462:                 error=None
+ 463:             )
+ 464: 
+ 465:             try:
+ 466:                 CSVService._check_csv_for_downloads()
+ 467:                 APP_LOGGER.debug("Webhook monitor check completed successfully")
+ 468:             except Exception as check_error:
+ 469:                 APP_LOGGER.error(f"Webhook monitor check error: {check_error}")
+ 470:                 workflow_state.update_csv_monitor_status(
+ 471:                     status="error",
+ 472:                     last_check=datetime.now().isoformat(),
+ 473:                     error=str(check_error)
+ 474:                 )
+ 475:                 time.sleep(WEBHOOK_MONITOR_INTERVAL)
+ 476:                 continue
+ 477: 
+ 478:             workflow_state.update_csv_monitor_status(
+ 479:                 status="active",
+ 480:                 last_check=datetime.now().isoformat(),
+ 481:                 error=None
+ 482:             )
+ 483: 
+ 484:         except Exception as e:
+ 485:             error_msg = f"Erreur dans le service CSV monitor: {e}"
+ 486:             APP_LOGGER.error(error_msg, exc_info=True)
+ 487:             workflow_state.update_csv_monitor_status(
+ 488:                 status="error",
+ 489:                 last_check=datetime.now().isoformat(),
+ 490:                 error=error_msg
+ 491:             )
+ 492: 
+ 493:         time.sleep(WEBHOOK_MONITOR_INTERVAL)
  494: 
- 495: def run_process_async(step_key: str):
- 496:     from services.workflow_service import WorkflowService
- 497:     
- 498:     APP_LOGGER.info(f"[RUN_PROCESS] Starting execution for {step_key}")
- 499: 
- 500:     projects_dir = os.path.join(BASE_PATH_SCRIPTS, 'projets_extraits')
- 501:     os.makedirs(projects_dir, exist_ok=True)
- 502: 
- 503:     config = workflow_commands_config.get_step_config(step_key)
- 504:     if not config:
- 505:         APP_LOGGER.error(f"Invalid step_key: {step_key}")
- 506:         return
- 507:     workflow_state.update_step_status(step_key, 'starting')
- 508:     workflow_state.clear_step_log(step_key)
- 509:     workflow_state.append_step_log(step_key, f"--- Lancement de: {html.escape(config['display_name'])} ---\n")
- 510:     workflow_state.update_step_info(
- 511:         step_key,
- 512:         return_code=None,
- 513:         progress_current=0,
- 514:         progress_total=0,
- 515:         progress_text='',
- 516:         start_time_epoch=time.time(),
- 517:         duration_str=None
- 518:     )
- 519: 
+ 495: 
+ 496: def run_process_async(step_key: str):
+ 497:     from services.workflow_service import WorkflowService
+ 498:     
+ 499:     APP_LOGGER.info(f"[RUN_PROCESS] Starting execution for {step_key}")
+ 500: 
+ 501:     projects_dir = os.path.join(BASE_PATH_SCRIPTS, 'projets_extraits')
+ 502:     os.makedirs(projects_dir, exist_ok=True)
+ 503: 
+ 504:     config = workflow_commands_config.get_step_config(step_key)
+ 505:     if not config:
+ 506:         APP_LOGGER.error(f"Invalid step_key: {step_key}")
+ 507:         return
+ 508:     workflow_state.update_step_status(step_key, 'starting')
+ 509:     workflow_state.clear_step_log(step_key)
+ 510:     workflow_state.append_step_log(step_key, f"--- Lancement de: {html.escape(config['display_name'])} ---\n")
+ 511:     workflow_state.update_step_info(
+ 512:         step_key,
+ 513:         return_code=None,
+ 514:         progress_current=0,
+ 515:         progress_total=0,
+ 516:         progress_text='',
+ 517:         start_time_epoch=time.time(),
+ 518:         duration_str=None
+ 519:     )
  520: 
- 521:     
- 522:     cmd_str_list = [str(c) for c in config['cmd']]
- 523:     temp_json_path_for_tracking = None
- 524: 
- 525:     if step_key == "STEP5":
- 526:         workflow_state.append_step_log(step_key, "Préparation de l'étape de tracking : recherche des vidéos à traiter...\n")
- 527:         try:
- 528:             videos_to_process = WorkflowService.prepare_tracking_step(
- 529:                 BASE_TRACKING_LOG_SEARCH_PATH,
- 530:                 KEYWORD_FILTER_TRACKING_ENV,
- 531:                 SUBDIR_FILTER_TRACKING_ENV
- 532:             )
- 533:             
- 534:             if not videos_to_process:
- 535:                 APP_LOGGER.info(f"{step_key}: No videos require tracking, completing immediately")
- 536:                 workflow_state.append_step_log(step_key, "Toutes les vidéos candidates semblent déjà traitées (aucun .mp4/.mov/... sans .json trouvé). Étape terminée.\n")
- 537:                 workflow_state.update_step_info(step_key, status='completed', return_code=0)
- 538:                 start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
- 539:                 workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
- 540:                 return
- 541: 
- 542:             temp_json_path_for_tracking = WorkflowService.create_tracking_temp_file(videos_to_process)
- 543:             cmd_str_list.extend(["--videos_json_path", str(temp_json_path_for_tracking)])
- 544:             workflow_state.append_step_log(step_key, f"{len(videos_to_process)} vidéo(s) ajoutée(s) au lot de traitement.\nLe script gestionnaire va maintenant prendre le relais.\n\n")
- 545: 
- 546:         except Exception as e_prep:
- 547:             APP_LOGGER.error(f"{step_key}: Preparation failed - {e_prep}", exc_info=True)
- 548:             error_msg = f"Erreur lors de la préparation de l'étape de tracking: {e_prep}"
- 549:             workflow_state.append_step_log(step_key, html.escape(error_msg))
- 550:             workflow_state.update_step_info(step_key, status='failed', return_code=-1)
- 551:             return
- 552: 
- 553:     workflow_state.append_step_log(step_key, f"Commande: {html.escape(' '.join(cmd_str_list))}\n")
- 554:     workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(config['cwd']))}\n\n")
- 555:     
- 556:     step_progress_patterns = config.get("progress_patterns", {})
- 557:     total_pattern_re = step_progress_patterns.get("total")
- 558:     current_pattern_re = step_progress_patterns.get("current")
- 559:     current_success_line_pattern_re = step_progress_patterns.get("current_success_line_pattern")
- 560:     current_item_counter = 0
- 561: 
- 562:     try:
- 563:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} executing command: {cmd_str_list}")
- 564:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} working directory: {config['cwd']}")
- 565: 
- 566:         process_env = os.environ.copy()
- 567:         process_env["PYTHONIOENCODING"] = "UTF-8"; process_env["PYTHONUTF8"] = "1"
- 568: 
- 569:         if step_key == "STEP3":
- 570:             try:
- 571:                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
- 572:             except Exception as _e:
- 573:                 APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF: {_e}")
- 574: 
- 575:         if step_key == "STEP4":
- 576:             try:
- 577:                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
- 578:                 process_env["AUDIO_PARTIAL_SUCCESS_OK"] = "1"
- 579:             except Exception as _e:
- 580:                 APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
- 581: 
- 582:         process = subprocess.Popen(
- 583:             cmd_str_list, cwd=str(config['cwd']),
- 584:             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
- 585:             text=True, bufsize=1, encoding='utf-8', errors='replace', env=process_env
- 586:         )
- 587: 
- 588:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess started successfully (PID: {process.pid})")
- 589: 
- 590:         workflow_state.set_step_process(step_key, process)
- 591:         workflow_state.update_step_status(step_key, 'running')
- 592:         running_status_start_time = time.time()
- 593: 
- 594:         log_deque = workflow_state.get_step_log_deque(step_key)
- 595: 
- 596:         if process.stdout:
- 597:             for line in iter(process.stdout.readline, ''):
- 598:                 line_strip = line.strip()
- 599: 
- 600:                 if line_strip.startswith("[Progression-MultiLine]"):
- 601:                     progress_data = line_strip.replace("[Progression-MultiLine]", "", 1)
- 602:                     text_progress = progress_data.replace(" || ", "\n")
- 603:                     workflow_state.set_step_field(step_key, 'progress_text', text_progress)
- 604:                     continue
- 605: 
- 606:                 if '\r' in line or '\x1b[' in line or '\033[' in line:
- 607:                     continue
- 608: 
- 609:                 if log_deque is not None:
- 610:                     log_deque.append(html.escape(line))
- 611:                 try:
- 612:                     APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT: {line_strip}")
- 613:                 except UnicodeEncodeError:
- 614:                     APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT (ascii): {line_strip.encode('ascii', 'replace').decode('ascii')}")
- 615: 
- 616:                 if total_pattern_re:
- 617:                     total_match = total_pattern_re.search(line_strip)
- 618:                     if total_match:
- 619:                         try:
- 620:                             workflow_state.set_step_field(step_key, 'progress_total', int(total_match.group(1)))
- 621:                             files_completed = workflow_state.get_step_field(step_key, 'files_completed')
- 622:                             if files_completed is None or not isinstance(files_completed, int):
- 623:                                 workflow_state.set_step_field(step_key, 'files_completed', 0)
- 624:                         except (ValueError, IndexError):
- 625:                             APP_LOGGER.warning(f"[{step_key}] ProgTotal parse error: {line_strip}")
- 626: 
- 627:                 if current_pattern_re:
- 628:                     current_match = current_pattern_re.search(line_strip)
- 629:                     if current_match:
- 630:                         try:
- 631:                             groups = current_match.groups()
- 632: 
- 633:                             if len(groups) >= 3 and groups[0].isdigit() and groups[1].isdigit():
- 634:                                 current_num = int(groups[0])
- 635:                                 total_num = int(groups[1])
- 636:                                 filename = groups[2].strip()
- 637:                                 workflow_state.set_step_field(step_key, 'progress_current', current_num)
- 638:                                 if workflow_state.get_step_field(step_key, 'progress_total', 0) == 0:
- 639:                                     workflow_state.set_step_field(step_key, 'progress_total', total_num)
- 640:                                 if filename:
- 641:                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
- 642:                             elif len(groups) >= 1 and step_key == 'STEP3':
- 643:                                 filename = groups[0].strip()
- 644:                                 if filename:
- 645:                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
- 646:                                 progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
- 647:                                 if progress_total > 0:
- 648:                                     files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
- 649:                                     workflow_state.set_step_field(step_key, 'progress_current', min(progress_total, max(files_completed, 0) + 1))
- 650:                                     workflow_state.set_step_field(step_key, 'progress_current_fractional', min(float(progress_total), float(workflow_state.get_step_field(step_key, 'progress_current', 0)) - 0.0 + 0.01))
- 651:                             else:
- 652:                                 filename = groups[0].strip() if len(groups) >= 1 else ""
- 653:                                 percent = int(groups[1]) if len(groups) >= 2 and str(groups[1]).isdigit() else None
- 654:                                 if filename:
- 655:                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
- 656:                                 progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
- 657:                                 if percent is not None and progress_total > 0:
- 658:                                     files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
- 659:                                     current_file_progress = max(0.0, min(0.99, percent / 100.0))
- 660:                                     overall_progress = (files_completed + current_file_progress)
- 661:                                     workflow_state.set_step_field(step_key, 'progress_current_fractional', max(0.0, min(float(progress_total), overall_progress)))
- 662:                         except (ValueError, IndexError):
- 663:                             APP_LOGGER.warning(f"[{step_key}] ProgCurrent parse error: {line_strip}")
- 664: 
- 665:                 internal_pattern_re = step_progress_patterns.get("internal")
- 666:                 if internal_pattern_re:
- 667:                     internal_match = internal_pattern_re.search(line_strip)
- 668:                     if internal_match:
- 669:                         try:
- 670:                             groups = internal_match.groups()
- 671: 
- 672:                             if len(groups) >= 4:
- 673:                                 current_batch = int(groups[0])
- 674:                                 total_batches = int(groups[1])
- 675:                                 percent = int(groups[2])
- 676:                                 filename = groups[3].strip() if groups[3] else ""
- 677:                             elif len(groups) >= 2:
- 678:                                 filename = groups[0].strip() if groups[0] else ""
- 679:                                 percent = int(groups[1])
- 680:                                 current_batch = percent
- 681:                                 total_batches = 100
- 682:                             else:
- 683:                                 continue
- 684: 
- 685:                             progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
- 686:                             if progress_total > 0:
- 687:                                 files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
- 688:                                 current_file_progress = max(0.0, min(0.99, percent / 100.0))
- 689:                                 overall_progress_files = files_completed + current_file_progress
- 690:                                 overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
- 691:                                 workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
- 692: 
- 693:                             if filename:
- 694:                                 workflow_state.set_step_field(step_key, 'progress_text', html.escape(f"{filename} ({percent}%)"))
- 695: 
- 696:                         except (ValueError, IndexError):
- 697:                             APP_LOGGER.warning(f"[{step_key}] Internal progress parse error: {line_strip}")
- 698: 
- 699:                 internal_simple_re = step_progress_patterns.get("internal_simple")
- 700:                 if internal_simple_re:
- 701:                     internal_simple_match = internal_simple_re.search(line_strip)
- 702:                     if internal_simple_match:
- 703:                         try:
- 704:                             batches = int(internal_simple_match.group(1))
- 705:                             filename = internal_simple_match.group(2).strip() if internal_simple_match.group(2) else ""
- 706:                             progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
- 707:                             if progress_total > 0:
- 708:                                 files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
- 709:                                 current_file_progress = 0.01
- 710:                                 overall_progress_files = files_completed + current_file_progress
- 711:                                 overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
- 712:                                 workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
- 713:                             if filename:
- 714:                                 workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
- 715:                         except Exception:
- 716:                             APP_LOGGER.warning(f"[{step_key}] Internal simple progress parse error: {line_strip}")
- 717: 
- 718:                 if current_success_line_pattern_re:
- 719:                     success_match = current_success_line_pattern_re.search(line_strip)
- 720:                     if success_match:
- 721:                         current_item_counter += 1
- 722:                         workflow_state.set_step_field(step_key, 'progress_current', current_item_counter)
- 723:                         workflow_state.set_step_field(step_key, 'files_completed', current_item_counter)
- 724:                         workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
- 725:                         if step_progress_patterns.get("current_item_text_from_success_line"):
- 726:                             try:
- 727:                                 workflow_state.set_step_field(step_key, 'progress_text', html.escape(success_match.group(1).strip()))
- 728:                             except IndexError:
- 729:                                 pass
- 730:             
- 731:             process.stdout.close()
- 732:         subprocess_start_time = time.time()
- 733:         process.wait()
- 734:         subprocess_duration = time.time() - subprocess_start_time
- 735: 
- 736:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess completed in {subprocess_duration:.2f} seconds (return_code: {process.returncode})")
- 737: 
- 738:         running_status_duration = time.time() - running_status_start_time
- 739:         min_running_time = 0.6
- 740: 
- 741:         if running_status_duration < min_running_time:
- 742:             sleep_time = min_running_time - running_status_duration
- 743:             APP_LOGGER.info(f"[TIMING_FIX] {step_key} ensuring minimum running time: sleeping {sleep_time:.3f}s (total running time will be {min_running_time:.3f}s)")
- 744:             time.sleep(sleep_time)
- 745: 
- 746:         workflow_state.update_step_info(
- 747:             step_key,
- 748:             return_code=process.returncode,
- 749:             status='completed' if process.returncode == 0 else 'failed'
- 750:         )
- 751:         log_suffix = "terminé avec succès" if process.returncode == 0 else f"a échoué (code: {process.returncode})"
- 752:         workflow_state.append_step_log(step_key, f"\n--- {html.escape(config['display_name'])} {log_suffix} ---")
- 753: 
- 754:         status = workflow_state.get_step_status(step_key)
- 755:         progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
- 756:         progress_current = workflow_state.get_step_field(step_key, 'progress_current', 0)
- 757:         if status == 'completed' and progress_total > 0 and progress_current < progress_total:
- 758:             workflow_state.set_step_field(step_key, 'progress_current', progress_total)
- 759:         progress_text = workflow_state.get_step_field(step_key, 'progress_text', '')
- 760:         if not progress_text and status == 'completed':
- 761:             workflow_state.set_step_field(step_key, 'progress_text', "Terminé")
- 762:     except FileNotFoundError:
- 763:         APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - executable not found: {cmd_str_list[0] if cmd_str_list else 'N/A'}")
- 764: 
- 765:         error_msg = f"Erreur: Exécutable non trouvé pour {step_key}: {cmd_str_list[0]}"
- 766:         workflow_state.append_step_log(step_key, html.escape(error_msg))
- 767:         workflow_state.update_step_info(step_key, status='failed', return_code=-1)
- 768:         APP_LOGGER.error(error_msg)
- 769:     except Exception as e:
- 770:         APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - general exception: {e}")
- 771: 
- 772:         error_msg = f"Erreur exécution {step_key}: {str(e)}"
- 773:         workflow_state.append_step_log(step_key, html.escape(error_msg))
- 774:         workflow_state.update_step_info(step_key, status='failed', return_code=-1)
- 775:         APP_LOGGER.error(f"Exception run_process_async pour {step_key}: {e}", exc_info=True)
- 776:     finally:
- 777:         start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
- 778:         workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
- 779:         workflow_state.set_step_process(step_key, None)
- 780:         if temp_json_path_for_tracking and temp_json_path_for_tracking.exists():
- 781:             try:
- 782:                 os.remove(temp_json_path_for_tracking)
- 783:                 APP_LOGGER.info(f"Fichier temporaire de tracking '{temp_json_path_for_tracking.name}' supprimé.")
- 784:             except Exception as e_clean:
- 785:                 APP_LOGGER.error(f"Impossible de supprimer le fichier temporaire de tracking '{temp_json_path_for_tracking.name}': {e_clean}")
- 786: 
+ 521: 
+ 522:     
+ 523:     cmd_str_list = [str(c) for c in config['cmd']]
+ 524:     temp_json_path_for_tracking = None
+ 525: 
+ 526:     if step_key == "STEP5":
+ 527:         workflow_state.append_step_log(step_key, "Préparation de l'étape de tracking : recherche des vidéos à traiter...\n")
+ 528:         try:
+ 529:             videos_to_process = WorkflowService.prepare_tracking_step(
+ 530:                 BASE_TRACKING_LOG_SEARCH_PATH,
+ 531:                 KEYWORD_FILTER_TRACKING_ENV,
+ 532:                 SUBDIR_FILTER_TRACKING_ENV
+ 533:             )
+ 534:             
+ 535:             if not videos_to_process:
+ 536:                 APP_LOGGER.info(f"{step_key}: No videos require tracking, completing immediately")
+ 537:                 workflow_state.append_step_log(step_key, "Toutes les vidéos candidates semblent déjà traitées (aucun .mp4/.mov/... sans .json trouvé). Étape terminée.\n")
+ 538:                 workflow_state.update_step_info(step_key, status='completed', return_code=0)
+ 539:                 start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
+ 540:                 workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
+ 541:                 return
+ 542: 
+ 543:             temp_json_path_for_tracking = WorkflowService.create_tracking_temp_file(videos_to_process)
+ 544:             cmd_str_list.extend(["--videos_json_path", str(temp_json_path_for_tracking)])
+ 545:             workflow_state.append_step_log(step_key, f"{len(videos_to_process)} vidéo(s) ajoutée(s) au lot de traitement.\nLe script gestionnaire va maintenant prendre le relais.\n\n")
+ 546: 
+ 547:         except Exception as e_prep:
+ 548:             APP_LOGGER.error(f"{step_key}: Preparation failed - {e_prep}", exc_info=True)
+ 549:             error_msg = f"Erreur lors de la préparation de l'étape de tracking: {e_prep}"
+ 550:             workflow_state.append_step_log(step_key, html.escape(error_msg))
+ 551:             workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+ 552:             return
+ 553: 
+ 554:     workflow_state.append_step_log(step_key, f"Commande: {html.escape(' '.join(cmd_str_list))}\n")
+ 555:     workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(config['cwd']))}\n\n")
+ 556:     
+ 557:     step_progress_patterns = config.get("progress_patterns", {})
+ 558:     total_pattern_re = step_progress_patterns.get("total")
+ 559:     current_pattern_re = step_progress_patterns.get("current")
+ 560:     current_success_line_pattern_re = step_progress_patterns.get("current_success_line_pattern")
+ 561:     current_item_counter = 0
+ 562: 
+ 563:     try:
+ 564:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} executing command: {cmd_str_list}")
+ 565:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} working directory: {config['cwd']}")
+ 566: 
+ 567:         process_env = os.environ.copy()
+ 568:         process_env["PYTHONIOENCODING"] = "UTF-8"; process_env["PYTHONUTF8"] = "1"
+ 569: 
+ 570:         if step_key == "STEP3":
+ 571:             try:
+ 572:                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+ 573:             except Exception as _e:
+ 574:                 APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF: {_e}")
+ 575: 
+ 576:         if step_key == "STEP4":
+ 577:             try:
+ 578:                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
+ 579:                 process_env["AUDIO_PARTIAL_SUCCESS_OK"] = "1"
+ 580:             except Exception as _e:
+ 581:                 APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
+ 582: 
+ 583:         process = subprocess.Popen(
+ 584:             cmd_str_list, cwd=str(config['cwd']),
+ 585:             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+ 586:             text=True, bufsize=1, encoding='utf-8', errors='replace', env=process_env
+ 587:         )
+ 588: 
+ 589:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess started successfully (PID: {process.pid})")
+ 590: 
+ 591:         workflow_state.set_step_process(step_key, process)
+ 592:         workflow_state.update_step_status(step_key, 'running')
+ 593:         running_status_start_time = time.time()
+ 594: 
+ 595:         log_deque = workflow_state.get_step_log_deque(step_key)
+ 596: 
+ 597:         if process.stdout:
+ 598:             for line in iter(process.stdout.readline, ''):
+ 599:                 line_strip = line.strip()
+ 600: 
+ 601:                 if line_strip.startswith("[Progression-MultiLine]"):
+ 602:                     progress_data = line_strip.replace("[Progression-MultiLine]", "", 1)
+ 603:                     text_progress = progress_data.replace(" || ", "\n")
+ 604:                     workflow_state.set_step_field(step_key, 'progress_text', text_progress)
+ 605:                     continue
+ 606: 
+ 607:                 if '\r' in line or '\x1b[' in line or '\033[' in line:
+ 608:                     continue
+ 609: 
+ 610:                 if log_deque is not None:
+ 611:                     log_deque.append(html.escape(line))
+ 612:                 try:
+ 613:                     APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT: {line_strip}")
+ 614:                 except UnicodeEncodeError:
+ 615:                     APP_LOGGER.debug(f"[{step_key}] SCRIPT_OUT (ascii): {line_strip.encode('ascii', 'replace').decode('ascii')}")
+ 616: 
+ 617:                 if total_pattern_re:
+ 618:                     total_match = total_pattern_re.search(line_strip)
+ 619:                     if total_match:
+ 620:                         try:
+ 621:                             workflow_state.set_step_field(step_key, 'progress_total', int(total_match.group(1)))
+ 622:                             files_completed = workflow_state.get_step_field(step_key, 'files_completed')
+ 623:                             if files_completed is None or not isinstance(files_completed, int):
+ 624:                                 workflow_state.set_step_field(step_key, 'files_completed', 0)
+ 625:                         except (ValueError, IndexError):
+ 626:                             APP_LOGGER.warning(f"[{step_key}] ProgTotal parse error: {line_strip}")
+ 627: 
+ 628:                 if current_pattern_re:
+ 629:                     current_match = current_pattern_re.search(line_strip)
+ 630:                     if current_match:
+ 631:                         try:
+ 632:                             groups = current_match.groups()
+ 633: 
+ 634:                             if len(groups) >= 3 and groups[0].isdigit() and groups[1].isdigit():
+ 635:                                 current_num = int(groups[0])
+ 636:                                 total_num = int(groups[1])
+ 637:                                 filename = groups[2].strip()
+ 638:                                 workflow_state.set_step_field(step_key, 'progress_current', current_num)
+ 639:                                 if workflow_state.get_step_field(step_key, 'progress_total', 0) == 0:
+ 640:                                     workflow_state.set_step_field(step_key, 'progress_total', total_num)
+ 641:                                 if filename:
+ 642:                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+ 643:                             elif len(groups) >= 1 and step_key == 'STEP3':
+ 644:                                 filename = groups[0].strip()
+ 645:                                 if filename:
+ 646:                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+ 647:                                 progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+ 648:                                 if progress_total > 0:
+ 649:                                     files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+ 650:                                     workflow_state.set_step_field(step_key, 'progress_current', min(progress_total, max(files_completed, 0) + 1))
+ 651:                                     workflow_state.set_step_field(step_key, 'progress_current_fractional', min(float(progress_total), float(workflow_state.get_step_field(step_key, 'progress_current', 0)) - 0.0 + 0.01))
+ 652:                             else:
+ 653:                                 filename = groups[0].strip() if len(groups) >= 1 else ""
+ 654:                                 percent = int(groups[1]) if len(groups) >= 2 and str(groups[1]).isdigit() else None
+ 655:                                 if filename:
+ 656:                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+ 657:                                 progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+ 658:                                 if percent is not None and progress_total > 0:
+ 659:                                     files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+ 660:                                     current_file_progress = max(0.0, min(0.99, percent / 100.0))
+ 661:                                     overall_progress = (files_completed + current_file_progress)
+ 662:                                     workflow_state.set_step_field(step_key, 'progress_current_fractional', max(0.0, min(float(progress_total), overall_progress)))
+ 663:                         except (ValueError, IndexError):
+ 664:                             APP_LOGGER.warning(f"[{step_key}] ProgCurrent parse error: {line_strip}")
+ 665: 
+ 666:                 internal_pattern_re = step_progress_patterns.get("internal")
+ 667:                 if internal_pattern_re:
+ 668:                     internal_match = internal_pattern_re.search(line_strip)
+ 669:                     if internal_match:
+ 670:                         try:
+ 671:                             groups = internal_match.groups()
+ 672: 
+ 673:                             if len(groups) >= 4:
+ 674:                                 current_batch = int(groups[0])
+ 675:                                 total_batches = int(groups[1])
+ 676:                                 percent = int(groups[2])
+ 677:                                 filename = groups[3].strip() if groups[3] else ""
+ 678:                             elif len(groups) >= 2:
+ 679:                                 filename = groups[0].strip() if groups[0] else ""
+ 680:                                 percent = int(groups[1])
+ 681:                                 current_batch = percent
+ 682:                                 total_batches = 100
+ 683:                             else:
+ 684:                                 continue
+ 685: 
+ 686:                             progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+ 687:                             if progress_total > 0:
+ 688:                                 files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+ 689:                                 current_file_progress = max(0.0, min(0.99, percent / 100.0))
+ 690:                                 overall_progress_files = files_completed + current_file_progress
+ 691:                                 overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
+ 692:                                 workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
+ 693: 
+ 694:                             if filename:
+ 695:                                 workflow_state.set_step_field(step_key, 'progress_text', html.escape(f"{filename} ({percent}%)"))
+ 696: 
+ 697:                         except (ValueError, IndexError):
+ 698:                             APP_LOGGER.warning(f"[{step_key}] Internal progress parse error: {line_strip}")
+ 699: 
+ 700:                 internal_simple_re = step_progress_patterns.get("internal_simple")
+ 701:                 if internal_simple_re:
+ 702:                     internal_simple_match = internal_simple_re.search(line_strip)
+ 703:                     if internal_simple_match:
+ 704:                         try:
+ 705:                             batches = int(internal_simple_match.group(1))
+ 706:                             filename = internal_simple_match.group(2).strip() if internal_simple_match.group(2) else ""
+ 707:                             progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+ 708:                             if progress_total > 0:
+ 709:                                 files_completed = int(workflow_state.get_step_field(step_key, 'files_completed', max(0, int(workflow_state.get_step_field(step_key, 'progress_current', 0)))))
+ 710:                                 current_file_progress = 0.01
+ 711:                                 overall_progress_files = files_completed + current_file_progress
+ 712:                                 overall_progress_files = max(0.0, min(float(progress_total), overall_progress_files))
+ 713:                                 workflow_state.set_step_field(step_key, 'progress_current_fractional', overall_progress_files)
+ 714:                             if filename:
+ 715:                                 workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
+ 716:                         except Exception:
+ 717:                             APP_LOGGER.warning(f"[{step_key}] Internal simple progress parse error: {line_strip}")
+ 718: 
+ 719:                 if current_success_line_pattern_re:
+ 720:                     success_match = current_success_line_pattern_re.search(line_strip)
+ 721:                     if success_match:
+ 722:                         current_item_counter += 1
+ 723:                         workflow_state.set_step_field(step_key, 'progress_current', current_item_counter)
+ 724:                         workflow_state.set_step_field(step_key, 'files_completed', current_item_counter)
+ 725:                         workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
+ 726:                         if step_progress_patterns.get("current_item_text_from_success_line"):
+ 727:                             try:
+ 728:                                 workflow_state.set_step_field(step_key, 'progress_text', html.escape(success_match.group(1).strip()))
+ 729:                             except IndexError:
+ 730:                                 pass
+ 731:             
+ 732:             process.stdout.close()
+ 733:         subprocess_start_time = time.time()
+ 734:         process.wait()
+ 735:         subprocess_duration = time.time() - subprocess_start_time
+ 736: 
+ 737:         APP_LOGGER.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess completed in {subprocess_duration:.2f} seconds (return_code: {process.returncode})")
+ 738: 
+ 739:         running_status_duration = time.time() - running_status_start_time
+ 740:         min_running_time = 0.6
+ 741: 
+ 742:         if running_status_duration < min_running_time:
+ 743:             sleep_time = min_running_time - running_status_duration
+ 744:             APP_LOGGER.info(f"[TIMING_FIX] {step_key} ensuring minimum running time: sleeping {sleep_time:.3f}s (total running time will be {min_running_time:.3f}s)")
+ 745:             time.sleep(sleep_time)
+ 746: 
+ 747:         workflow_state.update_step_info(
+ 748:             step_key,
+ 749:             return_code=process.returncode,
+ 750:             status='completed' if process.returncode == 0 else 'failed'
+ 751:         )
+ 752:         log_suffix = "terminé avec succès" if process.returncode == 0 else f"a échoué (code: {process.returncode})"
+ 753:         workflow_state.append_step_log(step_key, f"\n--- {html.escape(config['display_name'])} {log_suffix} ---")
+ 754: 
+ 755:         status = workflow_state.get_step_status(step_key)
+ 756:         progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+ 757:         progress_current = workflow_state.get_step_field(step_key, 'progress_current', 0)
+ 758:         if status == 'completed' and progress_total > 0 and progress_current < progress_total:
+ 759:             workflow_state.set_step_field(step_key, 'progress_current', progress_total)
+ 760:         progress_text = workflow_state.get_step_field(step_key, 'progress_text', '')
+ 761:         if not progress_text and status == 'completed':
+ 762:             workflow_state.set_step_field(step_key, 'progress_text', "Terminé")
+ 763:     except FileNotFoundError:
+ 764:         APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - executable not found: {cmd_str_list[0] if cmd_str_list else 'N/A'}")
+ 765: 
+ 766:         error_msg = f"Erreur: Exécutable non trouvé pour {step_key}: {cmd_str_list[0]}"
+ 767:         workflow_state.append_step_log(step_key, html.escape(error_msg))
+ 768:         workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+ 769:         APP_LOGGER.error(error_msg)
+ 770:     except Exception as e:
+ 771:         APP_LOGGER.error(f"[EARLY_RETURN_DEBUG] {step_key} failing - general exception: {e}")
+ 772: 
+ 773:         error_msg = f"Erreur exécution {step_key}: {str(e)}"
+ 774:         workflow_state.append_step_log(step_key, html.escape(error_msg))
+ 775:         workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+ 776:         APP_LOGGER.error(f"Exception run_process_async pour {step_key}: {e}", exc_info=True)
+ 777:     finally:
+ 778:         start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
+ 779:         workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))
+ 780:         workflow_state.set_step_process(step_key, None)
+ 781:         if temp_json_path_for_tracking and temp_json_path_for_tracking.exists():
+ 782:             try:
+ 783:                 os.remove(temp_json_path_for_tracking)
+ 784:                 APP_LOGGER.info(f"Fichier temporaire de tracking '{temp_json_path_for_tracking.name}' supprimé.")
+ 785:             except Exception as e_clean:
+ 786:                 APP_LOGGER.error(f"Impossible de supprimer le fichier temporaire de tracking '{temp_json_path_for_tracking.name}': {e_clean}")
  787: 
- 788: def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="Custom"):
- 789:     """Execute a sequence of workflow steps.
- 790:     
- 791:     This function has been migrated to use WorkflowState for sequence management.
- 792:     
- 793:     Args:
- 794:         steps_to_run_list: List of step keys to execute in order
- 795:         sequence_type: Type of sequence ('Full', 'Remote', 'Custom', etc.)
- 796:     """
- 797:     APP_LOGGER.info("🔥🔥🔥 [SEQUENCE_WORKER_TEST] UPDATED SEQUENCE WORKER WITH DEBUGGING IS RUNNING! 🔥🔥🔥")
- 798:     
- 799:     if sequence_type != "InternalPollingCheck" and workflow_state.is_sequence_running():
- 800:         APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Tentative de lancement alors qu'une séquence est déjà en cours.")
- 801:         return
- 802:     
- 803:     if not workflow_state.start_sequence(sequence_type):
- 804:         APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Could not start - already running")
- 805:         return
- 806:     
- 807:     APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence démarrée.")
- 808:     all_steps_succeeded = True; sequence_summary_data = []
- 809:     try:
- 810:         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Thread démarré pour {len(steps_to_run_list)} étapes: {steps_to_run_list}")
- 811: 
- 812:         APP_LOGGER.info(f"[CACHE_CLEAR_TEST] *** UPDATED CODE IS RUNNING - CACHE CLEARED SUCCESSFULLY ***")
- 813:         for i, step_key in enumerate(steps_to_run_list):
- 814:             step_config = workflow_commands_config.get_step_config(step_key)
- 815:             if not step_config:
- 816:                 APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Clé invalide '{step_key}'. Interruption.")
- 817:                 all_steps_succeeded = False; sequence_summary_data.append({"name": f"Étape Invalide ({html.escape(step_key)})", "status": "Erreur de config", "duration": "0s", "success": False}); break
- 818:             step_display_name = step_config['display_name']
- 819:             APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Lancement étape {i+1}/{len(steps_to_run_list)}: '{step_display_name}' ({step_key})")
- 820:             
- 821:             workflow_state.update_step_info(
- 822:                 step_key,
- 823:                 status='idle',
- 824:                 progress_current=0,
- 825:                 progress_total=0,
- 826:                 progress_text='',
- 827:                 start_time_epoch=None,
- 828:                 duration_str=None
- 829:             )
- 830: 
- 831:             current_status = workflow_state.get_step_status(step_key)
- 832: 
- 833:             try:
- 834:                 run_process_async(step_key)
- 835:                 final_status = workflow_state.get_step_status(step_key)
- 836:                 return_code = workflow_state.get_step_field(step_key, 'return_code')
- 837:                 APP_LOGGER.info(f"[SEQUENCE_DEBUG] run_process_async completed for {step_key} (final status: {final_status}, return_code: {return_code})")
- 838:             except Exception as e:
- 839:                 APP_LOGGER.error(f"[SEQUENCE_DEBUG] Exception in run_process_async for {step_key}: {e}", exc_info=True)
- 840:                 workflow_state.update_step_info(step_key, status='failed', return_code=-1)
- 841:             
- 842:             step_info = workflow_state.get_step_info(step_key)
- 843:             duration_str_step = step_info.get('duration_str', 'N/A')
- 844:             if step_info['status'] == 'completed':
- 845:                 sequence_summary_data.append({"name": html.escape(step_display_name), "status": "Réussie", "duration": duration_str_step, "success": True})
- 846:             else:
- 847:                 all_steps_succeeded = False
- 848:                 sequence_summary_data.append({"name": html.escape(step_display_name), "status": f"Échouée ({step_info['status']})", "duration": duration_str_step, "success": False})
- 849:                 APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Étape '{html.escape(step_display_name)}' Échouée. Interruption.")
- 850:                 break 
- 851:         final_overall_status_text = "Terminée avec succès" if all_steps_succeeded else "Terminée avec erreurs"
- 852:         summary_log = [f"{s['name']}: {s['status']} ({s['duration']})" for s in sequence_summary_data]
- 853:         full_summary_log_text = f"Séquence {sequence_type} {final_overall_status_text}. Détails: " + " | ".join(summary_log)
- 854:         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: {full_summary_log_text}")
- 855:         
- 856:         workflow_state.complete_sequence(success=all_steps_succeeded, message=full_summary_log_text, sequence_type=sequence_type)
- 857:     except Exception as e_seq:
- 858:         APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Erreur inattendue dans le worker de séquence: {e_seq}", exc_info=True)
- 859:         all_steps_succeeded = False
- 860:         workflow_state.complete_sequence(success=False, message=f"Erreur critique durant la séquence: {e_seq}", sequence_type=sequence_type)
- 861:     finally:
- 862:         if workflow_state.is_sequence_running():
- 863:             workflow_state.complete_sequence(success=False, message="Séquence terminée de façon inattendue", sequence_type=sequence_type)
- 864:         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence terminée.")
- 865: 
- 866: def run_full_sequence_from_remote():
- 867:     """Launch full sequence from remote trigger.
- 868:     
- 869:     Migrated to use WorkflowState for sequence management.
- 870:     """
- 871:     APP_LOGGER.info("REMOTE TRIGGER: Demande de lancement de la séquence complète reçue.")
- 872:     
- 873:     if workflow_state.is_sequence_running():
- 874:         APP_LOGGER.warning("REMOTE TRIGGER: Séquence complète non lancée, une autre séquence est déjà en cours.")
- 875:         return
- 876:     
- 877:     seq_thread = threading.Thread(target=execute_step_sequence_worker, args=(list(REMOTE_SEQUENCE_STEP_KEYS), "Remote"))
- 878:     seq_thread.daemon = True
- 879:     seq_thread.start()
- 880: 
- 881: def poll_remote_trigger():
- 882:     """Poll remote trigger URL for pending commands.
- 883:     
- 884:     Migrated to use WorkflowState for sequence status checking.
- 885:     """
- 886:     APP_LOGGER.info(f"REMOTE POLLER: Démarré. Interrogation de {REMOTE_TRIGGER_URL} toutes les {REMOTE_POLLING_INTERVAL}s.")
- 887:     
- 888:     while True:
- 889:         time.sleep(REMOTE_POLLING_INTERVAL)
- 890:         
- 891:         if workflow_state.is_sequence_running():
- 892:             APP_LOGGER.debug("REMOTE POLLER: Une séquence est marquée comme en cours, attente.")
- 893:             continue
- 894:         
- 895:         if workflow_state.is_any_step_running():
- 896:             APP_LOGGER.debug("REMOTE POLLER: Une étape individuelle est active. Attente.")
- 897:             continue
- 898:         
- 899:         try:
- 900:             APP_LOGGER.debug(f"REMOTE POLLER: Vérification de {REMOTE_TRIGGER_URL}.")
- 901:             response = requests.get(REMOTE_TRIGGER_URL, timeout=10)
- 902:             response.raise_for_status()
- 903:             data = response.json()
- 904:             
- 905:             if data.get('command_pending'):
- 906:                 APP_LOGGER.info(f"REMOTE POLLER: Commande reçue! Payload: {data.get('payload')}")
- 907:                 
- 908:                 if not workflow_state.is_sequence_running():
- 909:                     run_full_sequence_from_remote()
- 910:                 else:
- 911:                     APP_LOGGER.warning("REMOTE POLLER: Signal reçu, mais une séquence est déjà en cours.")
- 912:             else:
- 913:                 APP_LOGGER.debug("REMOTE POLLER: Aucune commande en attente.")
- 914:         except requests.exceptions.RequestException as e:
- 915:             APP_LOGGER.warning(f"REMOTE POLLER: Erreur communication {REMOTE_TRIGGER_URL}: {e}")
- 916:         except Exception as e_poll:
- 917:             APP_LOGGER.error(f"REMOTE POLLER: Erreur inattendue: {e_poll}", exc_info=True)
- 918: 
- 919: @APP_FLASK.route('/test-slideshow-fixes')
- 920: def test_slideshow_fixes():
- 921:     """Serve the slideshow fixes test page."""
- 922:     APP_LOGGER.debug("Serving slideshow fixes test page")
- 923: 
- 924:     try:
- 925:         with open('test_dom_slideshow_fixes.html', 'r', encoding='utf-8') as f:
- 926:             test_content = f.read()
- 927: 
- 928:         return test_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
- 929: 
- 930:     except Exception as e:
- 931:         APP_LOGGER.error(f"Error serving test page: {e}")
- 932:         return f"Error loading test page: {e}", 500
- 933: 
- 934: @APP_FLASK.route('/favicon.ico')
- 935: def favicon():
- 936:     """
- 937:     Handle favicon.ico requests to prevent 404 errors in browser console.
- 938:     Returns a 204 No Content response since we don't have a favicon file.
- 939:     """
- 940:     APP_LOGGER.debug("Favicon requested - returning 204 No Content")
- 941:     return '', 204
- 942: 
- 943: def get_current_workflow_status_summary():
- 944:     """Get comprehensive workflow status summary including CSV downloads.
- 945:     
- 946:     Migrated to use WorkflowState for all state access.
- 947:     """
- 948:     overall_status_code_val = "idle"
- 949:     overall_status_text_display_val = "Prêt et en attente."
- 950:     current_step_name_val = None
- 951:     progress_current_val = 0
- 952:     progress_total_val = 0
- 953:     active_step_key_found = None
- 954:     
- 955:     is_sequence_globally_active = workflow_state.is_sequence_running()
- 956:     
- 957:     if is_sequence_globally_active:
- 958:         sequence_outcome = workflow_state.get_sequence_outcome()
- 959:         active_sequence_type = sequence_outcome.get("type", "Inconnue") if sequence_outcome.get("status", "").startswith("running_") else "Inconnue"
- 960:         
- 961:         for step_key_seq in REMOTE_SEQUENCE_STEP_KEYS:
- 962:             step_status = workflow_state.get_step_status(step_key_seq)
- 963:             if step_status in ['running', 'starting']:
- 964:                 active_step_key_found = step_key_seq
- 965:                 overall_status_code_val = f"sequence_running_{active_sequence_type.lower()}"
- 966:                 break
- 967:     
- 968:     if not active_step_key_found:
- 969:         all_steps_info = workflow_state.get_all_steps_info()
- 970:         for step_key_ind, info_ind in all_steps_info.items():
- 971:             if info_ind['status'] in ['running', 'starting']:
- 972:                 active_step_key_found = step_key_ind
- 973:                 overall_status_code_val = f"step_running_{step_key_ind}"
- 974:                 break
- 975:     
- 976:     if active_step_key_found:
- 977:         active_step_info = workflow_state.get_step_info(active_step_key_found)
- 978:         active_step_config = workflow_commands_config.get_step_config(active_step_key_found)
- 979:         current_step_name_val = active_step_config['display_name'] if active_step_config else 'Étape inconnue'
- 980:         progress_current_val = active_step_info['progress_current']
- 981:         progress_total_val = active_step_info['progress_total']
- 982:         
- 983:         if overall_status_code_val.startswith("sequence_running"):
- 984:             seq_type_disp = overall_status_code_val.split("_")[-1].capitalize()
- 985:             overall_status_text_display_val = f"Séquence {seq_type_disp} - En cours: {current_step_name_val}"
- 986:         elif overall_status_code_val.startswith("step_running"):
- 987:             overall_status_text_display_val = f"En cours: {current_step_name_val}"
- 988:     else:
- 989:         sequence_outcome = workflow_state.get_sequence_outcome()
- 990:         if sequence_outcome and sequence_outcome.get("timestamp"):
- 991:             last_seq_time_str = sequence_outcome["timestamp"]
- 992:             if last_seq_time_str.endswith('Z'):
- 993:                 last_seq_time_str = last_seq_time_str[:-1] + '+00:00'
- 994:             try:
- 995:                 last_seq_dt = datetime.fromisoformat(last_seq_time_str)
- 996:                 if last_seq_dt.tzinfo is None:
- 997:                     last_seq_dt = last_seq_dt.replace(tzinfo=timezone.utc)
- 998:                 time_since_last_seq = datetime.now(timezone.utc) - last_seq_dt
- 999:                 
-1000:                 if time_since_last_seq < timedelta(hours=1):
-1001:                     seq_type_display = sequence_outcome.get('type', 'N/A')
-1002:                     if sequence_outcome.get("status") == "success":
-1003:                         overall_status_code_val = "completed_success_recent"
-1004:                         overall_status_text_display_val = f"Terminé avec succès (Séquence {seq_type_display})"
-1005:                         current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
-1006:                     elif sequence_outcome.get("status") == "error":
-1007:                         overall_status_code_val = "completed_error_recent"
-1008:                         overall_status_text_display_val = f"Terminé avec erreur(s) (Séquence {seq_type_display})"
-1009:                         current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
-1010:                     elif sequence_outcome.get("status", "").startswith("running_"):
-1011:                         seq_type_running = sequence_outcome.get("type", "N/A")
-1012:                         overall_status_code_val = f"sequence_starting_{seq_type_running.lower()}"
-1013:                         overall_status_text_display_val = f"Démarrage Séquence {seq_type_running}..."
-1014:                 else:
-1015:                     overall_status_code_val = "idle_after_completion"
-1016:                     overall_status_text_display_val = "Prêt (dernière opération terminée il y a >1h)."
-1017:             except ValueError as e_ts:
-1018:                 APP_LOGGER.warning(f"Error parsing sequence outcome timestamp '{sequence_outcome['timestamp']}': {e_ts}")
-1019:                 overall_status_code_val = "idle_parse_error"
-1020:                 overall_status_text_display_val = "Prêt (erreur parsing dernier statut)."
-1021:         else:
-1022:             overall_status_code_val = "idle_initial"
-1023:             overall_status_text_display_val = "Prêt et en attente (jamais exécuté)."
-1024: 
-1025:     active_list_csv = workflow_state.get_active_csv_downloads_list()
-1026:     kept_list_csv = workflow_state.get_kept_csv_downloads_list()
-1027: 
-1028:     all_csv_downloads_intermediate = active_list_csv + kept_list_csv
-1029:     all_csv_downloads_intermediate.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
-1030: 
-1031:     recent_downloads_summary_val = []
-1032:     for item_csv in all_csv_downloads_intermediate[:5]:
-1033:         recent_downloads_summary_val.append({
-1034:             "filename": item_csv.get('filename', 'N/A'),
-1035:             "status": item_csv.get('status', 'N/A'),
-1036:             "timestamp": item_csv.get('display_timestamp', 'N/A'),
-1037:             "csv_timestamp": item_csv.get('csv_timestamp', 'N/A')
-1038:         })
-1039:     status_text_detail_val = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-1040: 
-1041:     return {
-1042:         "overall_status_code": overall_status_code_val,
-1043:         "overall_status_text_display": overall_status_text_display_val,
-1044:         "current_step_name": current_step_name_val,
-1045:         "status_text_detail": status_text_detail_val,
-1046:         "progress_current": progress_current_val,
-1047:         "progress_total": progress_total_val,
-1048:         "recent_downloads": recent_downloads_summary_val,
-1049:         "last_updated_utc": datetime.now(timezone.utc).isoformat(),
-1050:         "last_sequence_summary": workflow_state.get_sequence_outcome()
-1051:     }
-1052: 
+ 788: 
+ 789: def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="Custom"):
+ 790:     """Execute a sequence of workflow steps.
+ 791:     
+ 792:     This function has been migrated to use WorkflowState for sequence management.
+ 793:     
+ 794:     Args:
+ 795:         steps_to_run_list: List of step keys to execute in order
+ 796:         sequence_type: Type of sequence ('Full', 'Remote', 'Custom', etc.)
+ 797:     """
+ 798:     APP_LOGGER.info("🔥🔥🔥 [SEQUENCE_WORKER_TEST] UPDATED SEQUENCE WORKER WITH DEBUGGING IS RUNNING! 🔥🔥🔥")
+ 799:     
+ 800:     if sequence_type != "InternalPollingCheck" and workflow_state.is_sequence_running():
+ 801:         APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Tentative de lancement alors qu'une séquence est déjà en cours.")
+ 802:         return
+ 803:     
+ 804:     if not workflow_state.start_sequence(sequence_type):
+ 805:         APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Could not start - already running")
+ 806:         return
+ 807:     
+ 808:     APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence démarrée.")
+ 809:     all_steps_succeeded = True; sequence_summary_data = []
+ 810:     try:
+ 811:         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Thread démarré pour {len(steps_to_run_list)} étapes: {steps_to_run_list}")
+ 812: 
+ 813:         APP_LOGGER.info(f"[CACHE_CLEAR_TEST] *** UPDATED CODE IS RUNNING - CACHE CLEARED SUCCESSFULLY ***")
+ 814:         for i, step_key in enumerate(steps_to_run_list):
+ 815:             step_config = workflow_commands_config.get_step_config(step_key)
+ 816:             if not step_config:
+ 817:                 APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Clé invalide '{step_key}'. Interruption.")
+ 818:                 all_steps_succeeded = False; sequence_summary_data.append({"name": f"Étape Invalide ({html.escape(step_key)})", "status": "Erreur de config", "duration": "0s", "success": False}); break
+ 819:             step_display_name = step_config['display_name']
+ 820:             APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Lancement étape {i+1}/{len(steps_to_run_list)}: '{step_display_name}' ({step_key})")
+ 821:             
+ 822:             workflow_state.update_step_info(
+ 823:                 step_key,
+ 824:                 status='idle',
+ 825:                 progress_current=0,
+ 826:                 progress_total=0,
+ 827:                 progress_text='',
+ 828:                 start_time_epoch=None,
+ 829:                 duration_str=None
+ 830:             )
+ 831: 
+ 832:             current_status = workflow_state.get_step_status(step_key)
+ 833: 
+ 834:             try:
+ 835:                 run_process_async(step_key)
+ 836:                 final_status = workflow_state.get_step_status(step_key)
+ 837:                 return_code = workflow_state.get_step_field(step_key, 'return_code')
+ 838:                 APP_LOGGER.info(f"[SEQUENCE_DEBUG] run_process_async completed for {step_key} (final status: {final_status}, return_code: {return_code})")
+ 839:             except Exception as e:
+ 840:                 APP_LOGGER.error(f"[SEQUENCE_DEBUG] Exception in run_process_async for {step_key}: {e}", exc_info=True)
+ 841:                 workflow_state.update_step_info(step_key, status='failed', return_code=-1)
+ 842:             
+ 843:             step_info = workflow_state.get_step_info(step_key)
+ 844:             duration_str_step = step_info.get('duration_str', 'N/A')
+ 845:             if step_info['status'] == 'completed':
+ 846:                 sequence_summary_data.append({"name": html.escape(step_display_name), "status": "Réussie", "duration": duration_str_step, "success": True})
+ 847:             else:
+ 848:                 all_steps_succeeded = False
+ 849:                 sequence_summary_data.append({"name": html.escape(step_display_name), "status": f"Échouée ({step_info['status']})", "duration": duration_str_step, "success": False})
+ 850:                 APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Étape '{html.escape(step_display_name)}' Échouée. Interruption.")
+ 851:                 break 
+ 852:         final_overall_status_text = "Terminée avec succès" if all_steps_succeeded else "Terminée avec erreurs"
+ 853:         summary_log = [f"{s['name']}: {s['status']} ({s['duration']})" for s in sequence_summary_data]
+ 854:         full_summary_log_text = f"Séquence {sequence_type} {final_overall_status_text}. Détails: " + " | ".join(summary_log)
+ 855:         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: {full_summary_log_text}")
+ 856:         
+ 857:         workflow_state.complete_sequence(success=all_steps_succeeded, message=full_summary_log_text, sequence_type=sequence_type)
+ 858:     except Exception as e_seq:
+ 859:         APP_LOGGER.error(f"{sequence_type.upper()} SEQUENCE: Erreur inattendue dans le worker de séquence: {e_seq}", exc_info=True)
+ 860:         all_steps_succeeded = False
+ 861:         workflow_state.complete_sequence(success=False, message=f"Erreur critique durant la séquence: {e_seq}", sequence_type=sequence_type)
+ 862:     finally:
+ 863:         if workflow_state.is_sequence_running():
+ 864:             workflow_state.complete_sequence(success=False, message="Séquence terminée de façon inattendue", sequence_type=sequence_type)
+ 865:         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence terminée.")
+ 866: 
+ 867: def run_full_sequence_from_remote():
+ 868:     """Launch full sequence from remote trigger.
+ 869:     
+ 870:     Migrated to use WorkflowState for sequence management.
+ 871:     """
+ 872:     APP_LOGGER.info("REMOTE TRIGGER: Demande de lancement de la séquence complète reçue.")
+ 873:     
+ 874:     if workflow_state.is_sequence_running():
+ 875:         APP_LOGGER.warning("REMOTE TRIGGER: Séquence complète non lancée, une autre séquence est déjà en cours.")
+ 876:         return
+ 877:     
+ 878:     seq_thread = threading.Thread(target=execute_step_sequence_worker, args=(list(REMOTE_SEQUENCE_STEP_KEYS), "Remote"))
+ 879:     seq_thread.daemon = True
+ 880:     seq_thread.start()
+ 881: 
+ 882: def poll_remote_trigger():
+ 883:     """Poll remote trigger URL for pending commands.
+ 884:     
+ 885:     Migrated to use WorkflowState for sequence status checking.
+ 886:     """
+ 887:     APP_LOGGER.info(f"REMOTE POLLER: Démarré. Interrogation de {REMOTE_TRIGGER_URL} toutes les {REMOTE_POLLING_INTERVAL}s.")
+ 888:     
+ 889:     while True:
+ 890:         time.sleep(REMOTE_POLLING_INTERVAL)
+ 891:         
+ 892:         if workflow_state.is_sequence_running():
+ 893:             APP_LOGGER.debug("REMOTE POLLER: Une séquence est marquée comme en cours, attente.")
+ 894:             continue
+ 895:         
+ 896:         if workflow_state.is_any_step_running():
+ 897:             APP_LOGGER.debug("REMOTE POLLER: Une étape individuelle est active. Attente.")
+ 898:             continue
+ 899:         
+ 900:         try:
+ 901:             APP_LOGGER.debug(f"REMOTE POLLER: Vérification de {REMOTE_TRIGGER_URL}.")
+ 902:             response = requests.get(REMOTE_TRIGGER_URL, timeout=10)
+ 903:             response.raise_for_status()
+ 904:             data = response.json()
+ 905:             
+ 906:             if data.get('command_pending'):
+ 907:                 APP_LOGGER.info(f"REMOTE POLLER: Commande reçue! Payload: {data.get('payload')}")
+ 908:                 
+ 909:                 if not workflow_state.is_sequence_running():
+ 910:                     run_full_sequence_from_remote()
+ 911:                 else:
+ 912:                     APP_LOGGER.warning("REMOTE POLLER: Signal reçu, mais une séquence est déjà en cours.")
+ 913:             else:
+ 914:                 APP_LOGGER.debug("REMOTE POLLER: Aucune commande en attente.")
+ 915:         except requests.exceptions.RequestException as e:
+ 916:             APP_LOGGER.warning(f"REMOTE POLLER: Erreur communication {REMOTE_TRIGGER_URL}: {e}")
+ 917:         except Exception as e_poll:
+ 918:             APP_LOGGER.error(f"REMOTE POLLER: Erreur inattendue: {e_poll}", exc_info=True)
+ 919: 
+ 920: @APP_FLASK.route('/test-slideshow-fixes')
+ 921: def test_slideshow_fixes():
+ 922:     """Serve the slideshow fixes test page."""
+ 923:     APP_LOGGER.debug("Serving slideshow fixes test page")
+ 924: 
+ 925:     try:
+ 926:         with open('test_dom_slideshow_fixes.html', 'r', encoding='utf-8') as f:
+ 927:             test_content = f.read()
+ 928: 
+ 929:         return test_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+ 930: 
+ 931:     except Exception as e:
+ 932:         APP_LOGGER.error(f"Error serving test page: {e}")
+ 933:         return f"Error loading test page: {e}", 500
+ 934: 
+ 935: @APP_FLASK.route('/favicon.ico')
+ 936: def favicon():
+ 937:     """
+ 938:     Handle favicon.ico requests to prevent 404 errors in browser console.
+ 939:     Returns a 204 No Content response since we don't have a favicon file.
+ 940:     """
+ 941:     APP_LOGGER.debug("Favicon requested - returning 204 No Content")
+ 942:     return '', 204
+ 943: 
+ 944: def get_current_workflow_status_summary():
+ 945:     """Get comprehensive workflow status summary including CSV downloads.
+ 946:     
+ 947:     Migrated to use WorkflowState for all state access.
+ 948:     """
+ 949:     overall_status_code_val = "idle"
+ 950:     overall_status_text_display_val = "Prêt et en attente."
+ 951:     current_step_name_val = None
+ 952:     progress_current_val = 0
+ 953:     progress_total_val = 0
+ 954:     active_step_key_found = None
+ 955:     
+ 956:     is_sequence_globally_active = workflow_state.is_sequence_running()
+ 957:     
+ 958:     if is_sequence_globally_active:
+ 959:         sequence_outcome = workflow_state.get_sequence_outcome()
+ 960:         active_sequence_type = sequence_outcome.get("type", "Inconnue") if sequence_outcome.get("status", "").startswith("running_") else "Inconnue"
+ 961:         
+ 962:         for step_key_seq in REMOTE_SEQUENCE_STEP_KEYS:
+ 963:             step_status = workflow_state.get_step_status(step_key_seq)
+ 964:             if step_status in ['running', 'starting']:
+ 965:                 active_step_key_found = step_key_seq
+ 966:                 overall_status_code_val = f"sequence_running_{active_sequence_type.lower()}"
+ 967:                 break
+ 968:     
+ 969:     if not active_step_key_found:
+ 970:         all_steps_info = workflow_state.get_all_steps_info()
+ 971:         for step_key_ind, info_ind in all_steps_info.items():
+ 972:             if info_ind['status'] in ['running', 'starting']:
+ 973:                 active_step_key_found = step_key_ind
+ 974:                 overall_status_code_val = f"step_running_{step_key_ind}"
+ 975:                 break
+ 976:     
+ 977:     if active_step_key_found:
+ 978:         active_step_info = workflow_state.get_step_info(active_step_key_found)
+ 979:         active_step_config = workflow_commands_config.get_step_config(active_step_key_found)
+ 980:         current_step_name_val = active_step_config['display_name'] if active_step_config else 'Étape inconnue'
+ 981:         progress_current_val = active_step_info['progress_current']
+ 982:         progress_total_val = active_step_info['progress_total']
+ 983:         
+ 984:         if overall_status_code_val.startswith("sequence_running"):
+ 985:             seq_type_disp = overall_status_code_val.split("_")[-1].capitalize()
+ 986:             overall_status_text_display_val = f"Séquence {seq_type_disp} - En cours: {current_step_name_val}"
+ 987:         elif overall_status_code_val.startswith("step_running"):
+ 988:             overall_status_text_display_val = f"En cours: {current_step_name_val}"
+ 989:     else:
+ 990:         sequence_outcome = workflow_state.get_sequence_outcome()
+ 991:         if sequence_outcome and sequence_outcome.get("timestamp"):
+ 992:             last_seq_time_str = sequence_outcome["timestamp"]
+ 993:             if last_seq_time_str.endswith('Z'):
+ 994:                 last_seq_time_str = last_seq_time_str[:-1] + '+00:00'
+ 995:             try:
+ 996:                 last_seq_dt = datetime.fromisoformat(last_seq_time_str)
+ 997:                 if last_seq_dt.tzinfo is None:
+ 998:                     last_seq_dt = last_seq_dt.replace(tzinfo=timezone.utc)
+ 999:                 time_since_last_seq = datetime.now(timezone.utc) - last_seq_dt
+1000:                 
+1001:                 if time_since_last_seq < timedelta(hours=1):
+1002:                     seq_type_display = sequence_outcome.get('type', 'N/A')
+1003:                     if sequence_outcome.get("status") == "success":
+1004:                         overall_status_code_val = "completed_success_recent"
+1005:                         overall_status_text_display_val = f"Terminé avec succès (Séquence {seq_type_display})"
+1006:                         current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
+1007:                     elif sequence_outcome.get("status") == "error":
+1008:                         overall_status_code_val = "completed_error_recent"
+1009:                         overall_status_text_display_val = f"Terminé avec erreur(s) (Séquence {seq_type_display})"
+1010:                         current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
+1011:                     elif sequence_outcome.get("status", "").startswith("running_"):
+1012:                         seq_type_running = sequence_outcome.get("type", "N/A")
+1013:                         overall_status_code_val = f"sequence_starting_{seq_type_running.lower()}"
+1014:                         overall_status_text_display_val = f"Démarrage Séquence {seq_type_running}..."
+1015:                 else:
+1016:                     overall_status_code_val = "idle_after_completion"
+1017:                     overall_status_text_display_val = "Prêt (dernière opération terminée il y a >1h)."
+1018:             except ValueError as e_ts:
+1019:                 APP_LOGGER.warning(f"Error parsing sequence outcome timestamp '{sequence_outcome['timestamp']}': {e_ts}")
+1020:                 overall_status_code_val = "idle_parse_error"
+1021:                 overall_status_text_display_val = "Prêt (erreur parsing dernier statut)."
+1022:         else:
+1023:             overall_status_code_val = "idle_initial"
+1024:             overall_status_text_display_val = "Prêt et en attente (jamais exécuté)."
+1025: 
+1026:     active_list_csv = workflow_state.get_active_csv_downloads_list()
+1027:     kept_list_csv = workflow_state.get_kept_csv_downloads_list()
+1028: 
+1029:     all_csv_downloads_intermediate = active_list_csv + kept_list_csv
+1030:     all_csv_downloads_intermediate.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
+1031: 
+1032:     recent_downloads_summary_val = []
+1033:     for item_csv in all_csv_downloads_intermediate[:5]:
+1034:         recent_downloads_summary_val.append({
+1035:             "filename": item_csv.get('filename', 'N/A'),
+1036:             "status": item_csv.get('status', 'N/A'),
+1037:             "timestamp": item_csv.get('display_timestamp', 'N/A'),
+1038:             "csv_timestamp": item_csv.get('csv_timestamp', 'N/A')
+1039:         })
+1040:     status_text_detail_val = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+1041: 
+1042:     return {
+1043:         "overall_status_code": overall_status_code_val,
+1044:         "overall_status_text_display": overall_status_text_display_val,
+1045:         "current_step_name": current_step_name_val,
+1046:         "status_text_detail": status_text_detail_val,
+1047:         "progress_current": progress_current_val,
+1048:         "progress_total": progress_total_val,
+1049:         "recent_downloads": recent_downloads_summary_val,
+1050:         "last_updated_utc": datetime.now(timezone.utc).isoformat(),
+1051:         "last_sequence_summary": workflow_state.get_sequence_outcome()
+1052:     }
 1053: 
-1054: if __name__ == '__main__':
-1055:     init_app()
-1056: 
-1057:     APP_FLASK.run(
-1058:         debug=config.DEBUG,
-1059:         host=config.HOST,
-1060:         port=config.PORT,
-1061:         threaded=True,
-1062:         use_reloader=False
-1063:     )
-```
-
-## File: config/settings.py
-```python
-  1: """
-  2: Centralized configuration management for workflow_mediapipe.
-  3: 
-  4: This module provides environment-based configuration management
-  5: following the project's development guidelines.
-  6: """
-  7: 
-  8: import os
-  9: import logging
- 10: import subprocess
- 11: from pathlib import Path
- 12: from dataclasses import dataclass, field
- 13: from typing import Optional, List
- 14: 
- 15: logger = logging.getLogger(__name__)
- 16: 
- 17: 
- 18: def _parse_bool(raw: Optional[str], default: bool) -> bool:
- 19:     if raw is None:
- 20:         return default
- 21:     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
- 22: 
- 23: 
- 24: def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
- 25:     if raw is None:
- 26:         return None
- 27:     raw = raw.strip()
- 28:     if not raw:
- 29:         return None
- 30:     try:
- 31:         return int(raw)
- 32:     except Exception:
- 33:         return None
- 34: 
- 35: 
- 36: def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
- 37:     value = _parse_optional_int(raw)
- 38:     if value is None:
- 39:         return None
- 40:     if value <= 0:
- 41:         return None
- 42:     return value
- 43: 
- 44: 
- 45: def _parse_csv_list(raw: Optional[str]) -> List[str]:
- 46:     if raw is None:
- 47:         return []
- 48:     parts = [p.strip() for p in raw.split(",")]
- 49:     return [p for p in parts if p]
- 50: 
- 51: 
- 52: @dataclass
- 53: class Config:
- 54:     """
- 55:     Centralized configuration class for the workflow_mediapipe application.
- 56:     
- 57:     All configuration values are loaded from environment variables with
- 58:     sensible defaults to maintain backward compatibility.
- 59:     """
- 60:     
- 61:     # Flask Application Settings
- 62:     SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
- 63:     DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
- 64:     HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
- 65:     PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
- 66:     
- 67:     # Security Tokens (loaded from environment)
- 68:     INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
- 69:     RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
- 70:     
- 71:     # Webhook JSON Source (single data source for monitoring)
- 72:     WEBHOOK_JSON_URL: str = os.environ.get(
- 73:         'WEBHOOK_JSON_URL',
- 74:         'https://webhook.kidpixel.fr/data/webhook_links.json'
- 75:     )
- 76:     WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
- 77:     WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
- 78:     WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
- 79:     
- 80:     # Directory Configuration
- 81:     BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
- 82:         'BASE_PATH_SCRIPTS_ENV', 
- 83:         os.path.dirname(os.path.abspath(__file__ + '/../'))
- 84:     ))
- 85:     CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
- 86:     LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
- 87:         'LOCAL_DOWNLOADS_DIR', 
- 88:         Path.home() / 'Téléchargements'
- 89:     ))
- 90:     DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
- 91:     ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
- 92:     DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
- 93:     DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
- 94:     # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
- 95:     # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
- 96:     LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
- 97:     # Virtual environments base directory (defaults to project root if not set)
- 98:     VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
- 99:     # Projects directory for visualization/timeline features
-100:     PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
-101:     # Archives directory for persistent analysis results (timeline)
-102:     ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
-103:     
-104:     # Python Environment Configuration
-105:     PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
-106:     
-107:     # Processing Configuration
-108:     MAX_CPU_WORKERS: int = int(os.environ.get(
-109:         'MAX_CPU_WORKERS', 
-110:         str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
-111:     ))
-112:     
-113:     # Polling Intervals (in milliseconds for frontend, seconds for backend)
-114:     POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
-115:     LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
-116: 
-117:     SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
-118:     
-119:     # MediaPipe Configuration
-120:     MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
-121:         'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
-122:     ))
-123:     MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
-124:         'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
-125:     ))
-126:     
-127:     # GPU Configuration
-128:     ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
-129:     
-130:     # Lemonfox API Configuration (STEP4 alternative)
-131:     LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
-132:     LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
-133:     LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
-134: 
-135:     LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
-136:     LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
-137:     LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
-138:         os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
-139:         default=True,
-140:     )
-141:     LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
-142:         os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
-143:     )
-144:     LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
-145:         os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
-146:     )
-147:     LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
-148:         default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
-149:     )
-150:     LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
-151:     LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
-152:     LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
-153:         os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
-154:     )
-155:     LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
-156:         os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
-157:         default=False,
-158:     )
-159:     LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
-160:     LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
-161: 
-162:     STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
-163:     
-164:     # STEP5 Object Detection Configuration
-165:     # Model selection for fallback object detection when face detection fails (MediaPipe only)
-166:     STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
-167:         'STEP5_OBJECT_DETECTOR_MODEL',
-168:         'efficientdet_lite2'  # Default: current baseline, backward compatible
-169:     )
-170:     STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
-171:     STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
-172:     
-173:     # STEP5 Tracking configuration
-174:     STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
-175:     STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
-176: 
-177:     STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-178:         os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
-179:     )
-180:     STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
-181:     STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
-182:         os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
-183:     )
-184:     
-185:     def __post_init__(self):
-186:         """Post-initialization to ensure paths are Path objects and create directories."""
-187:         # Ensure all path attributes are Path objects
-188:         if isinstance(self.BASE_PATH_SCRIPTS, str):
-189:             self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
-190:         if isinstance(self.CACHE_ROOT_DIR, str):
-191:             self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
-192:         if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
-193:             self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
-194:         if isinstance(self.LOGS_DIR, str):
-195:             self.LOGS_DIR = Path(self.LOGS_DIR)
-196: 
-197:         if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
-198:             self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
-199:         
-200:         # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
-201:         if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
-202:             self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
-203:         elif isinstance(self.VENV_BASE_DIR, str):
-204:             self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
-205: 
-206:         # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
-207:         # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
-208:         if not self.PYTHON_VENV_EXE:
-209:             self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
-210:         else:
-211:             python_exe_path = Path(self.PYTHON_VENV_EXE)
-212:             if not python_exe_path.is_absolute():
-213:                 self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
-214:         
-215:         # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
-216:         # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
-217:         # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
-218:         # like 'projets_extraits/logs' when steps run with a different CWD.
-219:         if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
-220:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
-221:         elif not self.LOGS_DIR.is_absolute():
-222:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
-223: 
-224:         if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
-225:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
-226:         elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
-227:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
-228: 
-229:         if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
-230:             self.CACHE_ROOT_DIR = Path('/mnt/cache')
-231:         elif not self.CACHE_ROOT_DIR.is_absolute():
-232:             self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
-233:         else:
-234:             self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
-235: 
-236:         # Default PROJECTS_DIR if not set
-237:         if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
-238:             self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
-239:         elif isinstance(self.PROJECTS_DIR, str):
-240:             self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
-241:         # Default ARCHIVES_DIR if not set
-242:         if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
-243:             self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
-244:         elif isinstance(self.ARCHIVES_DIR, str):
-245:             self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
-246:             
-247:         # Create necessary directories
-248:         self._create_directories()
-249:     
-250:     def _create_directories(self) -> None:
-251:         """Create necessary directories if they don't exist."""
-252:         directories_to_create = [
-253:             self.LOGS_DIR,
-254:             self.LOGS_DIR / 'step1',
-255:             self.LOGS_DIR / 'step2',
-256:             self.LOGS_DIR / 'step3',
-257:             self.LOGS_DIR / 'step4',
-258:             self.LOGS_DIR / 'step5',
-259:             self.LOGS_DIR / 'step6',
-260:             self.LOGS_DIR / 'step7',
-261:             # Ensure projects directory exists by default to avoid confusion
-262:             self.PROJECTS_DIR,
-263:             # Ensure archives directory exists
-264:             self.ARCHIVES_DIR,
-265:         ]
-266:         
-267:         for directory in directories_to_create:
-268:             try:
-269:                 directory.mkdir(parents=True, exist_ok=True)
-270:                 logger.debug(f"Ensured directory exists: {directory}")
-271:             except Exception as e:
-272:                 logger.error(f"Failed to create directory {directory}: {e}")
-273:     
-274:     def validate(self, strict: bool = None) -> bool:
-275:         """
-276:         Validate the configuration and ensure all required settings are present.
-277: 
-278:         Args:
-279:             strict: If None, uses DEBUG mode to determine strictness.
-280:                    If True, raises errors. If False, logs warnings.
-281: 
-282:         Returns:
-283:             bool: True if configuration is valid
-284: 
-285:         Raises:
-286:             ValueError: If required configuration is missing or invalid and strict=True
-287:         """
-288:         if strict is None:
-289:             strict = not self.DEBUG  # Strict in production, lenient in development
-290: 
-291:         errors = []
-292:         warnings = []
-293: 
-294:         # Security validation
-295:         if not self.INTERNAL_WORKER_TOKEN:
-296:             msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
-297:             if strict:
-298:                 errors.append(msg)
-299:             else:
-300:                 warnings.append(msg)
-301:                 # Set development default
-302:                 self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-303: 
-304:         if not self.RENDER_REGISTER_TOKEN:
-305:             msg = "RENDER_REGISTER_TOKEN environment variable is required"
-306:             if strict:
-307:                 errors.append(msg)
-308:             else:
-309:                 warnings.append(msg)
-310:                 # Set development default
-311:                 self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
-312: 
-313:         # Production security checks
-314:         if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
-315:             errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
-316: 
-317:         # Webhook validation (single data source)
-318:         if not self.WEBHOOK_JSON_URL:
-319:             msg = "WEBHOOK_JSON_URL must be set"
-320:             if strict:
-321:                 errors.append(msg)
-322:             else:
-323:                 warnings.append(msg)
-324:         if self.WEBHOOK_TIMEOUT <= 0:
-325:             warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
-326:         if self.WEBHOOK_CACHE_TTL < 0:
-327:             warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
-328:         
-329:         # Path validation
-330:         if not self.BASE_PATH_SCRIPTS.exists():
-331:             warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
-332:         
-333:         if not self.LOCAL_DOWNLOADS_DIR.exists():
-334:             warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
-335:         
-336:         # Python executable validation
-337:         python_exe_path = Path(self.PYTHON_VENV_EXE)
-338:         if not python_exe_path.exists():
-339:             warnings.append(f"Python executable not found: {python_exe_path}")
-340:         
-341:         # Log warnings
-342:         for warning in warnings:
-343:             logger.warning(warning)
-344:         
-345:         # Log warnings
-346:         if warnings:
-347:             for warning in warnings:
-348:                 logger.warning(f"Configuration warning: {warning}")
-349:             if not strict:
-350:                 logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
-351: 
-352:         # Raise errors if any
-353:         if errors:
-354:             error_msg = f"Configuration validation failed: {'; '.join(errors)}"
-355:             logger.error(error_msg)
-356:             raise ValueError(error_msg)
-357: 
-358:         if warnings and not strict:
-359:             logger.info("Configuration validation completed with warnings (development mode)")
-360:         else:
-361:             logger.info("Configuration validation successful")
-362:         return True
-363:     
-364:     def get_venv_path(self, venv_name: str) -> Path:
-365:         """
-366:         Get the path to a virtual environment.
-367:         
-368:         Args:
-369:             venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
-370:             
-371:         Returns:
-372:             Path object to the virtual environment directory
-373:         """
-374:         return self.VENV_BASE_DIR / venv_name
-375:     
-376:     def get_venv_python(self, venv_name: str) -> Path:
-377:         """
-378:         Get the path to the Python executable in a virtual environment.
-379:         
-380:         Args:
-381:             venv_name: Name of the virtual environment
-382:             
-383:         Returns:
-384:             Path object to the Python executable
-385:         """
-386:         return self.get_venv_path(venv_name) / "bin" / "python"
-387:     
-388:     def get_allowed_base_paths(self) -> List[Path]:
-389:         """
-390:         Get list of allowed base paths for file operations.
-391:         
-392:         Returns:
-393:             List of Path objects representing allowed base directories
-394:         """
-395:         return [
-396:             self.BASE_PATH_SCRIPTS,
-397:             self.LOCAL_DOWNLOADS_DIR,
-398:             self.LOGS_DIR,
-399:             self.BASE_PATH_SCRIPTS / 'workflow_scripts',
-400:             self.BASE_PATH_SCRIPTS / 'static',
-401:             self.BASE_PATH_SCRIPTS / 'templates',
-402:             self.BASE_PATH_SCRIPTS / 'utils',
-403:         ]
-404:     
-405:     def to_dict(self) -> dict:
-406:         """
-407:         Convert configuration to dictionary for serialization.
-408:         
-409:         Returns:
-410:             Dictionary representation of configuration (excluding sensitive data)
-411:         """
-412:         config_dict = {}
-413:         for key, value in self.__dict__.items():
-414:             # Exclude sensitive information
-415:             if 'TOKEN' in key or 'SECRET' in key:
-416:                 config_dict[key] = '***HIDDEN***' if value else None
-417:             elif isinstance(value, Path):
-418:                 config_dict[key] = str(value)
-419:             else:
-420:                 config_dict[key] = value
-421:         
-422:         return config_dict
-423:     
-424:     @staticmethod
-425:     def check_gpu_availability() -> dict:
-426:         """
-427:         Vérifier la disponibilité GPU pour STEP5 (InsightFace uniquement).
-428:         
-429:         Returns:
-430:             dict: {
-431:                 'available': bool,
-432:                 'reason': str (si non disponible),
-433:                 'vram_total_gb': float (si disponible),
-434:                 'vram_free_gb': float (si disponible),
-435:                 'cuda_version': str (si disponible),
-436:                 'onnx_cuda': bool
-437:             }
-438:         """
-439:         result = {
-440:             'available': False,
-441:             'reason': '',
-442:             'onnx_cuda': False,
-443:         }
-444:         
-445:         # Check GPU availability via pynv (NVML) first, fallback to nvidia-smi
-446:         gpu_checked = False
-447:         try:
-448:             import pynvml
-449: 
-450:             pynvml.nvmlInit()
-451:             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-452:             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-453:             vram_total = mem_info.total / (1024 ** 3)
-454:             vram_free = mem_info.free / (1024 ** 3)
-455:             result['vram_total_gb'] = round(vram_total, 2)
-456:             result['vram_free_gb'] = round(vram_free, 2)
-457:             result['cuda_version'] = os.environ.get('CUDA_VERSION') or ''
-458:             gpu_checked = True
-459: 
-460:             if vram_free < 1.5:
-461:                 result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
-462:                 return result
-463:         except ImportError:
-464:             logger.debug('pynvml not available; falling back to nvidia-smi for GPU detection')
-465:         except Exception as e:
-466:             logger.warning(f"pynvml check failed: {e}; falling back to nvidia-smi")
-467: 
-468:         if not gpu_checked:
-469:             try:
-470:                 completed = subprocess.run(
-471:                     ['nvidia-smi', '--query-gpu=memory.total,memory.free', '--format=csv,noheader,nounits'],
-472:                     capture_output=True,
-473:                     text=True,
-474:                     timeout=5,
-475:                 )
-476:                 if completed.returncode == 0:
-477:                     line = completed.stdout.strip().split('\n')[0]
-478:                     total_str, free_str = [part.strip() for part in line.split(',')]
-479:                     vram_total = float(total_str) / 1024
-480:                     vram_free = float(free_str) / 1024
-481:                     result['vram_total_gb'] = round(vram_total, 2)
-482:                     result['vram_free_gb'] = round(vram_free, 2)
-483:                     gpu_checked = True
-484:                     if vram_free < 1.5:
-485:                         result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
-486:                         return result
-487:                 else:
-488:                     logger.warning(
-489:                         "nvidia-smi GPU check failed (code %s): %s",
-490:                         completed.returncode,
-491:                         completed.stderr.strip(),
-492:                     )
-493:             except FileNotFoundError:
-494:                 logger.warning("nvidia-smi introuvable pour la vérification GPU")
-495:             except subprocess.TimeoutExpired:
-496:                 logger.warning("nvidia-smi GPU check timed out")
-497:             except Exception as e:
-498:                 logger.warning(f"nvidia-smi GPU check failed: {e}")
-499: 
-500:         if not gpu_checked:
-501:             result['reason'] = 'Impossible de déterminer la disponibilité GPU (pynvml/nvidia-smi indisponibles)'
-502:             return result
-503:         
-504:         # Check ONNXRuntime CUDA provider (requis pour InsightFace)
-505:         try:
-506:             import onnxruntime as ort
-507:             if 'CUDAExecutionProvider' in ort.get_available_providers():
-508:                 result['onnx_cuda'] = True
-509:         except ImportError:
-510:             pass
-511:         except Exception as e:
-512:             logger.warning(f"ONNXRuntime check failed: {e}")
-513: 
-514:         # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
-515:         if not result.get('onnx_cuda'):
-516:             ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
-517:             if ort_gpu_python:
-518:                 try:
-519:                     ort_check_code = (
-520:                         "import sys\n"
-521:                         "import onnxruntime as ort\n"
-522:                         "providers = ort.get_available_providers()\n"
-523:                         "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
-524:                     )
-525:                     completed = subprocess.run(
-526:                         [ort_gpu_python, "-c", ort_check_code],
-527:                         capture_output=True,
-528:                         text=True,
-529:                         timeout=15,
-530:                     )
-531:                     if completed.returncode == 0:
-532:                         result['onnx_cuda'] = completed.stdout.strip() == "1"
-533:                     else:
-534:                         logger.warning(
-535:                             "ONNXRuntime GPU check failed (external env returned code %s): %s",
-536:                             completed.returncode,
-537:                             completed.stderr.strip(),
-538:                         )
-539:                 except FileNotFoundError:
-540:                     logger.warning(
-541:                         "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
-542:                         ort_gpu_python,
-543:                     )
-544:                 except subprocess.TimeoutExpired:
-545:                     logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
-546:                 except Exception as exc:
-547:                     logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
-548:         
-549:         # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
-550:         if result['onnx_cuda']:
-551:             result['available'] = True
-552:         else:
-553:             result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
-554:         
-555:         return result
-556:     
-557:     @staticmethod
-558:     def is_step5_gpu_enabled() -> bool:
-559:         """
-560:         Vérifier si le mode GPU STEP5 est activé via configuration.
-561:         
-562:         Returns:
-563:             bool: True si STEP5_ENABLE_GPU=1
-564:         """
-565:         return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
-566:     
-567:     @staticmethod
-568:     def get_step5_gpu_engines() -> List[str]:
-569:         """
-570:         Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
-571:         
-572:         Returns:
-573:             List[str]: ['insightface'] (valeurs non supportées ignorées)
-574:         """
-575:         engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
-576:         engines = _parse_csv_list(engines_str)
-577: 
-578:         normalized = [e.strip().lower() for e in engines if e.strip()]
-579:         allowed = {"insightface", "all"}
-580:         return [e for e in normalized if e in allowed]
-581:     
-582:     @staticmethod
-583:     def get_step5_gpu_max_vram_mb() -> int:
-584:         """
-585:         Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
-586:         
-587:         Returns:
-588:             int: Limite en Mo (défaut: 2048)
-589:         """
-590:         return _parse_optional_positive_int(
-591:             os.environ.get('STEP5_GPU_MAX_VRAM_MB')
-592:         ) or 2048
-593: 
-594: 
-595: # Global configuration instance
-596: config = Config()
+1054: 
+1055: if __name__ == '__main__':
+1056:     init_app()
+1057: 
+1058:     APP_FLASK.run(
+1059:         debug=config.DEBUG,
+1060:         host=config.HOST,
+1061:         port=config.PORT,
+1062:         threaded=True,
+1063:         use_reloader=False
+1064:     )
 ```
 
 ## File: static/css/components/logs.css
@@ -32390,6 +33079,606 @@ app_new.py
 194: }
 ```
 
+## File: config/settings.py
+```python
+  1: """
+  2: Centralized configuration management for workflow_mediapipe.
+  3: 
+  4: This module provides environment-based configuration management
+  5: following the project's development guidelines.
+  6: """
+  7: 
+  8: import os
+  9: import logging
+ 10: import subprocess
+ 11: from pathlib import Path
+ 12: from dataclasses import dataclass, field
+ 13: from typing import Optional, List
+ 14: 
+ 15: logger = logging.getLogger(__name__)
+ 16: 
+ 17: 
+ 18: def _parse_bool(raw: Optional[str], default: bool) -> bool:
+ 19:     if raw is None:
+ 20:         return default
+ 21:     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+ 22: 
+ 23: 
+ 24: def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+ 25:     if raw is None:
+ 26:         return None
+ 27:     raw = raw.strip()
+ 28:     if not raw:
+ 29:         return None
+ 30:     try:
+ 31:         return int(raw)
+ 32:     except Exception:
+ 33:         return None
+ 34: 
+ 35: 
+ 36: def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
+ 37:     value = _parse_optional_int(raw)
+ 38:     if value is None:
+ 39:         return None
+ 40:     if value <= 0:
+ 41:         return None
+ 42:     return value
+ 43: 
+ 44: 
+ 45: def _parse_csv_list(raw: Optional[str]) -> List[str]:
+ 46:     if raw is None:
+ 47:         return []
+ 48:     parts = [p.strip() for p in raw.split(",")]
+ 49:     return [p for p in parts if p]
+ 50: 
+ 51: 
+ 52: @dataclass
+ 53: class Config:
+ 54:     """
+ 55:     Centralized configuration class for the workflow_mediapipe application.
+ 56:     
+ 57:     All configuration values are loaded from environment variables with
+ 58:     sensible defaults to maintain backward compatibility.
+ 59:     """
+ 60:     
+ 61:     # Flask Application Settings
+ 62:     SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
+ 63:     DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
+ 64:     HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
+ 65:     PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
+ 66:     
+ 67:     # Security Tokens (loaded from environment)
+ 68:     INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
+ 69:     RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
+ 70:     
+ 71:     # Webhook JSON Source (single data source for monitoring)
+ 72:     WEBHOOK_JSON_URL: str = os.environ.get(
+ 73:         'WEBHOOK_JSON_URL',
+ 74:         'https://webhook.kidpixel.fr/data/webhook_links.json'
+ 75:     )
+ 76:     WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
+ 77:     WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
+ 78:     WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
+ 79:     
+ 80:     # Directory Configuration
+ 81:     BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
+ 82:         'BASE_PATH_SCRIPTS_ENV', 
+ 83:         os.path.dirname(os.path.abspath(__file__ + '/../'))
+ 84:     ))
+ 85:     CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
+ 86:     LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
+ 87:         'LOCAL_DOWNLOADS_DIR', 
+ 88:         Path.home() / 'Téléchargements'
+ 89:     ))
+ 90:     DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
+ 91:     ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
+ 92:     DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
+ 93:     DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
+ 94:     # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
+ 95:     # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
+ 96:     LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
+ 97:     # Virtual environments base directory (defaults to project root if not set)
+ 98:     VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
+ 99:     # Projects directory for visualization/timeline features
+100:     PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
+101:     # Archives directory for persistent analysis results (timeline)
+102:     ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
+103:     
+104:     # Python Environment Configuration
+105:     PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
+106:     
+107:     # Processing Configuration
+108:     MAX_CPU_WORKERS: int = int(os.environ.get(
+109:         'MAX_CPU_WORKERS', 
+110:         str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
+111:     ))
+112:     
+113:     # Polling Intervals (in milliseconds for frontend, seconds for backend)
+114:     POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
+115:     LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
+116: 
+117:     SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+118:     
+119:     # MediaPipe Configuration
+120:     MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
+121:         'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
+122:     ))
+123:     MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
+124:         'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
+125:     ))
+126:     
+127:     # GPU Configuration
+128:     ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
+129:     
+130:     # Lemonfox API Configuration (STEP4 alternative)
+131:     LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
+132:     LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
+133:     LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
+134: 
+135:     LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
+136:     LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
+137:     LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
+138:         os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
+139:         default=True,
+140:     )
+141:     LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
+142:         os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
+143:     )
+144:     LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
+145:         os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
+146:     )
+147:     LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
+148:         default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
+149:     )
+150:     LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
+151:     LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
+152:     LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
+153:         os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
+154:     )
+155:     LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
+156:         os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
+157:         default=False,
+158:     )
+159:     LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
+160:     LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
+161: 
+162:     STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+163:     
+164:     # STEP5 Object Detection Configuration
+165:     # Model selection for fallback object detection when face detection fails (MediaPipe only)
+166:     STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
+167:         'STEP5_OBJECT_DETECTOR_MODEL',
+168:         'efficientdet_lite2'  # Default: current baseline, backward compatible
+169:     )
+170:     STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+171:     STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
+172:     
+173:     # STEP5 Tracking configuration
+174:     STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
+175:     STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
+176: 
+177:     STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+178:         os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
+179:     )
+180:     STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+181:     STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
+182:         os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+183:     )
+184:     
+185:     def __post_init__(self):
+186:         """Post-initialization to ensure paths are Path objects and create directories."""
+187:         # Ensure all path attributes are Path objects
+188:         if isinstance(self.BASE_PATH_SCRIPTS, str):
+189:             self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
+190:         if isinstance(self.CACHE_ROOT_DIR, str):
+191:             self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
+192:         if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
+193:             self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
+194:         if isinstance(self.LOGS_DIR, str):
+195:             self.LOGS_DIR = Path(self.LOGS_DIR)
+196: 
+197:         if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
+198:             self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
+199:         
+200:         # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
+201:         if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
+202:             self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
+203:         elif isinstance(self.VENV_BASE_DIR, str):
+204:             self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
+205: 
+206:         # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
+207:         # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
+208:         if not self.PYTHON_VENV_EXE:
+209:             self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
+210:         else:
+211:             python_exe_path = Path(self.PYTHON_VENV_EXE)
+212:             if not python_exe_path.is_absolute():
+213:                 self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
+214:         
+215:         # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
+216:         # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
+217:         # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
+218:         # like 'projets_extraits/logs' when steps run with a different CWD.
+219:         if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
+220:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
+221:         elif not self.LOGS_DIR.is_absolute():
+222:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
+223: 
+224:         if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
+225:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
+226:         elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
+227:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
+228: 
+229:         if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
+230:             self.CACHE_ROOT_DIR = Path('/mnt/cache')
+231:         elif not self.CACHE_ROOT_DIR.is_absolute():
+232:             self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
+233:         else:
+234:             self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
+235: 
+236:         # Default PROJECTS_DIR if not set
+237:         if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
+238:             self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
+239:         elif isinstance(self.PROJECTS_DIR, str):
+240:             self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
+241:         # Default ARCHIVES_DIR if not set
+242:         if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
+243:             self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
+244:         elif isinstance(self.ARCHIVES_DIR, str):
+245:             self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
+246:             
+247:         # Create necessary directories
+248:         self._create_directories()
+249:     
+250:     def _create_directories(self) -> None:
+251:         """Create necessary directories if they don't exist."""
+252:         directories_to_create = [
+253:             self.LOGS_DIR,
+254:             self.LOGS_DIR / 'step1',
+255:             self.LOGS_DIR / 'step2',
+256:             self.LOGS_DIR / 'step3',
+257:             self.LOGS_DIR / 'step4',
+258:             self.LOGS_DIR / 'step5',
+259:             self.LOGS_DIR / 'step6',
+260:             self.LOGS_DIR / 'step7',
+261:             # Ensure projects directory exists by default to avoid confusion
+262:             self.PROJECTS_DIR,
+263:             # Ensure archives directory exists
+264:             self.ARCHIVES_DIR,
+265:         ]
+266:         
+267:         for directory in directories_to_create:
+268:             try:
+269:                 directory.mkdir(parents=True, exist_ok=True)
+270:                 logger.debug(f"Ensured directory exists: {directory}")
+271:             except Exception as e:
+272:                 logger.error(f"Failed to create directory {directory}: {e}")
+273:     
+274:     def validate(self, strict: bool = None) -> bool:
+275:         """
+276:         Validate the configuration and ensure all required settings are present.
+277: 
+278:         Args:
+279:             strict: If None, uses DEBUG mode to determine strictness.
+280:                    If True, raises errors. If False, logs warnings.
+281: 
+282:         Returns:
+283:             bool: True if configuration is valid
+284: 
+285:         Raises:
+286:             ValueError: If required configuration is missing or invalid and strict=True
+287:         """
+288:         if strict is None:
+289:             strict = not self.DEBUG  # Strict in production, lenient in development
+290: 
+291:         errors = []
+292:         warnings = []
+293: 
+294:         # Security validation
+295:         if not self.INTERNAL_WORKER_TOKEN:
+296:             msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
+297:             if strict:
+298:                 errors.append(msg)
+299:             else:
+300:                 warnings.append(msg)
+301:                 # Set development default
+302:                 self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
+303: 
+304:         if not self.RENDER_REGISTER_TOKEN:
+305:             msg = "RENDER_REGISTER_TOKEN environment variable is required"
+306:             if strict:
+307:                 errors.append(msg)
+308:             else:
+309:                 warnings.append(msg)
+310:                 # Set development default
+311:                 self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
+312: 
+313:         # Production security checks
+314:         if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
+315:             errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
+316: 
+317:         # Webhook validation (single data source)
+318:         if not self.WEBHOOK_JSON_URL:
+319:             msg = "WEBHOOK_JSON_URL must be set"
+320:             if strict:
+321:                 errors.append(msg)
+322:             else:
+323:                 warnings.append(msg)
+324:         if self.WEBHOOK_TIMEOUT <= 0:
+325:             warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
+326:         if self.WEBHOOK_CACHE_TTL < 0:
+327:             warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
+328:         
+329:         # Path validation
+330:         if not self.BASE_PATH_SCRIPTS.exists():
+331:             warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
+332:         
+333:         if not self.LOCAL_DOWNLOADS_DIR.exists():
+334:             warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
+335:         
+336:         # Python executable validation
+337:         python_exe_path = Path(self.PYTHON_VENV_EXE)
+338:         if not python_exe_path.exists():
+339:             warnings.append(f"Python executable not found: {python_exe_path}")
+340:         
+341:         # Log warnings
+342:         for warning in warnings:
+343:             logger.warning(warning)
+344:         
+345:         # Log warnings
+346:         if warnings:
+347:             for warning in warnings:
+348:                 logger.warning(f"Configuration warning: {warning}")
+349:             if not strict:
+350:                 logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
+351: 
+352:         # Raise errors if any
+353:         if errors:
+354:             error_msg = f"Configuration validation failed: {'; '.join(errors)}"
+355:             logger.error(error_msg)
+356:             raise ValueError(error_msg)
+357: 
+358:         if warnings and not strict:
+359:             logger.info("Configuration validation completed with warnings (development mode)")
+360:         else:
+361:             logger.info("Configuration validation successful")
+362:         return True
+363:     
+364:     def get_venv_path(self, venv_name: str) -> Path:
+365:         """
+366:         Get the path to a virtual environment.
+367:         
+368:         Args:
+369:             venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
+370:             
+371:         Returns:
+372:             Path object to the virtual environment directory
+373:         """
+374:         return self.VENV_BASE_DIR / venv_name
+375:     
+376:     def get_venv_python(self, venv_name: str) -> Path:
+377:         """
+378:         Get the path to the Python executable in a virtual environment.
+379:         
+380:         Args:
+381:             venv_name: Name of the virtual environment
+382:             
+383:         Returns:
+384:             Path object to the Python executable
+385:         """
+386:         return self.get_venv_path(venv_name) / "bin" / "python"
+387:     
+388:     def get_allowed_base_paths(self) -> List[Path]:
+389:         """
+390:         Get list of allowed base paths for file operations.
+391:         
+392:         Returns:
+393:             List of Path objects representing allowed base directories
+394:         """
+395:         return [
+396:             self.BASE_PATH_SCRIPTS,
+397:             self.LOCAL_DOWNLOADS_DIR,
+398:             self.LOGS_DIR,
+399:             self.BASE_PATH_SCRIPTS / 'workflow_scripts',
+400:             self.BASE_PATH_SCRIPTS / 'static',
+401:             self.BASE_PATH_SCRIPTS / 'templates',
+402:             self.BASE_PATH_SCRIPTS / 'utils',
+403:         ]
+404:     
+405:     def to_dict(self) -> dict:
+406:         """
+407:         Convert configuration to dictionary for serialization.
+408:         
+409:         Returns:
+410:             Dictionary representation of configuration (excluding sensitive data)
+411:         """
+412:         config_dict = {}
+413:         for key, value in self.__dict__.items():
+414:             # Exclude sensitive information
+415:             if 'TOKEN' in key or 'SECRET' in key:
+416:                 config_dict[key] = '***HIDDEN***' if value else None
+417:             elif isinstance(value, Path):
+418:                 config_dict[key] = str(value)
+419:             else:
+420:                 config_dict[key] = value
+421:         
+422:         return config_dict
+423:     
+424:     @staticmethod
+425:     def check_gpu_availability() -> dict:
+426:         """
+427:         Vérifier la disponibilité GPU pour STEP5 (InsightFace uniquement).
+428:         
+429:         Returns:
+430:             dict: {
+431:                 'available': bool,
+432:                 'reason': str (si non disponible),
+433:                 'vram_total_gb': float (si disponible),
+434:                 'vram_free_gb': float (si disponible),
+435:                 'cuda_version': str (si disponible),
+436:                 'onnx_cuda': bool
+437:             }
+438:         """
+439:         result = {
+440:             'available': False,
+441:             'reason': '',
+442:             'onnx_cuda': False,
+443:         }
+444:         
+445:         # Check GPU availability via pynv (NVML) first, fallback to nvidia-smi
+446:         gpu_checked = False
+447:         try:
+448:             import pynvml
+449: 
+450:             pynvml.nvmlInit()
+451:             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+452:             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+453:             vram_total = mem_info.total / (1024 ** 3)
+454:             vram_free = mem_info.free / (1024 ** 3)
+455:             result['vram_total_gb'] = round(vram_total, 2)
+456:             result['vram_free_gb'] = round(vram_free, 2)
+457:             result['cuda_version'] = os.environ.get('CUDA_VERSION') or ''
+458:             gpu_checked = True
+459: 
+460:             if vram_free < 1.5:
+461:                 result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+462:                 return result
+463:         except ImportError:
+464:             logger.debug('pynvml not available; falling back to nvidia-smi for GPU detection')
+465:         except Exception as e:
+466:             logger.warning(f"pynvml check failed: {e}; falling back to nvidia-smi")
+467: 
+468:         if not gpu_checked:
+469:             try:
+470:                 completed = subprocess.run(
+471:                     ['nvidia-smi', '--query-gpu=memory.total,memory.free', '--format=csv,noheader,nounits'],
+472:                     capture_output=True,
+473:                     text=True,
+474:                     timeout=5,
+475:                 )
+476:                 if completed.returncode == 0:
+477:                     line = completed.stdout.strip().split('\n')[0]
+478:                     total_str, free_str = [part.strip() for part in line.split(',')]
+479:                     vram_total = float(total_str) / 1024
+480:                     vram_free = float(free_str) / 1024
+481:                     result['vram_total_gb'] = round(vram_total, 2)
+482:                     result['vram_free_gb'] = round(vram_free, 2)
+483:                     gpu_checked = True
+484:                     if vram_free < 1.5:
+485:                         result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+486:                         return result
+487:                 else:
+488:                     logger.warning(
+489:                         "nvidia-smi GPU check failed (code %s): %s",
+490:                         completed.returncode,
+491:                         completed.stderr.strip(),
+492:                     )
+493:             except FileNotFoundError:
+494:                 logger.warning("nvidia-smi introuvable pour la vérification GPU")
+495:             except subprocess.TimeoutExpired:
+496:                 logger.warning("nvidia-smi GPU check timed out")
+497:             except Exception as e:
+498:                 logger.warning(f"nvidia-smi GPU check failed: {e}")
+499: 
+500:         if not gpu_checked:
+501:             result['reason'] = 'Impossible de déterminer la disponibilité GPU (pynvml/nvidia-smi indisponibles)'
+502:             return result
+503:         
+504:         # Check ONNXRuntime CUDA provider (requis pour InsightFace)
+505:         try:
+506:             import onnxruntime as ort
+507:             if 'CUDAExecutionProvider' in ort.get_available_providers():
+508:                 result['onnx_cuda'] = True
+509:         except ImportError:
+510:             pass
+511:         except Exception as e:
+512:             logger.warning(f"ONNXRuntime check failed: {e}")
+513: 
+514:         # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
+515:         if not result.get('onnx_cuda'):
+516:             ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
+517:             if ort_gpu_python:
+518:                 try:
+519:                     ort_check_code = (
+520:                         "import sys\n"
+521:                         "import onnxruntime as ort\n"
+522:                         "providers = ort.get_available_providers()\n"
+523:                         "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
+524:                     )
+525:                     completed = subprocess.run(
+526:                         [ort_gpu_python, "-c", ort_check_code],
+527:                         capture_output=True,
+528:                         text=True,
+529:                         timeout=15,
+530:                     )
+531:                     if completed.returncode == 0:
+532:                         result['onnx_cuda'] = completed.stdout.strip() == "1"
+533:                     else:
+534:                         logger.warning(
+535:                             "ONNXRuntime GPU check failed (external env returned code %s): %s",
+536:                             completed.returncode,
+537:                             completed.stderr.strip(),
+538:                         )
+539:                 except FileNotFoundError:
+540:                     logger.warning(
+541:                         "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
+542:                         ort_gpu_python,
+543:                     )
+544:                 except subprocess.TimeoutExpired:
+545:                     logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
+546:                 except Exception as exc:
+547:                     logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
+548:         
+549:         # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
+550:         if result['onnx_cuda']:
+551:             result['available'] = True
+552:         else:
+553:             result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
+554:         
+555:         return result
+556:     
+557:     @staticmethod
+558:     def is_step5_gpu_enabled() -> bool:
+559:         """
+560:         Vérifier si le mode GPU STEP5 est activé via configuration.
+561:         
+562:         Returns:
+563:             bool: True si STEP5_ENABLE_GPU=1
+564:         """
+565:         return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
+566:     
+567:     @staticmethod
+568:     def get_step5_gpu_engines() -> List[str]:
+569:         """
+570:         Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
+571:         
+572:         Returns:
+573:             List[str]: ['insightface'] (valeurs non supportées ignorées)
+574:         """
+575:         engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
+576:         engines = _parse_csv_list(engines_str)
+577: 
+578:         normalized = [e.strip().lower() for e in engines if e.strip()]
+579:         allowed = {"insightface", "all"}
+580:         return [e for e in normalized if e in allowed]
+581:     
+582:     @staticmethod
+583:     def get_step5_gpu_max_vram_mb() -> int:
+584:         """
+585:         Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
+586:         
+587:         Returns:
+588:             int: Limite en Mo (défaut: 2048)
+589:         """
+590:         return _parse_optional_positive_int(
+591:             os.environ.get('STEP5_GPU_MAX_VRAM_MB')
+592:         ) or 2048
+593: 
+594: 
+595: # Global configuration instance
+596: config = Config()
+```
+
 ## File: static/eventHandlers.js
 ```javascript
   1: import * as dom from './domElements.js';
@@ -32525,9 +33814,9 @@ app_new.py
 131:             if (getIsAnySequenceRunning()) {
 132:                 showNotification("Séquence déjà en cours.", 'warning'); return;
 133:             }
-134:             // Play workflow start sound for complete sequence 1-6
+134:             // Play workflow start sound for complete sequence 1-8
 135:             soundEvents.workflowStart();
-136:             await runStepSequence(defaultSequenceableStepsKeys, "Séquence 0-4");
+136:             await runStepSequence(defaultSequenceableStepsKeys, "Séquence 1-8");
 137:         });
 138:     }
 139: 
@@ -33314,7 +34603,7 @@ app_new.py
  31:             <div class="workflow-controls">
  32:                 <div class="sequence-controls">
  33:                     <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
- 34:                         <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-7)</button>
+ 34:                         <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-8)</button>
  35:                     </div>
  36:                     <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
  37:                         <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
@@ -33392,7 +34681,7 @@ app_new.py
 109:                                 <div class="timeline-content">
 110:                             <div class="timeline-head">
 111:                                 <div class="step-title-group">
-112:                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
+112:                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}🧠{% elif step_key == 'STEP8' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
 113:                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
 114:                                 </div>
 115:                                 <div class="step-selection-control">

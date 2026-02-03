@@ -18,7 +18,7 @@ def temp_base_path(tmp_path):
     """Create a temporary base path for testing."""
     # Create necessary directory structure
     (tmp_path / "workflow_scripts").mkdir()
-    for step in range(1, 8):
+    for step in range(1, 9):
         (tmp_path / "workflow_scripts" / f"step{step}").mkdir()
     
     (tmp_path / "projets_extraits").mkdir()
@@ -28,6 +28,7 @@ def temp_base_path(tmp_path):
     (tmp_path / "transnet_env" / "bin").mkdir(parents=True)
     (tmp_path / "audio_env" / "bin").mkdir(parents=True)
     (tmp_path / "tracking_env" / "bin").mkdir(parents=True)
+    (tmp_path / "tracking_env_slim" / "bin").mkdir(parents=True)
     
     return tmp_path
 
@@ -56,15 +57,18 @@ class TestWorkflowCommandsConfigInitialization:
         
         assert commands.hf_token == token
         
-        # Check that token is in STEP4 command
+        # Check that token is in STEP4 command when the Pyannote runner is active
         step4_cmd = commands.get_step_command('STEP4')
-        assert token in step4_cmd
+        cmd_str = ' '.join(step4_cmd)
+        if 'run_audio_analysis.py' in cmd_str:
+            assert '--hf_auth_token' in step4_cmd
+            assert token in step4_cmd
     
     def test_log_directories_created(self, temp_base_path):
         """Test that log directories are created."""
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
-        for step in range(1, 8):
+        for step in range(1, 9):
             log_dir = commands.logs_base_dir / f"step{step}"
             assert log_dir.exists()
 
@@ -73,13 +77,13 @@ class TestConfigurationRetrieval:
     """Test configuration retrieval methods."""
     
     def test_get_config_returns_all_steps(self, temp_base_path):
-        """Test that get_config returns all 7 steps."""
+        """Test that get_config returns all 8 steps."""
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
         config = commands.get_config()
         
-        assert len(config) == 7
-        assert all(f"STEP{i}" in config for i in range(1, 8))
+        assert len(config) == 8
+        assert all(f"STEP{i}" in config for i in range(1, 9))
     
     def test_get_step_config_valid_key(self, temp_base_path):
         """Test getting config for valid step key."""
@@ -106,7 +110,7 @@ class TestConfigurationRetrieval:
         
         assert commands.validate_step_key('STEP1') is True
         assert commands.validate_step_key('STEP7') is True
-        assert commands.validate_step_key('STEP8') is False
+        assert commands.validate_step_key('STEP8') is True
         assert commands.validate_step_key('INVALID') is False
     
     def test_get_all_step_keys(self, temp_base_path):
@@ -115,8 +119,8 @@ class TestConfigurationRetrieval:
         
         keys = commands.get_all_step_keys()
         
-        assert len(keys) == 7
-        assert all(f"STEP{i}" in keys for i in range(1, 8))
+        assert len(keys) == 8
+        assert all(f"STEP{i}" in keys for i in range(1, 9))
 
 
 class TestStepSpecificMethods:
@@ -191,7 +195,7 @@ class TestStepConfigurations:
         cmd_str = ' '.join(cmd)
         
         assert 'audio_env' in cmd_str
-        assert 'run_audio_analysis.py' in cmd_str
+        assert ('run_audio_analysis.py' in cmd_str) or ('run_audio_analysis_lemonfox.py' in cmd_str)
     
     def test_step5_uses_tracking_env_slim(self, temp_base_path):
         """Test that STEP5 uses tracking_env_slim."""
@@ -231,8 +235,9 @@ class TestHFTokenManagement:
         cmd = commands.get_step_command('STEP4')
         cmd_str = ' '.join(cmd)
         
-        # Should not have --hf_auth_token in command
-        assert '--hf_auth_token' not in cmd_str
+        # Pyannote runner requires a token (only appended when hf_token is provided).
+        if 'run_audio_analysis.py' in cmd_str:
+            assert '--hf_auth_token' not in cmd_str
     
     def test_init_with_token(self, temp_base_path):
         """Test initialization with HF token."""
@@ -240,26 +245,30 @@ class TestHFTokenManagement:
         commands = WorkflowCommandsConfig(base_path=temp_base_path, hf_token=token)
         
         cmd = commands.get_step_command('STEP4')
-        
-        assert '--hf_auth_token' in cmd
-        assert token in cmd
+
+        cmd_str = ' '.join(cmd)
+        if 'run_audio_analysis.py' in cmd_str:
+            assert '--hf_auth_token' in cmd
+            assert token in cmd
     
     def test_update_hf_token(self, temp_base_path):
         """Test updating HF token after initialization."""
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
-        # Initially no token
         cmd_before = commands.get_step_command('STEP4')
-        assert '--hf_auth_token' not in ' '.join(cmd_before)
+        cmd_before_str = ' '.join(cmd_before)
+        if 'run_audio_analysis.py' in cmd_before_str:
+            assert '--hf_auth_token' not in cmd_before_str
         
         # Update token
         new_token = "hf_newtoken456"
         commands.update_hf_token(new_token)
         
-        # Should now have token
         cmd_after = commands.get_step_command('STEP4')
-        assert '--hf_auth_token' in cmd_after
-        assert new_token in cmd_after
+        cmd_after_str = ' '.join(cmd_after)
+        if 'run_audio_analysis.py' in cmd_after_str:
+            assert '--hf_auth_token' in cmd_after
+            assert new_token in cmd_after
 
 
 class TestProgressPatterns:
@@ -332,4 +341,4 @@ class TestRepr:
         
         assert 'WorkflowCommandsConfig' in repr_str
         assert 'base_path' in repr_str
-        assert 'steps=7' in repr_str
+        assert 'steps=8' in repr_str

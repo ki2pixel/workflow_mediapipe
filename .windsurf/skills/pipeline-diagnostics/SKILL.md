@@ -1,6 +1,6 @@
 ---
 name: pipeline-diagnostics
-description: Checklists and scripts to validate env vars, venv availability, and hardware readiness before launching Workflow MediaPipe steps (STEP1-STEP7). Use when pre-run sanity checks or root-cause hunts point to configuration drift.
+description: Checklists and scripts to validate env vars, venv availability, and hardware readiness before launching Workflow MediaPipe steps (STEP1-STEP8). Use when pre-run sanity checks or root-cause hunts point to configuration drift.
 ---
 
 # Pipeline Diagnostics Skill
@@ -8,8 +8,9 @@ description: Checklists and scripts to validate env vars, venv availability, and
 ## Quick Start
 1. Lire `.env` via `config/settings.py` (`python - <<'PY' ...`) pour afficher les variables critiques (`CACHE_ROOT_DIR`, `STEP5_*`, `DOWNLOAD_HISTORY_DB_PATH`).
 2. Valider l'existence des venv spécialisés (`env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
-3. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP5 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
-4. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur.
+3. Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
+4. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP5 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
+5. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur, y compris les vérifications STEP7/STEP8.
 
 ## Procédure Complète
 1. **Sanity `.env`**
@@ -23,9 +24,11 @@ description: Checklists and scripts to validate env vars, venv availability, and
    - `nvidia-smi` (GPU dispo, driver version ≥ 515).
    - `ffmpeg -hide_banner | head -n 1` pour STEP2.
    - `insightface_env/bin/python - <<'PY'` pour importer `onnxruntime` et vérifier `get_available_providers()` (GPU).
-4. **Filesystem & Permissions**
+5. **Filesystem & Permissions**
    - Vérifier `CACHE_ROOT_DIR`, `ARCHIVES_DIR`, `logs/stepX` existent et sont accessibles (`FilesystemService` doit être utilisé côté code; ici on vérifie les répertoires).
-5. **SQLite Health**
+   - Pour STEP7, vérifier l'accès aux fichiers `*_tracking.json` en entrée.
+   - Pour STEP8, vérifier les permissions d'écriture dans `OUTPUT_DIR` et `ARCHIVES_DIR`.
+6. **SQLite Health**
    - `python - <<'PY'` pour ouvrir `download_history.sqlite3`, lancer `PRAGMA integrity_check;`.
 
 ## Résolution Rapide

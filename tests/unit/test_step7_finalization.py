@@ -12,15 +12,15 @@ import pytest
 
 def _load_finalize_module():
     project_root = Path(__file__).resolve().parents[2]
-    module_path = project_root / 'workflow_scripts' / 'step7' / 'finalize_and_copy.py'
-    spec = importlib.util.spec_from_file_location('workflow_scripts.step7.finalize_and_copy', module_path)
+    module_path = project_root / 'workflow_scripts' / 'step8' / 'finalize_and_copy.py'
+    spec = importlib.util.spec_from_file_location('workflow_scripts.step8.finalize_and_copy', module_path)
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(mod)
     return mod
 
 
-class TestStep7FinalizationChmodFallback:
+class TestStep8FinalizationChmodFallback:
     def test_destination_supports_chmod_returns_false_on_eperm(self, tmp_path, monkeypatch):
         mod = _load_finalize_module()
 

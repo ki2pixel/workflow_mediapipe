@@ -1,6 +1,6 @@
 # Pipeline Diagnostics — Environnement & Matériel
 
-> **Objectif** : valider rapidement que les variables `.env`, les environnements virtuels et le matériel sont prêts avant d’exécuter STEP1→STEP7.
+> **Objectif** : valider rapidement que les variables `.env`, les environnements virtuels et le matériel sont prêts avant d’exécuter STEP1→STEP8.
 
 ## 1. Variables critiques (`.env`)
 ```bash
@@ -57,5 +57,6 @@ PY
 - [ ] `download_history.sqlite3` sain et accessible.
 - [ ] Répertoires `CACHE_ROOT_DIR`, `ARCHIVES_DIR`, `logs/step*` existent avec permissions écriture.
 - [ ] `requirements-tracking-env-lite.txt` utilisé pour `tracking_env_slim`.
+- [ ] Scripts STEP7 (`preprocess_ae_json.py`) et STEP8 (`finalize_and_copy.py`) accessibles et exécutables.
 
 > **Astuce** : conserver ce fichier localement pendant les astreintes pour gagner du temps avant un run complet.

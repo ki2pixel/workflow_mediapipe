@@ -19,7 +19,8 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 | **STEP 4** (Audio) | `step4/` | `audio_env/` | `LemonfoxAudioService` |
 | **STEP 5** (Tracking) | `step5/` | `tracking_env_slim/` (CPU) / `insightface_env/` (GPU) | `InsightFaceEngine (GPU-only) + factory` |
 | **STEP 6** (Reducer) | `step6/` | `env/` | N/A |
-| **STEP 7** (Finalize) | `step7/` | `env/` | `ResultsArchiver` |
+| **STEP 7** (AE Preprocess) | `step7/` | `env/` | N/A |
+| **STEP 8** (Finalize) | `step8/` | `env/` | `ResultsArchiver` |
 
 **Chemins des Venvs (interpréteurs montés sous `/mnt/venv_ext4`) :**
 - Base : `env/bin/python`
@@ -32,7 +33,7 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 
 Ces commandes doivent être lancées depuis la racine du projet **tout en ciblant les interpréteurs situés dans `/mnt/venv_ext4/<venv>/bin/python`** (pas le Python système).
 
-> 🔎 **Raccourci** : consultez `resources/step_command_matrix.md` pour une vue tabulaire des 7 étapes (interpréteur, commande, logs, prérequis). Gardez le fichier ouvert pendant les interventions d'astreinte.
+> 🔎 **Raccourci** : consultez `resources/step_command_matrix.md` pour une vue tabulaire des 8 étapes (interpréteur, commande, logs, prérequis). Gardez le fichier ouvert pendant les interventions d'astreinte.
 
 ### Step 1 : Extraction Sécurisée
 ```bash
@@ -80,10 +81,15 @@ STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python 
 env/bin/python workflow_scripts/step6/json_reducer.py --log_dir logs/step6 --work_dir projets_extraits
 ```
 
-### Step 7 : Finalisation (Avec Archivage)
+### Step 7 : Pré-traitement After Effects (AE)
+```bash
+env/bin/python workflow_scripts/step7/preprocess_ae_json.py --log_dir logs/step7 --work_dir projets_extraits
+```
+
+### Step 8 : Finalisation (Avec Archivage)
 ```bash
 # Vérifier OUTPUT_DIR dans .env avant
-env/bin/python workflow_scripts/step7/finalize_and_copy.py
+env/bin/python workflow_scripts/step8/finalize_and_copy.py
 ```
 
 ## 3. Diagnostic & État

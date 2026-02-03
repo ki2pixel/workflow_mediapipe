@@ -8,5 +8,6 @@ export const defaultSequenceableStepsKeys = [
     "STEP4",
     "STEP5",
     "STEP6",
-    "STEP7"
+    "STEP7",
+    "STEP8"
 ];

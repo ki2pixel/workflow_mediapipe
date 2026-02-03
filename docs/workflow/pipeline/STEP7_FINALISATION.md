@@ -1,6 +1,6 @@
-# Documentation Technique - Étape 7 : Finalisation
+# Documentation Technique - Étape 8 : Finalisation
 
-> **Code-Doc Context** – Part of the 7‑step pipeline; see `../README.md` for the uniform template. Backend hotspots: moderate complexity (radon D) in `finalize_and_copy.py`; file system operations and NTFS compatibility handling.
+> **Code-Doc Context** – Part of the 8‑step pipeline; see `README.md` for the uniform template. Backend hotspots: moderate complexity (radon D) in `finalize_and_copy.py`; file system operations and NTFS compatibility handling.
 
 ---
 
@@ -12,7 +12,7 @@ L'Étape 7 constitue la phase finale du pipeline de traitement vidéo MediaPipe.
 **Note importante** : Cette étape préserve systématiquement le répertoire d'archives (`ARCHIVES_DIR`) qui contient les analyses persistantes pour consultation ultérieure.
 
 ### Rôle dans le Pipeline
-- **Position** : Septième et dernière étape du pipeline (STEP7)
+- **Position** : Huitième et dernière étape du pipeline (STEP8)
 - **Prérequis** : Projets complets avec tous les fichiers générés (CSV, JSON audio [optionnel], JSON tracking réduits par STEP6)
 - **Sortie** : Archives finales organisées dans la destination de stockage
 - **Étape suivante** : Aucune (fin du pipeline)
@@ -38,7 +38,7 @@ L'Étape 7 constitue la phase finale du pipeline de traitement vidéo MediaPipe.
 ### Outputs
 - **Archives finales** : Structure organisée dans la destination de stockage
 - **Rapport de finalisation** : Résumé des opérations et validation
-- **Logs détaillés** : Journal de finalisation dans `logs/step7/`
+- **Logs détaillés** : Journal de finalisation dans `logs/step8/`
 - **Archives préservées** : `ARCHIVES_DIR` maintenu intact
 
 ---
@@ -48,7 +48,7 @@ L'Étape 7 constitue la phase finale du pipeline de traitement vidéo MediaPipe.
 ### Commande WorkflowCommandsConfig
 ```python
 # Exemple de commande (voir WorkflowCommandsConfig pour la commande exacte)
-python workflow_scripts/step7/finalize_and_copy.py --source-dir projets_extraits/ --dest-dir /mnt/archives/final/
+python workflow_scripts/step8/finalize_and_copy.py --source-dir projets_extraits/ --dest-dir /mnt/archives/final/
 ```
 
 ### Environnement Virtuel

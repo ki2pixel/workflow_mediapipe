@@ -24,7 +24,7 @@ alwaysApply: true
 2. [Project Structure](#project-structure)
 3. [Code Style](#code-style)
 4. [Core Patterns](#core-patterns)
-5. [Pipeline STEP4 & STEP5](#pipeline-step4--step5)
+5. [Pipeline STEP4, STEP5 & STEP7](#pipeline-step4--step5--step7)
 6. [Quality & Testing](#quality--testing)
 7. [Process & Tooling](#process--tooling)
 8. [Common Tasks](#common-tasks)
@@ -107,7 +107,7 @@ domBatcher.scheduleUpdate(() => {
 - `subscribeToProperty(['steps', stepKey, 'status'])` pour mettre à jour badges Timeline.
 - `PollingManager` met à jour `WorkflowState` → `AppState` via actions spécifiques (jamais de dispatch global).
 
-## Pipeline STEP4 & STEP5
+## Pipeline STEP4, STEP5 & STEP7
 ### STEP4 Audio (audio_env)
 - Extraction audio via `ffmpeg` preset TV, analyse `Lemonfox` (avec smoothing) + fallback Pyannote.
 - Profil imposé `AUDIO_PROFILE=gpu_fp32` (AMP désactivé) pour éviter divergences GPU/CPU.
@@ -121,6 +121,13 @@ domBatcher.scheduleUpdate(() => {
 - **Règles d’export** : JSON dense frame-by-frame, `tracked_objects` vide si aucune détection.
 - **Optimisations** : Warmup `cap.read()`, chunking adaptatif interne.
 - **GPU** : Réservé strictement à InsightFace (ONNX Runtime). MediaPipe tourne toujours sur CPU.
+
+### STEP7 Pré-traitement AE (env)
+- **Objectif** : Optimiser les données JSON pour After Effects en pré-traitant les sorties STEP6.
+- **Entrée** : Fichiers `*_tracking.json` (sortie STEP6) et JSON audio associés.
+- **Sortie** : Fichiers `*_ae.json` optimisés pour AE avec structures pré-indexées.
+- **Patterns** : Utiliser les patterns de progression définis dans `WorkflowCommandsConfig._get_step7_config()`.
+- **After Effects Integration** : Le script AE `Analyse-Écart-X...jsx` priorise les `*_ae.json` avec fallback sur STEP6/STEP5.
 
 ## Quality & Testing
 - **Tests unitaires** : `tests/unit/` pour services isolés. Utiliser fixtures `patched_workflow_state()` et `patched_commands_config()`.

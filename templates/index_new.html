@@ -31,7 +31,7 @@
             <div class="workflow-controls">
                 <div class="sequence-controls">
                     <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
-                        <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-7)</button>
+                        <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-8)</button>
                     </div>
                     <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
                         <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
@@ -109,7 +109,7 @@
                                 <div class="timeline-content">
                             <div class="timeline-head">
                                 <div class="step-title-group">
-                                <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
+                                <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}🧠{% elif step_key == 'STEP8' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
                                 </div>
                                 <div class="step-selection-control">

@@ -18,7 +18,7 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
   - Singleton thread-safe (RLock) exposant APIs pour étapes, séquences, téléchargements.
   - Accès atomiques: `update_step_info`, `update_step_status`, `update_step_progress`, `append_step_log`.
 - **Configuration (WorkflowCommandsConfig)** :
-  - Source unique pour les 7 étapes (cmd, cwd, logs, patterns regex).
+  - Source unique pour les 8 étapes (cmd, cwd, logs, patterns regex).
   - Gestion token HF via `update_hf_token()`; méthodes `get_step_config`, `get_step_command`.
 - **Extraction Téléchargements (DownloadService)** :
   - `download_dropbox_file()` avec callbacks de progression et dataclass `DownloadResult`.

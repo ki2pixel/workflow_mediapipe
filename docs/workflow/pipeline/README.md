@@ -4,7 +4,7 @@
 
 ## Overview
 
-This directory contains the complete technical documentation for the 7‑step MediaPipe video processing pipeline. Each step follows a **uniform template**:
+This directory contains the complete technical documentation for the 8‑step MediaPipe video processing pipeline. Each step follows a **uniform template**:
 
 - **Purpose & Pipeline Role** – What the step does and its position in the workflow
 - **Inputs & Outputs** – Expected artifacts and generated results
@@ -24,7 +24,8 @@ This directory contains the complete technical documentation for the 7‑step Me
 4. **[STEP4_ANALYSE_AUDIO.md](STEP4_ANALYSE_AUDIO.md)** — Analyse audio
 5. **[STEP5_SUIVI_VIDEO.md](STEP5_SUIVI_VIDEO.md)** — Suivi vidéo et blendshapes
 6. **[STEP6_REDUCTION_JSON.md](STEP6_REDUCTION_JSON.md)** — Réduction JSON
-7. **[STEP7_FINALISATION.md](STEP7_FINALISATION.md)** — Finalisation et archivage
+7. **[STEP7_PRETRAITEMENT_AE.md](STEP7_PRETRAITEMENT_AE.md)** — Pré-traitement AE (JSON optimisé)
+8. **[STEP8_FINALISATION.md](STEP8_FINALISATION.md)** — Finalisation et archivage
 
 ## Development & Operations
 

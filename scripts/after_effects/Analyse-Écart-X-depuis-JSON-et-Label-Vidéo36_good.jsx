@@ -29,6 +29,11 @@ var CONFIG = {
 	ENABLE_CONFIDENCE_WEIGHTING: true,
 	CONFIDENCE_WEIGHT: 0.35,
 	
+	ENABLE_PYTHON_ANALYZER: true,
+	PYTHON_CMD: "C:/Python313/python.exe",
+	STEP7_ANALYZER_SCRIPT_PATH: "F:/Adobe/Adobe After Effects 2024/Support Files/Scripts/ScriptUI Panels/preprocess_ae_json.py",
+	TEMP_FOLDER: Folder.temp.fsName,
+	
 	// Labels de couleur After Effects
 	LABEL_HIGH_SPREAD: 12,  // Label pour visages avec forte dispersion
 	LABEL_STABLE: 3,        // Label pour objets stables
@@ -79,6 +84,162 @@ if (!Object.keys) {
 			return r;
 		};
 	}());
+}
+
+function _escapeJsonString(value) {
+	if (value === null || value === undefined) return "";
+	var s = value.toString();
+	s = s.replace(/\\/g, "\\\\");
+	s = s.replace(/\"/g, "\\\"");
+	s = s.replace(/\r/g, "\\r");
+	s = s.replace(/\n/g, "\\n");
+	s = s.replace(/\t/g, "\\t");
+	return s;
+}
+
+function _jsonStringify(value) {
+	if (value === null || value === undefined) return "null";
+	var t = typeof value;
+	if (t === "number") {
+		if (isNaN(value) || !isFinite(value)) return "null";
+		return value.toString();
+	}
+	if (t === "boolean") return value ? "true" : "false";
+	if (t === "string") return "\"" + _escapeJsonString(value) + "\"";
+	if (value instanceof Array) {
+		var parts = [];
+		for (var i = 0; i < value.length; i++) {
+			parts.push(_jsonStringify(value[i]));
+		}
+		return "[" + parts.join(",") + "]";
+	}
+	if (t === "object") {
+		var out = [];
+		for (var k in value) {
+			if (!value.hasOwnProperty(k)) continue;
+			if (typeof value[k] === "function") continue;
+			out.push("\"" + _escapeJsonString(k) + "\":" + _jsonStringify(value[k]));
+		}
+		return "{" + out.join(",") + "}";
+	}
+	return "null";
+}
+
+function _escapeSystemArg(arg) {
+	if (arg === null || arg === undefined) return "\"\"";
+	var s = arg.toString();
+	s = s.replace(/\"/g, "\\\"");
+	return "\"" + s + "\"";
+}
+
+function tryRunPythonAnalyzer(comp, frameRate, videoJsonFile) {
+	if (!CONFIG.ENABLE_PYTHON_ANALYZER) {
+		writeToLog("  [PY] Analyse Python désactivée");
+		return null;
+	}
+	if (!CONFIG.PYTHON_CMD || !CONFIG.STEP7_ANALYZER_SCRIPT_PATH) {
+		writeToLog("  [PY] PYTHON_CMD ou STEP7_ANALYZER_SCRIPT_PATH manquant");
+		return null;
+	}
+	if (!videoJsonFile || !videoJsonFile.exists) {
+		writeToLog("  [PY] Fichier vidéo introuvable pour la manif" );
+		return null;
+	}
+	if (!system || typeof system.callSystem !== 'function') {
+		writeToLog("  [PY] system.callSystem indisponible dans After Effects");
+		return null;
+	}
+
+	var manifest = {
+		comp_name: comp.name,
+		comp_max_frame: Math.round(comp.duration * frameRate),
+		json_path: videoJsonFile.fsName,
+		config: {
+			SPREAD_THRESHOLD: CONFIG.SPREAD_THRESHOLD,
+			ENABLE_CONFIDENCE_WEIGHTING: CONFIG.ENABLE_CONFIDENCE_WEIGHTING,
+			CONFIDENCE_WEIGHT: CONFIG.CONFIDENCE_WEIGHT,
+			LABEL_HIGH_SPREAD: CONFIG.LABEL_HIGH_SPREAD,
+			LABEL_STABLE: CONFIG.LABEL_STABLE
+		},
+		layers: {}
+	};
+
+	for (var i = 1; i <= comp.numLayers; i++) {
+		var layer = comp.layer(i);
+		if (!(layer instanceof AVLayer && layer.hasVideo && !layer.nullLayer) || layer.locked) {
+			continue;
+		}
+		manifest.layers[i.toString()] = {
+			name: layer.name,
+			json_path: videoJsonFile.fsName,
+			in_frame: Math.floor(layer.inPoint * frameRate),
+			out_frame: Math.ceil(layer.outPoint * frameRate),
+			video_scale: 1.0
+		};
+	}
+
+	var ts = formatDateForFilename(new Date());
+	var manifestFile = new File(CONFIG.TEMP_FOLDER + "/ae_manifest_" + ts + ".json");
+	var resultFile = new File(CONFIG.TEMP_FOLDER + "/ae_results_" + ts + ".json");
+	writeToLog("  [PY] manifest=" + manifestFile.fsName + ", result=" + resultFile.fsName);
+
+	try {
+		manifestFile.open("w");
+		manifestFile.encoding = "UTF-8";
+		manifestFile.write(_jsonStringify(manifest));
+		manifestFile.close();
+	} catch (eWrite) {
+		try { manifestFile.close(); } catch (eClose) {}
+		writeToLog("  [WARN] Impossible d'écrire le manifest JSON: " + eWrite.toString());
+		return null;
+	}
+
+	var cmd = _escapeSystemArg(CONFIG.PYTHON_CMD) + " " + _escapeSystemArg(CONFIG.STEP7_ANALYZER_SCRIPT_PATH) +
+		" --manifest_path " + _escapeSystemArg(manifestFile.fsName) +
+		" --output_path " + _escapeSystemArg(resultFile.fsName);
+
+	writeToLog("Appel Python analyzer: " + cmd);
+	var systemOutput = "";
+	try {
+		systemOutput = system.callSystem(cmd) || "";
+		if (systemOutput.length > 0) {
+			writeToLog("  [PY] Sortie python: " + systemOutput);
+		}
+	} catch (eCall) {
+		writeToLog("  [WARN] system.callSystem a échoué: " + eCall.toString());
+		return null;
+	}
+
+	if (!resultFile.exists) {
+		writeToLog("  [WARN] Résultat Python introuvable: " + resultFile.fsName);
+		return null;
+	}
+
+	var content = "";
+	try {
+		resultFile.open("r");
+		resultFile.encoding = "UTF-8";
+		content = resultFile.read();
+		resultFile.close();
+	} catch (eRead) {
+		try { resultFile.close(); } catch (eClose2) {}
+		writeToLog("  [WARN] Impossible de lire le résultat Python: " + eRead.toString());
+		return null;
+	}
+
+	try {
+		var cleaned = content.replace(/^\uFEFF/, '');
+		var parsed = eval('(' + cleaned + ')');
+		if (parsed && parsed.error) {
+			writeToLog("  [WARN] Erreur Python: " + parsed.error);
+			return null;
+		}
+		writeToLog("  [PY] Résultats valides reçus (layers=" + Object.keys(parsed).length + ")");
+		return parsed;
+	} catch (eParse) {
+		writeToLog("  [WARN] Parsing résultat Python échoué: " + eParse.toString());
+		return null;
+	}
 }
 
 // --- Polyfill JSON sécurisé (json2.js simplifié) ---
@@ -151,7 +312,7 @@ function initLog() {
 		logFile = new File(logFilePath);
 		logFile.encoding = "UTF-8";
 		logFile.open("w");
-		logFile.writeln("--- Début du log du Script Final v4.5 (Bbox Support) : " + new Date().toString() + " ---");
+		logFile.writeln("--- Début du log du Script Final v4.7 (Bbox Support) : " + new Date().toString() + " ---");
 		logFile.writeln("--- Fichier : " + logFile.fsName + " ---");
 		return true;
 	} catch (e) {
@@ -193,6 +354,15 @@ function closeLog() {
 	}
  }
 
+ function isAePreprocessedJsonFile(fileObj) {
+	if (!fileObj) return false;
+	try {
+		return endsWithIgnoreCase(fileObj.name, "_ae.json");
+	} catch (e) {
+		return false;
+	}
+ }
+
  function readAndParseJsonRoot(filePath) {
 	var file = new File(filePath);
 	if (!file.exists) {
@@ -205,7 +375,9 @@ function closeLog() {
 	file.close();
 	try {
 		var cleanedContent = content.replace(/^\uFEFF/, '');
-		return JSON.parse(cleanedContent);
+		// OPTIMISATION 2: Utiliser eval() au lieu du polyfill JSON.parse
+		// C'est sécuritaire ici car on lit un fichier local généré par notre pipeline
+		return eval('(' + cleanedContent + ')');
 	} catch (e) {
 		writeToLog("  [ERROR] Échec du parsing JSON (root) pour '" + filePath + "' : " + e.toString());
 		return null;
@@ -371,7 +543,9 @@ function readAndParseJson(filePath) {
 	file.close();
 	try {
 		var cleanedContent = content.replace(/^\uFEFF/, '');
-		var data = JSON.parse(cleanedContent);
+		// OPTIMISATION 2: Utiliser eval() au lieu du polyfill JSON.parse
+		// C'est sécuritaire ici car on lit un fichier local généré par notre pipeline
+		var data = eval('(' + cleanedContent + ')');
 		
 		for (var i = 0; i < CONFIG.JSON_FIELDS.FRAMES.length; i++) {
 			var fieldName = CONFIG.JSON_FIELDS.FRAMES[i];
@@ -391,6 +565,7 @@ function tryJsonVariants(docsFolder, baseName) {
 	if (!baseName) return null;
 	
 	var variants = [
+		baseName + "_ae.json",
 		baseName + "_tracking.json",
 		baseName + ".json"
 	];
@@ -399,6 +574,7 @@ function tryJsonVariants(docsFolder, baseName) {
 	if (baseName.toLowerCase().indexOf("_tracking") === baseName.length - 9) {
 		var baseWithoutTracking = baseName.substring(0, baseName.length - 9);
 		if (baseWithoutTracking) {
+			variants.push(baseWithoutTracking + "_ae.json");
 			variants.push(baseWithoutTracking + "_tracking.json");
 			variants.push(baseWithoutTracking + ".json");
 		}
@@ -503,6 +679,35 @@ function extractJsonField(objectString, fieldName) {
 	}
 }
 
+// OPTIMISATION 3: Version rapide pour JSON générés par machine (formatage standard)
+function extractJsonFieldFast(str, key) {
+	// Version simplifiée qui assume un JSON standard sans espaces bizarres autour des :
+	var keyStr = '"' + key + '":';
+	var idx = str.indexOf(keyStr);
+	if (idx === -1) return null;
+	
+	var start = idx + keyStr.length;
+	var valueFirstChar = str.charAt(start);
+	
+	// Si c'est un nombre (cas bbox, confidence, x...)
+	if (valueFirstChar !== '"') { 
+		var end = start;
+		while (end < str.length) {
+			var c = str.charAt(end);
+			if (c === ',' || c === '}') break;
+			end++;
+		}
+		return str.substring(start, end);
+	} 
+	// Si c'est une string (cas id, label...)
+	else {
+		// Sauter le premier guillemet
+		var strStart = start + 1;
+		var end = str.indexOf('"', strStart);
+		return str.substring(strStart, end);
+	}
+}
+
 function extractSpeakers(objectString) {
 	var searchKey = '"active_speakers":';
 	var keyPos = objectString.indexOf(searchKey);
@@ -592,14 +797,15 @@ function indexReducedTrackingFrames(framesArray) {
 	return { dataByFrame: extractedData, maxFrame: maxFrameSeen };
 }
 
-function optimizedScanEngineFromFile(fileObj, chunkSizeChars) {
-	writeToLog("Début du scan streaming optimisé...");
+function optimizedScanEngineFromFile(fileObj, chunkSizeChars, minFrame, maxFrame) {
+	writeToLog("Début du scan streaming optimisé (Plage: " + (minFrame||0) + " - " + (maxFrame||"Fin") + ")...");
 	var extractedData = {};
 	var maxFrameSeen = 0;
 	var buffer = "";
 	var searchFromIndex = 0;
 	var tailKeep = 64 * 1024;
 	var limit = chunkSizeChars || CONFIG.JSON_CHUNK_SIZE_CHARS;
+	var useRange = (minFrame !== undefined && maxFrame !== undefined);
 	try {
 		fileObj.open("r");
 		fileObj.encoding = "UTF-8";
@@ -643,6 +849,26 @@ function optimizedScanEngineFromFile(fileObj, chunkSizeChars) {
 					searchFromIndex = trackedObjectsTagPos + 1;
 					continue;
 				}
+
+				// OPTIMISATION MAJEURE: Filtrage par plage de frames
+				if (useRange) {
+					if (frameNum < minFrame || frameNum > maxFrame) {
+						// On a trouvé une frame, mais elle ne nous intéresse pas.
+						// On doit sauter tout le bloc [ ... ] de tracked_objects pour ne pas le parser.
+						var arrayStartPosSkip = buffer.indexOf('[', trackedObjectsTagPos);
+						if (arrayStartPosSkip !== -1) {
+							var arrayEndPosSkip = _findMatchingBracket(buffer, arrayStartPosSkip);
+							if (arrayEndPosSkip !== -1) {
+								// On saute directement après le tableau d'objets
+								searchFromIndex = arrayEndPosSkip + 1;
+								continue;
+							}
+						}
+						// Si le buffer est coupé en plein milieu du tableau, on attend la suite
+						break; 
+					}
+				}
+
 				if (frameNum > maxFrameSeen) maxFrameSeen = frameNum;
 
 				var arrayEndPos = _findMatchingBracket(buffer, arrayStartPos);
@@ -658,11 +884,11 @@ function optimizedScanEngineFromFile(fileObj, chunkSizeChars) {
 					if (objectEndPos === -1 || objectEndPos > arrayEndPos) break;
 					var objectString = buffer.substring(objectStartPos, objectEndPos + 1);
 					if (objectString.indexOf('"face_landmarker"') > -1 || objectString.indexOf('"person"') > -1) {
-						var id = extractJsonField(objectString, "id");
-						var centroid_x = parseFloat(extractJsonField(objectString, "centroid_x") || extractJsonField(objectString, "x_coordinate"));
-						var bbox_width = parseFloat(extractJsonField(objectString, "bbox_width"));
-						var bbox_height = parseFloat(extractJsonField(objectString, "bbox_height"));
-						var confidence = parseFloat(extractJsonField(objectString, "confidence"));
+						var id = extractJsonFieldFast(objectString, "id");
+						var centroid_x = parseFloat(extractJsonFieldFast(objectString, "centroid_x") || extractJsonFieldFast(objectString, "x_coordinate"));
+						var bbox_width = parseFloat(extractJsonFieldFast(objectString, "bbox_width"));
+						var bbox_height = parseFloat(extractJsonFieldFast(objectString, "bbox_height"));
+						var confidence = parseFloat(extractJsonFieldFast(objectString, "confidence"));
 						if (isNaN(confidence)) confidence = 0;
 						if (id !== null && id !== undefined && id !== "" && !isNaN(centroid_x)) {
 							if (!extractedData[frameNum]) {
@@ -672,8 +898,8 @@ function optimizedScanEngineFromFile(fileObj, chunkSizeChars) {
 							extractedData[frameNum].push({
 								id: id,
 								centroid_x: centroid_x,
-								source: extractJsonField(objectString, "source"),
-								label: extractJsonField(objectString, "label"),
+								source: extractJsonFieldFast(objectString, "source"),
+								label: extractJsonFieldFast(objectString, "label"),
 								video_speakers: extractSpeakers(objectString),
 								bbox_width: bbox_width || 0,
 								bbox_height: bbox_height || 0,
@@ -706,9 +932,29 @@ function optimizedScanEngineFromFile(fileObj, chunkSizeChars) {
 	return { dataByFrame: extractedData, maxFrame: maxFrameSeen };
 }
 
-function loadVideoTrackingData(videoJsonFile) {
+function loadVideoTrackingData(videoJsonFile, minFrame, maxFrame) {
 	if (!videoJsonFile || !videoJsonFile.exists) {
 		return { dataByFrame: {}, maxFrame: 0 };
+	}
+	if (isAePreprocessedJsonFile(videoJsonFile)) {
+		try {
+			var root = readAndParseJsonRoot(videoJsonFile.fsName);
+			if (root && root.dataByFrame) {
+				var idx = {
+					dataByFrame: root.dataByFrame || {},
+					maxFrame: root.maxFrame || 0,
+					tracking_analytics: root.tracking_analytics || null,
+					expression_summary: root.expression_summary || null,
+					temporal_alignment: root.temporal_alignment || null,
+					audioByFrame: root.audioByFrame || {},
+					audioMaxFrame: root.audioMaxFrame || null,
+					speaker_embeddings: root.speaker_embeddings || null
+				};
+				return idx;
+			}
+		} catch (e) {
+			writeToLog("  [WARN] Impossible de lire le JSON pré-traité AE. Fallback.");
+		}
 	}
 	try {
 		if (videoJsonFile.length && videoJsonFile.length < CONFIG.MAX_FULL_JSON_READ_BYTES) {
@@ -724,7 +970,7 @@ function loadVideoTrackingData(videoJsonFile) {
 	} catch (e) {
 		writeToLog("  [WARN] Impossible de lire le tracking réduit via JSON.parse. Fallback streaming.");
 	}
-	return optimizedScanEngineFromFile(videoJsonFile, CONFIG.JSON_CHUNK_SIZE_CHARS);
+	return optimizedScanEngineFromFile(videoJsonFile, CONFIG.JSON_CHUNK_SIZE_CHARS, minFrame, maxFrame);
 }
 
 function optimizedScanEngine(content) {
@@ -779,11 +1025,11 @@ function optimizedScanEngine(content) {
 			if (objectEndPos === -1 || objectEndPos > arrayEndPos) break;
 			var objectString = content.substring(objectStartPos, objectEndPos + 1);
 			if (objectString.indexOf('"face_landmarker"') > -1 || objectString.indexOf('"person"') > -1) {
-				var id = extractJsonField(objectString, "id");
-				var centroid_x = parseFloat(extractJsonField(objectString, "centroid_x") || extractJsonField(objectString, "x_coordinate"));
-				var bbox_width = parseFloat(extractJsonField(objectString, "bbox_width"));
-				var bbox_height = parseFloat(extractJsonField(objectString, "bbox_height"));
-				var confidence = parseFloat(extractJsonField(objectString, "confidence"));
+				var id = extractJsonFieldFast(objectString, "id");
+				var centroid_x = parseFloat(extractJsonFieldFast(objectString, "centroid_x") || extractJsonFieldFast(objectString, "x_coordinate"));
+				var bbox_width = parseFloat(extractJsonFieldFast(objectString, "bbox_width"));
+				var bbox_height = parseFloat(extractJsonFieldFast(objectString, "bbox_height"));
+				var confidence = parseFloat(extractJsonFieldFast(objectString, "confidence"));
 				if (isNaN(confidence)) confidence = 0;
 				
 				if (id !== null && id !== undefined && id !== "" && !isNaN(centroid_x)) {
@@ -797,8 +1043,8 @@ function optimizedScanEngine(content) {
 					extractedData[frameNum].push({
 						id: id,
 						centroid_x: centroid_x,
-						source: extractJsonField(objectString, "source"),
-						label: extractJsonField(objectString, "label"),
+						source: extractJsonFieldFast(objectString, "source"),
+						label: extractJsonFieldFast(objectString, "label"),
 						video_speakers: extractSpeakers(objectString),
 						bbox_width: bbox_width || 0,
 						bbox_height: bbox_height || 0,
@@ -836,6 +1082,23 @@ function optimizedScanEngine(content) {
 		var compMaxFrame = Math.round(comp.duration * frameRate);
 		var compCenterX = comp.width / 2;
 
+		// OPTIMISATION 1: Calculer la plage globale de frames utiles depuis tous les calques
+		var globalMinFrame = compMaxFrame; // Initialiser haut
+		var globalMaxFrame = 0;
+		for (var i = 1; i <= comp.numLayers; i++) {
+			var l = comp.layer(i);
+			if (l.hasVideo && !l.locked) {
+				var inF = Math.floor(l.inPoint * frameRate);
+				var outF = Math.ceil(l.outPoint * frameRate);
+				if (inF < globalMinFrame) globalMinFrame = inF;
+				if (outF > globalMaxFrame) globalMaxFrame = outF;
+			}
+		}
+		// Marge de sécurité (padding)
+		globalMinFrame = Math.max(0, globalMinFrame - 10);
+		globalMaxFrame += 10;
+		writeToLog("Plage de frames utile calculée : " + globalMinFrame + " - " + globalMaxFrame);
+
 		var videoJsonFile = findJsonForActiveComp();
 		if (!videoJsonFile) {
 			videoJsonFile = File.openDialog("Aucun JSON n'a pu être détecté. Veuillez le sélectionner manuellement.", "*.json", false);
@@ -851,7 +1114,40 @@ function optimizedScanEngine(content) {
 			safeVideoJsonPath = videoJsonFile.fsName;
 		}
 		writeToLog("Lecture du fichier VIDÉO " + safeVideoJsonPath + "...");
-		var videoScanResult = loadVideoTrackingData(videoJsonFile);
+		var pythonResults = tryRunPythonAnalyzer(comp, frameRate, videoJsonFile);
+		if (pythonResults) {
+			writeToLog("Mode Python analyzer actif: application directe des résultats (" + Object.keys(pythonResults).length + " calques).");
+			for (var layerId in pythonResults) {
+				if (!pythonResults.hasOwnProperty(layerId)) continue;
+				var idx = parseInt(layerId, 10);
+				if (isNaN(idx)) continue;
+				var layer = comp.layer(idx);
+				if (!(layer instanceof AVLayer && layer.hasVideo && !layer.nullLayer) || layer.locked) {
+					continue;
+				}
+				var res = pythonResults[layerId];
+				if (!res) continue;
+				var centerToAim = parseFloat(res.center_x);
+				if (isNaN(centerToAim)) continue;
+				var labelToApply = parseInt(res.label_color, 10);
+				if (isNaN(labelToApply)) labelToApply = CONFIG.LABEL_STABLE;
+				layer.label = labelToApply;
+				var transform = layer.property("Transform");
+				var positionProp = transform.property("Position");
+				var anchorPointProp = transform.property("Anchor Point");
+				removeAllKeys(positionProp);
+				removeAllKeys(anchorPointProp);
+				var originalPos = positionProp.value;
+				var originalAnchor = anchorPointProp.value;
+				anchorPointProp.setValue([centerToAim, originalAnchor[1], originalAnchor.length > 2 ? originalAnchor[2] : 0]);
+				positionProp.setValue([compCenterX, originalPos[1], originalPos.length > 2 ? originalPos[2] : 0]);
+				writeToLog("  - [PY] Calque=" + layer.name + " center_x=" + centerToAim.toFixed(1) + " label=" + labelToApply + " reason=" + (res.reason || "") + " id=" + (res.selected_id || ""));
+			}
+			writeToLog("--- Fin (Python analyzer) ---");
+			return;
+		}
+
+		var videoScanResult = loadVideoTrackingData(videoJsonFile, globalMinFrame, globalMaxFrame);
 		var videoDataByFrame = videoScanResult.dataByFrame;
 		if (videoScanResult && videoScanResult.temporal_alignment && videoScanResult.temporal_alignment.warnings && videoScanResult.temporal_alignment.warnings.length > 0) {
 			writeToLog("  [WARN] temporal_alignment: " + videoScanResult.temporal_alignment.warnings.join(", "));
@@ -876,27 +1172,40 @@ function optimizedScanEngine(content) {
 
 		var audioDataByFrame = {};
 		var audioMaxFrame = null;
-		var audioJsonFile = findJsonAudioForVideoJson(videoJsonFile);
-		if (audioJsonFile) {
-			var audioData = readAndParseJson(audioJsonFile.fsName);
-			if (audioData) {
-				var audioMinFrame = null;
-				audioMaxFrame = null;
-				for (var i = 0, len = audioData.length; i < len; i++) {
-					if (audioData[i] && audioData[i].frame !== null && audioData[i].frame !== undefined) {
-						var audioFrameNum = parseInt(audioData[i].frame, 10);
-						if (!isNaN(audioFrameNum)) {
-							audioDataByFrame[audioFrameNum] = audioData[i].audio_info;
-							if (audioMinFrame === null || audioFrameNum < audioMinFrame) audioMinFrame = audioFrameNum;
-							if (audioMaxFrame === null || audioFrameNum > audioMaxFrame) audioMaxFrame = audioFrameNum;
-						}
-					}
+		if (videoScanResult && videoScanResult.audioByFrame && (typeof videoScanResult.audioByFrame === 'object')) {
+			try {
+				audioDataByFrame = videoScanResult.audioByFrame;
+				if (videoScanResult.audioMaxFrame !== null && videoScanResult.audioMaxFrame !== undefined) {
+					audioMaxFrame = videoScanResult.audioMaxFrame;
 				}
-				var audioRangeInfo = (audioMinFrame !== null && audioMaxFrame !== null) ? (" (min=" + audioMinFrame + ", max=" + audioMaxFrame + ")") : "";
-				writeToLog("Données audio chargées pour " + Object.keys(audioDataByFrame).length + " frames" + audioRangeInfo + ".");
+				writeToLog("Données audio chargées depuis JSON pré-traité AE (frames=" + Object.keys(audioDataByFrame).length + ").");
+			} catch (e) {
+				audioDataByFrame = {};
+				audioMaxFrame = null;
 			}
 		} else {
-			writeToLog("Aucun fichier audio trouvé.");
+			var audioJsonFile = findJsonAudioForVideoJson(videoJsonFile);
+			if (audioJsonFile) {
+				var audioData = readAndParseJson(audioJsonFile.fsName);
+				if (audioData) {
+					var audioMinFrame = null;
+					audioMaxFrame = null;
+					for (var i = 0, len = audioData.length; i < len; i++) {
+						if (audioData[i] && audioData[i].frame !== null && audioData[i].frame !== undefined) {
+							var audioFrameNum = parseInt(audioData[i].frame, 10);
+							if (!isNaN(audioFrameNum)) {
+								audioDataByFrame[audioFrameNum] = audioData[i].audio_info;
+								if (audioMinFrame === null || audioFrameNum < audioMinFrame) audioMinFrame = audioFrameNum;
+								if (audioMaxFrame === null || audioFrameNum > audioMaxFrame) audioMaxFrame = audioFrameNum;
+							}
+						}
+					}
+					var audioRangeInfo = (audioMinFrame !== null && audioMaxFrame !== null) ? (" (min=" + audioMinFrame + ", max=" + audioMaxFrame + ")") : "";
+					writeToLog("Données audio chargées pour " + Object.keys(audioDataByFrame).length + " frames" + audioRangeInfo + ".");
+				}
+			} else {
+				writeToLog("Aucun fichier audio trouvé.");
+			}
 		}
 
 		var referenceMaxFrame = (audioMaxFrame !== null && audioMaxFrame !== undefined) ? audioMaxFrame : compMaxFrame;

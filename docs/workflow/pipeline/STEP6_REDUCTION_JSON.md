@@ -17,10 +17,10 @@ L'Étape 6 réduit la taille des fichiers JSON de tracking (STEP5) tout en enric
 - **Écriture Atomique** : Sauvegarde sécurisée avec fichier temporaire + rename
 
 ### Rôle dans le Pipeline
-- **Position** : Étape intermédiaire entre le suivi vidéo (STEP5) et la finalisation (STEP7)
+- **Position** : Étape intermédiaire entre le suivi vidéo (STEP5) et le pré-traitement AE (STEP7)
 - **Prérequis** : Fichiers JSON de tracking (`.json`) et d'analyse audio (`_audio.json`)
 - **Sortie** : Fichiers JSON (`.json` et `_audio.json`) modifiés sur place, avec une structure de données allégée
-- **Étape suivante** : Finalisation (STEP7)
+- **Étape suivante** : Pré-traitement AE (STEP7)
 
 ### Valeur Ajoutée
 - **Optimisation des performances** : Réduit significativement le temps de chargement et de traitement des données dans After Effects
@@ -234,7 +234,7 @@ Cette étape est conçue pour être appelée automatiquement par le `WorkflowSer
 WorkflowService.run_step("STEP6")
 ```
 
-Elle s'exécute après que le tracking vidéo (STEP5) ait généré ses données et avant que l'étape de finalisation (STEP7) ne rassemble tous les résultats pour l'archivage.
+Elle s'exécute après que le tracking vidéo (STEP5) ait généré ses données et avant que l'étape de pré-traitement AE (STEP7) ne prépare les données optimisées pour After Effects.
 
 ### Notes Techniques
 -   Si un fichier audio correspondant à un fichier de tracking n'est pas trouvé, le traitement de cette paire est simplement ignoré.
