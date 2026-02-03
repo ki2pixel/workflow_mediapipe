@@ -170,17 +170,9 @@ class Config:
     STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
     STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
     
-    # STEP5 Performance Optimizations (opencv_yunet_pyfeat)
+    # STEP5 Tracking configuration
     STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
-    STEP5_ONNX_INTRA_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTRA_OP_THREADS', '2'))
-    STEP5_ONNX_INTER_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTER_OP_THREADS', '1'))
     STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
-    STEP5_YUNET_MAX_WIDTH: int = int(os.environ.get('STEP5_YUNET_MAX_WIDTH', '640'))  # Max width for YuNet detection (coordinates rescaled)
-
-    STEP5_OPENCV_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_OPENCV_MAX_FACES')
-    )
-    STEP5_OPENCV_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE', '1.0'))
 
     STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
         os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
@@ -189,36 +181,6 @@ class Config:
     STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
         os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
     )
-
-    # STEP5 OpenSeeFace Engine Configuration
-    # Lightweight CPU tracking via ONNX Runtime (OpenSeeFace-style models)
-    STEP5_OPENSEEFACE_MODELS_DIR: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')
-    STEP5_OPENSEEFACE_MODEL_ID: int = int(os.environ.get('STEP5_OPENSEEFACE_MODEL_ID', '1'))
-    STEP5_OPENSEEFACE_DETECTION_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')
-    STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')
-    STEP5_OPENSEEFACE_DETECT_EVERY_N: int = int(os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N', '1'))
-    STEP5_OPENSEEFACE_MAX_WIDTH: int = int(
-        os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH')
-        or os.environ.get('STEP5_YUNET_MAX_WIDTH', '640')
-    )
-    STEP5_OPENSEEFACE_DETECTION_THRESHOLD: float = float(os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD', '0.6'))
-    STEP5_OPENSEEFACE_MAX_FACES: int = int(os.environ.get('STEP5_OPENSEEFACE_MAX_FACES', '1'))
-    STEP5_OPENSEEFACE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE', '1.0'))
-
-    STEP5_EOS_ENV_PYTHON: Optional[str] = os.environ.get('STEP5_EOS_ENV_PYTHON')
-    STEP5_EOS_MODELS_DIR: Optional[str] = os.environ.get('STEP5_EOS_MODELS_DIR')
-    STEP5_EOS_SFM_MODEL_PATH: Optional[str] = os.environ.get('STEP5_EOS_SFM_MODEL_PATH')
-    STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH: Optional[str] = os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH')
-    STEP5_EOS_LANDMARK_MAPPER_PATH: Optional[str] = os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH')
-    STEP5_EOS_EDGE_TOPOLOGY_PATH: Optional[str] = os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH')
-    STEP5_EOS_MODEL_CONTOUR_PATH: Optional[str] = os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH')
-    STEP5_EOS_CONTOUR_LANDMARKS_PATH: Optional[str] = os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH')
-    STEP5_EOS_FIT_EVERY_N: int = int(os.environ.get('STEP5_EOS_FIT_EVERY_N', '1'))
-    STEP5_EOS_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_EOS_MAX_FACES')
-    )
-    STEP5_EOS_MAX_WIDTH: int = int(os.environ.get('STEP5_EOS_MAX_WIDTH', '1280'))
-    STEP5_EOS_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_EOS_JAWOPEN_SCALE', '1.0'))
     
     def __post_init__(self):
         """Post-initialization to ensure paths are Path objects and create directories."""
@@ -462,7 +424,7 @@ class Config:
     @staticmethod
     def check_gpu_availability() -> dict:
         """
-        Vérifier la disponibilité GPU pour STEP5 (MediaPipe + OpenSeeFace).
+        Vérifier la disponibilité GPU pour STEP5 (InsightFace uniquement).
         
         Returns:
             dict: {
@@ -471,15 +433,13 @@ class Config:
                 'vram_total_gb': float (si disponible),
                 'vram_free_gb': float (si disponible),
                 'cuda_version': str (si disponible),
-                'onnx_cuda': bool,
-                'tensorflow_gpu': bool
+                'onnx_cuda': bool
             }
         """
         result = {
             'available': False,
             'reason': '',
             'onnx_cuda': False,
-            'tensorflow_gpu': False
         }
         
         # Check PyTorch CUDA (indicateur général)
@@ -509,7 +469,7 @@ class Config:
             result['reason'] = f'PyTorch CUDA check failed: {e}'
             return result
         
-        # Check ONNXRuntime CUDA provider (requis pour OpenSeeFace / InsightFace)
+        # Check ONNXRuntime CUDA provider (requis pour InsightFace)
         try:
             import onnxruntime as ort
             if 'CUDAExecutionProvider' in ort.get_available_providers():
@@ -578,12 +538,14 @@ class Config:
         Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
         
         Returns:
-            List[str]: ['mediapipe_landmarker', 'openseeface', ...]
+            List[str]: ['insightface'] (valeurs non supportées ignorées)
         """
         engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
         engines = _parse_csv_list(engines_str)
-        # Normaliser les noms
-        return [e.strip().lower() for e in engines if e.strip()]
+
+        normalized = [e.strip().lower() for e in engines if e.strip()]
+        allowed = {"insightface", "all"}
+        return [e for e in normalized if e in allowed]
     
     @staticmethod
     def get_step5_gpu_max_vram_mb() -> int:

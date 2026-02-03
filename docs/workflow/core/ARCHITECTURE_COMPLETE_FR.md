@@ -209,7 +209,7 @@ graph TD
 - **Environnement** : `tracking_env/` (spécialisé MediaPipe)
 - **Entrées** : Vidéos avec analyses scènes/audio
 - **Sorties** : Fichiers JSON avec données de tracking (`<stem>_tracking.json`)
-- **Technologies** : MediaPipe avec OpenCV
+- **Technologies** : MediaPipe Tasks + OpenCV (I/O) + ONNXRuntime (InsightFace)
 - **Configuration CPU-only par défaut (v4.1)** :
   - Variables d'environnement fixées dans `app_new.py` :
     - `TRACKING_DISABLE_GPU=1` : Désactive GPU
@@ -231,9 +231,9 @@ graph TD
     - Gestion spéciale si `progress_current == progress_total` mais statut en cours
 - **Restrictions GPU (décision 27/12/2025)** :
   - `STEP5_ENABLE_GPU=1` n'autorise plus que le moteur InsightFace à utiliser le GPU.
-  - MediaPipe Face Landmarker, OpenSeeFace, OpenCV YuNet/PyFeat et EOS sont forcés en mode CPU même si le flag GPU est actif.
+  - Le mode MediaPipe (par défaut) est forcé en mode CPU même si le flag GPU est actif.
   - Le gestionnaire crée au plus **un worker GPU séquentiel** (pas de parallélisation) et bascule automatiquement en CPU si `Config.check_gpu_availability()` échoue ou si `STEP5_GPU_FALLBACK_AUTO=1`.
-  - `process_video_worker_multiprocessing.py` applique un **lazy import MediaPipe** (`_ensure_mediapipe_loaded(required=False)`) pour éviter de charger TensorFlow quand seuls les moteurs OpenCV/EOS sont utilisés.
+  - `process_video_worker_multiprocessing.py` applique un **lazy import MediaPipe** pour minimiser le coût d'import dans les workers.
 - **Fonctionnalités** :
   - Détection faciale avancée
   - Tracking d'objets avec fallback

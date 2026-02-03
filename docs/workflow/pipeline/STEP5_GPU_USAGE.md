@@ -10,7 +10,11 @@
 
 ## Vue d'ensemble
 
-⚠️ **IMPORTANT** : Le support GPU pour STEP5 est **réservé exclusivement au moteur InsightFace**. Tous les autres moteurs (MediaPipe Face Landmarker, OpenSeeFace, OpenCV YuNet + PyFeat, EOS) s'exécutent automatiquement en mode CPU-only, même si `STEP5_ENABLE_GPU=1` est activé.
+⚠️ **IMPORTANT** : Le support GPU pour STEP5 est **réservé exclusivement au moteur InsightFace**.
+
+STEP5 supporte 2 modes :
+- **Mode MediaPipe (défaut)** : `STEP5_TRACKING_ENGINE` vide (CPU)
+- **InsightFace** : `STEP5_TRACKING_ENGINE=insightface` (GPU-only)
 
 ---
 
@@ -21,7 +25,7 @@
 #### STEP5 Workers (Radon F/E)
 - **`process_video_worker.py`** : Complexité critique (radon F) dans `main` et `process_frame_chunk`
 - **`run_tracking_manager.py`** : Complexité critique (radon F) dans `main`
-- **`face_engines.py`** : Complexité élevée (radon E) dans `detect` (InsightFace, EOS)
+- **`face_engines.py`** : Complexité élevée (radon E) principalement sur InsightFace
 
 #### GPU-Specific Risks
 - **Memory Management** : OOM fréquent avec InsightFace GPU
@@ -47,11 +51,7 @@
   - Le manager complète automatiquement `LD_LIBRARY_PATH` avec les bibliothèques CUDA du venv InsightFace **et** celles du système (`/usr/lib/x86_64-linux-gnu`, `/usr/local/cuda-*/targets/...`) pour garantir que `CUDAExecutionProvider` soit disponible.
 
 ❌ **Moteurs en mode CPU-only uniquement** :
-- **MediaPipe Face Landmarker** : Mode CPU avec 15 workers internes (v4.1)
-- **OpenSeeFace** : Mode CPU avec multiprocessing
-- **OpenCV YuNet + PyFeat** : Mode CPU optimisé
-- **OpenCV Haar** : Détection pure CPU
-- **EOS** : CPU-only (3DMM fitting)
+- **Mode MediaPipe (défaut)** : CPU (avec multiprocessing)
 
 ⚠️ **Contraintes importantes** :
 - **1 seul worker GPU séquentiel** (pas de parallélisation GPU)
@@ -103,33 +103,28 @@ cd /home/kidpixel6/kidpixel_files/kidpixel/workflow_mediapipe
 
 **Sortie attendue** :
 ```
-[1/7] Checking NVIDIA GPU...
+[1/6] Checking NVIDIA GPU...
 ✓ GPU detected: NVIDIA GeForce GTX 1650
   VRAM: 4096 MiB
   Driver: 580.95.05
 
-[4/7] Checking PyTorch CUDA support...
+[4/6] Checking PyTorch CUDA support...
 ✓ PyTorch CUDA enabled
   PyTorch: 2.9.1+cu128
   CUDA available: True
   CUDA version: 12.8
 
-[5/7] Checking ONNXRuntime providers...
+[5/6] Checking ONNXRuntime providers...
 ✓ ONNX CUDA provider available (InsightFace GPU will work)
-  Install: pip install onnxruntime-gpu
 ```
 
 ### Étape 2 : Installation des Dépendances GPU
 
 ```bash
-# Installation automatique (recommandé)
-./scripts/install_onnxruntime_gpu.sh
-
 # Installation manuelle dans insightface_env
 source /mnt/venv_ext4/insightface_env/bin/activate
-pip uninstall -y onnxruntime tensorflow
+pip uninstall -y onnxruntime onnxruntime-gpu
 pip install onnxruntime-gpu==1.23.2
-pip install tensorflow==2.15.0
 
 # Vérifier l'installation
 python -c "import onnxruntime as ort; print('Providers:', ort.get_available_providers())"
@@ -179,18 +174,16 @@ STEP5_GPU_ENGINES=insightface
 # GTX 1650 (4096 Mo) : recommandé 2048 Mo pour laisser 2 Go libres
 STEP5_GPU_MAX_VRAM_MB=2048
 
-# Profiling GPU (logs utilisation VRAM/temps GPU)
-STEP5_GPU_PROFILING=1
-
 # Fallback automatique vers CPU si GPU échoue ou VRAM insuffisante
 STEP5_GPU_FALLBACK_AUTO=1
 ```
 
-> ℹ️ Depuis la restriction GPU du 27/12/2025, `STEP5_TF_GPU_ENV_PYTHON` n'existe plus : MediaPipe, OpenSeeFace, OpenCV et EOS fonctionnent exclusivement en mode CPU.
+> ℹ️ Depuis la restriction GPU du 27/12/2025, `STEP5_TF_GPU_ENV_PYTHON` n'existe plus.
+> ℹ️ Le mode CPU par défaut est désormais le mode MediaPipe (engine vide).
 
 ### Lazy Imports MediaPipe
 
-Pour éviter les conflits TensorFlow lorsque seules les dépendances OpenCV sont installées, le système utilise un lazy import pour MediaPipe :
+Pour minimiser le coût d'import, le système utilise un lazy import pour MediaPipe :
 
 ```python
 # Dans process_video_worker_multiprocessing.py
@@ -208,16 +201,15 @@ def _ensure_mediapipe_loaded(required=False):
         return None
 ```
 
-- **Moteurs OpenCV/EOS** : appellent `_ensure_mediapipe_loaded(required=False)` pour éviter les crashs TensorFlow
-- **Moteur MediaPipe** : utilise `required=True` lorsque MediaPipe est indispensable
+- **Mode MediaPipe (défaut)** : utilise `required=True` lorsque MediaPipe est indispensable
 - **Subprocess ONNXRuntime GPU** : les vérifications GPU utilisent `STEP5_INSIGHTFACE_ENV_PYTHON` pour isoler les tests ONNXRuntime GPU
 
 ### Validation dynamique (run_tracking_manager.py)
 
 Au lancement, `workflow_scripts/step5/run_tracking_manager.py` applique systématiquement la logique suivante :
 
-1. **Normalisation moteur** : si aucun moteur n'est fourni, `mediapipe_landmarker` est utilisé.  
-2. **Vérification d'éligibilité GPU** : seul InsightFace peut activer le GPU. Tous les autres moteurs logguent `GPU mode is reserved for InsightFace only. Engine 'xxx' will run in CPU-only mode` et forcent `args.disable_gpu = True`.
+1. **Normalisation moteur** : si aucun moteur n'est fourni, le mode MediaPipe par défaut est utilisé (`STEP5_TRACKING_ENGINE` vide).
+2. **Vérification d'éligibilité GPU** : seul InsightFace peut activer le GPU. En mode MediaPipe, le manager force l'exécution en CPU.
 3. **`Config.check_gpu_availability()`** : la vérification matérielle tourne dans un sous-processus isolé pour vérifier VRAM, CUDA providers, etc.
 4. **Fallback automatique** : si `available=False` et `STEP5_GPU_FALLBACK_AUTO=1`, le gestionnaire continue en mode CPU.
 5. **Injection des librairies CUDA** : lorsqu'un worker InsightFace GPU est lancé, le gestionnaire ajoute les chemins `.../nvidia/*/lib` dans `LD_LIBRARY_PATH`.
@@ -230,7 +222,6 @@ Au lancement, `workflow_scripts/step5/run_tracking_manager.py` applique systéma
 STEP5_ENABLE_GPU=1
 STEP5_GPU_ENGINES=insightface          # Seul moteur GPU supporté
 STEP5_GPU_MAX_VRAM_MB=2048             # Limite stricte
-STEP5_GPU_PROFILING=1                  # Activer pour surveiller VRAM
 STEP5_TRACKING_ENGINE=insightface      # Moteur InsightFace
 ```
 
@@ -240,7 +231,6 @@ STEP5_TRACKING_ENGINE=insightface      # Moteur InsightFace
 STEP5_ENABLE_GPU=1
 STEP5_GPU_ENGINES=insightface
 STEP5_GPU_MAX_VRAM_MB=8192
-STEP5_GPU_PROFILING=1
 STEP5_TRACKING_ENGINE=insightface
 ```
 
@@ -254,7 +244,7 @@ STEP5_TRACKING_ENGINE=insightface
 2. Onglet **Étape 5 : Suivi Vidéo**
 3. Sélectionner le moteur :
    - **InsightFace** (GPU uniquement si `STEP5_ENABLE_GPU=1`)
-   - **MediaPipe / OpenSeeFace / OpenCV / EOS** (mode CPU automatique)
+   - **Mode MediaPipe par défaut** (CPU)
 4. Lancer le traitement normalement
 
 **Logs attendus** (console Flask) :
@@ -264,9 +254,8 @@ STEP5_TRACKING_ENGINE=insightface
 [INFO] ✓ GPU mode ENABLED for insightface
 ```
 
-**Logs pour autres moteurs** :
+**Logs mode MediaPipe (CPU)** :
 ```
-[INFO] GPU mode is reserved for InsightFace only. Engine 'mediapipe_landmarker' will run in CPU-only mode.
 [INFO] CPU-only mode (GPU disabled or not supported for this engine)
 ```
 
@@ -288,13 +277,6 @@ STEP5_ENABLE_GPU=1 \
 STEP5_GPU_ENGINES=insightface \
 python run_tracking_manager.py \
   --videos_json_path ../../videos_to_track.json \
-  --tracking_engine mediapipe_landmarker \
-  --cpu_internal_workers 15
-
-# Test avec OpenSeeFace en mode CPU
-python run_tracking_manager.py \
-  --videos_json_path ../../videos_to_track.json \
-  --tracking_engine openseeface \
   --cpu_internal_workers 15
 ```
 
@@ -338,13 +320,13 @@ watch -n 1 'nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.use
 
 Activer dans `.env` :
 ```bash
-STEP5_GPU_PROFILING=1
+STEP5_ENABLE_PROFILING=1
 ```
 
 **Logs attendus** (dans les sorties worker) :
 ```
-[InsightFace] Detection session using provider: CUDAExecutionProvider
-[PROFILING] Frame 20: detection=12.3ms, landmarks=8.5ms, total=20.8ms, VRAM=1450MB
+[InsightFace] Available ONNXRuntime providers: ['CUDAExecutionProvider', ...]
+[PROFILING] InsightFace after 20 frames: resize=12.3ms/frame, detect=8.5ms/frame, post=20.8ms/frame
 ```
 
 ---
@@ -355,7 +337,7 @@ STEP5_GPU_PROFILING=1
 
 **Symptôme** :
 ```
-[INFO] GPU mode is reserved for InsightFace only. Engine 'mediapipe_landmarker' will run in CPU-only mode.
+[INFO] CPU-only mode (GPU disabled or not supported for this engine)
 ```
 
 **Explication** : C'est le comportement attendu. Seul InsightFace peut utiliser le GPU.
@@ -434,9 +416,7 @@ RuntimeError: CUDA out of memory. Tried to allocate 1.50 GiB
 | Moteur | Mode | FPS Moyen | VRAM Utilisée | CPU % |
 |--------|------|-----------|---------------|-------|
 | **InsightFace** | 1 worker GPU | 25-30 FPS | 1500 Mo | 20% |
-| **MediaPipe** | 15 workers CPU | 25-30 FPS | 0 Mo | 100% |
-| **OpenSeeFace** | 15 workers CPU | 18-22 FPS | 0 Mo | 100% |
-| **OpenCV YuNet+PyFeat** | 15 workers CPU | 15-20 FPS | 0 Mo | 100% |
+| **MediaPipe (défaut)** | 15 workers CPU | 25-30 FPS | 0 Mo | 100% |
 
 **Notes** :
 - Les FPS GPU sont pour **1 vidéo à la fois** (worker séquentiel)
@@ -451,7 +431,7 @@ RuntimeError: CUDA out of memory. Tried to allocate 1.50 GiB
 
 ❌ **CPU préférable** :
 - Batch processing de 10+ vidéos (tous moteurs)
-- Utilisation de MediaPipe, OpenSeeFace ou OpenCV (pas de choix, CPU-only)
+- Utilisation du mode MediaPipe (CPU)
 - Systèmes avec VRAM limitée (< 2 Go libres)
 - STEP2 (conversion vidéo) actif simultanément
 
@@ -462,7 +442,7 @@ RuntimeError: CUDA out of memory. Tried to allocate 1.50 GiB
 ### Limitations Techniques
 
 1. **GPU réservé à InsightFace uniquement**
-   - Tous les autres moteurs (MediaPipe, OpenSeeFace, OpenCV, EOS) fonctionnent en CPU-only
+   - Le mode MediaPipe fonctionne en CPU
    - Décision de stabilité basée sur les tests v4.2+
 
 2. **1 worker GPU séquentiel uniquement**
@@ -558,10 +538,10 @@ Pour proposer des améliorations (support d'autres moteurs en GPU, TensorRT, etc
 
 ⚠️ **Important** : Suite à la stabilisation du 27/12/2025, le support GPU est soumis aux contraintes suivantes :
 
-- **GPU réservé exclusivement à InsightFace** : Tous les autres moteurs (MediaPipe, OpenSeeFace, OpenCV, EOS) sont forcés en mode CPU
+- **GPU réservé exclusivement à InsightFace** : le mode MediaPipe reste CPU
 - **1 worker GPU séquentiel uniquement** : Aucune parallélisation GPU possible
 - **Pas de fallback GPU pour les autres moteurs** : Même avec `STEP5_ENABLE_GPU=1`, les moteurs non-InsightFace restent en CPU
-- **Dépendances isolées** : Nécessite `insightface_env` avec `onnxruntime-gpu` et `tensorflow==2.15.0`
+- **Dépendances isolées** : Nécessite `insightface_env` avec `onnxruntime-gpu`
 
 ### Considérations Performance
 
@@ -573,8 +553,6 @@ Pour proposer des améliorations (support d'autres moteurs en GPU, TensorRT, etc
 
 Pour des performances optimales sans GPU :
 - **MediaPipe CPU** : 15 workers multiprocessing, le plus rapide pour la plupart des cas
-- **OpenCV YuNet + PyFeat** : Bon compromis précision/vitesse en CPU
-- **EOS** : Pour les besoins spécifiques de modèles 3D
 
 ---
 

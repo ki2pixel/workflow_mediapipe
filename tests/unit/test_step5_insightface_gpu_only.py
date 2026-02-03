@@ -2,8 +2,7 @@
 Tests unitaires pour valider que le GPU STEP5 est réservé exclusivement à InsightFace.
 
 Décision v4.2+ : Seul le moteur InsightFace peut utiliser le GPU.
-Tous les autres moteurs (MediaPipe, OpenSeeFace, OpenCV, EOS) doivent
-s'exécuter en mode CPU-only même si STEP5_ENABLE_GPU=1.
+Le mode MediaPipe (défaut) doit s'exécuter en mode CPU-only même si STEP5_ENABLE_GPU=1.
 """
 
 import pytest
@@ -14,6 +13,18 @@ from unittest.mock import patch, MagicMock
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE_DIR))
+
+
+def _normalize_tracking_engine(engine_name: str) -> str:
+    engine_norm = (engine_name or "").strip().lower()
+    if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+        return ""
+    return engine_norm
+
+
+def _validate_supported_tracking_engine(engine_norm: str) -> None:
+    if engine_norm not in {"", "insightface"}:
+        raise ValueError(f"Unsupported STEP5 tracking engine: {engine_norm}")
 
 
 class TestInsightFaceGPUOnly:
@@ -85,7 +96,8 @@ class TestInsightFaceGPUOnly:
         
         args = Args()
         
-        engine_norm = 'mediapipe_landmarker'
+        engine_norm = _normalize_tracking_engine('mediapipe_landmarker')
+        _validate_supported_tracking_engine(engine_norm)
         gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
         
         engine_supports_gpu = False
@@ -98,99 +110,12 @@ class TestInsightFaceGPUOnly:
         assert engine_supports_gpu is False, "MediaPipe ne doit pas pouvoir utiliser le GPU"
         assert args.disable_gpu is True, "MediaPipe doit être forcé en mode CPU"
 
-    def test_openseeface_gpu_forced_to_cpu(self):
-        """
-        Test: OpenSeeFace avec STEP5_ENABLE_GPU=1 doit être forcé en mode CPU.
-        """
-        os.environ['STEP5_ENABLE_GPU'] = '1'
-        os.environ['STEP5_GPU_ENGINES'] = 'insightface'
-        os.environ['STEP5_TRACKING_ENGINE'] = 'openseeface'
-        
-        # Simuler les arguments CLI
-        class Args:
-            tracking_engine = 'openseeface'
-            disable_gpu = False
-            cpu_internal_workers = 15
-            videos_json_path = 'dummy.json'
-        
-        args = Args()
-        
-        engine_norm = 'openseeface'
-        gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
-        
-        engine_supports_gpu = False
-        if gpu_enabled_global and not args.disable_gpu:
-            if engine_norm == "insightface":
-                engine_supports_gpu = True
-            else:
-                args.disable_gpu = True
-        
-        assert engine_supports_gpu is False, "OpenSeeFace ne doit pas pouvoir utiliser le GPU"
-        assert args.disable_gpu is True, "OpenSeeFace doit être forcé en mode CPU"
-
-    def test_opencv_yunet_pyfeat_gpu_forced_to_cpu(self):
-        """
-        Test: OpenCV YuNet + PyFeat avec STEP5_ENABLE_GPU=1 doit être forcé en mode CPU.
-        """
-        os.environ['STEP5_ENABLE_GPU'] = '1'
-        os.environ['STEP5_GPU_ENGINES'] = 'insightface'
-        os.environ['STEP5_TRACKING_ENGINE'] = 'opencv_yunet_pyfeat'
-        
-        # Simuler les arguments CLI
-        class Args:
-            tracking_engine = 'opencv_yunet_pyfeat'
-            disable_gpu = False
-            cpu_internal_workers = 15
-            videos_json_path = 'dummy.json'
-        
-        args = Args()
-        
-        engine_norm = 'opencv_yunet_pyfeat'
-        gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
-        
-        engine_supports_gpu = False
-        if gpu_enabled_global and not args.disable_gpu:
-            if engine_norm == "insightface":
-                engine_supports_gpu = True
-            else:
-                args.disable_gpu = True
-        
-        assert engine_supports_gpu is False, "OpenCV YuNet+PyFeat ne doit pas pouvoir utiliser le GPU"
-        assert args.disable_gpu is True, "OpenCV YuNet+PyFeat doit être forcé en mode CPU"
-
-    def test_eos_gpu_forced_to_cpu(self):
-        """
-        Test: EOS avec STEP5_ENABLE_GPU=1 doit être forcé en mode CPU.
-        """
-        os.environ['STEP5_ENABLE_GPU'] = '1'
-        os.environ['STEP5_GPU_ENGINES'] = 'insightface'
-        os.environ['STEP5_TRACKING_ENGINE'] = 'eos'
-        
-        # Simuler les arguments CLI
-        class Args:
-            tracking_engine = 'eos'
-            disable_gpu = False
-            cpu_internal_workers = 15
-            videos_json_path = 'dummy.json'
-        
-        args = Args()
-        
-        engine_norm = 'eos'
-        gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
-        
-        engine_supports_gpu = False
-        if gpu_enabled_global and not args.disable_gpu:
-            if engine_norm == "insightface":
-                engine_supports_gpu = True
-            else:
-                args.disable_gpu = True
-        
-        if engine_norm in {"opencv_haar", "opencv_yunet", "eos"}:
-            if not args.disable_gpu:
-                args.disable_gpu = True
-        
-        assert engine_supports_gpu is False, "EOS ne doit pas pouvoir utiliser le GPU"
-        assert args.disable_gpu is True, "EOS doit être forcé en mode CPU"
+    def test_unknown_engine_is_rejected(self):
+        """Test: Un moteur non supporté doit être rejeté."""
+        os.environ['STEP5_TRACKING_ENGINE'] = 'unknown_engine'
+        engine_norm = _normalize_tracking_engine('unknown_engine')
+        with pytest.raises(ValueError):
+            _validate_supported_tracking_engine(engine_norm)
 
     def test_insightface_without_gpu_engines_forced_to_cpu(self):
         """

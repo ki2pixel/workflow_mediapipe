@@ -16,11 +16,19 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 VENV_PATH="/mnt/venv_ext4/tracking_env"
+INSIGHTFACE_PYTHON="${STEP5_INSIGHTFACE_ENV_PYTHON:-}"
+if [ -z "$INSIGHTFACE_PYTHON" ]; then
+    if [ -x "/mnt/venv_ext4/insightface_env/bin/python" ]; then
+        INSIGHTFACE_PYTHON="/mnt/venv_ext4/insightface_env/bin/python"
+    else
+        INSIGHTFACE_PYTHON="$VENV_PATH/bin/python"
+    fi
+fi
 ERRORS=0
 WARNINGS=0
 
 # 1. Check NVIDIA GPU
-echo "[1/7] Checking NVIDIA GPU..."
+echo "[1/6] Checking NVIDIA GPU..."
 if command -v nvidia-smi &> /dev/null; then
     GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader)
     VRAM_TOTAL=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits)
@@ -41,7 +49,7 @@ fi
 echo ""
 
 # 2. Check CUDA availability
-echo "[2/7] Checking CUDA..."
+echo "[2/6] Checking CUDA..."
 if command -v nvcc &> /dev/null; then
     CUDA_VERSION=$(nvcc --version | grep "release" | sed -n 's/.*release \([0-9.]*\).*/\1/p')
     echo -e "${GREEN}✓${NC} CUDA Toolkit: $CUDA_VERSION"
@@ -53,7 +61,7 @@ fi
 echo ""
 
 # 3. Check tracking_env exists
-echo "[3/7] Checking tracking_env..."
+echo "[3/6] Checking tracking_env..."
 if [ -d "$VENV_PATH" ]; then
     echo -e "${GREEN}✓${NC} Virtual environment found: $VENV_PATH"
 else
@@ -65,7 +73,7 @@ fi
 echo ""
 
 # 4. Check PyTorch CUDA
-echo "[4/7] Checking PyTorch CUDA support..."
+echo "[4/6] Checking PyTorch CUDA support..."
 PYTORCH_CHECK=$($VENV_PATH/bin/python -c "
 import torch
 print('PyTorch:', torch.__version__)
@@ -86,8 +94,8 @@ fi
 echo ""
 
 # 5. Check ONNXRuntime providers
-echo "[5/7] Checking ONNXRuntime providers..."
-ONNX_CHECK=$($VENV_PATH/bin/python -c "
+echo "[5/6] Checking ONNXRuntime providers..."
+ONNX_CHECK=$($INSIGHTFACE_PYTHON -c "
 import onnxruntime as ort
 print('ONNXRuntime:', ort.__version__)
 providers = ort.get_available_providers()
@@ -100,43 +108,14 @@ echo "$ONNX_CHECK" | sed 's/^/  /'
 if echo "$ONNX_CHECK" | grep -q "CUDA provider: True"; then
     echo -e "${GREEN}✓${NC} ONNX CUDA provider available"
 else
-    echo -e "${YELLOW}⚠${NC} ONNX CUDA provider NOT available (OpenSeeFace GPU will not work)"
-    echo "  Install: pip install onnxruntime-gpu"
+    echo -e "${YELLOW}⚠${NC} ONNX CUDA provider NOT available (InsightFace GPU will not work)"
+    echo "  Install onnxruntime-gpu in insightface_env"
     ((WARNINGS++))
 fi
 echo ""
 
-# 6. Check TensorFlow (for MediaPipe GPU delegate)
-echo "[6/7] Checking TensorFlow GPU (for MediaPipe)..."
-TF_CHECK=$($VENV_PATH/bin/python -c "
-try:
-    import tensorflow as tf
-    print('TensorFlow:', tf.__version__)
-    gpus = tf.config.list_physical_devices('GPU')
-    print('GPU devices:', len(gpus))
-    if gpus:
-        for gpu in gpus:
-            print('  -', gpu.name)
-except ImportError:
-    print('TensorFlow: NOT INSTALLED')
-" 2>&1)
-
-echo "$TF_CHECK" | sed 's/^/  /'
-
-if echo "$TF_CHECK" | grep -q "NOT INSTALLED"; then
-    echo -e "${YELLOW}⚠${NC} TensorFlow not installed (MediaPipe GPU delegate unavailable)"
-    echo "  Install: pip install tensorflow==2.15.0"
-    ((WARNINGS++))
-elif echo "$TF_CHECK" | grep -q "GPU devices: 0"; then
-    echo -e "${YELLOW}⚠${NC} TensorFlow installed but no GPU detected"
-    ((WARNINGS++))
-else
-    echo -e "${GREEN}✓${NC} TensorFlow GPU ready"
-fi
-echo ""
-
-# 7. Check MediaPipe
-echo "[7/7] Checking MediaPipe..."
+# 6. Check MediaPipe
+echo "[6/6] Checking MediaPipe..."
 MP_CHECK=$($VENV_PATH/bin/python -c "
 import mediapipe as mp
 print('MediaPipe:', mp.__version__)
@@ -166,9 +145,8 @@ if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
     echo -e "${GREEN}✓ All checks passed${NC}"
     echo ""
     echo "Next steps:"
-    echo "  1. If ONNX CUDA missing: ./scripts/install_onnxruntime_gpu.sh"
-    echo "  2. If TensorFlow missing: ./scripts/install_tensorflow_gpu.sh"
-    echo "  3. Enable GPU: Set STEP5_ENABLE_GPU=1 in .env"
+    echo "  1. If ONNX CUDA missing: install onnxruntime-gpu in insightface_env"
+    echo "  2. Enable GPU: Set STEP5_ENABLE_GPU=1 in .env"
 elif [ $ERRORS -eq 0 ]; then
     echo -e "${YELLOW}⚠ $WARNINGS warning(s) - GPU partially available${NC}"
     echo ""

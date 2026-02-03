@@ -417,7 +417,7 @@ def main(args):
     total_frames = 0
 
     if face_engine is not None:
-        logging.info(f"Using OpenCV tracking engine: {engine_name}")
+        logging.info(f"Using face engine: {engine_name}")
         try:
             with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
                 fps = video_capture.get(cv2.CAP_PROP_FPS)
@@ -979,7 +979,11 @@ if __name__ == "__main__":
     parser.add_argument("video_file_path")
     parser.add_argument("--models_dir", required=True)
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--tracking_engine", default=None, help="Tracking engine: mediapipe_landmarker (default), opencv_haar, opencv_yunet")
+    parser.add_argument(
+        "--tracking_engine",
+        default=None,
+        help="Tracking engine: insightface (GPU) ou vide pour le mode MediaPipe par défaut",
+    )
     # Conserver les arguments pour la compatibilité avec le manager, même s'ils ne sont pas tous utilisés
     parser.add_argument("--mp_landmarker_num_faces", type=int, default=1)
     parser.add_argument("--mp_landmarker_min_face_detection_confidence", type=float, default=0.5)

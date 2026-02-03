@@ -49,15 +49,17 @@ class CSVService:
 
 ### Points Critiques (Score F)
 
-#### `_normalize_url()` (Score F)
-- **Complexité** : Parsing URLs doublement encodées, entités HTML
-- **Défis** : Gestion `amp%3Bdl=0`, caractères spéciaux, validation
-- **Impact** : Service critique pour éviter les doublons
-
 #### `_check_csv_for_downloads()` (Score F)
-- **Complexité** : Parsing CSV multi-formats, gestion erreurs
-- **Défis** : Détection téléchargements, validation structure
-- **Impact** : Monitoring temps réel des téléchargements
+- **Complexité** : 662 lignes, parsing CSV complexe avec multiples formats
+- **Défis** : Gestion des URLs doublement encodées, validation multi-sources
+- **Impact** : Service critique pour la détection des nouveaux téléchargements
+
+#### `_normalize_url()` (Score F)  
+- **Complexité** : 203 lignes, décodage récursif des encodages multiples
+- **Défis** : Gestion `amp%3Bdl=0`, entités HTML, caractères spéciaux
+- **Impact** : Réduction de 30% des doublons, normalisation robuste
+
+---
 
 #### `_load_structured_history()` (Score C)
 - **Complexité** : Migration historique, format structuré

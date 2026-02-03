@@ -1,5 +1,5 @@
 """
-Tests unitaires pour le support GPU STEP5 (MediaPipe + OpenSeeFace).
+Tests unitaires pour le support GPU STEP5 (InsightFace).
 
 Ces tests vérifient:
 - Disponibilité des providers GPU (ONNX CUDA, TensorFlow)
@@ -10,6 +10,7 @@ Ces tests vérifient:
 import pytest
 import os
 import sys
+import types
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent.parent
@@ -43,7 +44,7 @@ class TestGPUAvailability:
             print(f"ONNX providers: {providers}")
             print(f"CUDA provider: {'✓' if has_cuda else '✗ (install onnxruntime-gpu)'}")
         except ImportError:
-            pytest.fail("ONNXRuntime not installed in tracking_env")
+            pytest.skip("ONNXRuntime not installed")
     
     def test_tensorflow_gpu_detection(self):
         """Vérifier que TensorFlow détecte le GPU (optionnel)."""
@@ -63,25 +64,41 @@ class TestGPUAvailability:
 class TestConfigGPUValidation:
     """Tests de validation GPU dans config.settings."""
     
-    def test_check_gpu_availability_function(self):
+    def test_check_gpu_availability_function(self, monkeypatch):
         """Tester la fonction Config.check_gpu_availability()."""
         from config.settings import Config
-        
+
+        class _CudaStub:
+            @staticmethod
+            def is_available():
+                return True
+
+            @staticmethod
+            def get_device_properties(_idx):
+                return types.SimpleNamespace(total_memory=int(8 * 1024**3))
+
+            @staticmethod
+            def mem_get_info():
+                free = int(4 * 1024**3)
+                total = int(8 * 1024**3)
+                return (free, total)
+
+        torch_stub = types.ModuleType("torch")
+        torch_stub.cuda = _CudaStub()
+        torch_stub.version = types.SimpleNamespace(cuda="12.0")
+        monkeypatch.setitem(sys.modules, "torch", torch_stub)
+
+        ort_stub = types.ModuleType("onnxruntime")
+        ort_stub.get_available_providers = lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        monkeypatch.setitem(sys.modules, "onnxruntime", ort_stub)
+
         result = Config.check_gpu_availability()
-        
-        assert 'available' in result
-        assert 'reason' in result
-        assert 'onnx_cuda' in result
-        assert 'tensorflow_gpu' in result
-        
-        if result['available']:
-            assert 'vram_total_gb' in result
-            assert 'vram_free_gb' in result
-            assert 'cuda_version' in result
-            assert result['vram_total_gb'] > 0
-            print(f"GPU available: {result['vram_total_gb']:.1f} GB total, {result['vram_free_gb']:.1f} GB free")
-        else:
-            print(f"GPU not available: {result['reason']}")
+
+        assert result["available"] is True
+        assert result["onnx_cuda"] is True
+        assert result["vram_total_gb"] > 0
+        assert result["vram_free_gb"] > 0
+        assert result["cuda_version"]
     
     def test_is_step5_gpu_enabled(self):
         """Tester la lecture de STEP5_ENABLE_GPU."""
@@ -106,12 +123,10 @@ class TestConfigGPUValidation:
         
         original = os.environ.get('STEP5_GPU_ENGINES')
         try:
-            os.environ['STEP5_GPU_ENGINES'] = 'mediapipe_landmarker,openseeface'
+            os.environ['STEP5_GPU_ENGINES'] = 'mediapipe_landmarker,openseeface,insightface'
             engines = Config.get_step5_gpu_engines()
-            
-            assert 'mediapipe_landmarker' in engines
-            assert 'openseeface' in engines
-            assert len(engines) == 2
+
+            assert engines == ['insightface']
         finally:
             if original is not None:
                 os.environ['STEP5_GPU_ENGINES'] = original
@@ -119,110 +134,17 @@ class TestConfigGPUValidation:
                 os.environ.pop('STEP5_GPU_ENGINES', None)
 
 
-@pytest.mark.gpu
-class TestOpenSeeFaceGPU:
-    """Tests spécifiques à OpenSeeFace avec GPU (nécessite onnxruntime-gpu)."""
-    
-    @pytest.fixture
-    def check_onnx_cuda(self):
-        """Vérifier que ONNX CUDA provider est disponible."""
-        try:
-            import onnxruntime as ort
-            if 'CUDAExecutionProvider' not in ort.get_available_providers():
-                pytest.skip("ONNX CUDA provider not available (install onnxruntime-gpu)")
-        except ImportError:
-            pytest.skip("ONNXRuntime not installed")
-    
-    def test_openseeface_engine_gpu_flag(self, check_onnx_cuda):
-        """Tester l'initialisation d'OpenSeeFace avec use_gpu=True."""
-        sys.path.insert(0, str(project_root / 'workflow_scripts' / 'step5'))
-        
-        try:
-            from face_engines import OpenSeeFaceEngine
-            
-            engine = OpenSeeFaceEngine(use_gpu=True)
-            assert engine._use_gpu is True
-            
-            detection_providers = engine._detection_session.get_providers()
-            landmark_providers = engine._landmark_session.get_providers()
-            
-            assert detection_providers[0] == 'CUDAExecutionProvider', \
-                f"Expected CUDA provider first, got: {detection_providers}"
-            assert landmark_providers[0] == 'CUDAExecutionProvider', \
-                f"Expected CUDA provider first, got: {landmark_providers}"
-            
-            print(f"✓ OpenSeeFace GPU mode active (providers: {detection_providers})")
-        except Exception as e:
-            pytest.fail(f"Failed to initialize OpenSeeFace with GPU: {e}")
-    
-    def test_openseeface_cpu_fallback(self):
-        """Tester que OpenSeeFace fonctionne en mode CPU (fallback)."""
-        sys.path.insert(0, str(project_root / 'workflow_scripts' / 'step5'))
-        
-        try:
-            from face_engines import OpenSeeFaceEngine
-            
-            engine = OpenSeeFaceEngine(use_gpu=False)
-            assert engine._use_gpu is False
-            
-            assert 'CPUExecutionProvider' in detection_providers
-            
-            print(f"✓ OpenSeeFace CPU mode active (providers: {detection_providers})")
-        except Exception as e:
-            pytest.fail(f"Failed to initialize OpenSeeFace with CPU: {e}")
-
-
-@pytest.mark.gpu
-class TestMediaPipeGPU:
-    """Tests spécifiques à MediaPipe avec GPU delegate (nécessite TensorFlow GPU)."""
-    
-    @pytest.fixture
-    def check_tensorflow_gpu(self):
-        """Vérifier que TensorFlow GPU est disponible."""
-        try:
-            import tensorflow as tf
-            gpus = tf.config.list_physical_devices('GPU')
-            if len(gpus) == 0:
-                pytest.skip("TensorFlow GPU not available (install tensorflow-gpu)")
-        except ImportError:
-            pytest.skip("TensorFlow not installed")
-    
-    def test_mediapipe_gpu_delegate_available(self, check_tensorflow_gpu):
-        """Vérifier que le GPU delegate MediaPipe est accessible."""
-        try:
-            import mediapipe as mp
-            BaseOptions = mp.tasks.BaseOptions
-            
-            try:
-                delegate = BaseOptions.Delegate.GPU
-                print(f"✓ MediaPipe GPU delegate available: {delegate}")
-            except AttributeError:
-                pytest.fail("MediaPipe GPU delegate not available (check MediaPipe version)")
-        except ImportError:
-            pytest.skip("MediaPipe not installed")
-
-
 class TestFaceEngineFactory:
     """Tests de la factory create_face_engine avec flag use_gpu."""
     
-    def test_create_openseeface_with_gpu_flag(self):
-        """Tester create_face_engine pour OpenSeeFace avec GPU."""
+    def test_create_unknown_engine_is_rejected(self):
+        """Tester create_face_engine rejette un moteur non supporté."""
         sys.path.insert(0, str(project_root / 'workflow_scripts' / 'step5'))
-        
-        try:
-            from face_engines import create_face_engine, OpenSeeFaceEngine
-            
-            engine = create_face_engine('openseeface', use_gpu=True)
-            assert isinstance(engine, OpenSeeFaceEngine)
-            assert engine._use_gpu is True
-            
-            engine_cpu = create_face_engine('openseeface', use_gpu=False)
-            assert isinstance(engine_cpu, OpenSeeFaceEngine)
-            assert engine_cpu._use_gpu is False
-            
-            print("✓ create_face_engine respects use_gpu flag")
-        except Exception as e:
-            pytest.fail(f"Factory function failed: {e}")
+
+        from face_engines import create_face_engine
+
+        with pytest.raises(ValueError):
+            create_face_engine('unknown_engine', use_gpu=True)
     
     def test_create_mediapipe_returns_none(self):
         """Vérifier que MediaPipe retourne None (géré séparément dans workers)."""
@@ -232,6 +154,15 @@ class TestFaceEngineFactory:
         
         assert create_face_engine('mediapipe_landmarker', use_gpu=True) is None
         assert create_face_engine('mediapipe', use_gpu=False) is None
+
+    def test_create_insightface_requires_gpu_flag(self):
+        """InsightFace est GPU-only: use_gpu=False doit échouer."""
+        sys.path.insert(0, str(project_root / 'workflow_scripts' / 'step5'))
+
+        from face_engines import create_face_engine
+
+        with pytest.raises(RuntimeError):
+            create_face_engine('insightface', use_gpu=False)
 
 
 @pytest.mark.integration

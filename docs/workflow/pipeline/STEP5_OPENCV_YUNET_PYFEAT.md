@@ -1,5 +1,18 @@
 # Moteur Step5: OpenCV YuNet + py-feat (v4.1.2)
 
+> ⚠️ **ARCHIVE / OBSOLETE**
+>
+> Ce moteur n'est plus supporté dans STEP5 (simplification moteurs).
+>
+> STEP5 supporte désormais :
+> - **Mode MediaPipe (défaut)** : `STEP5_TRACKING_ENGINE` vide (CPU)
+> - **InsightFace** : `STEP5_TRACKING_ENGINE=insightface` (GPU-only)
+>
+> Références à jour :
+> - `docs/workflow/pipeline/STEP5_SUIVI_VIDEO.md`
+> - `docs/workflow/pipeline/STEP5_FACE_ENGINES.md`
+> - `docs/workflow/pipeline/STEP5_GPU_USAGE.md`
+
 ## 📌 Nouveautés (v4.1.2 - 2025-12-19)
 
 ### Optimisations majeures

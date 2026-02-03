@@ -4,6 +4,18 @@
 **Date** : 22 décembre 2025  
 **Statut** : EXPÉRIMENTAL — 1 worker GPU séquentiel uniquement
 
+> ⚠️ **ARCHIVE / OBSOLETE**
+> 
+> Ce document est conservé **à titre historique**. La configuration et les moteurs STEP5 ont été simplifiés :
+> - **Mode MediaPipe (défaut)** : `STEP5_TRACKING_ENGINE` vide (CPU)
+> - **InsightFace** : `STEP5_TRACKING_ENGINE=insightface` (GPU-only)
+> 
+> Les moteurs legacy (OpenSeeFace / OpenCV / EOS / MediaPipe landmarker explicite) ne sont plus supportés en STEP5.
+> 
+> Références à jour :
+> - `docs/workflow/pipeline/STEP5_GPU_USAGE.md`
+> - `docs/workflow/pipeline/STEP5_SUIVI_VIDEO.md`
+
 ---
 
 ## Vue d'ensemble

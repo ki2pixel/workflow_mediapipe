@@ -1,8 +1,33 @@
-# VisualizationService - Service de Visualisation des Données
+# VisualizationService — Métriques et Rapports
 
-## Purpose
+## Vue d'Ensemble
+Service spécialisé dans la génération de métriques, visualisations et rapports pour le monitoring et l'analyse des projets.
 
-Service central pour la génération de visualisations et l'analyse des données du pipeline MediaPipe. Fournit des API unifiées pour accéder aux métadonnées vidéo, données de tracking, analyses audio et timelines de projet.
+## Responsabilités
+- Génération des métriques de performance système
+- Création des rapports HTML et analyses de tendances
+- Agrégation des données multi-projets
+- Support au monitoring temps réel
+
+## Complexité
+- **Score Radon** : E (3 méthodes D/E)
+- **Méthodes critiques** :
+  - `get_available_projects()` (E) : Discovery projets
+  - `_get_video_metadata()` (D) : Métadonnées vidéo
+  - `_load_tracking_data()` (D) : Données tracking
+  - `get_project_timeline()` (C) : Timeline projet
+
+## Patterns d'Usage
+```python
+viz_service = VisualizationService(workflow_state)
+projects = viz_service.get_available_projects()
+timeline = viz_service.get_project_timeline(project_id)
+```
+
+## Intégrations
+- **WorkflowState** : Accès aux données du pipeline
+- **ResultsArchiver** : Lecture des archives consolidées
+- **PerformanceService** : Métriques système
 
 ---
 

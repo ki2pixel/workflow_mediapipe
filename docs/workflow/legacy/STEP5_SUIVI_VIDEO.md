@@ -1,3 +1,16 @@
+> ⚠️ **ARCHIVE / OBSOLETE**
+>
+> Ce document est conservé **à titre historique** et contient des sections obsolètes (ex: options avancées chunking, multi-moteurs legacy).
+>
+> STEP5 est désormais simplifié :
+> - **Mode MediaPipe (défaut)** : `STEP5_TRACKING_ENGINE` vide (CPU)
+> - **InsightFace** : `STEP5_TRACKING_ENGINE=insightface` (GPU-only)
+>
+> Références à jour :
+> - `docs/workflow/pipeline/STEP5_SUIVI_VIDEO.md`
+> - `docs/workflow/pipeline/STEP5_GPU_USAGE.md`
+> - `docs/workflow/pipeline/STEP5_FACE_ENGINES.md`
+
 ```json
 {
   "min": 100,    // Taille minimale de chunk en frames (null pour défaut)

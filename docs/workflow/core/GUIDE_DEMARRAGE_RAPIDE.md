@@ -127,11 +127,11 @@ WEBHOOK_TIMEOUT=10            # secondes
 | Variable | Description | Défaut / Notes |
 | --- | --- | --- |
 | `TRACKING_DISABLE_GPU`, `TRACKING_CPU_WORKERS` | Mode CPU-only v4.1 (15 workers internes) | `TRACKING_DISABLE_GPU=1`, `TRACKING_CPU_WORKERS=15` |
-| `STEP5_TRACKING_ENGINE` | Moteurs : `mediapipe_landmarker`, `opencv_yunet`, `openseeface`, `eos`, `insightface`, etc. | `mediapipe_landmarker` |
+| `STEP5_TRACKING_ENGINE` | Valeurs supportées : vide (mode MediaPipe par défaut) ou `insightface` | vide |
 | `STEP5_ENABLE_GPU`, `STEP5_GPU_ENGINES`, `STEP5_GPU_MAX_VRAM_MB`, `STEP5_GPU_FALLBACK_AUTO` | GPU InsightFace (unique moteur autorisé) | GPU désactivé par défaut |
 | `STEP5_ENABLE_PROFILING`, `STEP5_BLENDSHAPES_THROTTLE_N`, `STEP5_YUNET_MAX_WIDTH`, `STEP5_MEDIAPIPE_MAX_WIDTH` | Optimisations de perfs + downscale/rescale | Valeurs documentées dans `config/settings.py` |
 | `STEP5_OBJECT_DETECTOR_MODEL`, `STEP5_OBJECT_DETECTOR_MODEL_PATH`, `STEP5_ENABLE_OBJECT_DETECTION` | Fallback object detector (EfficientDet Lite2 par défaut) | Object detection désactivée par défaut |
-| `STEP5_OPENSEEFACE_*`, `STEP5_EOS_*`, `STEP5_INSIGHTFACE_*` | Répertoires modèles, overrides d’interpréteurs, throttling et limites moteur | Voir `config/settings.py` pour le détail complet |
+| `STEP5_INSIGHTFACE_*` | Répertoires modèles, overrides d’interpréteurs, throttling et limites moteur | Voir `config/settings.py` pour le détail complet |
 
 #### Sécurité & scripts auxiliaires
 
@@ -161,16 +161,10 @@ Les fonctionnalités suivantes ont été retirées pour simplifier l'interface :
 # Configuration du tracking (STEP5)
 TRACKING_DISABLE_GPU=1        # Mode CPU-only v4.1 (défaut recommandé)
 TRACKING_CPU_WORKERS=15       # Valeur v4.1 (CPU >= 8 cœurs). Réduire si machine limitée.
-STEP5_YUNET_MAX_WIDTH=640     # Downscale YuNet (coords rescalées dans le JSON)
-STEP5_OPENSEEFACE_MAX_WIDTH=640  # Même principe pour OpenSeeFace (fallback sur STEP5_YUNET_MAX_WIDTH)
-STEP5_OPENSEEFACE_MODEL_ID=1     # Modèle landmarks OpenSeeFace (0 = ultra-rapide, 2/3 = précision accrue)
-STEP5_OPENCV_MAX_FACES=2          # Limite le nombre de visages OpenCV (Haar, YuNet, YuNet+py-feat)
-STEP5_OPENCV_JAWOPEN_SCALE=1.0    # Ajuste l'intensité jawOpen pour les moteurs OpenCV
 STEP5_MEDIAPIPE_MAX_FACES=4       # Limite MediaPipe Tasks (descendre à 1 pour monologue)
 STEP5_MEDIAPIPE_JAWOPEN_SCALE=1.0 # Scaling jawOpen MediaPipe pour aligner l'analyse voix/visage
 # STEP5_MEDIAPIPE_MAX_WIDTH=960   # Optionnel : downscale MediaPipe comme YuNet si CPU limité
-# STEP5_TRACKING_ENGINE=openseeface  # Moteurs supportés: mediapipe_landmarker (défaut), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface, eos, insightface
-# STEP5_EOS_ENV_PYTHON=/mnt/cache/venv/workflow_mediapipe/eos_env/bin/python  # Override optionnel pour le moteur eos
+# STEP5_TRACKING_ENGINE=          # Vide = mode MediaPipe par défaut
 ```
 
 **Support GPU InsightFace (v4.2+)** :
@@ -180,7 +174,7 @@ STEP5_ENABLE_GPU=0                  # 1 pour activer le mode GPU (réservé à I
 STEP5_GPU_ENGINES=insightface
 STEP5_GPU_MAX_VRAM_MB=2048          # Ajuster selon la VRAM disponible (ex: 3072 pour GTX 1650)
 STEP5_GPU_FALLBACK_AUTO=1           # Bascule automatique CPU si VRAM indisponible
-STEP5_GPU_PROFILING=0               # 1 pour logguer VRAM/temps GPU
+STEP5_ENABLE_PROFILING=0            # 1 pour activer les logs [PROFILING]
 # STEP5_INSIGHTFACE_ENV_PYTHON=/mnt/venv_ext4/insightface_env/bin/python  # Override si le venv InsightFace est relocalisé
 
 # InsightFace (GPU-only)

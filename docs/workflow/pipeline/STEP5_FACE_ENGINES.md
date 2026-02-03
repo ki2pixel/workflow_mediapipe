@@ -19,29 +19,11 @@ Documentation des 5 moteurs de détection faciale utilisés dans STEP5, chacun a
 
 ## Moteurs Disponibles
 
-### MediaPipe Face Landmarker
-- **Caractéristiques** : 478 landmarks + 52 blendshapes ARKit
-- **Performance** : Accélération GPU optionnelle
-- **Complexité** : Moyenne - Intégré dans `face_engines.py`
-- **Cas d'usage** : Standard industriel, compatibilité ARKit
-
-### OpenCV YuNet + Py-Feat
-- **Caractéristiques** : Détection légère avec blendshapes py-feat
-- **Performance** : CPU optimisé, downscaling configurable
-- **Complexité** : Élevée - `OpenCVYuNetPyFeatEngine.detect()` (Score D)
-- **Cas d'usage** : Ressources limitées, traitement rapide
-
-### OpenSeeFace
-- **Caractéristiques** : 68 landmarks + blendshapes complets
-- **Performance** : CPU/GPU hybride
-- **Complexité** : Élevée - `OpenSeeFaceEngine.__init__()` (Score E)
-- **Cas d'usage** : Analyse faciale détaillée
-
-### EOS 3DMM
-- **Caractéristiques** : Modèles 3D morphables, coefficients shape/expression
-- **Performance** : CPU optimisé avec assets externes
-- **Complexité** : Élevée - `EosFaceEngine.detect()` (Score E)
-- **Cas d'usage** : Animation 3D avancée
+### Mode MediaPipe (défaut)
+- **Sélection** : `STEP5_TRACKING_ENGINE` vide (ou valeur `mediapipe` / `mediapipe_landmarker` normalisée en vide)
+- **Performance** : CPU
+- **Complexité** : Traitement géré dans les workers STEP5
+- **Cas d'usage** : Mode par défaut, stable, sans dépendances GPU
 
 ### InsightFace (RetinaFace + Antelopev2)
 - **Caractéristiques** : Détection haute précision, embeddings faciaux
@@ -60,16 +42,6 @@ Documentation des 5 moteurs de détection faciale utilisés dans STEP5, chacun a
 - **Défis** : Lazy import MediaPipe, gestion VRAM, throttling
 - **Impact** : Moteur le plus précis mais complexe à maintenir
 
-#### `OpenSeeFaceEngine.__init__()` (Score E)  
-- **Complexité** : 115 lignes, résolution modèles, configuration GPU
-- **Défis** : Gestion assets externes, validation chemins
-- **Impact** : Initialisation critique pour performances
-
-#### `EosFaceEngine.detect()` (Score E)
-- **Complexité** : 1537 lignes, calculs 3D, assets EOS
-- **Défis** : Intégration bibliothèque externe, optimisations CPU
-- **Impact** : Fonctionnalités 3D uniques mais maintenance lourde
-
 #### `InsightFaceEngine.__init__()` (Score D)
 - **Complexité** : 611 lignes, configuration CUDA, modèles antelopev2
 - **Défis** : Détection GPU, gestion dépendances ONNX
@@ -83,7 +55,7 @@ Documentation des 5 moteurs de détection faciale utilisés dans STEP5, chacun a
 ```bash
 # Activation GPU (optionnel)
 STEP5_ENABLE_GPU=1
-STEP5_GPU_ENGINES=mediapipe,insightface
+STEP5_GPU_ENGINES=insightface
 
 # Désactivation GPU (défaut pour stabilité)
 STEP5_DISABLE_GPU=1
@@ -118,13 +90,8 @@ def _ensure_mediapipe_loaded(required=True):
 # workflow_scripts/step5/face_engines.py
 class FaceEngineRegistry:
     engines = {
-        'mediapipe': MediaPipeFaceEngine,
-        'opencv_haar': OpenCVHaarEngine,
-        'opencv_yunet': OpenCVYuNetEngine,
-        'opencv_yunet_pyfeat': OpenCVYuNetPyFeatEngine,
-        'openseeface': OpenSeeFaceEngine,
-        'eos': EosFaceEngine,
-        'insightface': InsightFaceEngine
+        'mediapipe': None,
+        'insightface': InsightFaceEngine,
     }
 ```
 
@@ -147,9 +114,8 @@ def detect(self, frame: np.ndarray, frame_num: int) -> List[Dict]:
 ## Performance & Optimisations
 
 ### Downscaling & Rescaling
-- **YuNet** : `STEP5_YUNET_MAX_WIDTH=640` (défaut)
-- **OpenSeeFace** : `STEP5_OPENSEEFACE_MAX_WIDTH=640`
-- **EOS** : `STEP5_EOS_MAX_WIDTH=640`
+- **InsightFace** : `STEP5_INSIGHTFACE_MAX_WIDTH` (fallback `STEP5_YUNET_MAX_WIDTH`, défaut 1280)
+- **MediaPipe (défaut)** : options MediaPipe dans les workers (ex: `STEP5_MEDIAPIPE_MAX_WIDTH`)
 - **Rescaling automatique** : Coordonnées remises à l'échelle de la vidéo originale
 
 ### Profiling Intégré
@@ -172,16 +138,13 @@ if frame_num % 20 == 0:
 ## Sélection du Moteur
 
 ### Recommandations par Cas d'Usage
-- **Production stable** : MediaPipe (CPU-only)
-- **Haute précision** : InsightFace (GPU disponible)
-- **Ressources limitées** : OpenCV YuNet
-- **Animation 3D** : EOS
-- **Analyse détaillée** : OpenSeeFace
+- **Production stable** : Mode MediaPipe par défaut (CPU)
+- **Haute précision** : InsightFace (GPU)
 
 ### Critères de Performance
-- **Vitesse** : OpenCV YuNet > MediaPipe > OpenSeeFace > EOS > InsightFace
-- **Précision** : InsightFace > MediaPipe > OpenSeeFace > EOS > OpenCV YuNet
-- **Complexité** : EOS > InsightFace > OpenSeeFace > MediaPipe > OpenCV YuNet
+- **Vitesse** : dépend fortement du matériel et des modèles; comparer uniquement MediaPipe (CPU) vs InsightFace (GPU)
+- **Précision** : InsightFace (GPU) vise la meilleure précision; MediaPipe (CPU) est le mode par défaut
+- **Complexité** : InsightFace est le moteur le plus complexe; MediaPipe est le mode le plus simple à opérer
 
 ---
 

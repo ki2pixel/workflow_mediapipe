@@ -105,24 +105,17 @@ try:
     sys.path.insert(0, str(BASE_DIR))
     from config.settings import config as app_config
     TRACKING_ENV_PYTHON = app_config.get_venv_python("tracking_env")
-    EOS_ENV_PYTHON = app_config.get_venv_python("eos_env")
     INSIGHTFACE_ENV_PYTHON = app_config.get_venv_python("insightface_env")
 except (ImportError, AttributeError):
     TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
-    EOS_ENV_PYTHON = BASE_DIR / "eos_env" / "bin" / "python"
     INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
 
 TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
-EOS_ENV_PYTHON = Path(EOS_ENV_PYTHON)
 INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
 
 WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
 
 TRACKING_ENGINE = None
-
-TF_GPU_ENV_PYTHON = ENV.get_str("STEP5_TF_GPU_ENV_PYTHON", "").strip()
-if TF_GPU_ENV_PYTHON:
-    TF_GPU_ENV_PYTHON = Path(TF_GPU_ENV_PYTHON)
 
 CUDA_LIB_SUBDIRS = [
     "cublas/lib",
@@ -324,11 +317,13 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
     if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
         engine_norm = ""
 
-    gpu_capable_engines = {"openseeface", "opencv_yunet_pyfeat", "insightface"}
-    
-    if engine_norm and engine_norm not in gpu_capable_engines:
-        if use_gpu:
-            logging.info(f"Engine {engine_norm} not GPU-capable, forcing CPU mode")
+    if engine_norm not in {"", "insightface"}:
+        raise RuntimeError(
+            f"Unsupported STEP5 tracking engine: {engine_norm}. Supported values: insightface (GPU) or default (empty)."
+        )
+
+    if use_gpu and engine_norm != "insightface":
+        logging.info("GPU worker requested but only InsightFace supports GPU; forcing CPU mode")
         use_gpu = False
 
     if not use_gpu:
@@ -352,18 +347,10 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
     models_dir_path = Path(__file__).resolve().parent / "models"
     worker_script_path = Path(__file__).resolve().parent / worker_script
 
-    worker_python_override_eos = ENV.get_optional_str("STEP5_EOS_ENV_PYTHON")
     worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
     worker_python = TRACKING_ENV_PYTHON
     
-    if engine_norm == "eos":
-        worker_python = Path(worker_python_override_eos) if worker_python_override_eos else EOS_ENV_PYTHON
-        if not worker_python.exists():
-            raise RuntimeError(
-                f"EOS engine selected but python interpreter not found: {worker_python}. "
-                "Create eos_env or set STEP5_EOS_ENV_PYTHON to the eos_env python path."
-            )
-    elif engine_norm == "insightface":
+    if engine_norm == "insightface":
         if not use_gpu:
             raise RuntimeError(
                 "InsightFace engine is GPU-only. Enable STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
@@ -379,17 +366,6 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
                 f"InsightFace engine selected but python interpreter not found: {worker_python}. "
                 "Create insightface_env or set STEP5_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
             )
-    elif use_gpu and not engine_norm:
-        if TF_GPU_ENV_PYTHON and isinstance(TF_GPU_ENV_PYTHON, Path):
-            if TF_GPU_ENV_PYTHON.exists():
-                worker_python = TF_GPU_ENV_PYTHON
-                logging.info(f"Using TensorFlow GPU interpreter for MediaPipe: {worker_python}")
-            else:
-                logging.warning(
-                    "STEP5_TF_GPU_ENV_PYTHON is set but the interpreter was not found "
-                    f"({TF_GPU_ENV_PYTHON}). Falling back to tracking_env."
-                )
-
     command_args = [str(worker_python), str(worker_script_path), video_path, "--models_dir", str(models_dir_path)]
     if use_gpu: command_args.append("--use_gpu")
 
@@ -496,7 +472,7 @@ def main():
     parser.add_argument(
         "--tracking_engine",
         default=None,
-        help="Moteur de tracking: mediapipe_landmarker (défaut), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface, eos, insightface",
+        help="Moteur de tracking: insightface (GPU) ou vide pour le mode MediaPipe par défaut",
     )
     args = parser.parse_args()
     try:
@@ -513,15 +489,21 @@ def main():
         pass
 
     _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
+    if _engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+        _engine_norm = ""
+    if _engine_norm not in {"", "insightface"}:
+        logging.error(
+            "Unsupported STEP5_TRACKING_ENGINE '%s'. Supported values: insightface (GPU) or empty (default MediaPipe).",
+            _engine_norm,
+        )
+        sys.exit(1)
     
     gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
     gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
     gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
     _log_env_snapshot()
     
-    engine_normalized = _engine_norm if _engine_norm else "mediapipe_landmarker"
-    if engine_normalized in {"mediapipe", "mediapipe_landmarker"}:
-        engine_normalized = "mediapipe_landmarker"
+    engine_normalized = "insightface" if _engine_norm == "insightface" else "mediapipe"
     
     engine_supports_gpu = False
     if gpu_enabled_global and not args.disable_gpu:
@@ -529,12 +511,12 @@ def main():
             if engine_normalized in gpu_engines or 'all' in gpu_engines:
                 engine_supports_gpu = True
                 logging.info(f"GPU mode requested for engine: {engine_normalized}")
-                
+
                 try:
                     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
                     from config.settings import Config
                     gpu_status = Config.check_gpu_availability()
-                    
+
                     if not gpu_status['available']:
                         logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
                         fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
@@ -546,7 +528,9 @@ def main():
                             logging.error("GPU fallback disabled, aborting")
                             raise RuntimeError(f"GPU unavailable: {gpu_status['reason']}")
                     else:
-                        logging.info(f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}")
+                        logging.info(
+                            f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}"
+                        )
                 except ImportError as e:
                     logging.error(f"Failed to import config.settings: {e}")
                     args.disable_gpu = True
@@ -556,21 +540,17 @@ def main():
                     args.disable_gpu = True
                     engine_supports_gpu = False
             else:
-                logging.warning(f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode")
+                logging.warning(
+                    f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode"
+                )
                 args.disable_gpu = True
         else:
-            logging.info(f"GPU mode is reserved for InsightFace only. Engine '{engine_normalized}' will run in CPU-only mode.")
             args.disable_gpu = True
-    
-    if _engine_norm in {"opencv_haar", "opencv_yunet", "eos"}:
-        if not args.disable_gpu:
-            args.disable_gpu = True
-            logging.info(f"Engine {_engine_norm} does not support GPU, forcing CPU-only mode")
     
     if not args.disable_gpu and engine_supports_gpu:
-        logging.info(f"✓ GPU mode ENABLED for {_engine_norm or 'mediapipe_landmarker'}")
+        logging.info(f"✓ GPU mode ENABLED for {_engine_norm or 'mediapipe'}")
     else:
-        logging.info(f"CPU-only mode (GPU disabled or not supported for this engine)")
+        logging.info("CPU-only mode (GPU disabled or not supported for this engine)")
 
     if _engine_norm == "insightface" and (args.disable_gpu or not engine_supports_gpu):
         logging.error(

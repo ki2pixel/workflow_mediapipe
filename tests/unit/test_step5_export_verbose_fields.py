@@ -6,19 +6,28 @@ des données volumineuses (landmarks, coefficients EOS) tout en préservant
 la compatibilité avec STEP6.
 """
 
-from importlib import util as _import_util
 from unittest.mock import MagicMock
 import os
 import pytest
 
-if _import_util.find_spec("numpy") is None:
-    pytestmark = pytest.mark.skip(
-        reason="numpy non disponible dans cet environnement; tests STEP5 export verbose ignorés."
-    )
+try:
+    from importlib import util as _import_util
 
-if _import_util.find_spec("scipy") is None:
-    pytestmark = pytest.mark.skip(  # type: ignore[assignment]
-        reason="scipy non disponible dans cet environnement; tests STEP5 export verbose ignorés."
+    if _import_util.find_spec("numpy") is None:
+        pytest.skip(
+            reason="numpy non disponible dans cet environnement; tests STEP5 export verbose ignorés.",
+            allow_module_level=True,
+        )
+
+    if _import_util.find_spec("scipy") is None:
+        pytest.skip(
+            reason="scipy non disponible dans cet environnement; tests STEP5 export verbose ignorés.",
+            allow_module_level=True,
+        )
+except Exception:
+    pytest.skip(
+        reason="Dépendances Python indisponibles; tests STEP5 export verbose ignorés.",
+        allow_module_level=True,
     )
 
 from utils.tracking_optimizations import apply_tracking_and_management
@@ -54,8 +63,8 @@ class TestExportVerboseFields:
         }
 
     @pytest.fixture
-    def mock_detection_opencv_yunet_pyfeat(self):
-        """Détection opencv_yunet_pyfeat avec 478 landmarks."""
+    def mock_detection_large_landmarks(self):
+        """Détection faciale avec un grand nombre de landmarks (stress test export)."""
         return {
             "bbox": (120, 220, 160, 190),
             "centroid": (200, 315),
@@ -188,14 +197,14 @@ class TestExportVerboseFields:
             assert "landmarks" not in result[0], f"Failed for value: {false_value}"
             assert "eos" not in result[0], f"Failed for value: {false_value}"
 
-    def test_opencv_yunet_pyfeat_large_landmarks(
-        self, mock_detection_opencv_yunet_pyfeat, mock_enhanced_speaking_detector
+    def test_large_landmarks_export_is_removed_when_verbose_false(
+        self, mock_detection_large_landmarks, mock_enhanced_speaking_detector
     ):
-        """Test avec opencv_yunet_pyfeat (478 landmarks volumineux)."""
+        """Test avec 478 landmarks volumineux."""
         os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = 'false'
         
         active_objects = {}
-        current_detections = [mock_detection_opencv_yunet_pyfeat]
+        current_detections = [mock_detection_large_landmarks]
         next_id_counter = {"value": 0}
 
         result = apply_tracking_and_management(

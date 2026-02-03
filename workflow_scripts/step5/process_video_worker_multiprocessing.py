@@ -89,219 +89,85 @@ def _apply_jawopen_scale(blendshapes, scale):
 # Global variables for worker processes
 landmarker_global = None
 object_detector_global = None
-face_engine_global = None
-tracking_engine_type = None
 
 
 def init_worker_process(models_dir, args_dict):
     """
     Initialize tracking models once per worker process.
-    Supports MediaPipe and OpenCV-based engines.
+    Supports MediaPipe.
     """
-    global landmarker_global, object_detector_global, face_engine_global, tracking_engine_type
+    global landmarker_global, object_detector_global
     
     worker_pid = os.getpid()
     engine_name = args_dict.get('tracking_engine', '')
     engine_norm = (str(engine_name).strip().lower() if engine_name else "")
-    
+    if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+        engine_norm = ""
+
     logging.info(f"[WORKER-{worker_pid}] Initializing process with engine: {engine_norm or 'mediapipe'}")
-    
+
     try:
-        if engine_norm and engine_norm not in {"mediapipe", "mediapipe_landmarker"}:
-            # Inject env vars for OpenCV engines (not inherited from parent process)
-            if args_dict.get('yunet_model_path'):
-                os.environ['STEP5_YUNET_MODEL_PATH'] = args_dict['yunet_model_path']
-            if args_dict.get('eos_models_dir'):
-                os.environ['STEP5_EOS_MODELS_DIR'] = str(args_dict['eos_models_dir'])
-            if args_dict.get('eos_sfm_model_path'):
-                os.environ['STEP5_EOS_SFM_MODEL_PATH'] = str(args_dict['eos_sfm_model_path'])
-            if args_dict.get('eos_expression_blendshapes_path'):
-                os.environ['STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH'] = str(args_dict['eos_expression_blendshapes_path'])
-            if args_dict.get('eos_landmark_mapper_path'):
-                os.environ['STEP5_EOS_LANDMARK_MAPPER_PATH'] = str(args_dict['eos_landmark_mapper_path'])
-            if args_dict.get('eos_edge_topology_path'):
-                os.environ['STEP5_EOS_EDGE_TOPOLOGY_PATH'] = str(args_dict['eos_edge_topology_path'])
-            if args_dict.get('eos_model_contour_path'):
-                os.environ['STEP5_EOS_MODEL_CONTOUR_PATH'] = str(args_dict['eos_model_contour_path'])
-            if args_dict.get('eos_contour_landmarks_path'):
-                os.environ['STEP5_EOS_CONTOUR_LANDMARKS_PATH'] = str(args_dict['eos_contour_landmarks_path'])
-            if args_dict.get('eos_fit_every_n') is not None:
-                os.environ['STEP5_EOS_FIT_EVERY_N'] = str(args_dict['eos_fit_every_n'])
-            if args_dict.get('eos_max_faces') is not None:
-                os.environ['STEP5_EOS_MAX_FACES'] = str(args_dict['eos_max_faces'])
-            if args_dict.get('eos_max_width') is not None:
-                os.environ['STEP5_EOS_MAX_WIDTH'] = str(args_dict['eos_max_width'])
-            if args_dict.get('eos_jawopen_scale') is not None:
-                os.environ['STEP5_EOS_JAWOPEN_SCALE'] = str(args_dict['eos_jawopen_scale'])
-            if args_dict.get('opencv_max_faces') is not None:
-                os.environ['STEP5_OPENCV_MAX_FACES'] = str(args_dict['opencv_max_faces'])
-            if args_dict.get('opencv_jawopen_scale') is not None:
-                os.environ['STEP5_OPENCV_JAWOPEN_SCALE'] = str(args_dict['opencv_jawopen_scale'])
-            if args_dict.get('facemesh_onnx_path'):
-                os.environ['STEP5_FACEMESH_ONNX_PATH'] = args_dict['facemesh_onnx_path']
-            if args_dict.get('pyfeat_model_path'):
-                os.environ['STEP5_PYFEAT_MODEL_PATH'] = args_dict['pyfeat_model_path']
-            if args_dict.get('step5_onnx_intra_op_threads'):
-                os.environ['STEP5_ONNX_INTRA_OP_THREADS'] = str(args_dict['step5_onnx_intra_op_threads'])
-            if args_dict.get('step5_onnx_inter_op_threads'):
-                os.environ['STEP5_ONNX_INTER_OP_THREADS'] = str(args_dict['step5_onnx_inter_op_threads'])
-            if args_dict.get('openseeface_models_dir'):
-                os.environ['STEP5_OPENSEEFACE_MODELS_DIR'] = str(args_dict['openseeface_models_dir'])
-            if args_dict.get('openseeface_model_id') is not None:
-                os.environ['STEP5_OPENSEEFACE_MODEL_ID'] = str(args_dict['openseeface_model_id'])
-            if args_dict.get('openseeface_detection_model_path'):
-                os.environ['STEP5_OPENSEEFACE_DETECTION_MODEL_PATH'] = str(args_dict['openseeface_detection_model_path'])
-            if args_dict.get('openseeface_landmark_model_path'):
-                os.environ['STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH'] = str(args_dict['openseeface_landmark_model_path'])
-            if args_dict.get('openseeface_detect_every_n') is not None:
-                os.environ['STEP5_OPENSEEFACE_DETECT_EVERY_N'] = str(args_dict['openseeface_detect_every_n'])
-            if args_dict.get('openseeface_detection_threshold') is not None:
-                os.environ['STEP5_OPENSEEFACE_DETECTION_THRESHOLD'] = str(args_dict['openseeface_detection_threshold'])
-            if args_dict.get('openseeface_max_faces') is not None:
-                os.environ['STEP5_OPENSEEFACE_MAX_FACES'] = str(args_dict['openseeface_max_faces'])
-            if args_dict.get('openseeface_jawopen_scale') is not None:
-                os.environ['STEP5_OPENSEEFACE_JAWOPEN_SCALE'] = str(args_dict['openseeface_jawopen_scale'])
-            if args_dict.get('object_detector_model'):
-                os.environ['STEP5_OBJECT_DETECTOR_MODEL'] = args_dict['object_detector_model']
-            if args_dict.get('object_detector_model_path'):
-                os.environ['STEP5_OBJECT_DETECTOR_MODEL_PATH'] = args_dict['object_detector_model_path']
-            
-            
-            # Ensure profiling / throttling hints reach OpenCV-based engines
-            profiling_enabled = bool(args_dict.get('enable_profiling'))
-            os.environ['STEP5_ENABLE_PROFILING'] = "1" if profiling_enabled else "0"
-
-            throttle_raw = args_dict.get('blendshapes_throttle_n', 1)
-            try:
-                throttle_value = str(max(1, int(throttle_raw or 1)))
-            except Exception:
-                throttle_value = "1"
-            os.environ['STEP5_BLENDSHAPES_THROTTLE_N'] = throttle_value
-            
-            if engine_norm == "openseeface":
-                logging.info(
-                    f"[WORKER-{worker_pid}] OpenSeeFace config: "
-                    f"model_id={os.environ.get('STEP5_OPENSEEFACE_MODEL_ID')} "
-                    f"models_dir={os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')} "
-                    f"detection_model_path={os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')} "
-                    f"landmark_model_path={os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')} "
-                    f"detect_every_n={os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N')} "
-                    f"detection_threshold={os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD')} "
-                    f"max_faces={os.environ.get('STEP5_OPENSEEFACE_MAX_FACES')} "
-                    f"jawopen_scale={os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE')} "
-                    f"max_width={os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH') or os.environ.get('STEP5_YUNET_MAX_WIDTH')}"
-                )
-
-            from face_engines import create_face_engine
-            use_gpu = args_dict.get('use_gpu', False)
-            face_engine_global = create_face_engine(engine_norm, use_gpu=use_gpu)
-
-            if args_dict.get('enable_object_detection', False):
-                try:
-                    if mp is None:
-                        raise RuntimeError("mediapipe is not available")
-
-                    BaseOptions = mp.tasks.BaseOptions
-                    VisionRunningMode = mp.tasks.vision.RunningMode
-                    ObjectDetector = mp.tasks.vision.ObjectDetector
-                    ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
-
-                    delegate = BaseOptions.Delegate.CPU
-
-                    object_detector_model_name = args_dict.get('object_detector_model', 'efficientdet_lite2')
-                    object_model_path = ObjectDetectorRegistry.resolve_model_path(
-                        model_name=object_detector_model_name,
-                        models_dir=models_dir,
-                        override_path=args_dict.get('object_detector_model_path'),
-                    )
-                    logging.info(
-                        f"[WORKER-{worker_pid}] Using object detector (face_engine mode): "
-                        f"{object_detector_model_name} at {object_model_path}"
-                    )
-
-                    object_options = ObjectDetectorOptions(
-                        base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
-                        running_mode=VisionRunningMode.VIDEO,
-                        max_results=args_dict.get('object_max_results', 5),
-                        score_threshold=args_dict.get('object_score_threshold', 0.4),
-                    )
-                    object_detector_global = ObjectDetector.create_from_options(object_options)
-                except Exception as e:
-                    logging.error(
-                        f"[WORKER-{worker_pid}] Failed to initialize object detector (face_engine mode): {e}"
-                    )
-                    object_detector_global = None
-
-            tracking_engine_type = "face_engine"
-            logging.info(f"[WORKER-{worker_pid}] Initialized {engine_norm} engine")
-        else:
-            if mp is None:
-                raise RuntimeError(
-                    "mediapipe is required for the default tracking engine but is not available in this environment"
-                )
-
-            BaseOptions = mp.tasks.BaseOptions
-            VisionRunningMode = mp.tasks.vision.RunningMode
-            FaceLandmarker = mp.tasks.vision.FaceLandmarker
-            FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
-            ObjectDetector = mp.tasks.vision.ObjectDetector
-            ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
-            
-            # Configure delegate (CPU or GPU)
-            use_gpu = args_dict.get('use_gpu', False)
-            if use_gpu:
-                try:
-                    # Attempt to use GPU delegate for MediaPipe
-                    delegate = BaseOptions.Delegate.GPU
-                    logging.info(f"[WORKER-{worker_pid}] Attempting to use GPU delegate for MediaPipe")
-                except AttributeError:
-                    logging.warning(f"[WORKER-{worker_pid}] GPU delegate not available in MediaPipe, falling back to CPU")
-                    delegate = BaseOptions.Delegate.CPU
-            else:
-                delegate = BaseOptions.Delegate.CPU
-            face_model_candidates = [
-                models_dir / "face_detectors" / "mediapipe" / "face_landmarker_v2_with_blendshapes.task",
-                models_dir / "face_landmarker_v2_with_blendshapes.task",
-            ]
-            face_model_path = next((p for p in face_model_candidates if p.exists()), face_model_candidates[0])
-            
-            # Resolve object detector model using registry
-            object_detector_model_name = args_dict.get('object_detector_model', 'efficientdet_lite2')
-            try:
-                object_model_path = ObjectDetectorRegistry.resolve_model_path(
-                    model_name=object_detector_model_name,
-                    models_dir=models_dir,
-                    override_path=args_dict.get('object_detector_model_path')
-                )
-                logging.info(f"[WORKER-{worker_pid}] Using object detector: {object_detector_model_name} at {object_model_path}")
-            except (ValueError, FileNotFoundError) as e:
-                logging.error(f"[WORKER-{worker_pid}] Failed to resolve object detector model: {e}")
-                raise
-            
-            env_max_faces = _parse_optional_positive_int(args_dict.get('mediapipe_max_faces'))
-            num_faces = int(env_max_faces if env_max_faces is not None else (args_dict.get('mp_landmarker_num_faces', 5) or 5))
-
-            face_options = FaceLandmarkerOptions(
-                base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
-                running_mode=VisionRunningMode.VIDEO,
-                num_faces=num_faces,
-                min_face_detection_confidence=args_dict.get('mp_landmarker_min_face_detection_confidence', 0.3),
-                min_face_presence_confidence=args_dict.get('mp_landmarker_min_face_presence_confidence', 0.2),
-                min_tracking_confidence=args_dict.get('mp_landmarker_min_tracking_confidence', 0.3),
-                output_face_blendshapes=True
+        if engine_norm:
+            raise RuntimeError(
+                f"Unsupported STEP5 tracking engine for multiprocessing CPU worker: {engine_norm}. "
+                "Supported values: empty (default MediaPipe)."
             )
-            
-            object_options = ObjectDetectorOptions(
-                base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
-                running_mode=VisionRunningMode.VIDEO,
-                max_results=args_dict.get('object_max_results', 5),
-                score_threshold=args_dict.get('object_score_threshold', 0.4)
+
+        if mp is None:
+            raise RuntimeError(
+                "mediapipe is required for the default tracking engine but is not available in this environment"
             )
-            
-            landmarker_global = FaceLandmarker.create_from_options(face_options)
-            object_detector_global = ObjectDetector.create_from_options(object_options)
-            tracking_engine_type = "mediapipe"
-            logging.info(f"[WORKER-{worker_pid}] Initialized MediaPipe engine")
+
+        BaseOptions = mp.tasks.BaseOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
+        FaceLandmarker = mp.tasks.vision.FaceLandmarker
+        FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
+        ObjectDetector = mp.tasks.vision.ObjectDetector
+        ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
+
+        delegate = BaseOptions.Delegate.CPU
+        face_model_candidates = [
+            models_dir / "face_detectors" / "mediapipe" / "face_landmarker_v2_with_blendshapes.task",
+            models_dir / "face_landmarker_v2_with_blendshapes.task",
+        ]
+        face_model_path = next((p for p in face_model_candidates if p.exists()), face_model_candidates[0])
+
+        # Resolve object detector model using registry
+        object_detector_model_name = args_dict.get('object_detector_model', 'efficientdet_lite2')
+        try:
+            object_model_path = ObjectDetectorRegistry.resolve_model_path(
+                model_name=object_detector_model_name,
+                models_dir=models_dir,
+                override_path=args_dict.get('object_detector_model_path')
+            )
+            logging.info(f"[WORKER-{worker_pid}] Using object detector: {object_detector_model_name} at {object_model_path}")
+        except (ValueError, FileNotFoundError) as e:
+            logging.error(f"[WORKER-{worker_pid}] Failed to resolve object detector model: {e}")
+            raise
+
+        env_max_faces = _parse_optional_positive_int(args_dict.get('mediapipe_max_faces'))
+        num_faces = int(env_max_faces if env_max_faces is not None else (args_dict.get('mp_landmarker_num_faces', 5) or 5))
+
+        face_options = FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
+            running_mode=VisionRunningMode.VIDEO,
+            num_faces=num_faces,
+            min_face_detection_confidence=args_dict.get('mp_landmarker_min_face_detection_confidence', 0.3),
+            min_face_presence_confidence=args_dict.get('mp_landmarker_min_face_presence_confidence', 0.2),
+            min_tracking_confidence=args_dict.get('mp_landmarker_min_tracking_confidence', 0.3),
+            output_face_blendshapes=True
+        )
+
+        object_options = ObjectDetectorOptions(
+            base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
+            running_mode=VisionRunningMode.VIDEO,
+            max_results=args_dict.get('object_max_results', 5),
+            score_threshold=args_dict.get('object_score_threshold', 0.4)
+        )
+
+        landmarker_global = FaceLandmarker.create_from_options(face_options)
+        object_detector_global = ObjectDetector.create_from_options(object_options)
+        logging.info(f"[WORKER-{worker_pid}] Initialized MediaPipe engine")
         
         logging.info(f"[WORKER-{worker_pid}] Initialization complete")
         
@@ -309,7 +175,6 @@ def init_worker_process(models_dir, args_dict):
         logging.error(f"[WORKER-{worker_pid}] Initialization failed: {e}")
         landmarker_global = None
         object_detector_global = None
-        face_engine_global = None
 
 
 def process_frame_chunk(chunk_data):
@@ -317,20 +182,12 @@ def process_frame_chunk(chunk_data):
     Process a chunk of frames using the initialized models.
     Returns detection results for all frames in the chunk.
     """
-    global landmarker_global, object_detector_global, face_engine_global, tracking_engine_type
+    global landmarker_global, object_detector_global
     
     worker_pid = os.getpid()
     
-    if tracking_engine_type == "face_engine":
-        if not face_engine_global:
-            logging.error(f"[WORKER-{worker_pid}] Face engine not properly initialized")
-            return []
-    elif tracking_engine_type == "mediapipe":
-        if not landmarker_global:
-            logging.error(f"[WORKER-{worker_pid}] MediaPipe not properly initialized")
-            return []
-    else:
-        logging.error(f"[WORKER-{worker_pid}] No tracking engine initialized")
+    if not landmarker_global:
+        logging.error(f"[WORKER-{worker_pid}] MediaPipe not properly initialized")
         return []
     
     chunk_start, chunk_end, video_path, args_dict = chunk_data
@@ -430,108 +287,93 @@ def process_frame_chunk(chunk_data):
             current_detections = []
             face_detected = False
             
-            if tracking_engine_type == "face_engine":
-                try:
-                    detections = face_engine_global.detect(frame)
-                    if detections:
-                        face_detected = True
-                        current_detections.extend(detections)
-                except Exception as e:
-                    logging.warning(f"Face engine detection failed for frame {frame_idx}: {e}")
-            else:
-                orig_h, orig_w = frame.shape[:2]
-                work_frame = frame
-                scale_to_original = 1.0
-                if max_width is not None and orig_w > max_width:
-                    scale_factor = float(max_width) / float(orig_w)
-                    work_h = max(1, int(orig_h * scale_factor))
-                    work_frame = cv2.resize(frame, (int(max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
-                    scale_to_original = float(orig_w) / float(work_frame.shape[1])
+            orig_h, orig_w = frame.shape[:2]
+            work_frame = frame
+            scale_to_original = 1.0
+            if max_width is not None and orig_w > max_width:
+                scale_factor = float(max_width) / float(orig_w)
+                work_h = max(1, int(orig_h * scale_factor))
+                work_frame = cv2.resize(frame, (int(max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
+                scale_to_original = float(orig_w) / float(work_frame.shape[1])
 
-                t_to_rgb = time.perf_counter() if enable_profiling else 0.0
-                mp_image = mp.Image(
-                    image_format=mp.ImageFormat.SRGB,
-                    data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
-                )
+            t_to_rgb = time.perf_counter() if enable_profiling else 0.0
+            mp_image = mp.Image(
+                image_format=mp.ImageFormat.SRGB,
+                data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
+            )
+            if enable_profiling:
+                profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
+
+            timestamp_ms = int(frame_idx * 1000 / args_dict.get('fps', 25))
+
+            try:
+                t_detect = time.perf_counter() if enable_profiling else 0.0
+                face_result = landmarker_global.detect_for_video(mp_image, timestamp_ms)
                 if enable_profiling:
-                    profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
+                    profiling_stats["detect_total"] += time.perf_counter() - t_detect
 
-                timestamp_ms = int(frame_idx * 1000 / args_dict.get('fps', 25))
-                
-                try:
-                    t_detect = time.perf_counter() if enable_profiling else 0.0
-                    face_result = landmarker_global.detect_for_video(mp_image, timestamp_ms)
-                    if enable_profiling:
-                        profiling_stats["detect_total"] += time.perf_counter() - t_detect
-                    
-                    if face_result.face_landmarks:
-                        face_detected = True
-                        
-                        for i, landmarks in enumerate(face_result.face_landmarks):
-                            t_post = time.perf_counter() if enable_profiling else 0.0
-                            x_coords = [lm.x * orig_w for lm in landmarks]
-                            y_coords = [lm.y * orig_h for lm in landmarks]
-                            bbox = (
-                                int(min(x_coords)), int(min(y_coords)),
-                                int(max(x_coords) - min(x_coords)),
-                                int(max(y_coords) - min(y_coords))
-                            )
-                            centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
-                            
-                            det = {
-                                "bbox": bbox,
-                                "centroid": centroid,
-                                "source_detector": "face_landmarker",
-                                "label": "face"
-                            }
-                            
-                            if face_result.face_blendshapes:
-                                raw_blendshapes = {
-                                    cat.category_name: cat.score
-                                    for cat in face_result.face_blendshapes[i]
-                                }
-                                scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, jaw_open_scale)
+                if face_result.face_landmarks:
+                    face_detected = True
 
-                                current_frame_num = frame_idx + 1
-                                should_update_blendshapes = (blendshapes_throttle_n <= 1) or ((current_frame_num % blendshapes_throttle_n) == 0)
-                                object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
-                                if should_update_blendshapes or object_id not in blendshapes_cache:
-                                    blendshapes_cache[object_id] = scaled_blendshapes
-                                    det["blendshapes"] = scaled_blendshapes
-                                else:
-                                    det["blendshapes"] = blendshapes_cache.get(object_id)
-                            
-                            current_detections.append(det)
-
-                            if enable_profiling:
-                                profiling_stats["post_total"] += time.perf_counter() - t_post
-                
-                except Exception as e:
-                    logging.warning(f"Face detection failed for frame {frame_idx}: {e}")
-
-                if enable_profiling:
-                    fc = int(profiling_stats.get("frame_count", 0) or 0)
-                    if fc > 0 and (fc % 20) == 0:
-                        to_rgb_ms = (profiling_stats["to_rgb_total"] / fc) * 1000.0
-                        detect_ms = (profiling_stats["detect_total"] / fc) * 1000.0
-                        post_ms = (profiling_stats["post_total"] / fc) * 1000.0
-                        logging.info(
-                            "[PROFILING] MediaPipe after %s frames: to_rgb=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
-                            fc,
-                            to_rgb_ms,
-                            detect_ms,
-                            post_ms,
+                    for i, landmarks in enumerate(face_result.face_landmarks):
+                        t_post = time.perf_counter() if enable_profiling else 0.0
+                        x_coords = [lm.x * orig_w for lm in landmarks]
+                        y_coords = [lm.y * orig_h for lm in landmarks]
+                        bbox = (
+                            int(min(x_coords)), int(min(y_coords)),
+                            int(max(x_coords) - min(x_coords)),
+                            int(max(y_coords) - min(y_coords))
                         )
+                        centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
+
+                        det = {
+                            "bbox": bbox,
+                            "centroid": centroid,
+                            "source_detector": "face_landmarker",
+                            "label": "face"
+                        }
+
+                        if face_result.face_blendshapes:
+                            raw_blendshapes = {
+                                cat.category_name: cat.score
+                                for cat in face_result.face_blendshapes[i]
+                            }
+                            scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, jaw_open_scale)
+
+                            current_frame_num = frame_idx + 1
+                            should_update_blendshapes = (blendshapes_throttle_n <= 1) or ((current_frame_num % blendshapes_throttle_n) == 0)
+                            object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
+                            if should_update_blendshapes or object_id not in blendshapes_cache:
+                                blendshapes_cache[object_id] = scaled_blendshapes
+                                det["blendshapes"] = scaled_blendshapes
+                            else:
+                                det["blendshapes"] = blendshapes_cache.get(object_id)
+
+                        current_detections.append(det)
+
+                        if enable_profiling:
+                            profiling_stats["post_total"] += time.perf_counter() - t_post
+
+            except Exception as e:
+                logging.warning(f"Face detection failed for frame {frame_idx}: {e}")
+
+            if enable_profiling:
+                fc = int(profiling_stats.get("frame_count", 0) or 0)
+                if fc > 0 and (fc % 20) == 0:
+                    to_rgb_ms = (profiling_stats["to_rgb_total"] / fc) * 1000.0
+                    detect_ms = (profiling_stats["detect_total"] / fc) * 1000.0
+                    post_ms = (profiling_stats["post_total"] / fc) * 1000.0
+                    logging.info(
+                        "[PROFILING] MediaPipe after %s frames: to_rgb=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
+                        fc,
+                        to_rgb_ms,
+                        detect_ms,
+                        post_ms,
+                    )
             
             # Object detection fallback if no faces detected
             if not face_detected and args_dict.get('enable_object_detection', False) and object_detector_global:
                 try:
-                    if tracking_engine_type == "face_engine":
-                        mp_image = mp.Image(
-                            image_format=mp.ImageFormat.SRGB,
-                            data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        )
-                        timestamp_ms = int(frame_idx * 1000 / args_dict.get('fps', 25))
                     object_result = object_detector_global.detect_for_video(mp_image, timestamp_ms)
                     
                     if object_result.detections:
@@ -542,11 +384,10 @@ def process_frame_chunk(chunk_data):
                             width = int(bbox.width)
                             height = int(bbox.height)
 
-                            if tracking_engine_type != "face_engine":
-                                x_min = int(max(0, x_min * scale_to_original))
-                                y_min = int(max(0, y_min * scale_to_original))
-                                width = int(max(0, width * scale_to_original))
-                                height = int(max(0, height * scale_to_original))
+                            x_min = int(max(0, x_min * scale_to_original))
+                            y_min = int(max(0, y_min * scale_to_original))
+                            width = int(max(0, width * scale_to_original))
+                            height = int(max(0, height * scale_to_original))
                             
                             centroid = (x_min + width // 2, y_min + height // 2)
                             
@@ -615,35 +456,6 @@ def process_video_multiprocessing(args, video_capture, total_frames):
         'mediapipe_max_width': os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH'),
         'mediapipe_max_faces': os.environ.get('STEP5_MEDIAPIPE_MAX_FACES'),
         'mediapipe_jawopen_scale': os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'),
-        # OpenCV engine paths (env vars not inherited by ProcessPoolExecutor)
-        'yunet_model_path': os.environ.get('STEP5_YUNET_MODEL_PATH'),
-        'opencv_max_faces': os.environ.get('STEP5_OPENCV_MAX_FACES'),
-        'opencv_jawopen_scale': os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE'),
-        'facemesh_onnx_path': os.environ.get('STEP5_FACEMESH_ONNX_PATH'),
-        'pyfeat_model_path': os.environ.get('STEP5_PYFEAT_MODEL_PATH'),
-        # ONNX Runtime performance tuning (used by several engines)
-        'step5_onnx_intra_op_threads': os.environ.get('STEP5_ONNX_INTRA_OP_THREADS'),
-        'step5_onnx_inter_op_threads': os.environ.get('STEP5_ONNX_INTER_OP_THREADS'),
-        # OpenSeeFace engine configuration
-        'openseeface_models_dir': os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR'),
-        'openseeface_model_id': os.environ.get('STEP5_OPENSEEFACE_MODEL_ID'),
-        'openseeface_detection_model_path': os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH'),
-        'openseeface_landmark_model_path': os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH'),
-        'openseeface_detect_every_n': os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N'),
-        'openseeface_detection_threshold': os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD'),
-        'openseeface_max_faces': os.environ.get('STEP5_OPENSEEFACE_MAX_FACES'),
-        'openseeface_jawopen_scale': os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE'),
-        'eos_models_dir': os.environ.get('STEP5_EOS_MODELS_DIR'),
-        'eos_sfm_model_path': os.environ.get('STEP5_EOS_SFM_MODEL_PATH'),
-        'eos_expression_blendshapes_path': os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH'),
-        'eos_landmark_mapper_path': os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH'),
-        'eos_edge_topology_path': os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH'),
-        'eos_model_contour_path': os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH'),
-        'eos_contour_landmarks_path': os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH'),
-        'eos_fit_every_n': os.environ.get('STEP5_EOS_FIT_EVERY_N'),
-        'eos_max_faces': os.environ.get('STEP5_EOS_MAX_FACES'),
-        'eos_max_width': os.environ.get('STEP5_EOS_MAX_WIDTH'),
-        'eos_jawopen_scale': os.environ.get('STEP5_EOS_JAWOPEN_SCALE'),
         'object_detector_model': getattr(args, 'object_detector_model', None) or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL'),
         'object_detector_model_path': getattr(args, 'object_detector_model_path', None) or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
         'total_frames': total_frames,
@@ -844,7 +656,11 @@ if __name__ == "__main__":
     parser.add_argument("video_file_path")
     parser.add_argument("--models_dir", required=True)
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--tracking_engine", default=None, help="Tracking engine: mediapipe_landmarker (default), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface")
+    parser.add_argument(
+        "--tracking_engine",
+        default=None,
+        help="Tracking engine: vide (MediaPipe par défaut). 'insightface' n'est pas supporté en worker CPU multiprocessing.",
+    )
     parser.add_argument("--mp_landmarker_num_faces", type=int, default=5)
     parser.add_argument("--mp_landmarker_min_face_detection_confidence", type=float, default=0.3)
     parser.add_argument("--mp_landmarker_min_face_presence_confidence", type=float, default=0.2)

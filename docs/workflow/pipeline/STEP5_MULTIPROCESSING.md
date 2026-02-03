@@ -86,17 +86,13 @@ graph TD
 TRACKING_CPU_WORKERS=15        # Nombre de workers (défaut)
 TRACKING_DISABLE_GPU=1         # Forcer CPU-only (défaut v4.1)
 
-# GPU Optionnel (expérimental)
+# GPU optionnel (InsightFace uniquement)
 STEP5_ENABLE_GPU=1
-STEP5_GPU_ENGINES=mediapipe,insightface
+STEP5_GPU_ENGINES=insightface
 
 # Profiling et Debug
 STEP5_ENABLE_PROFILING=1      # Logs détaillés toutes les 20 frames
 STEP5_BLENDSHAPES_THROTTLE_N=1
-
-# Chunking Adaptatif
-STEP5_CHUNK_SIZE=100          # Frames par chunk (auto-ajusté)
-STEP5_MAX_CHUNKS=50           # Maximum chunks en parallèle
 ```
 
 ### WorkflowCommandsConfig Intégration
@@ -428,8 +424,9 @@ STEP5_BLENDSHAPES_THROTTLE_N=1
 
 # GPU (expérimental)
 STEP5_ENABLE_GPU=1
-STEP5_GPU_ENGINES=mediapipe
-TRACKING_CPU_WORKERS=4  # Moins de workers avec GPU
+STEP5_GPU_ENGINES=insightface
+STEP5_TRACKING_ENGINE=insightface
+TRACKING_CPU_WORKERS=4  # Moins de workers CPU en mode GPU
 ```
 
 ### Monitoring Production
@@ -449,4 +446,4 @@ nvidia-smi -l 1
 2. **Threading limité** : `cv2.setNumThreads(1)` par worker
 3. **Chunking adaptatif** : Ajuster selon mémoire disponible
 4. **Profiling activé** : En développement pour identifier bottlenecks
-5. **GPU lazy import** : Éviter conflits TensorFlow dans tracking_env
+5. **Lazy import** : Éviter les imports coûteux dans les workers tant que non nécessaires
