@@ -322,6 +322,47 @@ print(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}
 
 ---
 
+## Nouvelles Capacités (Janvier 2026)
+
+### Interactions STEP6 & After Effects
+
+#### Enrichissements STEP6
+Les embeddings locuteurs extraits par Lemonfox sont désormais préservés et enrichis dans STEP6 :
+
+- **`tracking_analytics`** : Histogramme des scores de confidence, statistiques par objet
+- **`expression_summary`** : Résumé léger des blendshapes (gated par `STEP6_INCLUDE_EXPRESSION_SUMMARY`)
+- **`temporal_alignment`** : Warnings de désalignement audio/vidéo
+
+#### Pondération par Confidence (After Effects)
+Les scripts AE peuvent maintenant pondérer les sélections par confidence moyenne :
+
+```javascript
+// Script After Effects avec pondération confidence
+const trackingData = JSON.parse footage("project_tracking.json");
+const analytics = trackingData.tracking_analytics;
+
+// Pondération automatique des cibles
+if (analytics && analytics.confidence_histogram) {
+    const avgConfidence = analytics.confidence_by_object.mean;
+    const weight = Math.max(0.1, avgConfidence); // Evite zéro
+    // Appliquer poids aux sélections AE
+}
+```
+
+#### Variables d'Activation
+```bash
+# STEP6 - Analytics et expressions
+STEP6_INCLUDE_TRACKING_ANALYTICS=1      # Active tracking_analytics
+STEP6_INCLUDE_EXPRESSION_SUMMARY=1      # Active expression_summary
+STEP6_EXPRESSION_KEYS=lipFunnel,jawOpen  # Clés blendshapes à inclure
+
+# After Effects - Pondération
+ENABLE_CONFIDENCE_WEIGHTING=1            # Active pondération confidence
+CONFIDENCE_WEIGHT=0.8                     # Poids global (défaut: 1.0)
+```
+
+---
+
 ## Intégration After Effects
 
 ### Utilisation des Embeddings

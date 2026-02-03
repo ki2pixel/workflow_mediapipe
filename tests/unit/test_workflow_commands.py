@@ -193,14 +193,14 @@ class TestStepConfigurations:
         assert 'audio_env' in cmd_str
         assert 'run_audio_analysis.py' in cmd_str
     
-    def test_step5_uses_tracking_env(self, temp_base_path):
-        """Test that STEP5 uses tracking_env."""
+    def test_step5_uses_tracking_env_slim(self, temp_base_path):
+        """Test that STEP5 uses tracking_env_slim."""
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
         cmd = commands.get_step_command('STEP5')
         cmd_str = ' '.join(cmd)
         
-        assert 'tracking_env' in cmd_str
+        assert 'tracking_env_slim' in cmd_str
         assert 'run_tracking_manager.py' in cmd_str
     
     def test_step5_has_post_completion_message(self, temp_base_path):

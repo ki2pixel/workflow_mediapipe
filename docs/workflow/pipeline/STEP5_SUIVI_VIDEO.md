@@ -52,8 +52,9 @@ python workflow_scripts/step5/run_tracking_manager.py --videos_json_path videos.
 ```
 
 ### Environnement Virtuel
-- **Environnement utilisé** : `tracking_env/` (MediaPipe CPU + orchestration STEP5)
-- **Isolation** : Environnement dédié tracking (imports MediaPipe en lazy-load dans les workers)
+- **Environnement utilisé** : `tracking_env_slim/` (MediaPipe CPU + orchestration STEP5)
+  - Provisionné via `requirements-tracking-env-lite.txt` (MediaPipe, OpenCV, NumPy, ONNX Runtime, tooling CLI uniquement).
+- **Isolation** : Environnement dédié tracking (imports MediaPipe en lazy-load dans les workers). InsightFace continue d’être exécuté dans `insightface_env`.
 
 ---
 
@@ -69,9 +70,11 @@ import multiprocessing                    # Multi-processing
 ```
 
 ### Dépendances Externes
-- **MediaPipe** : Mode par défaut (CPU)
-- **ONNX Runtime** : Requis pour InsightFace (GPU)
-- **CUDA** : Accélération GPU pour InsightFace
+- **MediaPipe** : Mode par défaut (CPU). Inclus dans `tracking_env_slim`.
+- **ONNX Runtime (CPU)** : Nécessaire pour l’orchestrateur (object detector fallback, conversions TFLite → ONNX).
+- **ONNX Runtime (GPU) + InsightFace** : Installés dans `insightface_env` uniquement (exécution séquentielle GPU).
+- **CUDA** : Accélération GPU pour InsightFace. Les bibliothèques CUDA Python ne résident plus dans `tracking_env_slim` (elles sont embarquées dans `insightface_env`).
+- **pynv / nvidia-smi** : Utilisés pour sonder la disponibilité GPU avant de déclencher InsightFace (remplace l’ancien check PyTorch).
 
 ---
 
@@ -386,11 +389,12 @@ workflow_scripts/step5/object_detector_registry.py
 ### Gestionnaire STEP5 & Routage des Environnements
 
 - `workflow_scripts/step5/run_tracking_manager.py` charge automatiquement `config.settings` pour récupérer les chemins des virtualenvs via `config.get_venv_python(<venv>)`.  
-  - ✅ `tracking_env` est la valeur par défaut.  
+  - ✅ `tracking_env_slim` est la valeur par défaut pour MediaPipe CPU.  
   - ✅ Lorsque `STEP5_TRACKING_ENGINE=insightface`, le gestionnaire bascule sur `insightface_env` (override possible via `STEP5_INSIGHTFACE_ENV_PYTHON`).  
 - `_EnvConfig` centralise désormais la lecture typée des variables `STEP5_*` (GPU, engines, workers, overrides). Le manager s’appuie sur cette couche pour :
-  - appliquer les restrictions InsightFace GPU-only (`STEP5_ENABLE_GPU=1`, `STEP5_GPU_ENGINES`), 
+  - appliquer les restrictions InsightFace GPU-only (`STEP5_ENABLE_GPU=1`, `STEP5_GPU_ENGINES`),
   - construire un environnement subprocess via `_build_subprocess_env()` qui injecte automatiquement `LD_LIBRARY_PATH` (CUDA libs découvertes dans les venvs + chemins système `/usr/local/cuda*` lorsque nécessaire),
   - propager les limites CPU (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, etc.) afin d’éviter la contention inter-process,
-  - router l’exécution vers `tracking_env` (MediaPipe CPU) ou `insightface_env` (InsightFace GPU) avec vérification d’existence et messages d’erreur explicites.
+  - router l’exécution vers `tracking_env_slim` (MediaPipe CPU) ou `insightface_env` (InsightFace GPU) avec vérification d’existence et messages d’erreur explicites.
 - Les workers multiprocessing rechargent toujours `.env` pour récupérer ces variables à chaque fork, garantissant que les réglages (`STEP5_BLENDSHAPES_THROTTLE_N`, profil d’export, profiling) restent synchronisés même en mode chunké.
+- **Check GPU sans PyTorch** : `config.Config.check_gpu_availability()` utilise désormais `pynvml` puis `nvidia-smi` pour valider VRAM disponible, avant de vérifier les providers ONNX Runtime. Ce changement permet de garder `tracking_env_slim` sans PyTorch tout en conservant un diagnostic GPU fiable.

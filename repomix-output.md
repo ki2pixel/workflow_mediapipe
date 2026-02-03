@@ -155,10 +155,8 @@ workflow_scripts/
   step5/
     face_engines.py
     object_detector_registry.py
-    onnx_facemesh_detector.py
     process_video_worker_multiprocessing.py
     process_video_worker.py
-    pyfeat_blendshape_extractor.py
     run_tracking_manager.py
   step6/
     json_reducer.py
@@ -640,7 +638,7 @@ app_new.py
 232:         return {
 233:             "display_name": "5. Analyse du tracking",
 234:             "cmd": [
-235:                 str(config.get_venv_python("tracking_env")),
+235:                 str(config.get_venv_python("tracking_env_slim")),
 236:                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
 237:             ],
 238:             "cwd": str(self.base_path / "projets_extraits"),
@@ -3457,815 +3455,6 @@ app_new.py
 426:                 logger.error(f"Progress callback error for {download_id}: {e}")
 427:         
 428:         return callback
-```
-
-## File: services/lemonfox_audio_service.py
-```python
-  1: """
-  2: Lemonfox Audio Service
-  3: Provides integration with Lemonfox Speech-to-Text API for STEP4 (Audio Analysis).
-  4: 
-  5: This service:
-  6: - Calls Lemonfox API with video files
-  7: - Converts Lemonfox transcription output to STEP4-compatible JSON format
-  8: - Writes {video_stem}_audio.json files with frame-by-frame audio analysis
-  9: - Ensures compatibility with STEP5 (enhanced_speaking_detection.py) and STEP6 (json_reducer.py)
- 10: 
- 11: Architecture:
- 12: - Service layer only (business logic)
- 13: - Consumed by API routes (thin controllers)
- 14: - All secrets via config.settings
- 15: - Security: anti path traversal, input validation
- 16: """
- 17: 
- 18: import os
- 19: import json
- 20: import logging
- 21: import math
- 22: import subprocess
- 23: import tempfile
- 24: import requests
- 25: from pathlib import Path
- 26: from typing import Callable, Dict, List, Optional, Tuple, Any
- 27: from dataclasses import dataclass
- 28: 
- 29: from config.settings import config
- 30: 
- 31: logger = logging.getLogger(__name__)
- 32: 
- 33: # Constants matching STEP4 current implementation
- 34: AUDIO_SUFFIX = "_audio.json"
- 35: DEFAULT_FPS = 25.0
- 36: 
- 37: 
- 38: @dataclass
- 39: class LemonfoxTranscriptionResult:
- 40:     """Result from Lemonfox API transcription."""
- 41:     success: bool
- 42:     segments: List[Dict[str, Any]]
- 43:     words: Optional[List[Dict[str, Any]]]
- 44:     duration: Optional[float]
- 45:     error: Optional[str] = None
- 46: 
- 47: 
- 48: @dataclass
- 49: class AudioAnalysisResult:
- 50:     """Result of audio analysis processing."""
- 51:     success: bool
- 52:     output_path: Optional[Path]
- 53:     fps: float
- 54:     total_frames: int
- 55:     error: Optional[str] = None
- 56: 
- 57: 
- 58: @dataclass
- 59: class UploadPreparationResult:
- 60:     """Upload artifact used for Lemonfox API requests."""
- 61:     upload_path: Path
- 62:     cleanup: Optional[Callable[[], None]]
- 63:     original_size_mb: float
- 64:     limit_mb: Optional[float]
- 65:     transcoded: bool = False
- 66: 
- 67: 
- 68: class LemonfoxAudioService:
- 69:     """Service for Lemonfox-based audio analysis."""
- 70: 
- 71:     @staticmethod
- 72:     def _apply_speech_smoothing(
- 73:         timeline: Dict[int, set],
- 74:         speech_frames: set[int],
- 75:         total_frames: int,
- 76:         fps: float,
- 77:         gap_fill_sec: float,
- 78:         min_on_sec: float,
- 79:     ) -> Tuple[Dict[int, set], set[int]]:
- 80:         if total_frames <= 0 or fps <= 0:
- 81:             return timeline, speech_frames
- 82: 
- 83:         if not speech_frames:
- 84:             return timeline, speech_frames
- 85: 
- 86:         try:
- 87:             gap_fill_sec = float(gap_fill_sec or 0.0)
- 88:         except Exception:
- 89:             gap_fill_sec = 0.0
- 90:         try:
- 91:             min_on_sec = float(min_on_sec or 0.0)
- 92:         except Exception:
- 93:             min_on_sec = 0.0
- 94: 
- 95:         gap_fill_frames = 0
- 96:         if gap_fill_sec > 0:
- 97:             gap_fill_frames = int(math.ceil(gap_fill_sec * fps))
- 98: 
- 99:         min_on_frames = 0
-100:         if min_on_sec > 0:
-101:             min_on_frames = int(math.ceil(min_on_sec * fps))
-102: 
-103:         def _build_runs(frames_sorted: List[int]) -> List[Tuple[int, int]]:
-104:             runs: List[Tuple[int, int]] = []
-105:             run_start = frames_sorted[0]
-106:             run_end = frames_sorted[0]
-107:             for frame in frames_sorted[1:]:
-108:                 if frame == run_end + 1:
-109:                     run_end = frame
-110:                 else:
-111:                     runs.append((run_start, run_end))
-112:                     run_start = frame
-113:                     run_end = frame
-114:             runs.append((run_start, run_end))
-115:             return runs
-116: 
-117:         frames_sorted = sorted(speech_frames)
-118: 
-119:         if gap_fill_frames > 0:
-120:             runs = _build_runs(frames_sorted)
-121:             for (prev_start, prev_end), (next_start, next_end) in zip(runs, runs[1:]):
-122:                 gap_start = prev_end + 1
-123:                 gap_end = next_start - 1
-124:                 if gap_end < gap_start:
-125:                     continue
-126:                 gap_len = gap_end - gap_start + 1
-127:                 if gap_len <= gap_fill_frames:
-128:                     for f in range(gap_start, gap_end + 1):
-129:                         speech_frames.add(f)
-130: 
-131:             frames_sorted = sorted(speech_frames)
-132: 
-133:         if min_on_frames > 0 and speech_frames:
-134:             runs = _build_runs(frames_sorted)
-135:             for run_start, run_end in runs:
-136:                 run_len = run_end - run_start + 1
-137:                 if run_len >= min_on_frames:
-138:                     continue
-139:                 for f in range(run_start, run_end + 1):
-140:                     speech_frames.discard(f)
-141:                     timeline.pop(f, None)
-142: 
-143:         return timeline, speech_frames
-144: 
-145:     @staticmethod
-146:     def _validate_project_and_video(project_name: str, video_name: str) -> Tuple[bool, Optional[Path], Optional[str]]:
-147:         """
-148:         Validate and resolve project + video paths securely.
-149:         
-150:         Args:
-151:             project_name: Name of the project (must be a valid folder name)
-152:             video_name: Relative path to video within project
-153:             
-154:         Returns:
-155:             Tuple of (success, video_path, error_message)
-156:         """
-157:         # Security: Reject absolute paths
-158:         if os.path.isabs(video_name):
-159:             return False, None, "video_name must be a relative path"
-160:         
-161:         # Security: Reject path traversal attempts (sanitize separators)
-162:         sanitized_video_name = (video_name or "").replace("\\", "/").strip()
-163:         if ".." in project_name:
-164:             return False, None, "Path traversal not allowed"
-165:         video_rel_path = Path(sanitized_video_name)
-166:         if any(part == ".." for part in video_rel_path.parts):
-167:             return False, None, "Path traversal not allowed"
-168:         
-169:         # Normalize project name (should be a simple folder name)
-170:         if "/" in project_name or "\\" in project_name:
-171:             return False, None, "project_name must be a simple folder name"
-172:         
-173:         # Construct and validate project path
-174:         projects_dir = config.PROJECTS_DIR
-175:         project_path = projects_dir / project_name
-176:         
-177:         if not project_path.exists():
-178:             return False, None, f"Project not found: {project_name}"
-179:         
-180:         # Resolve video path
-181:         video_path = project_path / video_name
-182:         
-183:         # Security: Ensure final path is within project directory
-184:         try:
-185:             video_path_resolved = video_path.resolve()
-186:             project_path_resolved = project_path.resolve()
-187:             
-188:             if not str(video_path_resolved).startswith(str(project_path_resolved)):
-189:                 return False, None, "Invalid video path (outside project directory)"
-190:         except Exception as e:
-191:             logger.error(f"Path resolution error: {e}")
-192:             return False, None, "Invalid path"
-193:         
-194:         if not video_path.exists():
-195:             return False, None, f"Video not found: {video_name}"
-196:         
-197:         if not video_path.is_file():
-198:             return False, None, f"Video path is not a file: {video_name}"
-199:         
-200:         return True, video_path, None
-201: 
-202:     @staticmethod
-203:     def _get_video_duration_ffprobe(video_path: Path) -> Optional[float]:
-204:         """
-205:         Get video duration in seconds using ffprobe.
-206:         
-207:         Args:
-208:             video_path: Path to video file
-209:             
-210:         Returns:
-211:             Duration in seconds or None if failed
-212:         """
-213:         try:
-214:             result = subprocess.run(
-215:                 [
-216:                     "ffprobe", "-v", "error", "-show_entries", "format=duration",
-217:                     "-of", "default=nw=1:nk=1", str(video_path)
-218:                 ],
-219:                 stdout=subprocess.PIPE,
-220:                 stderr=subprocess.PIPE,
-221:                 check=True,
-222:                 text=True,
-223:                 timeout=30
-224:             )
-225:             return float(result.stdout.strip())
-226:         except Exception as e:
-227:             logger.warning(f"ffprobe failed for {video_path.name}: {e}")
-228:             return None
-229: 
-230:     @staticmethod
-231:     def _call_lemonfox_api(
-232:         video_path: Path,
-233:         *,
-234:         upload_filename: Optional[str] = None,
-235:         original_file_size_mb: Optional[float] = None,
-236:         limit_mb: Optional[float] = None,
-237:         language: Optional[str] = None,
-238:         prompt: Optional[str] = None,
-239:         speaker_labels: bool = True,
-240:         min_speakers: Optional[int] = None,
-241:         max_speakers: Optional[int] = None,
-242:         timestamp_granularities: Optional[List[str]] = None,
-243:         eu_processing: Optional[bool] = None
-244:     ) -> LemonfoxTranscriptionResult:
-245:         """
-246:         Call Lemonfox API to transcribe audio.
-247:         
-248:         Args:
-249:             video_path: Path to the (possibly transcodé) file to upload
-250:             upload_filename: Filename to expose to the API (defaults to video_path.name)
-251:             original_file_size_mb: Size of the original video (for logging/errors)
-252:             limit_mb: Configured upload limit (for logging/errors)
-253:             language: Optional language hint
-254:             prompt: Optional prompt to guide transcription
-255:             speaker_labels: Enable speaker diarization (default: True)
-256:             min_speakers: Minimum number of speakers
-257:             max_speakers: Maximum number of speakers
-258:             timestamp_granularities: List of granularities (e.g., ["word"])
-259:             eu_processing: Force EU processing (overrides default from config)
-260:             
-261:         Returns:
-262:             LemonfoxTranscriptionResult
-263:         """
-264:         api_key = config.LEMONFOX_API_KEY
-265:         if not api_key:
-266:             return LemonfoxTranscriptionResult(
-267:                 success=False,
-268:                 segments=[],
-269:                 words=None,
-270:                 duration=None,
-271:                 error="LEMONFOX_API_KEY not configured"
-272:             )
-273:         
-274:         # Determine endpoint (EU or standard)
-275:         use_eu = eu_processing if eu_processing is not None else config.LEMONFOX_EU_DEFAULT
-276:         base_url = "https://eu-api.lemonfox.ai" if use_eu else "https://api.lemonfox.ai"
-277:         endpoint = f"{base_url}/v1/audio/transcriptions"
-278:         
-279:         # Prepare request
-280:         headers = {
-281:             "Authorization": f"Bearer {api_key}"
-282:         }
-283: 
-284:         # Build form data as list of tuples to support repeated keys like timestamp_granularities[]
-285:         data: List[Tuple[str, str]] = [
-286:             ("response_format", "verbose_json"),
-287:         ]
-288: 
-289:         if language:
-290:             data.append(("language", language))
-291:         if prompt:
-292:             data.append(("prompt", prompt))
-293:         if speaker_labels:
-294:             data.append(("speaker_labels", "true"))
-295:         if min_speakers is not None:
-296:             data.append(("min_speakers", str(min_speakers)))
-297:         if max_speakers is not None:
-298:             data.append(("max_speakers", str(max_speakers)))
-299:         if timestamp_granularities:
-300:             for gran in timestamp_granularities:
-301:                 data.append(("timestamp_granularities[]", str(gran)))
-302:         
-303:         filename_for_api = upload_filename or video_path.name
-304: 
-305:         try:
-306:             with open(video_path, 'rb') as video_file:
-307:                 files = {
-308:                     "file": (filename_for_api, video_file, "video/mp4")
-309:                 }
-310:                 
-311:                 logger.info(f"Calling Lemonfox API for {video_path.name}...")
-312:                 response = requests.post(
-313:                     endpoint,
-314:                     headers=headers,
-315:                     data=data,
-316:                     files=files,
-317:                     timeout=config.LEMONFOX_TIMEOUT_SEC
-318:                 )
-319:                 
-320:                 if response.status_code != 200:
-321:                     if response.status_code == 413:
-322:                         size_clause = ""
-323:                         if original_file_size_mb is not None:
-324:                             size_clause = f" (taille locale ≈ {original_file_size_mb:.2f} MB)"
-325:                         limit_clause = ""
-326:                         if limit_mb is not None:
-327:                             limit_clause = f" (limite configurée: {limit_mb} MB)"
-328:                         error_msg = (
-329:                             "Lemonfox API error: HTTP 413 - fichier trop volumineux"
-330:                             f"{size_clause}{limit_clause}. "
-331:                             "Activez LEMONFOX_ENABLE_TRANSCODE ou réduisez la vidéo."
-332:                         )
-333:                     else:
-334:                         error_msg = f"Lemonfox API error: HTTP {response.status_code}"
-335:                     try:
-336:                         error_detail = response.json()
-337:                         error_msg += f" - {error_detail}"
-338:                     except Exception:
-339:                         error_msg += f" - {response.text[:200]}"
-340:                     
-341:                     logger.error(error_msg)
-342:                     return LemonfoxTranscriptionResult(
-343:                         success=False,
-344:                         segments=[],
-345:                         words=None,
-346:                         duration=None,
-347:                         error=error_msg
-348:                     )
-349:                 
-350:                 result = response.json()
-351:                 
-352:                 # Extract segments and words
-353:                 segments = result.get("segments", [])
-354:                 words = result.get("words", None)
-355:                 duration = result.get("duration", None)
-356:                 
-357:                 logger.info(f"Lemonfox API success: {len(segments)} segments, duration={duration}s")
-358:                 
-359:                 return LemonfoxTranscriptionResult(
-360:                     success=True,
-361:                     segments=segments,
-362:                     words=words,
-363:                     duration=duration,
-364:                     error=None
-365:                 )
-366:                 
-367:         except requests.Timeout:
-368:             error_msg = f"Lemonfox API timeout after {config.LEMONFOX_TIMEOUT_SEC}s"
-369:             logger.error(error_msg)
-370:             return LemonfoxTranscriptionResult(
-371:                 success=False,
-372:                 segments=[],
-373:                 words=None,
-374:                 duration=None,
-375:                 error=error_msg
-376:             )
-377:         except Exception as e:
-378:             error_msg = f"Lemonfox API call failed: {str(e)}"
-379:             logger.error(error_msg, exc_info=True)
-380:             return LemonfoxTranscriptionResult(
-381:                 success=False,
-382:                 segments=[],
-383:                 words=None,
-384:                 duration=None,
-385:                 error=error_msg
-386:             )
-387: 
-388:     @staticmethod
-389:     def _build_frame_timeline(
-390:         transcription: LemonfoxTranscriptionResult,
-391:         total_frames: int,
-392:         fps: float
-393:     ) -> Tuple[Dict[int, set], set]:
-394:         """
-395:         Build frame-by-frame timeline from Lemonfox segments/words.
-396:         
-397:         Args:
-398:             transcription: Lemonfox transcription result
-399:             total_frames: Total number of frames in video
-400:             fps: Frames per second
-401:             
-402:         Returns:
-403:             Tuple of:
-404:             - timeline: Dictionary mapping frame_num -> set of speaker labels
-405:             - speech_frames: Set of frame numbers where speech is present even if no speaker label is available
-406:         """
-407:         timeline: Dict[int, set] = {}  # frame_num -> set(speaker_labels)
-408:         speech_frames: set[int] = set()
-409:         
-410:         # Use words if available (more granular), otherwise use segments
-411:         source = transcription.words if transcription.words else transcription.segments
-412:         
-413:         if not source:
-414:             logger.warning("No segments or words in transcription, returning empty timeline")
-415:             return timeline, speech_frames
-416:         
-417:         # Build speaker label mapping (normalize to SPEAKER_XX format)
-418:         speaker_map = {}
-419:         speaker_counter = 0
-420: 
-421:         for item in source:
-422:             raw_speaker = item.get("speaker")
-423:             if raw_speaker and raw_speaker not in speaker_map:
-424:                 speaker_map[raw_speaker] = f"SPEAKER_{speaker_counter:02d}"
-425:                 speaker_counter += 1
-426: 
-427:         logger.info(f"Speaker mapping: {speaker_map}")
-428: 
-429:         # Build timeline
-430:         for item in source:
-431:             start = item.get("start")
-432:             end = item.get("end")
-433:             raw_speaker = item.get("speaker")
-434: 
-435:             if start is None or end is None:
-436:                 continue
-437: 
-438:             # Convert times to frame numbers (1-based)
-439:             start_frame = max(1, int(start * fps))
-440:             end_frame = min(total_frames, int(end * fps))
-441:             if end_frame < start_frame:
-442:                 continue
-443: 
-444:             # Get normalized speaker label
-445:             speaker_label = speaker_map.get(raw_speaker) if raw_speaker else None
-446: 
-447:             # Track speech presence for each frame in range
-448:             for frame_num in range(start_frame, end_frame + 1):
-449:                 speech_frames.add(frame_num)
-450:                 if frame_num not in timeline:
-451:                     timeline[frame_num] = set()
-452:                 if speaker_label:
-453:                     timeline[frame_num].add(speaker_label)
-454:         
-455:         logger.info(f"Built timeline with {len(speech_frames)} frames containing speech")
-456:         gap_fill_sec = float(getattr(config, "LEMONFOX_SPEECH_GAP_FILL_SEC", 0.0) or 0.0)
-457:         min_on_sec = float(getattr(config, "LEMONFOX_SPEECH_MIN_ON_SEC", 0.0) or 0.0)
-458:         timeline, speech_frames = LemonfoxAudioService._apply_speech_smoothing(
-459:             timeline=timeline,
-460:             speech_frames=speech_frames,
-461:             total_frames=total_frames,
-462:             fps=fps,
-463:             gap_fill_sec=gap_fill_sec,
-464:             min_on_sec=min_on_sec,
-465:         )
-466:         return timeline, speech_frames
-467: 
-468:     @staticmethod
-469:     def _calculate_file_size_mb(path: Path) -> float:
-470:         size_bytes = path.stat().st_size
-471:         return size_bytes / (1024 * 1024)
-472: 
-473:     @staticmethod
-474:     def _transcode_video_for_upload(video_path: Path) -> Tuple[Path, Callable[[], None]]:
-475:         """
-476:         Create an audio-only MP4 optimized for Lemonfox uploads.
-477: 
-478:         Returns:
-479:             Tuple[path_to_upload, cleanup_callback]
-480:         """
-481:         tmp_file = tempfile.NamedTemporaryFile(prefix="lemonfox_audio_upload_", suffix=".mp4", delete=False)
-482:         tmp_path = Path(tmp_file.name)
-483:         tmp_file.close()
-484: 
-485:         audio_codec = getattr(config, "LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
-486:         bitrate_kbps = int(getattr(config, "LEMONFOX_TRANSCODE_BITRATE_KBPS", 96))
-487: 
-488:         cmd = [
-489:             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-490:             "-i", str(video_path),
-491:             "-vn",
-492:             "-ac", "1",
-493:             "-ar", "16000",
-494:             "-c:a", audio_codec,
-495:             "-b:a", f"{bitrate_kbps}k",
-496:             "-movflags", "+faststart",
-497:             str(tmp_path),
-498:         ]
-499: 
-500:         logger.info(
-501:             "Transcodage Lemonfox audio-only pour %s via codec=%s bitrate=%skbps",
-502:             video_path.name,
-503:             audio_codec,
-504:             bitrate_kbps,
-505:         )
-506: 
-507:         try:
-508:             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-509:         except subprocess.CalledProcessError as exc:
-510:             raise RuntimeError(f"Transcodage Lemonfox échoué pour {video_path.name}: {exc}") from exc
-511: 
-512:         def _cleanup() -> None:
-513:             try:
-514:                 tmp_path.unlink(missing_ok=True)
-515:             except Exception:
-516:                 pass
-517: 
-518:         return tmp_path, _cleanup
-519: 
-520:     @staticmethod
-521:     def _prepare_upload_artifact(video_path: Path) -> UploadPreparationResult:
-522:         """
-523:         Ensure the file to upload respects Lemonfox size policy.
-524: 
-525:         Returns:
-526:             UploadPreparationResult describing the artifact to upload.
-527: 
-528:         Raises:
-529:             ValueError if the file exceeds the limit and transcode is disabled.
-530:             RuntimeError if transcode fails.
-531:         """
-532:         original_size_mb = LemonfoxAudioService._calculate_file_size_mb(video_path)
-533:         limit_mb = getattr(config, "LEMONFOX_MAX_UPLOAD_MB", None)
-534: 
-535:         if not limit_mb or original_size_mb <= float(limit_mb):
-536:             return UploadPreparationResult(
-537:                 upload_path=video_path,
-538:                 cleanup=None,
-539:                 original_size_mb=original_size_mb,
-540:                 limit_mb=limit_mb,
-541:                 transcoded=False,
-542:             )
-543: 
-544:         if not getattr(config, "LEMONFOX_ENABLE_TRANSCODE", False):
-545:             raise ValueError(
-546:                 f"La vidéo ({original_size_mb:.2f} MB) dépasse la limite Lemonfox "
-547:                 f"configurée ({limit_mb} MB) et LEMONFOX_ENABLE_TRANSCODE=0."
-548:             )
-549: 
-550:         tmp_path, cleanup = LemonfoxAudioService._transcode_video_for_upload(video_path)
-551:         transcoded_size_mb = LemonfoxAudioService._calculate_file_size_mb(tmp_path)
-552:         if limit_mb and transcoded_size_mb > float(limit_mb):
-553:             cleanup()
-554:             raise ValueError(
-555:                 f"Le fichier transcodé ({transcoded_size_mb:.2f} MB) dépasse toujours "
-556:                 f"la limite Lemonfox ({limit_mb} MB)."
-557:             )
-558: 
-559:         logger.info(
-560:             "Lemonfox upload: %s compressé de %.2f MB à %.2f MB (limite=%s MB)",
-561:             video_path.name,
-562:             original_size_mb,
-563:             transcoded_size_mb,
-564:             limit_mb,
-565:         )
-566: 
-567:         return UploadPreparationResult(
-568:             upload_path=tmp_path,
-569:             cleanup=cleanup,
-570:             original_size_mb=original_size_mb,
-571:             limit_mb=limit_mb,
-572:             transcoded=True,
-573:         )
-574: 
-575:     @staticmethod
-576:     def _write_step4_json_atomically(
-577:         output_path: Path,
-578:         video_filename: str,
-579:         fps: float,
-580:         total_frames: int,
-581:         timeline: Dict[int, set],
-582:         speech_frames: set
-583:     ) -> bool:
-584:         """
-585:         Write STEP4-compatible JSON atomically.
-586:         
-587:         Args:
-588:             output_path: Target output path
-589:             video_filename: Video filename for metadata
-590:             fps: Frames per second
-591:             total_frames: Total number of frames
-592:             timeline: Frame timeline (frame_num -> set of speakers)
-593:             
-594:         Returns:
-595:             True if successful, False otherwise
-596:         """
-597:         try:
-598:             # Write to temporary file first (atomic write pattern)
-599:             tmp_path = output_path.with_suffix('.tmp')
-600:             
-601:             with open(tmp_path, 'w', encoding='utf-8') as f:
-602:                 # Write JSON header
-603:                 f.write('{\n')
-604:                 f.write(f'  "video_filename": "{video_filename}",\n')
-605:                 f.write(f'  "total_frames": {total_frames},\n')
-606:                 f.write(f'  "fps": {round(fps, 2)},\n')
-607:                 f.write('  "frames_analysis": [\n')
-608:                 
-609:                 # Write frame-by-frame analysis
-610:                 for frame_num in range(1, total_frames + 1):
-611:                     speakers = sorted(timeline.get(frame_num, set()))
-612:                     is_speech = (frame_num in speech_frames) or (len(speakers) > 0)
-613:                     timecode_sec = round((frame_num - 1) / fps, 3)
-614:                     
-615:                     frame_obj = {
-616:                         "frame": frame_num,
-617:                         "audio_info": {
-618:                             "is_speech_present": is_speech,
-619:                             "num_distinct_speakers_audio": len(speakers),
-620:                             "active_speaker_labels": speakers,
-621:                             "timecode_sec": timecode_sec
-622:                         }
-623:                     }
-624:                     
-625:                     if frame_num > 1:
-626:                         f.write(',\n')
-627:                     f.write('    ' + json.dumps(frame_obj))
-628:                 
-629:                 f.write('\n  ]\n')
-630:                 f.write('}\n')
-631:             
-632:             # Atomic replace (overwrites existing file)
-633:             os.replace(tmp_path, output_path)
-634:             logger.info(f"Successfully wrote {output_path}")
-635:             return True
-636:             
-637:         except Exception as e:
-638:             logger.error(f"Failed to write JSON: {e}", exc_info=True)
-639:             # Clean up temp file if it exists
-640:             if tmp_path.exists():
-641:                 try:
-642:                     tmp_path.unlink()
-643:                 except Exception:
-644:                     pass
-645:             return False
-646: 
-647:     @staticmethod
-648:     def process_video_with_lemonfox(
-649:         project_name: str,
-650:         video_name: str,
-651:         language: Optional[str] = None,
-652:         prompt: Optional[str] = None,
-653:         speaker_labels: Optional[bool] = None,
-654:         min_speakers: Optional[int] = None,
-655:         max_speakers: Optional[int] = None,
-656:         timestamp_granularities: Optional[List[str]] = None,
-657:         eu_processing: Optional[bool] = None
-658:     ) -> AudioAnalysisResult:
-659:         """
-660:         Process a video with Lemonfox API and generate STEP4-compatible JSON.
-661:         
-662:         This is the main service method called by API routes.
-663:         
-664:         Args:
-665:             project_name: Name of the project
-666:             video_name: Relative path to video within project
-667:             language: Optional language hint
-668:             prompt: Optional prompt to guide transcription
-669:             speaker_labels: Enable speaker diarization
-670:             min_speakers: Minimum number of speakers
-671:             max_speakers: Maximum number of speakers
-672:             timestamp_granularities: List of granularities (e.g., ["word"])
-673:             eu_processing: Force EU processing
-674:             
-675:         Returns:
-676:             AudioAnalysisResult with success status and output details
-677:         """
-678:         # Step 1: Validate and resolve paths
-679:         valid, video_path, error = LemonfoxAudioService._validate_project_and_video(
-680:             project_name, video_name
-681:         )
-682:         if not valid:
-683:             return AudioAnalysisResult(
-684:                 success=False,
-685:                 output_path=None,
-686:                 fps=DEFAULT_FPS,
-687:                 total_frames=0,
-688:                 error=error
-689:             )
-690:         
-691:         # Step 2: Get video duration and calculate frames
-692:         duration_sec = LemonfoxAudioService._get_video_duration_ffprobe(video_path)
-693:         if duration_sec is None or duration_sec <= 0:
-694:             return AudioAnalysisResult(
-695:                 success=False,
-696:                 output_path=None,
-697:                 fps=DEFAULT_FPS,
-698:                 total_frames=0,
-699:                 error="Could not determine video duration"
-700:             )
-701:         
-702:         fps = DEFAULT_FPS
-703:         total_frames = int(round(duration_sec * fps))
-704:         
-705:         logger.info(f"Video: {video_path.name}, duration={duration_sec:.2f}s, fps={fps}, frames={total_frames}")
-706:         
-707:         # Step 3: Prepare file for upload (size policy + optional transcode)
-708:         try:
-709:             upload_prep = LemonfoxAudioService._prepare_upload_artifact(video_path)
-710:         except ValueError as size_error:
-711:             return AudioAnalysisResult(
-712:                 success=False,
-713:                 output_path=None,
-714:                 fps=fps,
-715:                 total_frames=total_frames,
-716:                 error=str(size_error),
-717:             )
-718: 
-719:         # Step 4: Call Lemonfox API
-720:         effective_language = language
-721:         if effective_language is None:
-722:             effective_language = getattr(config, "LEMONFOX_DEFAULT_LANGUAGE", None)
-723: 
-724:         effective_prompt = prompt
-725:         if effective_prompt is None:
-726:             effective_prompt = getattr(config, "LEMONFOX_DEFAULT_PROMPT", None)
-727: 
-728:         if speaker_labels is None:
-729:             effective_speaker_labels = bool(getattr(config, "LEMONFOX_SPEAKER_LABELS_DEFAULT", True))
-730:         else:
-731:             effective_speaker_labels = bool(speaker_labels)
-732: 
-733:         effective_min_speakers = min_speakers
-734:         if effective_min_speakers is None:
-735:             effective_min_speakers = getattr(config, "LEMONFOX_DEFAULT_MIN_SPEAKERS", None)
-736: 
-737:         effective_max_speakers = max_speakers
-738:         if effective_max_speakers is None:
-739:             effective_max_speakers = getattr(config, "LEMONFOX_DEFAULT_MAX_SPEAKERS", None)
-740: 
-741:         effective_timestamp_granularities = timestamp_granularities
-742:         if effective_timestamp_granularities is None:
-743:             effective_timestamp_granularities = list(getattr(config, "LEMONFOX_TIMESTAMP_GRANULARITIES", []) or [])
-744:         if not effective_timestamp_granularities:
-745:             effective_timestamp_granularities = None
-746: 
-747:         try:
-748:             transcription = LemonfoxAudioService._call_lemonfox_api(
-749:                 video_path=upload_prep.upload_path,
-750:                 upload_filename=video_path.name,
-751:                 original_file_size_mb=upload_prep.original_size_mb,
-752:                 limit_mb=upload_prep.limit_mb,
-753:                 language=effective_language,
-754:                 prompt=effective_prompt,
-755:                 speaker_labels=effective_speaker_labels,
-756:                 min_speakers=effective_min_speakers,
-757:                 max_speakers=effective_max_speakers,
-758:                 timestamp_granularities=effective_timestamp_granularities,
-759:                 eu_processing=eu_processing
-760:             )
-761:         finally:
-762:             if upload_prep.cleanup:
-763:                 upload_prep.cleanup()
-764:         
-765:         if not transcription.success:
-766:             return AudioAnalysisResult(
-767:                 success=False,
-768:                 output_path=None,
-769:                 fps=fps,
-770:                 total_frames=total_frames,
-771:                 error=transcription.error
-772:             )
-773:         
-774:         # Step 4: Build frame timeline
-775:         timeline, speech_frames = LemonfoxAudioService._build_frame_timeline(
-776:             transcription, total_frames, fps
-777:         )
-778:         
-779:         # Step 5: Write output JSON atomically
-780:         output_path = video_path.with_name(f"{video_path.stem}{AUDIO_SUFFIX}")
-781:         success = LemonfoxAudioService._write_step4_json_atomically(
-782:             output_path=output_path,
-783:             video_filename=video_path.name,
-784:             fps=fps,
-785:             total_frames=total_frames,
-786:             timeline=timeline,
-787:             speech_frames=speech_frames
-788:         )
-789:         
-790:         if not success:
-791:             return AudioAnalysisResult(
-792:                 success=False,
-793:                 output_path=None,
-794:                 fps=fps,
-795:                 total_frames=total_frames,
-796:                 error="Failed to write output JSON"
-797:             )
-798:         
-799:         return AudioAnalysisResult(
-800:             success=True,
-801:             output_path=output_path,
-802:             fps=fps,
-803:             total_frames=total_frames,
-804:             error=None
-805:         )
 ```
 
 ## File: services/monitoring_service.py
@@ -19097,2445 +18286,6 @@ app_new.py
 154:     raise SystemExit(main())
 ```
 
-## File: workflow_scripts/step4/run_audio_analysis.py
-```python
-  1: #!/usr/bin/env python3
-  2: # -*- coding: utf-8 -*-
-  3: 
-  4: """
-  5: Script d'analyse audio (diarisation) avec Pyannote.audio
-  6: Version Ubuntu - Étape 4
-  7: 
-  8: Optimisations clés:
-  9: - Extraction audio via ffmpeg (remplace MoviePy) vers tmpfs si disponible
- 10: - Suppression d'OpenCV/MoviePy pour les métadonnées (utilisation ffprobe + fallback FPS=25)
- 11: - Écriture JSON en streaming (évite le stockage complet en mémoire)
- 12: - Mapping segments->frames sans matérialiser toute la diarisation
- 13: - Journalisation unique (suppression des prints dupliqués)
- 14: - Inference PyTorch optimisée (CUDA prioritaire, CPU fallback; no_grad/inference_mode)
- 15: - Politique device/workers configurable via variables d'environnement
- 16: - Nettoyage robuste des répertoires temporaires
- 17: - Compression gzip optionnelle (désactivée par défaut pour compatibilité STEP5)
- 18: """
- 19: 
- 20: import os
- 21: import sys
- 22: import json
- 23: import argparse
- 24: import logging
- 25: import subprocess
- 26: import tempfile
- 27: import gzip
- 28: import time
- 29: import gc
- 30: from contextlib import nullcontext
- 31: import torch
- 32: from pathlib import Path
- 33: from datetime import datetime
- 34: 
- 35: # --- Configuration ---
- 36: WORK_DIR = Path(os.getcwd())
- 37: VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm')
- 38: OUTPUT_SUFFIX = "_audio.json"
- 39: DEFAULT_FPS = 25
- 40: 
- 41: LOG_DIR_PATH = None
- 42: 
- 43: 
- 44: def _load_optimal_tv_config() -> dict:
- 45:     try:
- 46:         repo_root = Path(__file__).resolve().parents[2]
- 47:         config_path = repo_root / "config" / "optimal_tv_config.json"
- 48:         if not config_path.exists():
- 49:             return {}
- 50:         with open(config_path, "r", encoding="utf-8") as f:
- 51:             data = json.load(f)
- 52:         if not isinstance(data, dict):
- 53:             logging.warning("optimal_tv_config.json ignoré (JSON racine non-objet).")
- 54:             return {}
- 55:         logging.info(f"optimal_tv_config.json chargé: {config_path}")
- 56:         return data
- 57:     except Exception as e:
- 58:         logging.warning(f"Impossible de charger optimal_tv_config.json: {e}")
- 59:         return {}
- 60: 
- 61: # Le dossier de log est AUDIO_ANALYSIS_LOG_DIR, passé par argument
- 62: # On configure un logger de base qui sera complété dans main()
- 63: logging.basicConfig(
- 64:     level=logging.INFO,
- 65:     format='%(asctime)s - %(levelname)s - %(message)s',
- 66:     handlers=[logging.StreamHandler(sys.stdout)]
- 67: )
- 68: 
- 69: 
- 70: def find_videos_for_audio_analysis():
- 71:     """Trouve toutes les vidéos à analyser qui n'ont pas encore de fichier _audio.json."""
- 72:     videos_to_process = []
- 73:     logging.info(f"Recherche de vidéos dans {WORK_DIR}...")
- 74: 
- 75:     all_videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}')]
- 76: 
- 77:     skipped_mov = 0
- 78:     filtered_videos = []
- 79:     for video_path in all_videos:
- 80:         if video_path.suffix.lower() == '.mov':
- 81:             skipped_mov += 1
- 82:             continue
- 83:         filtered_videos.append(video_path)
- 84: 
- 85:     for video_path in filtered_videos:
- 86:         output_json_path = video_path.with_name(f"{video_path.stem}{OUTPUT_SUFFIX}")
- 87:         if not output_json_path.exists():
- 88:             videos_to_process.append(video_path)
- 89:     
- 90:     return videos_to_process
- 91: 
- 92: 
- 93: def _run_ffprobe_duration(video_path: Path) -> float:
- 94:     """Retourne la durée (en secondes) via ffprobe, ou -1 en cas d'échec."""
- 95:     try:
- 96:         result = subprocess.run(
- 97:             [
- 98:                 "ffprobe", "-v", "error", "-show_entries", "format=duration",
- 99:                 "-of", "default=nw=1:nk=1", str(video_path)
-100:             ],
-101:             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
-102:         )
-103:         return float(result.stdout.strip())
-104:     except Exception as e:
-105:         logging.warning(f"ffprobe a échoué pour {video_path.name}: {e}")
-106:         return -1.0
-107: 
-108: 
-109: def _extract_audio_ffmpeg(input_video: Path, output_wav: Path) -> bool:
-110:     """Extrait l'audio en WAV mono 16kHz via ffmpeg. Retourne True si OK."""
-111:     try:
-112:         cmd = [
-113:             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-114:             "-i", str(input_video),
-115:             "-vn", "-ac", "1", "-ar", "16000", "-f", "wav", "-acodec", "pcm_s16le",
-116:             str(output_wav)
-117:         ]
-118:         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-119:         return True
-120:     except subprocess.CalledProcessError as e:
-121:         logging.error(f"ffmpeg extraction audio a échoué pour {input_video.name}: {e}")
-122:         return False
-123: 
-124: 
-125: def _write_empty_audio_json_streaming(output_json_path: Path, video_name: str, total_frames: int, fps: float) -> None:
-126:     """Écrit un JSON vide compatible STEP5 en streaming."""
-127:     with open(output_json_path, 'w', encoding='utf-8') as f:
-128:         f.write('{\n')
-129:         f.write(f'  "video_filename": "{video_name}",\n')
-130:         f.write(f'  "total_frames": {total_frames},\n')
-131:         f.write(f'  "fps": {round(fps, 2)},\n')
-132:         f.write('  "frames_analysis": [')
-133:         if total_frames > 0:
-134:             f.write('\n')
-135:             for frame_num in range(1, total_frames + 1):
-136:                 timecode = round((frame_num - 1) / fps, 3)
-137:                 obj = {
-138:                     "frame": frame_num,
-139:                     "audio_info": {
-140:                         "is_speech_present": False,
-141:                         "num_distinct_speakers_audio": 0,
-142:                         "active_speaker_labels": [],
-143:                         "timecode_sec": timecode,
-144:                     },
-145:                 }
-146:                 if frame_num > 1:
-147:                     f.write(',\n')
-148:                 f.write(json.dumps(obj))
-149:         f.write('\n  ]\n')
-150:         f.write('}\n')
-151: 
-152: 
-153: def _cleanup_cuda_memory() -> None:
-154:     try:
-155:         if torch.cuda.is_available():
-156:             torch.cuda.empty_cache()
-157:     except Exception:
-158:         pass
-159:     try:
-160:         gc.collect()
-161:     except Exception:
-162:         pass
-163: 
-164: 
-165: def _get_total_vram_gb() -> float:
-166:     try:
-167:         if not torch.cuda.is_available():
-168:             return 0.0
-169:         props = torch.cuda.get_device_properties(0)
-170:         return float(props.total_memory) / (1024**3)
-171:     except Exception:
-172:         return 0.0
-173: 
-174: 
-175: def _is_low_vram_gpu(threshold_gb: float = 6.0) -> bool:
-176:     total_gb = _get_total_vram_gb()
-177:     return total_gb > 0.0 and total_gb <= threshold_gb
-178: 
-179: 
-180: def _should_enable_amp(device: str) -> bool:
-181:     if device != "cuda":
-182:         return False
-183:     env_value = os.getenv("AUDIO_ENABLE_AMP")
-184:     if env_value is not None:
-185:         return env_value == "1"
-186:     return _is_low_vram_gpu()
-187: 
-188: 
-189: def _get_pyannote_batch_size(device: str) -> int | None:
-190:     raw = os.getenv("AUDIO_PYANNOTE_BATCH_SIZE")
-191:     if raw is not None:
-192:         try:
-193:             value = int(raw)
-194:             return value if value > 0 else None
-195:         except Exception:
-196:             return None
-197:     if device == "cuda" and _is_low_vram_gpu():
-198:         return 1
-199:     return None
-200: 
-201: 
-202: def _import_pyannote_pipeline():
-203:     from pyannote.audio import Pipeline
-204:     return Pipeline
-205: 
-206: 
-207: def _load_pyannote_pipeline(model_id: str, hf_token: str, pipeline_cls=None):
-208:     """
-209:     Load pyannote Pipeline while handling token/use_auth_token compatibility.
-210:     """
-211:     pipeline_cls = pipeline_cls or _import_pyannote_pipeline()
-212:     try:
-213:         return pipeline_cls.from_pretrained(model_id, token=hf_token)
-214:     except TypeError as type_err:
-215:         if "token" not in str(type_err):
-216:             raise
-217:         logging.info(
-218:             "Pipeline.from_pretrained(%s) ne supporte pas 'token'. "
-219:             "Tentative avec use_auth_token.",
-220:             model_id,
-221:         )
-222:         return pipeline_cls.from_pretrained(model_id, use_auth_token=hf_token)
-223: 
-224: 
-225: def _run_diarization_and_extract_segments(diarization_pipeline, wav_path: Path, device: str) -> list:
-226:     use_amp = _should_enable_amp(device)
-227:     if use_amp and hasattr(torch, "cuda") and hasattr(torch.cuda, "amp"):
-228:         amp_ctx = torch.cuda.amp.autocast(dtype=torch.float16)
-229:     else:
-230:         amp_ctx = nullcontext()
-231: 
-232:     pyannote_batch_size = _get_pyannote_batch_size(device)
-233:     diarization_kwargs = {"num_speakers": None}
-234:     if pyannote_batch_size is not None:
-235:         diarization_kwargs["batch_size"] = pyannote_batch_size
-236:         logging.info(f"Diarisation paramètres: batch_size={pyannote_batch_size}")
-237: 
-238:     with torch.inference_mode():
-239:         with amp_ctx:
-240:             try:
-241:                 diarization = diarization_pipeline(str(wav_path), **diarization_kwargs)
-242:             except TypeError as e:
-243:                 if "batch_size" in str(e):
-244:                     diarization_kwargs.pop("batch_size", None)
-245:                     diarization = diarization_pipeline(str(wav_path), **diarization_kwargs)
-246:                 else:
-247:                     raise
-248:     segments = [(t.start, t.end, spk) for t, _, spk in diarization.itertracks(yield_label=True)]
-249:     del diarization
-250:     return segments
-251: 
-252: 
-253: def _apply_audio_profile_from_env() -> None:
-254:     profile = (os.getenv("AUDIO_PROFILE") or "").strip().lower()
-255:     if not profile:
-256:         return
-257: 
-258:     if profile == "gpu_optimized":
-259:         os.environ["AUDIO_DISABLE_GPU"] = "0"
-260:         os.environ["AUDIO_ENABLE_AMP"] = "1"
-261:         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
-262:         logging.info("AUDIO_PROFILE=gpu_optimized appliqué (AMP=1, batch_size=1)")
-263:         logging.warning("ATTENTION: AMP peut réduire significativement la qualité de diarisation (faux négatifs).")
-264:         return
-265: 
-266:     if profile == "gpu_fp32":
-267:         os.environ["AUDIO_DISABLE_GPU"] = "0"
-268:         os.environ["AUDIO_ENABLE_AMP"] = "0"
-269:         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
-270:         logging.info("AUDIO_PROFILE=gpu_fp32 appliqué (AMP=0, batch_size=1, FP32 pur - cohérence CPU)")
-271:         return
-272: 
-273:     if profile == "gpu_no_amp":
-274:         os.environ["AUDIO_DISABLE_GPU"] = "0"
-275:         os.environ["AUDIO_ENABLE_AMP"] = "0"
-276:         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
-277:         logging.info("AUDIO_PROFILE=gpu_no_amp appliqué (AMP=0, batch_size=1)")
-278:         return
-279: 
-280:     if profile == "cpu_only":
-281:         os.environ["AUDIO_DISABLE_GPU"] = "1"
-282:         os.environ["AUDIO_ENABLE_AMP"] = "0"
-283:         os.environ.pop("AUDIO_PYANNOTE_BATCH_SIZE", None)
-284:         logging.info("AUDIO_PROFILE=cpu_only appliqué (GPU désactivé)")
-285:         return
-286: 
-287:     logging.warning(
-288:         f"AUDIO_PROFILE inconnu: '{profile}'. Valeurs supportées: gpu_optimized, gpu_fp32, gpu_no_amp, cpu_only"
-289:     )
-290: 
-291: 
-292: def _run_cpu_diarization_subprocess(wav_path: Path, output_segments_json: Path, hf_token: str) -> None:
-293:     """Fallback CPU avec mêmes paramètres que GPU (sauf AMP) pour cohérence."""
-294:     env = os.environ.copy()
-295:     env["AUDIO_DISABLE_GPU"] = "1"
-296:     env["CUDA_VISIBLE_DEVICES"] = ""
-297:     env["HUGGINGFACE_HUB_TOKEN"] = hf_token
-298:     # Forcer FP32 (pas d'AMP) pour cohérence avec mode GPU sans AMP
-299:     env["AUDIO_ENABLE_AMP"] = "0"
-300:     pyannote_batch_size = os.getenv("AUDIO_PYANNOTE_BATCH_SIZE")
-301:     if pyannote_batch_size:
-302:         env["AUDIO_PYANNOTE_BATCH_SIZE"] = pyannote_batch_size
-303: 
-304:     cmd = [
-305:         sys.executable,
-306:         str(Path(__file__).resolve()),
-307:         "--log_dir",
-308:         str(LOG_DIR_PATH or Path(tempfile.gettempdir())),
-309:         "--disable_gpu",
-310:         "--cpu_diarize_wav",
-311:         str(wav_path),
-312:         "--cpu_diarize_out",
-313:         str(output_segments_json),
-314:     ]
-315:     subprocess.run(
-316:         cmd,
-317:         check=True,
-318:         env=env,
-319:         stdout=subprocess.DEVNULL,
-320:         stderr=subprocess.PIPE,
-321:         text=True,
-322:     )
-323: 
-324: 
-325: def _load_segments_from_json(segments_json: Path) -> list:
-326:     with open(segments_json, "r", encoding="utf-8") as f:
-327:         data = json.load(f)
-328:     segments = []
-329:     for item in data:
-330:         start = float(item["start"])
-331:         end = float(item["end"])
-332:         speaker = str(item["speaker"])
-333:         segments.append((start, end, speaker))
-334:     return segments
-335: 
-336: 
-337: def analyze_audio_file(video_path, diarization_pipeline, hf_token, device: str):
-338:     """Analyse une vidéo, extrait l'audio via ffmpeg, effectue la diarisation et sauvegarde le JSON (streaming)."""
-339:     output_json_path = video_path.with_name(f"{video_path.stem}{OUTPUT_SUFFIX}")
-340: 
-341:     duration_sec = _run_ffprobe_duration(video_path)
-342:     video_fps = DEFAULT_FPS
-343:     if duration_sec > 0:
-344:         total_frames = int(round(duration_sec * video_fps))
-345:     else:
-346:         logging.warning(f"Durée inconnue, fallback frames basé sur DEFAULT_FPS={DEFAULT_FPS} pour {video_path.name}")
-347:         # On fixera total_frames après avoir déterminé le max de frame touché par la timeline.
-348:         total_frames = -1
-349: 
-350:     tmp_dir_root = "/dev/shm" if os.path.isdir("/dev/shm") else None
-351:     try:
-352:         with tempfile.TemporaryDirectory(dir=tmp_dir_root) as tmp_dir:
-353:             tmp_wav = Path(tmp_dir) / f"{video_path.stem}_temp.wav"
-354: 
-355:             logging.info(f"Extraction audio (ffmpeg) de {video_path.name} -> {tmp_wav.name}...")
-356:             if not _extract_audio_ffmpeg(video_path, tmp_wav):
-357:                 if total_frames < 0:
-358:                     total_frames = 0
-359:                 _write_empty_audio_json_streaming(output_json_path, video_path.name, total_frames, video_fps)
-360:                 return True
-361: 
-362:             logging.info(f"Diarisation en cours sur {tmp_wav.name}...")
-363:             start_infer_t = time.time()
-364:             segments = None
-365:             try:
-366:                 if device == "cuda":
-367:                     _cleanup_cuda_memory()
-368:                 segments = _run_diarization_and_extract_segments(diarization_pipeline, tmp_wav, device)
-369:                 logging.info(f"Diarisation: {len(segments)} segment(s) détecté(s)")
-370:             except RuntimeError as e_oom:
-371:                 if "CUDA out of memory" in str(e_oom):
-372:                     logging.warning("CUDA OOM durant la diarisation, tentative de fallback CPU pour ce fichier...")
-373:                     _cleanup_cuda_memory()
-374:                     try:
-375:                         cpu_segments_json = Path(tmp_dir) / f"{video_path.stem}_cpu_segments.json"
-376:                         logging.info("Fallback CPU: mêmes paramètres que GPU (batch_size) sauf AMP, pour cohérence")
-377:                         _run_cpu_diarization_subprocess(tmp_wav, cpu_segments_json, hf_token)
-378:                         segments = _load_segments_from_json(cpu_segments_json)
-379:                         logging.info(f"Fallback CPU: {len(segments)} segment(s) détecté(s)")
-380:                     except subprocess.CalledProcessError as cpu_e:
-381:                         safe_stderr = (cpu_e.stderr or "")
-382:                         logging.error(
-383:                             "Echec du fallback CPU (subprocess). "
-384:                             f"returncode={cpu_e.returncode}. stderr:\n{safe_stderr}"
-385:                         )
-386:                         raise
-387:                     except Exception:
-388:                         logging.error("Echec du fallback CPU (erreur inattendue).", exc_info=True)
-389:                         raise
-390:                 else:
-391:                     segments = _run_diarization_and_extract_segments(diarization_pipeline, tmp_wav, device)
-392:             infer_ms = int((time.time() - start_infer_t) * 1000)
-393:             logging.info(f"Diarisation terminée en ~{infer_ms} ms")
-394: 
-395:             audio_timeline = {}
-396:             max_frame_seen = 0
-397:             for start_sec, end_sec, speaker_label in (segments or []):
-398:                 start_frame = max(1, int(start_sec * video_fps))
-399:                 end_frame = int(end_sec * video_fps)
-400:                 if end_frame < start_frame:
-401:                     continue
-402:                 max_frame_seen = max(max_frame_seen, end_frame)
-403:                 for frame_num in range(start_frame, end_frame + 1):
-404:                     frame_entry = audio_timeline.get(frame_num)
-405:                     if frame_entry is None:
-406:                         frame_entry = set()
-407:                         audio_timeline[frame_num] = frame_entry
-408:                     frame_entry.add(speaker_label)
-409:             
-410:             num_speech_frames = len(audio_timeline)
-411:             speech_pct = (num_speech_frames / total_frames * 100) if total_frames > 0 else 0
-412:             logging.info(f"Timeline audio: {num_speech_frames}/{total_frames} frames avec parole ({speech_pct:.1f}%)")
-413: 
-414:             if total_frames < 0:
-415:                 total_frames = max_frame_seen
-416: 
-417:             # Écriture JSON streaming (préserve le schéma pour STEP5)
-418:             use_gzip = os.getenv("AUDIO_JSON_GZIP", "0") == "1"
-419:             if use_gzip:
-420:                 json_path = str(output_json_path) + ".gz"
-421:                 open_fn = lambda p: gzip.open(p, mode="wt", encoding="utf-8")
-422:             else:
-423:                 json_path = str(output_json_path)
-424:                 open_fn = lambda p: open(p, mode="w", encoding="utf-8")
-425: 
-426:             with open_fn(json_path) as f:
-427:                 f.write("{\n")
-428:                 f.write(f"  \"video_filename\": \"{video_path.name}\",\n")
-429:                 f.write(f"  \"total_frames\": {total_frames},\n")
-430:                 f.write(f"  \"fps\": {round(video_fps, 2)},\n")
-431:                 f.write("  \"frames_analysis\": [\n")
-432:     
-433:                 frames_processed = 0
-434:                 last_log_t = time.time()
-435:                 for frame_num in range(1, total_frames + 1):
-436:                     speakers = sorted(audio_timeline.get(frame_num, []))
-437:                     is_speech = len(speakers) > 0
-438:                     timecode = round((frame_num - 1) / video_fps, 3)
-439:                     obj = {
-440:                         "frame": frame_num,
-441:                         "audio_info": {
-442:                             "is_speech_present": is_speech,
-443:                             "num_distinct_speakers_audio": len(speakers),
-444:                             "active_speaker_labels": speakers,
-445:                             "timecode_sec": timecode,
-446:                         },
-447:                     }
-448:                     # Écriture streaming avec virgules correctes
-449:                     if frame_num > 1:
-450:                         f.write(",\n")
-451:                     f.write(json.dumps(obj))
-452:     
-453:                     frames_processed += 1
-454:                     if time.time() - last_log_t >= 2 or frames_processed == total_frames:
-455:                         progress_percent = int((frames_processed / total_frames) * 100) if total_frames else 100
-456:                         logging.info(
-457:                             f"INTERNAL_PROGRESS: {frames_processed}/{total_frames} frames ({progress_percent}%) - {video_path.name}")
-458:                         last_log_t = time.time()
-459:     
-460:                 f.write("\n  ]\n")
-461:                 f.write("}\n")
-462:     
-463:             logging.info(f"Succès: analyse audio terminée pour {video_path.name}")
-464:             return True
-465: 
-466:     except Exception as e:
-467:         logging.error(f"Erreur inattendue lors de l'analyse de {video_path.name}: {e}", exc_info=True)
-468:         return False
-469: 
-470: 
-471: def main():
-472:     parser = argparse.ArgumentParser(description="Analyse audio (diarisation) des vidéos.")
-473:     parser.add_argument("--log_dir", type=str, required=True, help="Répertoire de logs")
-474:     parser.add_argument("--hf_auth_token", type=str, help="Token d'authentification HuggingFace")
-475:     parser.add_argument("--disable_gpu", action="store_true", help="Forcer l'utilisation CPU")
-476:     parser.add_argument("--cpu_diarize_wav", type=str, help="Mode interne: diarisation CPU-only d'un WAV")
-477:     parser.add_argument("--cpu_diarize_out", type=str, help="Mode interne: sortie JSON segments")
-478:     args = parser.parse_args()
-479: 
-480:     log_dir_path = Path(args.log_dir)
-481:     log_dir_path.mkdir(parents=True, exist_ok=True)
-482:     global LOG_DIR_PATH
-483:     LOG_DIR_PATH = log_dir_path
-484:     log_file = log_dir_path / f"audio_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-485:     file_handler = logging.FileHandler(log_file, encoding='utf-8')
-486:     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-487:     logging.getLogger().addHandler(file_handler)
-488: 
-489:     logging.info("--- Démarrage du script d'analyse audio (Diarisation) ---")
-490: 
-491:     _apply_audio_profile_from_env()
-492: 
-493:     try:
-494:         os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:32")
-495: 
-496:         env_disable_gpu = os.getenv("AUDIO_DISABLE_GPU", "0") == "1"
-497:         use_cuda = torch.cuda.is_available() and not env_disable_gpu and not args.disable_gpu
-498:         device = "cuda" if use_cuda else "cpu"
-499:         if device == "cpu":
-500:             cpu_workers_env = os.getenv("AUDIO_CPU_WORKERS")
-501:             try:
-502:                 if cpu_workers_env:
-503:                     n_threads = max(1, int(cpu_workers_env))
-504:                     torch.set_num_threads(n_threads)
-505:                     os.environ.setdefault("OMP_NUM_THREADS", str(n_threads))
-506:                     os.environ.setdefault("MKL_NUM_THREADS", str(n_threads))
-507:             except Exception:
-508:                 pass
-509:         logging.info(f"Utilisation du device: {device}")
-510: 
-511:         hf_token = None
-512:         if args.hf_auth_token:
-513:             hf_token = args.hf_auth_token
-514:             try:
-515:                 os.environ["HUGGINGFACE_HUB_TOKEN"] = args.hf_auth_token
-516:             except Exception:
-517:                 pass
-518:         else:
-519:             hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HF_AUTH_TOKEN")
-520: 
-521:         if not hf_token:
-522:             logging.critical(
-523:                 "Aucun token Hugging Face fourni. Passez --hf_auth_token ou définissez HUGGINGFACE_HUB_TOKEN/HF_AUTH_TOKEN."
-524:             )
-525:             sys.exit(1)
-526:         try:
-527:             from huggingface_hub import HfApi
-528:             try:
-529:                 from huggingface_hub.hf_api import HfFolder
-530:                 HfFolder.save_token(hf_token)
-531:             except Exception:
-532:                 pass
-533:             _id = HfApi().whoami(token=hf_token)
-534:             safe_tail = hf_token[-6:] if len(hf_token) >= 6 else "***"
-535:             logging.info(
-536:                 "Authentifié sur Hugging Face (token tail=***%s) en tant que: %s",
-537:                 safe_tail,
-538:                 _id.get("name") or _id.get("email"),
-539:             )
-540:         except Exception as auth_e:
-541:             logging.warning(
-542:                 "Impossible de valider le token Hugging Face: %s. On tente quand même le téléchargement.",
-543:                 auth_e,
-544:             )
-545: 
-546:         pipeline = None
-547:         try:
-548:             pipeline = _load_pyannote_pipeline("pyannote/speaker-diarization-3.1", hf_token)
-549:         except Exception as e_v3:
-550:             logging.warning(f"Impossible de charger la pipeline v3.1: {e_v3}. Tentative avec v2...")
-551:             try:
-552:                 pipeline = _load_pyannote_pipeline("pyannote/speaker-diarization", hf_token)
-553:             except Exception as e_v2:
-554:                 logging.critical(
-555:                     "Echec du chargement des pipelines pyannote (v3.1 et v2). "
-556:                     "Le modèle peut être privé/gated. Assurez-vous que votre token HF a accès "
-557:                     "(accepter les conditions sur la page du modèle) et réessayez."
-558:                 )
-559:                 logging.critical(f"Détails v3.1: {e_v3}")
-560:                 logging.critical(f"Détails v2: {e_v2}")
-561:                 sys.exit(1)
-562:         optimal_tv_config = _load_optimal_tv_config()
-563:         pyannote_batch_size = _get_pyannote_batch_size(device)
-564:         if pyannote_batch_size is not None:
-565:             for key in ("segmentation", "embedding"):
-566:                 section = optimal_tv_config.get(key)
-567:                 if not isinstance(section, dict):
-568:                     optimal_tv_config[key] = {}
-569:                 optimal_tv_config[key]["batch_size"] = pyannote_batch_size
-570: 
-571:         if optimal_tv_config and hasattr(pipeline, "instantiate"):
-572:             try:
-573:                 pipeline.instantiate(optimal_tv_config)
-574:                 if pyannote_batch_size is not None:
-575:                     logging.info(
-576:                         f"Pyannote configuration appliquée (optimal_tv_config + batch_size={pyannote_batch_size})"
-577:                     )
-578:                 else:
-579:                     logging.info("Pyannote configuration appliquée (optimal_tv_config)")
-580:             except Exception as e:
-581:                 msg = str(e)
-582:                 if pyannote_batch_size is not None and "batch_size" in msg and "does not exist" in msg:
-583:                     logging.info(
-584:                         f"Pipeline.instantiate ne supporte pas batch_size (AUDIO_PYANNOTE_BATCH_SIZE={pyannote_batch_size}). "
-585:                         "Le batch_size sera appliqué lors de l'appel diarization si possible."
-586:                     )
-587:                 else:
-588:                     logging.warning(f"Impossible d'appliquer optimal_tv_config.json via pipeline.instantiate: {e}")
-589: 
-590:                     if pyannote_batch_size is not None:
-591:                         try:
-592:                             pipeline.instantiate(
-593:                                 {
-594:                                     "segmentation": {"batch_size": pyannote_batch_size},
-595:                                     "embedding": {"batch_size": pyannote_batch_size},
-596:                                 }
-597:                             )
-598:                             logging.info(
-599:                                 "Fallback: configuration minimale appliquée (batch_size seulement) suite à un échec optimal_tv_config"
-600:                             )
-601:                         except Exception as fallback_e:
-602:                             logging.warning(
-603:                                 "Fallback: impossible d'appliquer la configuration minimale (batch_size seulement): "
-604:                                 f"{fallback_e}"
-605:                             )
-606: 
-607:         if _should_enable_amp(device):
-608:             total_gb = _get_total_vram_gb()
-609:             logging.info(f"AMP activé pour l'inférence (VRAM total ~{total_gb:.2f} GiB)")
-610: 
-611:         if args.cpu_diarize_wav:
-612:             if not args.cpu_diarize_out:
-613:                 logging.critical("Mode cpu_diarize_wav: --cpu_diarize_out est requis")
-614:                 sys.exit(1)
-615:             wav_path = Path(args.cpu_diarize_wav)
-616:             out_path = Path(args.cpu_diarize_out)
-617:             out_path.parent.mkdir(parents=True, exist_ok=True)
-618:             
-619:             diarization_kwargs = {"num_speakers": None}
-620:             pyannote_batch_size = _get_pyannote_batch_size("cpu")
-621:             if pyannote_batch_size is not None:
-622:                 diarization_kwargs["batch_size"] = pyannote_batch_size
-623:                 logging.info(f"CPU subprocess: batch_size={pyannote_batch_size}")
-624:             
-625:             with torch.inference_mode():
-626:                 try:
-627:                     diarization = pipeline(str(wav_path), **diarization_kwargs)
-628:                 except TypeError as e:
-629:                     if "batch_size" in str(e):
-630:                         diarization_kwargs.pop("batch_size", None)
-631:                         diarization = pipeline(str(wav_path), **diarization_kwargs)
-632:                     else:
-633:                         raise
-634:             
-635:             segments = [
-636:                 {"start": float(t.start), "end": float(t.end), "speaker": str(spk)}
-637:                 for t, _, spk in diarization.itertracks(yield_label=True)
-638:             ]
-639:             logging.info(f"CPU subprocess: {len(segments)} segment(s) extrait(s)")
-640:             with open(out_path, "w", encoding="utf-8") as f:
-641:                 json.dump(segments, f)
-642:             return
-643: 
-644:         if pipeline is None:
-645:             logging.critical(
-646:                 "Impossible de charger la pipeline pyannote (pipeline=None). Le modèle peut être privé/gated. "
-647:                 "Vérifiez votre token Hugging Face (HUGGINGFACE_HUB_TOKEN) et acceptez les conditions du modèle."
-648:             )
-649:             sys.exit(1)
-650: 
-651:         try:
-652:             if hasattr(pipeline, "to"):
-653:                 pipeline.to(torch.device(device))
-654:                 logging.info(f"Pipeline de diarisation chargée avec succès sur {device}.")
-655:             else:
-656:                 logging.info("Pipeline pyannote ne supporte pas .to(); continuation sans déplacement explicite de device.")
-657:         except RuntimeError as e:
-658:             if "NVIDIA driver" in str(e) or "CUDA" in str(e):
-659:                 logging.warning(f"GPU incompatible ({e}), fallback sur CPU.")
-660:                 device = "cpu"
-661:                 if hasattr(pipeline, "to"):
-662:                     pipeline.to(torch.device("cpu"))
-663:                 logging.info("Pipeline de diarisation chargée avec succès sur CPU (fallback).")
-664:             else:
-665:                 raise
-666:     except ImportError as e:
-667:         logging.critical(f"Erreur lors du chargement de la pipeline Pyannote: {e}")
-668:         sys.exit(1)
-669: 
-670:     videos = find_videos_for_audio_analysis()
-671:     total_videos = len(videos)
-672:     logging.info(f"TOTAL_AUDIO_TO_ANALYZE: {total_videos}")
-673: 
-674:     if total_videos == 0:
-675:         logging.info("Aucune nouvelle vidéo à analyser.")
-676:         return
-677: 
-678:     successful_count = 0
-679:     for i, video_path in enumerate(videos):
-680:         logging.info(f"ANALYZING_AUDIO: {i + 1}/{total_videos}: {video_path.name}")
-681: 
-682:         success = analyze_audio_file(video_path, pipeline, hf_token, device)
-683:         if success:
-684:             successful_count += 1
-685: 
-686:         try:
-687:             if device == "cuda" and torch.cuda.is_available():
-688:                 torch.cuda.empty_cache()
-689:         except Exception:
-690:             pass
-691: 
-692:     logging.info("--- Analyse audio terminée ---")
-693:     logging.info(f"Résumé: {successful_count}/{total_videos} analyse(s) réussie(s).")
-694: 
-695:     if successful_count < total_videos:
-696:         # Permettre un succès partiel si demandé (utile pour pipelines tolérantes)
-697:         allow_partial = os.getenv("AUDIO_PARTIAL_SUCCESS_OK", "0") == "1"
-698:         if allow_partial and successful_count > 0:
-699:             logging.warning(
-700:                 f"Partial success autorisé: {successful_count}/{total_videos} analyses ont réussi. Code de sortie 0."
-701:             )
-702:             return
-703:         sys.exit(1)
-704: 
-705: 
-706: if __name__ == "__main__":
-707:     try:
-708:         main()
-709:     except Exception as e:
-710:         logging.critical(f"Erreur critique non gérée: {e}", exc_info=True)
-711:         sys.exit(1)
-```
-
-## File: workflow_scripts/step5/face_engines.py
-```python
-   1: import logging
-   2: import os
-   3: import threading
-   4: import time
-   5: from pathlib import Path
-   6: from typing import Optional
-   7: 
-   8: import cv2
-   9: import numpy as np
-  10: 
-  11: # Load .env file BEFORE reading any environment variables (critical for multiprocessing workers)
-  12: try:
-  13:     from dotenv import load_dotenv
-  14:     _env_path = Path(__file__).resolve().parent.parent.parent / '.env'
-  15:     if _env_path.exists():
-  16:         load_dotenv(_env_path)
-  17: except ImportError:
-  18:     pass  # dotenv not available, rely on system env vars
-  19: 
-  20: logger = logging.getLogger(__name__)
-  21: 
-  22: ARKIT_52_BLENDSHAPE_NAMES = [
-  23:     "browDownLeft",
-  24:     "browDownRight",
-  25:     "browInnerUp",
-  26:     "browOuterUpLeft",
-  27:     "browOuterUpRight",
-  28:     "cheekPuff",
-  29:     "cheekSquintLeft",
-  30:     "cheekSquintRight",
-  31:     "eyeBlinkLeft",
-  32:     "eyeBlinkRight",
-  33:     "eyeLookDownLeft",
-  34:     "eyeLookDownRight",
-  35:     "eyeLookInLeft",
-  36:     "eyeLookInRight",
-  37:     "eyeLookOutLeft",
-  38:     "eyeLookOutRight",
-  39:     "eyeLookUpLeft",
-  40:     "eyeLookUpRight",
-  41:     "eyeSquintLeft",
-  42:     "eyeSquintRight",
-  43:     "eyeWideLeft",
-  44:     "eyeWideRight",
-  45:     "jawForward",
-  46:     "jawLeft",
-  47:     "jawOpen",
-  48:     "jawRight",
-  49:     "mouthClose",
-  50:     "mouthDimpleLeft",
-  51:     "mouthDimpleRight",
-  52:     "mouthFrownLeft",
-  53:     "mouthFrownRight",
-  54:     "mouthFunnel",
-  55:     "mouthLeft",
-  56:     "mouthLowerDownLeft",
-  57:     "mouthLowerDownRight",
-  58:     "mouthPressLeft",
-  59:     "mouthPressRight",
-  60:     "mouthPucker",
-  61:     "mouthRight",
-  62:     "mouthRollLower",
-  63:     "mouthRollUpper",
-  64:     "mouthShrugLower",
-  65:     "mouthShrugUpper",
-  66:     "mouthSmileLeft",
-  67:     "mouthSmileRight",
-  68:     "mouthStretchLeft",
-  69:     "mouthStretchRight",
-  70:     "mouthUpperUpLeft",
-  71:     "mouthUpperUpRight",
-  72:     "noseSneerLeft",
-  73:     "noseSneerRight",
-  74:     "tongueOut",
-  75: ]
-  76: 
-  77: 
-  78: def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
-  79:     if raw is None:
-  80:         return None
-  81:     raw = raw.strip()
-  82:     if not raw:
-  83:         return None
-  84:     try:
-  85:         value = int(raw)
-  86:     except Exception:
-  87:         return None
-  88:     if value <= 0:
-  89:         return None
-  90:     return value
-  91: 
-  92: 
-  93: def _apply_jawopen_scale(blendshapes: Optional[dict], scale: float) -> Optional[dict]:
-  94:     if not blendshapes or not isinstance(blendshapes, dict):
-  95:         return blendshapes
-  96:     try:
-  97:         jaw_open_raw = blendshapes.get("jawOpen")
-  98:         if jaw_open_raw is None:
-  99:             return blendshapes
- 100:         jaw_open_scaled = float(jaw_open_raw) * float(scale)
- 101:         jaw_open_scaled = float(np.clip(jaw_open_scaled, 0.0, 1.0))
- 102:         out = dict(blendshapes)
- 103:         out["jawOpen"] = jaw_open_scaled
- 104:         return out
- 105:     except Exception:
- 106:         return blendshapes
- 107: 
- 108: 
- 109: def _openseeface_logit_arr(p: np.ndarray, factor: float = 16.0) -> np.ndarray:
- 110:     p = np.clip(p, 0.0000001, 0.9999999)
- 111:     return np.log(p / (1 - p)) / float(factor)
- 112: 
- 113: 
- 114: class OpenSeeFaceEngine:
- 115:     def __init__(
- 116:         self,
- 117:         models_dir: Optional[str] = None,
- 118:         model_id: Optional[int] = None,
- 119:         detection_threshold: Optional[float] = None,
- 120:         max_faces: Optional[int] = None,
- 121:         use_gpu: bool = False,
- 122:     ):
- 123:         self._lock = threading.Lock()
- 124: 
- 125:         try:
- 126:             import onnxruntime as ort
- 127:         except ImportError as e:
- 128:             raise RuntimeError(
- 129:                 "OpenSeeFace engine requires onnxruntime. Install it in tracking_env."
- 130:             ) from e
- 131: 
- 132:         self._ort = ort
- 133:         self._use_gpu = use_gpu
- 134:         self._frame_counter = 0
- 135:         self._last_detections = []
- 136: 
- 137:         self._enable_profiling = os.environ.get("STEP5_ENABLE_PROFILING", "0").strip().lower() in {
- 138:             "1",
- 139:             "true",
- 140:             "yes",
- 141:         }
- 142:         self._profiling_stats = {
- 143:             "resize_total": 0.0,
- 144:             "detect_total": 0.0,
- 145:             "landmarks_total": 0.0,
- 146:             "post_total": 0.0,
- 147:             "frame_count": 0,
- 148:         }
- 149: 
- 150:         env_models_dir = os.environ.get("STEP5_OPENSEEFACE_MODELS_DIR")
- 151:         models_dir_raw = models_dir or (env_models_dir.strip() if env_models_dir else "")
- 152:         if models_dir_raw:
- 153:             self._models_dir_explicit = True
- 154:             models_dir_candidate = Path(models_dir_raw)
- 155:             if models_dir_candidate.is_absolute() and models_dir_candidate.exists():
- 156:                 self._models_dir = models_dir_candidate
- 157:             elif models_dir_candidate.exists():
- 158:                 self._models_dir = models_dir_candidate.resolve()
- 159:             else:
- 160:                 step5_dir = Path(__file__).resolve().parent
- 161:                 project_root = step5_dir.parent.parent
- 162:                 resolved_models_dir = None
- 163:                 for c in [project_root / models_dir_candidate, step5_dir / models_dir_candidate]:
- 164:                     if c.exists():
- 165:                         resolved_models_dir = c
- 166:                         break
- 167:                 self._models_dir = (resolved_models_dir or models_dir_candidate).resolve()
- 168:         else:
- 169:             self._models_dir_explicit = False
- 170:             step5_dir = Path(__file__).resolve().parent
- 171:             self._models_dir = step5_dir / "models" / "engines" / "openseeface"
- 172: 
- 173:         env_model_id = os.environ.get("STEP5_OPENSEEFACE_MODEL_ID")
- 174:         self._model_id = int(model_id if model_id is not None else (env_model_id or "1"))
- 175: 
- 176:         env_detect_every = os.environ.get("STEP5_OPENSEEFACE_DETECT_EVERY_N")
- 177:         env_blendshapes_throttle = os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N")
- 178:         detect_every_raw = env_detect_every if (env_detect_every is not None and env_detect_every.strip()) else env_blendshapes_throttle
- 179:         self._detect_every_n = max(1, int(detect_every_raw or "1"))
- 180: 
- 181:         env_max_faces = os.environ.get("STEP5_OPENSEEFACE_MAX_FACES")
- 182:         self._max_faces = max(1, int(max_faces if max_faces is not None else (env_max_faces or "1")))
- 183: 
- 184:         env_detection_threshold = os.environ.get("STEP5_OPENSEEFACE_DETECTION_THRESHOLD")
- 185:         self._detection_threshold = float(
- 186:             detection_threshold if detection_threshold is not None else (env_detection_threshold or "0.6")
- 187:         )
- 188: 
- 189:         env_jaw_scale = os.environ.get("STEP5_OPENSEEFACE_JAWOPEN_SCALE")
- 190:         self._jaw_open_scale = float(env_jaw_scale or "1.0")
- 191: 
- 192:         try:
- 193:             cv2.setNumThreads(1)
- 194:         except Exception:
- 195:             pass
- 196: 
- 197:         env_openseeface_max_width = os.environ.get("STEP5_OPENSEEFACE_MAX_WIDTH")
- 198:         self._max_detection_width = max(
- 199:             1,
- 200:             int(
- 201:                 (env_openseeface_max_width.strip() if env_openseeface_max_width else "")
- 202:                 or os.environ.get("STEP5_YUNET_MAX_WIDTH", "640")
- 203:             ),
- 204:         )
- 205: 
- 206:         detection_override_path = os.environ.get("STEP5_OPENSEEFACE_DETECTION_MODEL_PATH")
- 207:         landmark_override_path = os.environ.get("STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH")
- 208: 
- 209:         self._detection_model_path = self._resolve_model_path(
- 210:             detection_override_path,
- 211:             default_filename="mnv3_detection_opt.onnx",
- 212:         )
- 213:         self._landmark_model_path = self._resolve_model_path(
- 214:             landmark_override_path,
- 215:             default_filename=f"lm_model{self._model_id}_opt.onnx",
- 216:         )
- 217: 
- 218:         if not self._detection_model_path:
- 219:             raise RuntimeError(
- 220:                 "OpenSeeFace detection model not found. Set STEP5_OPENSEEFACE_DETECTION_MODEL_PATH or "
- 221:                 "STEP5_OPENSEEFACE_MODELS_DIR with mnv3_detection_opt.onnx."
- 222:             )
- 223:         if not self._landmark_model_path:
- 224:             raise RuntimeError(
- 225:                 "OpenSeeFace landmark model not found. Set STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH or "
- 226:                 "STEP5_OPENSEEFACE_MODELS_DIR with lm_model{N}_opt.onnx."
- 227:             )
- 228: 
- 229:         intra_threads = int(os.environ.get("STEP5_ONNX_INTRA_OP_THREADS", "2"))
- 230:         inter_threads = int(os.environ.get("STEP5_ONNX_INTER_OP_THREADS", "1"))
- 231: 
- 232:         # Configure ONNX providers (GPU or CPU)
- 233:         available_providers = ort.get_available_providers()
- 234:         logger.info(f"[OpenSeeFace] Available ONNXRuntime providers: {available_providers}")
- 235: 
- 236:         if use_gpu:
- 237:             providers = ["CUDAExecutionProvider"]
- 238:             logger.info("[OpenSeeFace] Attempting to use CUDA provider for GPU inference (no CPU fallback)")
- 239:         else:
- 240:             providers = ["CPUExecutionProvider"]
- 241: 
- 242:         detection_sess_options = ort.SessionOptions()
- 243:         detection_sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
- 244:         if use_gpu:
- 245:             try:
- 246:                 detection_sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
- 247:                 detection_sess_options.add_session_config_entry("session.disable_contrib_ops", "1")
- 248:                 detection_sess_options.add_session_config_entry("session.disable_prepacking", "1")
- 249:                 detection_sess_options.add_session_config_entry("session.disable_aot_function_inlining", "1")
- 250:                 logger.info("[OpenSeeFace] Disabled contrib/fused ops to improve CUDA compatibility")
- 251:             except Exception as cfg_err:
- 252:                 logger.warning("[OpenSeeFace] Failed to set session config entries: %s", cfg_err)
- 253:         detection_sess_options.intra_op_num_threads = max(1, int(intra_threads))
- 254:         detection_sess_options.inter_op_num_threads = max(1, int(inter_threads))
- 255:         detection_sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
- 256: 
- 257:         def _create_session(model_path: Path, sess_options: "ort.SessionOptions", provider_list: list[str]):
- 258:             return ort.InferenceSession(
- 259:                 str(model_path),
- 260:                 sess_options=sess_options,
- 261:                 providers=provider_list,
- 262:             )
- 263: 
- 264:         try:
- 265:             self._detection_session = _create_session(self._detection_model_path, detection_sess_options, providers)
- 266:         except Exception as session_error:
- 267:             logger.exception(
- 268:                 "[OpenSeeFace] Failed to create detection session with providers %s: %s",
- 269:                 providers,
- 270:                 session_error,
- 271:             )
- 272:             if use_gpu:
- 273:                 logger.warning("[OpenSeeFace] Falling back to CPUExecutionProvider due to CUDA initialization failure")
- 274:                 providers = ["CPUExecutionProvider"]
- 275:                 self._use_gpu = False
- 276:                 self._detection_session = _create_session(self._detection_model_path, detection_sess_options, providers)
- 277:             else:
- 278:                 raise
- 279:         self._detection_input_name = self._detection_session.get_inputs()[0].name
- 280:         
- 281:         # Log active provider
- 282:         active_provider = self._detection_session.get_providers()[0]
- 283:         logger.info(f"[OpenSeeFace] Detection session using provider: {active_provider}")
- 284:         if use_gpu and active_provider != "CUDAExecutionProvider":
- 285:             logger.error("[OpenSeeFace] CUDA provider requested but not active despite GPU mode (should have failed)")
- 286: 
- 287:         landmark_sess_options = ort.SessionOptions()
- 288:         landmark_sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
- 289:         landmark_sess_options.intra_op_num_threads = max(1, int(intra_threads))
- 290:         landmark_sess_options.inter_op_num_threads = max(1, int(inter_threads))
- 291:         landmark_sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
- 292: 
- 293:         try:
- 294:             self._landmark_session = ort.InferenceSession(
- 295:                 str(self._landmark_model_path),
- 296:                 sess_options=landmark_sess_options,
- 297:                 providers=providers,
- 298:             )
- 299:         except Exception as session_error:
- 300:             logger.exception(
- 301:                 "[OpenSeeFace] Failed to create landmark session with providers %s: %s",
- 302:                 providers,
- 303:                 session_error,
- 304:             )
- 305:             raise
- 306:         self._landmark_input_name = self._landmark_session.get_inputs()[0].name
- 307:         
- 308:         active_provider_lm = self._landmark_session.get_providers()[0]
- 309:         logger.info(f"[OpenSeeFace] Landmark session using provider: {active_provider_lm}")
- 310: 
- 311:         self._mean = np.float32(np.array([0.485, 0.456, 0.406]))
- 312:         self._std = np.float32(np.array([0.229, 0.224, 0.225]))
- 313:         mean = (self._mean / self._std)
- 314:         std = (self._std * 255.0)
- 315:         self._mean = -mean
- 316:         self._std = 1.0 / std
- 317: 
- 318:         self._mean_224 = np.tile(self._mean, [224, 224, 1])
- 319:         self._std_224 = np.tile(self._std, [224, 224, 1])
- 320: 
- 321:         self._res = 224.0
- 322:         self._out_res = 27.0
- 323:         self._out_res_i = int(self._out_res) + 1
- 324:         self._logit_factor = 16.0
- 325: 
- 326:     def _resolve_model_path(self, override_path: Optional[str], default_filename: str) -> Optional[Path]:
- 327:         if override_path:
- 328:             candidate = Path(override_path)
- 329:             if candidate.is_absolute() and candidate.exists():
- 330:                 return candidate
- 331:             if candidate.exists():
- 332:                 return candidate.resolve()
- 333: 
- 334:             step5_dir = Path(__file__).resolve().parent
- 335:             project_root = step5_dir.parent.parent
- 336:             for c in [project_root / candidate, step5_dir / candidate]:
- 337:                 if c.exists():
- 338:                     return c
- 339: 
- 340:         candidate = self._models_dir / default_filename
- 341:         if candidate.exists():
- 342:             return candidate
- 343: 
- 344:         if getattr(self, "_models_dir_explicit", False):
- 345:             return None
- 346: 
- 347:         step5_dir = Path(__file__).resolve().parent
- 348:         fallback_candidates = [
- 349:             step5_dir / "models" / "engines" / "openseeface" / default_filename,
- 350:             step5_dir / "models" / default_filename,
- 351:         ]
- 352:         for fallback in fallback_candidates:
- 353:             if fallback.exists():
- 354:                 return fallback
- 355: 
- 356:         return None
- 357: 
- 358:     def _preprocess_detection(self, frame_bgr: np.ndarray) -> np.ndarray:
- 359:         resized = cv2.resize(frame_bgr, (224, 224), interpolation=cv2.INTER_LINEAR)
- 360:         rgb = resized[:, :, ::-1].astype(np.float32)
- 361:         im = rgb * self._std_224 + self._mean_224
- 362:         im = np.expand_dims(im, 0)
- 363:         im = np.transpose(im, (0, 3, 1, 2))
- 364:         return np.ascontiguousarray(im)
- 365: 
- 366:     def _detect_faces(self, frame_bgr: np.ndarray) -> list[tuple[float, float, float, float, float]]:
- 367:         im = self._preprocess_detection(frame_bgr)
- 368:         outputs = self._detection_session.run([], {self._detection_input_name: im})
- 369:         if not outputs or len(outputs) < 2:
- 370:             return []
- 371:         out_map = np.array(outputs[0])
- 372:         maxpool = np.array(outputs[1])
- 373:         if out_map.ndim != 4 or maxpool.ndim != 4:
- 374:             return []
- 375:         out_map[0, 0, out_map[0, 0] != maxpool[0, 0]] = 0
- 376: 
- 377:         detections = np.flip(np.argsort(out_map[0, 0].flatten()))
- 378:         results = []
- 379:         for det in detections[0 : self._max_faces]:
- 380:             y = int(det // 56)
- 381:             x = int(det % 56)
- 382:             conf = float(out_map[0, 0, y, x])
- 383:             radius = float(out_map[0, 1, y, x]) * 112.0
- 384:             x_px = float(x * 4)
- 385:             y_px = float(y * 4)
- 386:             if conf < self._detection_threshold:
- 387:                 break
- 388:             results.append((x_px - radius, y_px - radius, 2 * radius, 2 * radius, conf))
- 389: 
- 390:         if not results:
- 391:             return []
- 392: 
- 393:         results_np = np.array([r[:4] for r in results], dtype=np.float32)
- 394:         results_np[:, [0, 2]] *= (frame_bgr.shape[1] / 224.0)
- 395:         results_np[:, [1, 3]] *= (frame_bgr.shape[0] / 224.0)
- 396:         scaled = []
- 397:         for i, (x, y, w, h) in enumerate(results_np.tolist()):
- 398:             scaled.append((x, y, w, h, float(results[i][4])))
- 399:         return scaled
- 400: 
- 401:     def _preprocess_landmarks(
- 402:         self,
- 403:         frame_bgr: np.ndarray,
- 404:         crop: tuple[int, int, int, int],
- 405:     ) -> tuple[np.ndarray, tuple[int, int, float, float]]:
- 406:         x1, y1, x2, y2 = crop
- 407:         im = frame_bgr[y1:y2, x1:x2, ::-1].astype(np.float32)
- 408:         im = cv2.resize(im, (int(self._res), int(self._res)), interpolation=cv2.INTER_LINEAR)
- 409:         im = im * np.tile(self._std, [int(self._res), int(self._res), 1]) + np.tile(
- 410:             self._mean, [int(self._res), int(self._res), 1]
- 411:         )
- 412:         im = np.expand_dims(im, 0)
- 413:         im = np.transpose(im, (0, 3, 1, 2))
- 414:         im = np.ascontiguousarray(im)
- 415: 
- 416:         scale_x = float(x2 - x1) / float(self._res)
- 417:         scale_y = float(y2 - y1) / float(self._res)
- 418:         return im, (x1, y1, scale_x, scale_y)
- 419: 
- 420:     def _decode_landmarks(self, tensor: np.ndarray, crop_info: tuple[int, int, float, float]) -> tuple[float, np.ndarray]:
- 421:         crop_x1, crop_y1, scale_x, scale_y = crop_info
- 422:         res = self._res - 1
- 423: 
- 424:         c0, c1, c2 = 66, 132, 198
- 425:         t_main = tensor[0:c0].reshape((c0, self._out_res_i * self._out_res_i))
- 426:         t_m = t_main.argmax(1)
- 427:         indices = np.expand_dims(t_m, 1)
- 428:         t_conf = np.take_along_axis(t_main, indices, 1).reshape((c0,))
- 429: 
- 430:         t_off_x = np.take_along_axis(
- 431:             tensor[c0:c1].reshape((c0, self._out_res_i * self._out_res_i)),
- 432:             indices,
- 433:             1,
- 434:         ).reshape((c0,))
- 435:         t_off_y = np.take_along_axis(
- 436:             tensor[c1:c2].reshape((c0, self._out_res_i * self._out_res_i)),
- 437:             indices,
- 438:             1,
- 439:         ).reshape((c0,))
- 440:         t_off_x = res * _openseeface_logit_arr(t_off_x, self._logit_factor)
- 441:         t_off_y = res * _openseeface_logit_arr(t_off_y, self._logit_factor)
- 442: 
- 443:         t_x = crop_y1 + scale_y * (res * np.floor(t_m / self._out_res_i) / self._out_res + t_off_x)
- 444:         t_y = crop_x1 + scale_x * (res * np.floor(np.mod(t_m, self._out_res_i)) / self._out_res + t_off_y)
- 445:         avg_conf = float(np.average(t_conf))
- 446:         lms_yx_conf = np.stack([t_x, t_y, t_conf], 1)
- 447:         if np.isnan(lms_yx_conf).any():
- 448:             lms_yx_conf[np.isnan(lms_yx_conf).any(axis=1)] = np.array([0.0, 0.0, 0.0], dtype=np.float32)
- 449:         return avg_conf, lms_yx_conf
- 450: 
- 451:     def _compute_jaw_open(self, landmarks_xy: np.ndarray) -> float:
- 452:         if landmarks_xy.shape[0] < 66:
- 453:             return 0.0
- 454: 
- 455:         norm_distance_y = float(
- 456:             np.mean(
- 457:                 [
- 458:                     landmarks_xy[27, 1] - landmarks_xy[28, 1],
- 459:                     landmarks_xy[28, 1] - landmarks_xy[29, 1],
- 460:                     landmarks_xy[29, 1] - landmarks_xy[30, 1],
- 461:                 ]
- 462:             )
- 463:         )
- 464:         denom = max(abs(norm_distance_y), 1e-6)
- 465: 
- 466:         upper = float(np.mean(landmarks_xy[[59, 60, 61], 1], axis=0))
- 467:         lower = float(np.mean(landmarks_xy[[63, 64, 65], 1], axis=0))
- 468:         mouth_open_ratio = abs(upper - lower) / denom
- 469:         return float(np.clip(mouth_open_ratio * self._jaw_open_scale, 0.0, 1.0))
- 470: 
- 471:     def _build_arkit_blendshapes(self, jaw_open: float) -> dict:
- 472:         out = {}
- 473:         for name in ARKIT_52_BLENDSHAPE_NAMES:
- 474:             out[name] = 0.0
- 475:         out["jawOpen"] = float(jaw_open)
- 476:         return out
- 477: 
- 478:     def detect(self, frame_bgr):
- 479:         self._frame_counter += 1
- 480:         if (self._frame_counter % self._detect_every_n) != 0:
- 481:             return list(self._last_detections)
- 482: 
- 483:         if frame_bgr is None or getattr(frame_bgr, "shape", None) is None:
- 484:             self._last_detections = []
- 485:             return []
- 486: 
- 487:         orig_h, orig_w = frame_bgr.shape[:2]
- 488: 
- 489:         t_resize_start = time.perf_counter() if self._enable_profiling else 0.0
- 490:         work_frame = frame_bgr
- 491:         scale_x = 1.0
- 492:         scale_y = 1.0
- 493: 
- 494:         if orig_w > self._max_detection_width:
- 495:             detect_w = self._max_detection_width
- 496:             scale_factor = detect_w / float(orig_w)
- 497:             detect_h = max(1, int(orig_h * scale_factor))
- 498:             work_frame = cv2.resize(frame_bgr, (detect_w, detect_h), interpolation=cv2.INTER_LINEAR)
- 499:             scale_x = orig_w / float(detect_w)
- 500:             scale_y = orig_h / float(detect_h)
- 501: 
- 502:         if self._enable_profiling:
- 503:             self._profiling_stats["resize_total"] += time.perf_counter() - t_resize_start
- 504: 
- 505:         work_h, work_w = work_frame.shape[:2]
- 506: 
- 507:         t_detect_start = time.perf_counter() if self._enable_profiling else 0.0
- 508:         faces = self._detect_faces(work_frame)
- 509:         if self._enable_profiling:
- 510:             self._profiling_stats["detect_total"] += time.perf_counter() - t_detect_start
- 511:         if not faces:
- 512:             self._last_detections = []
- 513:             return []
- 514: 
- 515:         detections = []
- 516:         for (x, y, bw, bh, conf) in faces:
- 517:             t_landmarks_start = time.perf_counter() if self._enable_profiling else 0.0
- 518:             x1 = int(max(0, x - 0.1 * bw))
- 519:             y1 = int(max(0, y - 0.125 * bh))
- 520:             x2 = int(min(work_w, x + bw + 0.1 * bw))
- 521:             y2 = int(min(work_h, y + bh + 0.125 * bh))
- 522:             if x2 - x1 < 4 or y2 - y1 < 4:
- 523:                 continue
- 524: 
- 525:             with self._lock:
- 526:                 input_tensor, crop_info = self._preprocess_landmarks(work_frame, (x1, y1, x2, y2))
- 527:                 out = self._landmark_session.run([], {self._landmark_input_name: input_tensor})[0]
- 528: 
- 529:             if out is None:
- 530:                 continue
- 531: 
- 532:             if out.ndim == 4:
- 533:                 tensor = out[0]
- 534:             else:
- 535:                 tensor = out
- 536: 
- 537:             avg_conf, lms_yx_conf = self._decode_landmarks(np.asarray(tensor), crop_info)
- 538: 
- 539:             if self._enable_profiling:
- 540:                 self._profiling_stats["landmarks_total"] += time.perf_counter() - t_landmarks_start
- 541: 
- 542:             landmarks_xy = np.stack([lms_yx_conf[:, 1], lms_yx_conf[:, 0]], axis=1)
- 543: 
- 544:             t_post_start = time.perf_counter() if self._enable_profiling else 0.0
- 545:             if scale_x != 1.0 or scale_y != 1.0:
- 546:                 landmarks_xy = landmarks_xy.astype(np.float32, copy=True)
- 547:                 landmarks_xy[:, 0] *= float(scale_x)
- 548:                 landmarks_xy[:, 1] *= float(scale_y)
- 549:                 logger.debug(f"OpenSeeFace upscale: landmarks rescaled by x={scale_x:.2f}, y={scale_y:.2f}")
- 550: 
- 551:             x_min = int(max(0, np.min(landmarks_xy[:, 0])))
- 552:             y_min = int(max(0, np.min(landmarks_xy[:, 1])))
- 553:             x_max = int(min(orig_w - 1, np.max(landmarks_xy[:, 0])))
- 554:             y_max = int(min(orig_h - 1, np.max(landmarks_xy[:, 1])))
- 555:             bbox_w = max(0, x_max - x_min)
- 556:             bbox_h = max(0, y_max - y_min)
- 557: 
- 558:             centroid = (x_min + (bbox_w // 2), y_min + (bbox_h // 2))
- 559:             jaw_open = self._compute_jaw_open(landmarks_xy)
- 560: 
- 561:             landmarks_xyz = np.zeros((int(lms_yx_conf.shape[0]), 3), dtype=np.float32)
- 562:             landmarks_xyz[:, 0] = landmarks_xy[:, 0]
- 563:             landmarks_xyz[:, 1] = landmarks_xy[:, 1]
- 564: 
- 565:             detections.append(
- 566:                 {
- 567:                     "bbox": (x_min, y_min, bbox_w, bbox_h),
- 568:                     "centroid": centroid,
- 569:                     "source_detector": "face_landmarker",
- 570:                     "label": "face",
- 571:                     "confidence": float(avg_conf if avg_conf > 0 else conf),
- 572:                     "landmarks": landmarks_xyz.tolist(),
- 573:                     "blendshapes": self._build_arkit_blendshapes(jaw_open),
- 574:                 }
- 575:             )
- 576: 
- 577:             if self._enable_profiling:
- 578:                 self._profiling_stats["post_total"] += time.perf_counter() - t_post_start
- 579: 
- 580:         self._last_detections = detections
- 581: 
- 582:         if self._enable_profiling:
- 583:             self._profiling_stats["frame_count"] += 1
- 584:             if (self._profiling_stats["frame_count"] % 20) == 0:
- 585:                 self._log_profiling_stats()
- 586: 
- 587:         return detections
- 588: 
- 589:     def _log_profiling_stats(self) -> None:
- 590:         frame_count = int(self._profiling_stats.get("frame_count", 0) or 0)
- 591:         if frame_count <= 0:
- 592:             return
- 593: 
- 594:         resize_ms = (self._profiling_stats["resize_total"] / frame_count) * 1000.0
- 595:         detect_ms = (self._profiling_stats["detect_total"] / frame_count) * 1000.0
- 596:         landmarks_ms = (self._profiling_stats["landmarks_total"] / frame_count) * 1000.0
- 597:         post_ms = (self._profiling_stats["post_total"] / frame_count) * 1000.0
- 598: 
- 599:         logger.info(
- 600:             "[PROFILING] OpenSeeFace after %s frames: resize=%.2fms/frame, detect=%.2fms/frame, "
- 601:             "landmarks=%.2fms/frame, post=%.2fms/frame",
- 602:             frame_count,
- 603:             resize_ms,
- 604:             detect_ms,
- 605:             landmarks_ms,
- 606:             post_ms,
- 607:         )
- 608: 
- 609: 
- 610: class InsightFaceEngine:
- 611:     def __init__(
- 612:         self,
- 613:         model_name: Optional[str] = None,
- 614:         det_size: Optional[int] = None,
- 615:         use_gpu: bool = False,
- 616:     ):
- 617:         if not use_gpu:
- 618:             raise RuntimeError(
- 619:                 "InsightFace engine is GPU-only. Set STEP5_ENABLE_GPU=1, include 'insightface' in STEP5_GPU_ENGINES, "
- 620:                 "and run with use_gpu=True."
- 621:             )
- 622: 
- 623:         self._lock = threading.Lock()
- 624:         self._use_gpu = True
- 625: 
- 626:         try:
- 627:             import onnxruntime as ort
- 628:         except ImportError as e:
- 629:             raise RuntimeError(
- 630:                 "InsightFace engine requires onnxruntime in insightface_env. Install it (and onnxruntime-gpu) in that venv."
- 631:             ) from e
- 632: 
- 633:         available_providers = ort.get_available_providers()
- 634:         logger.info(f"[InsightFace] Available ONNXRuntime providers: {available_providers}")
- 635:         if "CUDAExecutionProvider" not in available_providers:
- 636:             raise RuntimeError(
- 637:                 "InsightFace engine requires CUDAExecutionProvider (onnxruntime-gpu). "
- 638:                 "Install onnxruntime-gpu in insightface_env and ensure CUDA libs are available."
- 639:             )
- 640: 
- 641:         try:
- 642:             from insightface.app import FaceAnalysis
- 643:         except ImportError as e:
- 644:             raise RuntimeError(
- 645:                 "InsightFace engine requires the 'insightface' Python package inside insightface_env."
- 646:             ) from e
- 647: 
- 648:         self._enable_profiling = os.environ.get("STEP5_ENABLE_PROFILING", "0").strip().lower() in {
- 649:             "1",
- 650:             "true",
- 651:             "yes",
- 652:         }
- 653:         self._profiling_stats = {
- 654:             "resize_total": 0.0,
- 655:             "detect_total": 0.0,
- 656:             "post_total": 0.0,
- 657:             "frame_count": 0,
- 658:         }
- 659: 
- 660:         env_max_faces = os.environ.get("STEP5_INSIGHTFACE_MAX_FACES")
- 661:         self._max_faces = _parse_optional_positive_int(env_max_faces)
- 662: 
- 663:         env_max_width = os.environ.get("STEP5_INSIGHTFACE_MAX_WIDTH")
- 664:         if env_max_width is None or env_max_width.strip() == "":
- 665:             env_max_width = os.environ.get("STEP5_YUNET_MAX_WIDTH", "1280")
- 666:         self._max_detection_width = max(1, int(str(env_max_width).strip() or "1280"))
- 667: 
- 668:         env_detect_every = os.environ.get("STEP5_INSIGHTFACE_DETECT_EVERY_N")
- 669:         if env_detect_every is None or env_detect_every.strip() == "":
- 670:             env_detect_every = os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")
- 671:         self._detect_every_n = max(1, int(str(env_detect_every).strip() or "1"))
- 672: 
- 673:         self._jaw_open_scale = float(os.environ.get("STEP5_INSIGHTFACE_JAWOPEN_SCALE", "1.0"))
- 674: 
- 675:         env_model_name = os.environ.get("STEP5_INSIGHTFACE_MODEL_NAME")
- 676:         self._model_name = (model_name or (env_model_name.strip() if env_model_name else "") or "antelopev2")
- 677: 
- 678:         env_det_size = os.environ.get("STEP5_INSIGHTFACE_DET_SIZE")
- 679:         det_size_value = det_size
- 680:         if det_size_value is None:
- 681:             try:
- 682:                 det_size_value = int(str(env_det_size).strip()) if env_det_size else 640
- 683:             except Exception:
- 684:                 det_size_value = 640
- 685:         self._det_size = max(64, int(det_size_value))
- 686: 
- 687:         ctx_id_raw = os.environ.get("STEP5_INSIGHTFACE_CTX_ID")
- 688:         try:
- 689:             ctx_id = int(str(ctx_id_raw).strip()) if ctx_id_raw else 0
- 690:         except Exception:
- 691:             ctx_id = 0
- 692:         if ctx_id < 0:
- 693:             ctx_id = 0
- 694: 
- 695:         providers = ["CUDAExecutionProvider"]
- 696:         insightface_root_raw = os.environ.get("INSIGHTFACE_HOME", "").strip()
- 697:         insightface_root = str(Path(insightface_root_raw or "~/.insightface").expanduser())
- 698: 
- 699:         allowed_modules_env = os.environ.get("STEP5_INSIGHTFACE_ALLOWED_MODULES", "").strip()
- 700:         allowed_modules = None
- 701:         if allowed_modules_env:
- 702:             allowed_modules = [m.strip() for m in allowed_modules_env.split(",") if m.strip()]
- 703:             if "detection" not in allowed_modules:
- 704:                 raise RuntimeError(
- 705:                     "STEP5_INSIGHTFACE_ALLOWED_MODULES must include 'detection' (required by FaceAnalysis)."
- 706:                 )
- 707: 
- 708:         try:
- 709:             self._app = FaceAnalysis(
- 710:                 name=self._model_name,
- 711:                 root=insightface_root,
- 712:                 providers=providers,
- 713:                 allowed_modules=allowed_modules,
- 714:             )
- 715:         except FileExistsError as e:
- 716:             model_dir = Path(insightface_root) / "models" / self._model_name
- 717:             quarantine_suffix = f"corrupt_{int(time.time())}"
- 718:             quarantine_dir = model_dir.with_name(f"{model_dir.name}.{quarantine_suffix}")
- 719:             try:
- 720:                 if model_dir.exists():
- 721:                     model_dir.rename(quarantine_dir)
- 722:                     logger.warning(
- 723:                         "[InsightFace] Model cache directory already exists but download attempted; "
- 724:                         "quarantined %s -> %s and retrying initialization.",
- 725:                         model_dir,
- 726:                         quarantine_dir,
- 727:                     )
- 728:             except Exception as rename_err:
- 729:                 raise RuntimeError(
- 730:                     f"InsightFace model cache appears corrupted at {model_dir}. "
- 731:                     f"Automatic quarantine failed ({rename_err}). "
- 732:                     "Please remove or rename the directory and retry."
- 733:                 ) from e
- 734: 
- 735:             self._app = FaceAnalysis(
- 736:                 name=self._model_name,
- 737:                 root=insightface_root,
- 738:                 providers=providers,
- 739:                 allowed_modules=allowed_modules,
- 740:             )
- 741:         self._app.prepare(ctx_id=ctx_id, det_size=(self._det_size, self._det_size))
- 742: 
- 743:         self._frame_counter = 0
- 744:         self._last_detections = []
- 745: 
- 746:         logger.info(
- 747:             f"[InsightFace] Initialized model_name={self._model_name}, det_size={self._det_size}, "
- 748:             f"max_width={self._max_detection_width}, max_faces={self._max_faces}, detect_every_n={self._detect_every_n}"
- 749:         )
- 750: 
- 751:     def _build_arkit_blendshapes(self, jaw_open: float) -> dict:
- 752:         out = {}
- 753:         for name in ARKIT_52_BLENDSHAPE_NAMES:
- 754:             out[name] = 0.0
- 755:         out["jawOpen"] = float(jaw_open)
- 756:         return out
- 757: 
- 758:     def _compute_jaw_open_from_dlib68(self, landmarks_68: np.ndarray) -> float:
- 759:         lm = np.asarray(landmarks_68, dtype=np.float32)
- 760:         if lm.ndim != 2 or lm.shape[0] < 68:
- 761:             return 0.0
- 762:         try:
- 763:             upper_inner = float(np.mean(lm[60:65, 1], axis=0))
- 764:             lower_inner = float(np.mean(lm[65:68, 1], axis=0))
- 765:             mouth_open = abs(lower_inner - upper_inner)
- 766: 
- 767:             nose_y = float(lm[33, 1])
- 768:             chin_y = float(lm[8, 1])
- 769:             denom = max(abs(chin_y - nose_y), 1e-6)
- 770:             ratio = (mouth_open / denom) * float(self._jaw_open_scale)
- 771:             return float(np.clip(ratio, 0.0, 1.0))
- 772:         except Exception:
- 773:             return 0.0
- 774: 
- 775:     def _get_face_landmarks_68(self, face_obj) -> Optional[np.ndarray]:
- 776:         candidates = [
- 777:             "landmark_3d_68",
- 778:             "landmark_2d_68",
- 779:         ]
- 780:         for attr in candidates:
- 781:             try:
- 782:                 val = getattr(face_obj, attr, None)
- 783:             except Exception:
- 784:                 val = None
- 785:             if val is None:
- 786:                 try:
- 787:                     val = face_obj.get(attr) if hasattr(face_obj, "get") else None
- 788:                 except Exception:
- 789:                     val = None
- 790:             if val is None:
- 791:                 continue
- 792: 
- 793:             lm = np.asarray(val)
- 794:             if lm.ndim != 2 or lm.shape[0] < 68:
- 795:                 continue
- 796:             if lm.shape[1] >= 2:
- 797:                 return lm[:, :2].astype(np.float32)
- 798:         return None
- 799: 
- 800:     def detect(self, frame_bgr):
- 801:         self._frame_counter += 1
- 802:         if (self._frame_counter % self._detect_every_n) != 0:
- 803:             return list(self._last_detections)
- 804: 
- 805:         if frame_bgr is None or getattr(frame_bgr, "shape", None) is None:
- 806:             self._last_detections = []
- 807:             return []
- 808: 
- 809:         orig_h, orig_w = frame_bgr.shape[:2]
- 810:         work_frame = frame_bgr
- 811:         scale_x = 1.0
- 812:         scale_y = 1.0
- 813: 
- 814:         t_resize_start = time.perf_counter() if self._enable_profiling else 0.0
- 815:         if orig_w > self._max_detection_width:
- 816:             detect_w = self._max_detection_width
- 817:             scale_factor = detect_w / float(orig_w)
- 818:             detect_h = max(1, int(orig_h * scale_factor))
- 819:             work_frame = cv2.resize(frame_bgr, (detect_w, detect_h), interpolation=cv2.INTER_LINEAR)
- 820:             scale_x = orig_w / float(detect_w)
- 821:             scale_y = orig_h / float(detect_h)
- 822:         if self._enable_profiling:
- 823:             self._profiling_stats["resize_total"] += time.perf_counter() - t_resize_start
- 824: 
- 825:         t_detect_start = time.perf_counter() if self._enable_profiling else 0.0
- 826:         try:
- 827:             with self._lock:
- 828:                 faces = self._app.get(work_frame)
- 829:         except Exception as e:
- 830:             logger.warning("[InsightFace] Detection failed: %s", e)
- 831:             self._last_detections = []
- 832:             return []
- 833:         if self._enable_profiling:
- 834:             self._profiling_stats["detect_total"] += time.perf_counter() - t_detect_start
- 835: 
- 836:         if not faces:
- 837:             self._last_detections = []
- 838:             return []
- 839: 
- 840:         if self._max_faces is not None:
- 841:             faces = faces[: self._max_faces]
- 842: 
- 843:         detections = []
- 844:         t_post_start = time.perf_counter() if self._enable_profiling else 0.0
- 845:         for face in faces:
- 846:             bbox = None
- 847:             try:
- 848:                 bbox = getattr(face, "bbox", None)
- 849:             except Exception:
- 850:                 bbox = None
- 851:             if bbox is None:
- 852:                 try:
- 853:                     bbox = face.get("bbox") if hasattr(face, "get") else None
- 854:                 except Exception:
- 855:                     bbox = None
- 856:             if bbox is None:
- 857:                 continue
- 858: 
- 859:             bbox_arr = np.asarray(bbox, dtype=np.float32).reshape(-1)
- 860:             if bbox_arr.size < 4:
- 861:                 continue
- 862: 
- 863:             x1, y1, x2, y2 = [float(v) for v in bbox_arr[:4]]
- 864:             if scale_x != 1.0 or scale_y != 1.0:
- 865:                 x1 *= float(scale_x)
- 866:                 x2 *= float(scale_x)
- 867:                 y1 *= float(scale_y)
- 868:                 y2 *= float(scale_y)
- 869: 
- 870:             x1_i = max(0, int(x1))
- 871:             y1_i = max(0, int(y1))
- 872:             x2_i = min(int(orig_w), int(x2))
- 873:             y2_i = min(int(orig_h), int(y2))
- 874:             if x2_i <= x1_i or y2_i <= y1_i:
- 875:                 continue
- 876: 
- 877:             bbox_w = int(x2_i - x1_i)
- 878:             bbox_h = int(y2_i - y1_i)
- 879:             centroid = (x1_i + (bbox_w // 2), y1_i + (bbox_h // 2))
- 880: 
- 881:             try:
- 882:                 score = float(getattr(face, "det_score", 1.0))
- 883:             except Exception:
- 884:                 score = 1.0
- 885: 
- 886:             landmarks_68 = self._get_face_landmarks_68(face)
- 887:             if landmarks_68 is not None and (scale_x != 1.0 or scale_y != 1.0):
- 888:                 landmarks_68 = landmarks_68.astype(np.float32, copy=True)
- 889:                 landmarks_68[:, 0] *= float(scale_x)
- 890:                 landmarks_68[:, 1] *= float(scale_y)
- 891: 
- 892:             jaw_open = self._compute_jaw_open_from_dlib68(landmarks_68) if landmarks_68 is not None else 0.0
- 893:             blendshapes = self._build_arkit_blendshapes(jaw_open)
- 894: 
- 895:             detections.append(
- 896:                 {
- 897:                     "bbox": (x1_i, y1_i, bbox_w, bbox_h),
- 898:                     "centroid": centroid,
- 899:                     "source_detector": "face_landmarker",
- 900:                     "label": "face",
- 901:                     "confidence": score,
- 902:                     "landmarks": landmarks_68.tolist() if landmarks_68 is not None else [],
- 903:                     "blendshapes": blendshapes,
- 904:                 }
- 905:             )
- 906: 
- 907:         if self._enable_profiling:
- 908:             self._profiling_stats["post_total"] += time.perf_counter() - t_post_start
- 909:             self._profiling_stats["frame_count"] += 1
- 910:             if (self._profiling_stats["frame_count"] % 20) == 0:
- 911:                 frame_count = int(self._profiling_stats.get("frame_count", 0) or 0)
- 912:                 if frame_count > 0:
- 913:                     resize_ms = (self._profiling_stats["resize_total"] / frame_count) * 1000.0
- 914:                     detect_ms = (self._profiling_stats["detect_total"] / frame_count) * 1000.0
- 915:                     post_ms = (self._profiling_stats["post_total"] / frame_count) * 1000.0
- 916:                     logger.info(
- 917:                         "[PROFILING] InsightFace after %s frames: resize=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
- 918:                         frame_count,
- 919:                         resize_ms,
- 920:                         detect_ms,
- 921:                         post_ms,
- 922:                     )
- 923: 
- 924:         self._last_detections = detections
- 925:         return detections
- 926: 
- 927: 
- 928: class OpenCVHaarFaceEngine:
- 929:     def __init__(self, cascade_path: Optional[str] = None):
- 930:         self._lock = threading.Lock()
- 931:         self._cascade_path = cascade_path or os.environ.get("STEP5_OPENCV_HAAR_CASCADE_PATH")
- 932:         if not self._cascade_path:
- 933:             self._cascade_path = str(Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml")
- 934: 
- 935:         self._max_faces = _parse_optional_positive_int(os.environ.get("STEP5_OPENCV_MAX_FACES"))
- 936: 
- 937:         self._classifier = cv2.CascadeClassifier(self._cascade_path)
- 938:         if self._classifier.empty():
- 939:             raise RuntimeError(f"Unable to load Haar cascade: {self._cascade_path}")
- 940: 
- 941:     def detect(self, frame_bgr):
- 942:         gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
- 943:         with self._lock:
- 944:             faces = self._classifier.detectMultiScale(
- 945:                 gray,
- 946:                 scaleFactor=1.1,
- 947:                 minNeighbors=5,
- 948:                 minSize=(30, 30),
- 949:             )
- 950: 
- 951:         if self._max_faces is not None:
- 952:             faces = faces[: self._max_faces]
- 953: 
- 954:         detections = []
- 955:         for (x, y, w, h) in faces:
- 956:             x_i = int(x)
- 957:             y_i = int(y)
- 958:             w_i = int(w)
- 959:             h_i = int(h)
- 960:             detections.append(
- 961:                 {
- 962:                     "bbox": (x_i, y_i, w_i, h_i),
- 963:                     "centroid": (x_i + (w_i // 2), y_i + (h_i // 2)),
- 964:                     "source_detector": "face_landmarker",
- 965:                     "label": "face",
- 966:                     "confidence": 1.0,
- 967:                     "blendshapes": None,
- 968:                 }
- 969:             )
- 970: 
- 971:         return detections
- 972: 
- 973: 
- 974: class OpenCVYuNetFaceEngine:
- 975:     def __init__(
- 976:         self,
- 977:         model_path: Optional[str] = None,
- 978:         score_threshold: float = 0.7,
- 979:         nms_threshold: float = 0.3,
- 980:         top_k: int = 5000,
- 981:         use_gpu: bool = False,
- 982:     ):
- 983:         self._lock = threading.Lock()
- 984:         self._use_gpu = use_gpu
- 985:         if use_gpu:
- 986:             logger.info(
- 987:                 "YuNet detection currently repose sur cv2.FaceDetectorYN (CPU). "
- 988:                 "Le flag GPU optimise uniquement les composants aval (FaceMesh/PyFeat)."
- 989:             )
- 990:         
- 991:         # Force OpenCV to use single thread to avoid contention with multiprocessing
- 992:         cv2.setNumThreads(1)
- 993:         
- 994:         # Configure downscaling for performance (coordinates will be rescaled to original)
- 995:         self._max_detection_width = int(os.environ.get("STEP5_YUNET_MAX_WIDTH", "640"))
- 996:         logger.info(f"YuNet downscale enabled: max_width={self._max_detection_width}px (coordinates auto-rescaled to original resolution)")
- 997: 
- 998:         self._max_faces = _parse_optional_positive_int(os.environ.get("STEP5_OPENCV_MAX_FACES"))
- 999:         
-1000:         self._model_path = model_path or os.environ.get("STEP5_YUNET_MODEL_PATH")
-1001:         if not self._model_path:
-1002:             raise RuntimeError("Missing STEP5_YUNET_MODEL_PATH (YuNet model .onnx)")
-1003: 
-1004:         self._model_path = self._resolve_model_path(self._model_path)
-1005:         if not Path(self._model_path).exists():
-1006:             raise RuntimeError(f"YuNet ONNX model not found: {self._model_path}")
-1007: 
-1008:         if not hasattr(cv2, "FaceDetectorYN"):
-1009:             raise RuntimeError("cv2.FaceDetectorYN is not available (opencv-contrib-python required)")
-1010: 
-1011:         self._score_threshold = float(score_threshold)
-1012:         self._nms_threshold = float(nms_threshold)
-1013:         self._top_k = int(top_k)
-1014: 
-1015:         self._detector = cv2.FaceDetectorYN.create(
-1016:             self._model_path,
-1017:             "",
-1018:             (320, 320),
-1019:             self._score_threshold,
-1020:             self._nms_threshold,
-1021:             self._top_k,
-1022:         )
-1023: 
-1024:     def _resolve_model_path(self, model_path: str) -> str:
-1025:         candidate = Path(model_path)
-1026:         if candidate.is_absolute():
-1027:             return str(candidate)
-1028: 
-1029:         if candidate.exists():
-1030:             return str(candidate)
-1031: 
-1032:         step5_dir = Path(__file__).resolve().parent
-1033:         project_root = step5_dir.parent.parent
-1034: 
-1035:         candidates = [
-1036:             project_root / candidate,
-1037:             step5_dir / candidate,
-1038:         ]
-1039:         for c in candidates:
-1040:             if c.exists():
-1041:                 return str(c)
-1042: 
-1043:         return str(candidate)
-1044: 
-1045:     def detect(self, frame_bgr):
-1046:         orig_height, orig_width = frame_bgr.shape[:2]
-1047:         
-1048:         # Downscale for detection if needed
-1049:         if orig_width > self._max_detection_width:
-1050:             scale_factor = self._max_detection_width / orig_width
-1051:             detect_width = self._max_detection_width
-1052:             detect_height = int(orig_height * scale_factor)
-1053:             frame_resized = cv2.resize(frame_bgr, (detect_width, detect_height), interpolation=cv2.INTER_LINEAR)
-1054:         else:
-1055:             frame_resized = frame_bgr
-1056:             detect_width = orig_width
-1057:             detect_height = orig_height
-1058:             scale_factor = 1.0
-1059:         
-1060:         with self._lock:
-1061:             self._detector.setInputSize((detect_width, detect_height))
-1062:             _, faces = self._detector.detect(frame_resized)
-1063: 
-1064:         detections = []
-1065:         if faces is None:
-1066:             return detections
-1067: 
-1068:         # Rescale coordinates to original resolution
-1069:         rescale = orig_width / detect_width
-1070:         if scale_factor != 1.0:
-1071:             logger.debug(f"YuNet upscale: {detect_width}x{detect_height} -> {orig_width}x{orig_height} (rescale={rescale:.2f})")
-1072:         
-1073:         face_limit = self._max_faces
-1074:         for idx, row in enumerate(faces):
-1075:             if face_limit is not None and idx >= face_limit:
-1076:                 break
-1077:             x, y, w, h = row[:4]
-1078:             score = float(row[-1]) if len(row) >= 15 else 0.0
-1079:             
-1080:             # Rescale to original coordinates
-1081:             x_orig = int(max(0, x * rescale))
-1082:             y_orig = int(max(0, y * rescale))
-1083:             w_orig = int(max(0, w * rescale))
-1084:             h_orig = int(max(0, h * rescale))
-1085:             
-1086:             detections.append(
-1087:                 {
-1088:                     "bbox": (x_orig, y_orig, w_orig, h_orig),
-1089:                     "centroid": (x_orig + (w_orig // 2), y_orig + (h_orig // 2)),
-1090:                     "source_detector": "face_landmarker",
-1091:                     "label": "face",
-1092:                     "confidence": score,
-1093:                     "blendshapes": None,
-1094:                 }
-1095:             )
-1096: 
-1097:         return detections
-1098: 
-1099: 
-1100: class OpenCVYuNetPyFeatEngine:
-1101:     def __init__(
-1102:         self,
-1103:         yunet_model_path: Optional[str] = None,
-1104:         facemesh_model_path: Optional[str] = None,
-1105:         pyfeat_model_path: Optional[str] = None,
-1106:         score_threshold: float = 0.7,
-1107:         nms_threshold: float = 0.3,
-1108:         top_k: int = 5000,
-1109:         use_gpu: bool = False,
-1110:     ):
-1111:         self._lock = threading.Lock()
-1112:         self._use_gpu = use_gpu
-1113:         
-1114:         # Debug: log environment variable values
-1115:         profiling_env = os.environ.get("STEP5_ENABLE_PROFILING", "NOT_SET")
-1116:         throttle_env = os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "NOT_SET")
-1117:         logger.info(f"[DEBUG] STEP5_ENABLE_PROFILING={profiling_env}, STEP5_BLENDSHAPES_THROTTLE_N={throttle_env}")
-1118:         
-1119:         self._enable_profiling = os.environ.get("STEP5_ENABLE_PROFILING", "0").strip() in {"1", "true", "yes"}
-1120:         logger.info(f"[DEBUG] Profiling enabled: {self._enable_profiling}")
-1121:         
-1122:         self._profiling_stats = {
-1123:             "yunet_total": 0.0,
-1124:             "roi_extraction": 0.0,
-1125:             "facemesh_total": 0.0,
-1126:             "pyfeat_total": 0.0,
-1127:             "frame_count": 0
-1128:         }
-1129:         
-1130:         # Blendshapes throttling: compute every N frames to reduce CPU cost
-1131:         self._blendshapes_throttle_n = max(1, int(os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")))
-1132:         logger.info(f"[DEBUG] Blendshapes throttle N: {self._blendshapes_throttle_n}")
-1133:         self._frame_counter = 0
-1134:         self._last_blendshapes_cache = {}  # object_id -> blendshapes dict
-1135: 
-1136:         self._jaw_open_scale = float(os.environ.get("STEP5_OPENCV_JAWOPEN_SCALE", "1.0"))
-1137:         
-1138:         self._yunet = OpenCVYuNetFaceEngine(
-1139:             model_path=yunet_model_path,
-1140:             score_threshold=score_threshold,
-1141:             nms_threshold=nms_threshold,
-1142:             top_k=top_k,
-1143:             use_gpu=use_gpu,
-1144:         )
-1145:         
-1146:         try:
-1147:             from onnx_facemesh_detector import ONNXFaceMeshDetector
-1148:             self._facemesh_detector = ONNXFaceMeshDetector(
-1149:                 model_path=facemesh_model_path,
-1150:                 use_gpu=use_gpu,
-1151:             )
-1152:         except Exception as e:
-1153:             raise RuntimeError(f"Failed to initialize FaceMesh ONNX detector: {e}")
-1154:         
-1155:         self._blendshape_extractor = None
-1156:         strict_pyfeat = os.environ.get("STEP5_PYFEAT_STRICT", "0").strip().lower() in {"1", "true", "yes"}
-1157:         try:
-1158:             from pyfeat_blendshape_extractor import PyFeatBlendshapeExtractor
-1159: 
-1160:             self._blendshape_extractor = PyFeatBlendshapeExtractor(
-1161:                 model_path=pyfeat_model_path,
-1162:                 use_gpu=use_gpu,
-1163:             )
-1164:         except Exception as e:
-1165:             if strict_pyfeat:
-1166:                 raise RuntimeError(f"Failed to initialize py-feat blendshape extractor: {e}")
-1167: 
-1168:             logger.warning(
-1169:                 "py-feat blendshape extractor disabled (continuing without blendshapes): %s",
-1170:                 e,
-1171:             )
-1172: 
-1173:     def detect(self, frame_bgr):
-1174:         height, width = frame_bgr.shape[:2]
-1175:         self._frame_counter += 1
-1176:         should_compute_blendshapes = (self._frame_counter % self._blendshapes_throttle_n) == 0
-1177:         
-1178:         t_start_yunet = time.perf_counter() if self._enable_profiling else 0
-1179:         yunet_detections = self._yunet.detect(frame_bgr)
-1180:         if self._enable_profiling:
-1181:             self._profiling_stats["yunet_total"] += time.perf_counter() - t_start_yunet
-1182:         
-1183:         detections_with_blendshapes = []
-1184:         
-1185:         for det in yunet_detections:
-1186:             bbox = det["bbox"]
-1187:             x, y, w, h = bbox
-1188:             
-1189:             x_safe = max(0, x)
-1190:             y_safe = max(0, y)
-1191:             x2_safe = min(width, x + w)
-1192:             y2_safe = min(height, y + h)
-1193:             
-1194:             if x2_safe <= x_safe or y2_safe <= y_safe:
-1195:                 detections_with_blendshapes.append(det)
-1196:                 continue
-1197:             
-1198:             t_start_roi = time.perf_counter() if self._enable_profiling else 0
-1199:             face_roi = frame_bgr[y_safe:y2_safe, x_safe:x2_safe]
-1200:             if self._enable_profiling:
-1201:                 self._profiling_stats["roi_extraction"] += time.perf_counter() - t_start_roi
-1202:             
-1203:             t_start_facemesh = time.perf_counter() if self._enable_profiling else 0
-1204:             landmarks_478 = self._facemesh_detector.detect_landmarks(
-1205:                 face_roi,
-1206:                 (x_safe, y_safe, x2_safe - x_safe, y2_safe - y_safe)
-1207:             )
-1208:             if self._enable_profiling:
-1209:                 self._profiling_stats["facemesh_total"] += time.perf_counter() - t_start_facemesh
-1210:             
-1211:             blendshapes = None
-1212:             if landmarks_478 is not None and self._blendshape_extractor is not None:
-1213:                 # Use simple bbox center as object identifier for caching
-1214:                 object_id = f"{x_safe}_{y_safe}_{x2_safe}_{y2_safe}"
-1215:                 
-1216:                 if should_compute_blendshapes:
-1217:                     t_start_pyfeat = time.perf_counter() if self._enable_profiling else 0
-1218:                     blendshapes = self._blendshape_extractor.extract_blendshapes(
-1219:                         landmarks_478,
-1220:                         width,
-1221:                         height,
-1222:                     )
-1223:                     if self._enable_profiling:
-1224:                         self._profiling_stats["pyfeat_total"] += time.perf_counter() - t_start_pyfeat
-1225:                     
-1226:                     # Cache for next frames
-1227:                     if blendshapes is not None:
-1228:                         blendshapes_scaled = _apply_jawopen_scale(blendshapes, self._jaw_open_scale)
-1229:                         self._last_blendshapes_cache[object_id] = blendshapes_scaled
-1230:                         blendshapes = blendshapes_scaled
-1231:                 else:
-1232:                     # Reuse cached blendshapes from previous computation
-1233:                     blendshapes = self._last_blendshapes_cache.get(object_id)
-1234:                     # If no cache available (first frames), compute anyway
-1235:                     if blendshapes is None:
-1236:                         t_start_pyfeat = time.perf_counter() if self._enable_profiling else 0
-1237:                         blendshapes = self._blendshape_extractor.extract_blendshapes(
-1238:                             landmarks_478,
-1239:                             width,
-1240:                             height,
-1241:                         )
-1242:                         if self._enable_profiling:
-1243:                             self._profiling_stats["pyfeat_total"] += time.perf_counter() - t_start_pyfeat
-1244:                         if blendshapes is not None:
-1245:                             blendshapes_scaled = _apply_jawopen_scale(blendshapes, self._jaw_open_scale)
-1246:                             self._last_blendshapes_cache[object_id] = blendshapes_scaled
-1247:                             blendshapes = blendshapes_scaled
-1248:             
-1249:             detection_with_bs = det.copy()
-1250:             detection_with_bs["bbox"] = (x_safe, y_safe, x2_safe - x_safe, y2_safe - y_safe)
-1251:             detection_with_bs["landmarks"] = landmarks_478.tolist() if landmarks_478 is not None else []
-1252:             detection_with_bs["blendshapes"] = blendshapes
-1253:             detections_with_blendshapes.append(detection_with_bs)
-1254:         
-1255:         if self._enable_profiling:
-1256:             self._profiling_stats["frame_count"] += 1
-1257:             # Log every 20 frames (compatible with multiprocessing chunk size)
-1258:             if self._profiling_stats["frame_count"] % 20 == 0:
-1259:                 self._log_profiling_stats()
-1260:         
-1261:         return detections_with_blendshapes
-1262:     
-1263:     def _log_profiling_stats(self):
-1264:         """Log accumulated profiling statistics."""
-1265:         fc = self._profiling_stats["frame_count"]
-1266:         if fc == 0:
-1267:             return
-1268:         logger.info(
-1269:             f"[PROFILING] After {fc} frames: "
-1270:             f"YuNet={self._profiling_stats['yunet_total']/fc*1000:.2f}ms/frame, "
-1271:             f"ROI={self._profiling_stats['roi_extraction']/fc*1000:.2f}ms/frame, "
-1272:             f"FaceMesh={self._profiling_stats['facemesh_total']/fc*1000:.2f}ms/frame, "
-1273:             f"py-feat={self._profiling_stats['pyfeat_total']/fc*1000:.2f}ms/frame"
-1274:         )
-1275: 
-1276: 
-1277: class EosFaceEngine:
-1278:     def __init__(
-1279:         self,
-1280:         yunet_model_path: Optional[str] = None,
-1281:         facemesh_model_path: Optional[str] = None,
-1282:     ):
-1283:         try:
-1284:             import eos as eos_module
-1285:         except Exception as e:
-1286:             raise RuntimeError(
-1287:                 "eos engine requires eos-py (install it inside eos_env)."
-1288:             ) from e
-1289: 
-1290:         self._eos = eos_module
-1291:         self._lock = threading.Lock()
-1292:         self._frame_counter = 0
-1293:         self._last_detections = []
-1294: 
-1295:         fit_every_raw = os.environ.get("STEP5_EOS_FIT_EVERY_N")
-1296:         if fit_every_raw is None or str(fit_every_raw).strip() == "":
-1297:             fit_every_raw = os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")
-1298:         try:
-1299:             self._fit_every_n = max(1, int(str(fit_every_raw)))
-1300:         except Exception:
-1301:             self._fit_every_n = 1
-1302: 
-1303:         self._jaw_open_scale = float(os.environ.get("STEP5_EOS_JAWOPEN_SCALE", "1.0"))
-1304:         self._max_faces = (
-1305:             _parse_optional_positive_int(os.environ.get("STEP5_EOS_MAX_FACES"))
-1306:             or _parse_optional_positive_int(os.environ.get("STEP5_OPENCV_MAX_FACES"))
-1307:         )
-1308:         
-1309:         self._max_detection_width = int(os.environ.get("STEP5_EOS_MAX_WIDTH", "1280"))
-1310:         self._enable_profiling = os.environ.get("STEP5_ENABLE_PROFILING", "").strip().lower() in {"1", "true", "yes"}
-1311:         self._profiling_interval = 20
-1312: 
-1313:         self._yunet = OpenCVYuNetFaceEngine(model_path=yunet_model_path)
-1314: 
-1315:         try:
-1316:             from onnx_facemesh_detector import ONNXFaceMeshDetector
-1317:         except Exception as e:
-1318:             raise RuntimeError(
-1319:                 "eos engine requires ONNXFaceMeshDetector dependencies (onnxruntime + FaceMesh model) inside eos_env."
-1320:             ) from e
-1321: 
-1322:         self._facemesh_detector = ONNXFaceMeshDetector(model_path=facemesh_model_path)
-1323: 
-1324:         self._models_dir = os.environ.get("STEP5_EOS_MODELS_DIR")
-1325:         self._sfm_model_path_raw = os.environ.get("STEP5_EOS_SFM_MODEL_PATH")
-1326:         self._expression_blendshapes_path_raw = os.environ.get("STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH")
-1327:         self._landmark_mapper_path_raw = os.environ.get("STEP5_EOS_LANDMARK_MAPPER_PATH")
-1328:         self._edge_topology_path_raw = os.environ.get("STEP5_EOS_EDGE_TOPOLOGY_PATH")
-1329:         self._model_contour_path_raw = os.environ.get("STEP5_EOS_MODEL_CONTOUR_PATH")
-1330:         self._contour_landmarks_path_raw = os.environ.get("STEP5_EOS_CONTOUR_LANDMARKS_PATH")
-1331: 
-1332:         self._morphable_model = None
-1333:         self._landmark_mapper = None
-1334:         self._edge_topology = None
-1335:         self._contour_landmarks = None
-1336:         self._model_contour = None
-1337: 
-1338:         correspondence = [
-1339:             (127, 127),
-1340:             (234, 234),
-1341:             (93, 93),
-1342:             (132, 58),
-1343:             (58, 172),
-1344:             (136, 136),
-1345:             (150, 150),
-1346:             (176, 176),
-1347:             (152, 152),
-1348:             (400, 400),
-1349:             (379, 379),
-1350:             (365, 365),
-1351:             (397, 288),
-1352:             (361, 361),
-1353:             (323, 323),
-1354:             (454, 454),
-1355:             (356, 356),
-1356:             (70, 70),
-1357:             (63, 63),
-1358:             (105, 105),
-1359:             (66, 66),
-1360:             (107, 107),
-1361:             (336, 336),
-1362:             (296, 296),
-1363:             (334, 334),
-1364:             (293, 293),
-1365:             (300, 300),
-1366:             (168, 6),
-1367:             (197, 195),
-1368:             (5, 5),
-1369:             (4, 4),
-1370:             (75, 75),
-1371:             (97, 97),
-1372:             (2, 2),
-1373:             (326, 326),
-1374:             (305, 305),
-1375:             (33, 33),
-1376:             (160, 160),
-1377:             (158, 158),
-1378:             (133, 133),
-1379:             (153, 153),
-1380:             (144, 144),
-1381:             (362, 362),
-1382:             (385, 385),
-1383:             (387, 387),
-1384:             (263, 263),
-1385:             (373, 373),
-1386:             (380, 380),
-1387:             (61, 61),
-1388:             (39, 39),
-1389:             (37, 37),
-1390:             (0, 0),
-1391:             (267, 267),
-1392:             (269, 269),
-1393:             (291, 291),
-1394:             (321, 321),
-1395:             (314, 314),
-1396:             (17, 17),
-1397:             (84, 84),
-1398:             (91, 91),
-1399:             (78, 78),
-1400:             (82, 82),
-1401:             (13, 13),
-1402:             (312, 312),
-1403:             (308, 308),
-1404:             (317, 317),
-1405:             (14, 14),
-1406:             (87, 87),
-1407:         ]
-1408: 
-1409:         self._mp2dlib_pairs = np.asarray(correspondence, dtype=np.int32)
-1410: 
-1411:     def _resolve_model_path(self, model_path: str) -> str:
-1412:         candidate = Path(model_path)
-1413:         if candidate.is_absolute() and candidate.exists():
-1414:             return str(candidate)
-1415:         if candidate.exists():
-1416:             return str(candidate)
-1417: 
-1418:         step5_dir = Path(__file__).resolve().parent
-1419:         project_root = step5_dir.parent.parent
-1420: 
-1421:         candidates = [
-1422:             project_root / candidate,
-1423:             step5_dir / candidate,
-1424:         ]
-1425:         for c in candidates:
-1426:             if c.exists():
-1427:                 return str(c)
-1428: 
-1429:         return str(candidate)
-1430: 
-1431:     def _get_models_base_dir(self) -> Path:
-1432:         if self._models_dir and str(self._models_dir).strip():
-1433:             return Path(self._resolve_model_path(self._models_dir)).resolve()
-1434: 
-1435:         step5_dir = Path(__file__).resolve().parent
-1436:         models_dir = step5_dir / "models" / "engines" / "eos"
-1437:         return models_dir.resolve()
-1438: 
-1439:     def _ensure_eos_assets_loaded(self) -> None:
-1440:         if self._morphable_model is not None:
-1441:             return
-1442: 
-1443:         models_base_dir = self._get_models_base_dir()
-1444:         sfm_model_path = self._sfm_model_path_raw or str(models_base_dir / "sfm_shape_3448.bin")
-1445:         expression_blendshapes_path = self._expression_blendshapes_path_raw or str(
-1446:             models_base_dir / "expression_blendshapes_3448.bin"
-1447:         )
-1448:         landmark_mapper_path = self._landmark_mapper_path_raw or str(models_base_dir / "ibug_to_sfm.txt")
-1449:         edge_topology_path = self._edge_topology_path_raw or str(models_base_dir / "sfm_3448_edge_topology.json")
-1450:         model_contour_path = self._model_contour_path_raw or str(models_base_dir / "sfm_model_contours.json")
-1451:         contour_landmarks_path = self._contour_landmarks_path_raw or landmark_mapper_path
-1452: 
-1453:         sfm_model_path = self._resolve_model_path(sfm_model_path)
-1454:         expression_blendshapes_path = self._resolve_model_path(expression_blendshapes_path)
-1455:         landmark_mapper_path = self._resolve_model_path(landmark_mapper_path)
-1456:         edge_topology_path = self._resolve_model_path(edge_topology_path)
-1457:         model_contour_path = self._resolve_model_path(model_contour_path)
-1458:         contour_landmarks_path = self._resolve_model_path(contour_landmarks_path)
-1459: 
-1460:         required_files = {
-1461:             "sfm_model": sfm_model_path,
-1462:             "expression_blendshapes": expression_blendshapes_path,
-1463:             "landmark_mapper": landmark_mapper_path,
-1464:             "edge_topology": edge_topology_path,
-1465:             "model_contour": model_contour_path,
-1466:             "contour_landmarks": contour_landmarks_path,
-1467:         }
-1468:         missing = [k for k, v in required_files.items() if not Path(v).exists()]
-1469:         if missing:
-1470:             raise RuntimeError(
-1471:                 "Missing eos asset files: "
-1472:                 + ", ".join(missing)
-1473:                 + ". Configure STEP5_EOS_MODELS_DIR and/or STEP5_EOS_*_PATH variables."
-1474:             )
-1475: 
-1476:         model = self._eos.morphablemodel.load_model(sfm_model_path)
-1477:         blendshapes = self._eos.morphablemodel.load_blendshapes(expression_blendshapes_path)
-1478: 
-1479:         self._morphable_model = self._eos.morphablemodel.MorphableModel(
-1480:             model.get_shape_model(),
-1481:             blendshapes,
-1482:             color_model=self._eos.morphablemodel.PcaModel(),
-1483:             vertex_definitions=None,
-1484:             texture_coordinates=model.get_texture_coordinates(),
-1485:         )
-1486:         self._landmark_mapper = self._eos.core.LandmarkMapper(landmark_mapper_path)
-1487:         self._edge_topology = self._eos.morphablemodel.load_edge_topology(edge_topology_path)
-1488:         self._contour_landmarks = self._eos.fitting.ContourLandmarks.load(contour_landmarks_path)
-1489:         self._model_contour = self._eos.fitting.ModelContour.load(model_contour_path)
-1490: 
-1491:     def _convert_478_to_68(self, landmarks_478: np.ndarray) -> np.ndarray:
-1492:         lm = np.asarray(landmarks_478, dtype=np.float32)
-1493:         if lm.ndim != 2 or lm.shape[0] < 468:
-1494:             raise ValueError(f"Invalid FaceMesh landmarks shape: {lm.shape}")
-1495:         if lm.shape[0] < 478:
-1496:             last = lm[-1:, :]
-1497:             pad = np.repeat(last, 478 - lm.shape[0], axis=0)
-1498:             lm = np.concatenate([lm, pad], axis=0)
-1499:         return lm[self._mp2dlib_pairs].mean(axis=1)
-1500: 
-1501:     def _compute_jaw_open_from_dlib68(self, landmarks_68: np.ndarray) -> float:
-1502:         lm = np.asarray(landmarks_68, dtype=np.float32)
-1503:         if lm.ndim != 2 or lm.shape[0] < 68:
-1504:             return 0.0
-1505: 
-1506:         try:
-1507:             upper_inner = float(np.mean(lm[60:65, 1], axis=0))
-1508:             lower_inner = float(np.mean(lm[65:68, 1], axis=0))
-1509:             mouth_open = abs(lower_inner - upper_inner)
-1510: 
-1511:             nose_y = float(lm[33, 1])
-1512:             chin_y = float(lm[8, 1])
-1513:             denom = max(abs(chin_y - nose_y), 1e-6)
-1514:             ratio = (mouth_open / denom) * float(self._jaw_open_scale)
-1515:             return float(np.clip(ratio, 0.0, 1.0))
-1516:         except Exception:
-1517:             return 0.0
-1518: 
-1519:     def _build_arkit_blendshapes(self, jaw_open: float) -> dict:
-1520:         out = {}
-1521:         for name in ARKIT_52_BLENDSHAPE_NAMES:
-1522:             out[name] = 0.0
-1523:         out["jawOpen"] = float(jaw_open)
-1524:         return out
-1525: 
-1526:     def _safe_to_list(self, value) -> list:
-1527:         if value is None:
-1528:             return []
-1529:         try:
-1530:             return [float(x) for x in value]
-1531:         except Exception:
-1532:             try:
-1533:                 return [float(x) for x in list(value)]
-1534:             except Exception:
-1535:                 return []
-1536: 
-1537:     def detect(self, frame_bgr):
-1538:         import time
-1539:         
-1540:         self._frame_counter += 1
-1541:         
-1542:         if self._enable_profiling and (self._frame_counter % self._profiling_interval) == 0:
-1543:             frame_start_time = time.time()
-1544:         else:
-1545:             frame_start_time = None
-1546:         
-1547:         if (self._frame_counter % self._fit_every_n) != 0:
-1548:             return list(self._last_detections)
-1549: 
-1550:         if frame_bgr is None or getattr(frame_bgr, "shape", None) is None:
-1551:             self._last_detections = []
-1552:             return []
-1553: 
-1554:         orig_height, orig_width = frame_bgr.shape[:2]
-1555:         
-1556:         if orig_width > self._max_detection_width:
-1557:             scale_factor = self._max_detection_width / orig_width
-1558:             detect_width = self._max_detection_width
-1559:             detect_height = int(orig_height * scale_factor)
-1560:             frame_resized = cv2.resize(frame_bgr, (detect_width, detect_height), interpolation=cv2.INTER_LINEAR)
-1561:             height, width = detect_height, detect_width
-1562:         else:
-1563:             frame_resized = frame_bgr
-1564:             height, width = orig_height, orig_width
-1565:             scale_factor = 1.0
-1566: 
-1567:         try:
-1568:             self._ensure_eos_assets_loaded()
-1569:         except Exception as e:
-1570:             logger.error("EOS assets load failed: %s", e)
-1571:             self._last_detections = []
-1572:             return []
-1573:         
-1574:         if frame_start_time is not None:
-1575:             assets_time = time.time()
-1576: 
-1577:         yunet_detections = self._yunet.detect(frame_resized)
-1578:         if self._max_faces is not None:
-1579:             yunet_detections = yunet_detections[: self._max_faces]
-1580:         
-1581:         if frame_start_time is not None:
-1582:             yunet_time = time.time()
-1583: 
-1584:         detections = []
-1585:         for det in yunet_detections:
-1586:             bbox = det.get("bbox")
-1587:             if not bbox or len(bbox) < 4:
-1588:                 continue
-1589: 
-1590:             x, y, w, h = bbox
-1591:             
-1592:             if scale_factor != 1.0:
-1593:                 x = int(x / scale_factor)
-1594:                 y = int(y / scale_factor)
-1595:                 w = int(w / scale_factor)
-1596:                 h = int(h / scale_factor)
-1597:                 logger.debug(f"EOS upscale: bbox rescaled by 1/{scale_factor:.2f} to original resolution")
-1598:             
-1599:             x_safe = max(0, int(x))
-1600:             y_safe = max(0, int(y))
-1601:             x2_safe = min(int(orig_width), int(x + w))
-1602:             y2_safe = min(int(orig_height), int(y + h))
-1603:             if x2_safe <= x_safe or y2_safe <= y_safe:
-1604:                 continue
-1605: 
-1606:             face_roi = frame_bgr[y_safe:y2_safe, x_safe:x2_safe]
-1607:             landmarks_478 = self._facemesh_detector.detect_landmarks(
-1608:                 face_roi,
-1609:                 (x_safe, y_safe, x2_safe - x_safe, y2_safe - y_safe),
-1610:             )
-1611:             if landmarks_478 is None:
-1612:                 continue
-1613:             
-1614:             if frame_start_time is not None:
-1615:                 facemesh_time = time.time()
-1616: 
-1617:             try:
-1618:                 landmarks_68 = self._convert_478_to_68(landmarks_478)
-1619:             except Exception:
-1620:                 continue
-1621: 
-1622:             jaw_open = self._compute_jaw_open_from_dlib68(landmarks_68)
-1623: 
-1624:             try:
-1625:                 eos_landmarks = []
-1626:                 for i in range(68):
-1627:                     eos_landmarks.append(
-1628:                         self._eos.core.Landmark(
-1629:                             str(i + 1),
-1630:                             [float(landmarks_68[i, 0]), float(landmarks_68[i, 1])],
-1631:                         )
-1632:                     )
-1633: 
-1634:                 with self._lock:
-1635:                     (
-1636:                         _mesh,
-1637:                         _pose,
-1638:                         shape_coeffs,
-1639:                         blendshape_coeffs,
-1640:                     ) = self._eos.fitting.fit_shape_and_pose(
-1641:                         self._morphable_model,
-1642:                         eos_landmarks,
-1643:                         self._landmark_mapper,
-1644:                         int(orig_width),
-1645:                         int(orig_height),
-1646:                         self._edge_topology,
-1647:                         self._contour_landmarks,
-1648:                         self._model_contour,
-1649:                     )
-1650:             except Exception as e:
-1651:                 logger.warning("EOS fitting failed: %s", e)
-1652:                 continue
-1653:             
-1654:             if frame_start_time is not None:
-1655:                 eos_fit_time = time.time()
-1656: 
-1657:             landmarks_xyz = np.zeros((68, 3), dtype=np.float32)
-1658:             landmarks_xyz[:, 0] = landmarks_68[:, 0]
-1659:             landmarks_xyz[:, 1] = landmarks_68[:, 1]
-1660: 
-1661:             eos_payload = {
-1662:                 "shape_coeffs": self._safe_to_list(shape_coeffs),
-1663:                 "expression_coeffs": self._safe_to_list(blendshape_coeffs),
-1664:             }
-1665: 
-1666:             out_det = dict(det)
-1667:             out_det["bbox"] = (x_safe, y_safe, x2_safe - x_safe, y2_safe - y_safe)
-1668:             out_det["centroid"] = (x_safe + ((x2_safe - x_safe) // 2), y_safe + ((y2_safe - y_safe) // 2))
-1669:             out_det["source_detector"] = "face_landmarker"
-1670:             out_det["label"] = "face"
-1671:             out_det["landmarks"] = landmarks_xyz.tolist()
-1672:             out_det["blendshapes"] = self._build_arkit_blendshapes(jaw_open)
-1673:             out_det["eos"] = eos_payload
-1674:             detections.append(out_det)
-1675: 
-1676:         self._last_detections = detections
-1677:         
-1678:         if frame_start_time is not None:
-1679:             total_time = time.time() - frame_start_time
-1680:             assets_duration = (assets_time - frame_start_time) * 1000 if 'assets_time' in locals() else 0
-1681:             yunet_duration = (yunet_time - assets_time) * 1000 if 'yunet_time' in locals() and 'assets_time' in locals() else 0
-1682:             facemesh_duration = (facemesh_time - yunet_time) * 1000 if 'facemesh_time' in locals() and 'yunet_time' in locals() else 0
-1683:             eos_duration = (eos_fit_time - facemesh_time) * 1000 if 'eos_fit_time' in locals() and 'facemesh_time' in locals() else 0
-1684:             logger.info(
-1685:                 f"[PROFILING] Frame {self._frame_counter}: total={total_time*1000:.1f}ms "
-1686:                 f"(assets={assets_duration:.1f}ms, yunet={yunet_duration:.1f}ms, "
-1687:                 f"facemesh={facemesh_duration:.1f}ms, eos_fit={eos_duration:.1f}ms, "
-1688:                 f"faces={len(detections)}, downscale={scale_factor:.2f})"
-1689:             )
-1690:         
-1691:         return detections
-1692: 
-1693: 
-1694: def create_face_engine(engine_name: str, use_gpu: bool = False):
-1695:     """
-1696:     Factory function to create face tracking engines.
-1697:     
-1698:     Args:
-1699:         engine_name: Name of the engine (mediapipe_landmarker, openseeface, etc.)
-1700:         use_gpu: If True, enable GPU acceleration for supported engines (v4.2+)
-1701:     
-1702:     Returns:
-1703:         Engine instance or None for MediaPipe (handled separately in workers)
-1704:     """
-1705:     normalized = (engine_name or "").strip().lower()
-1706:     if not normalized or normalized in {"mediapipe", "mediapipe_landmarker"}:
-1707:         return None
-1708:     if normalized == "openseeface":
-1709:         return OpenSeeFaceEngine(use_gpu=use_gpu)
-1710:     if normalized == "insightface":
-1711:         return InsightFaceEngine(use_gpu=use_gpu)
-1712:     if normalized == "eos":
-1713:         return EosFaceEngine()
-1714:     if normalized == "opencv_haar":
-1715:         return OpenCVHaarFaceEngine()
-1716:     if normalized == "opencv_yunet":
-1717:         return OpenCVYuNetFaceEngine(use_gpu=use_gpu)
-1718:     if normalized == "opencv_yunet_pyfeat":
-1719:         return OpenCVYuNetPyFeatEngine(use_gpu=use_gpu)
-1720:     raise ValueError(f"Unsupported tracking engine: {engine_name}")
-```
-
 ## File: workflow_scripts/step5/object_detector_registry.py
 ```python
   1: #!/usr/bin/env python3
@@ -21826,2640 +18576,6 @@ app_new.py
 286:                 return False
 287:         else:
 288:             return False
-```
-
-## File: workflow_scripts/step5/onnx_facemesh_detector.py
-```python
-  1: import logging
-  2: import os
-  3: from pathlib import Path
-  4: from typing import Optional, Tuple
-  5: 
-  6: import cv2
-  7: import numpy as np
-  8: 
-  9: logger = logging.getLogger(__name__)
- 10: 
- 11: 
- 12: class ONNXFaceMeshDetector:
- 13:     def __init__(self, model_path: Optional[str] = None, use_gpu: bool = False):
- 14:         self._model_path = model_path or os.environ.get("STEP5_FACEMESH_ONNX_PATH")
- 15:         self._model_path = self._resolve_model_path(self._model_path)
- 16:         
- 17:         if not self._model_path:
- 18:             self._model_path = self._find_mediapipe_facemesh_model()
- 19:         
- 20:         self._model_path = self._resolve_model_path(self._model_path)
- 21: 
- 22:         if not self._model_path or not Path(self._model_path).exists():
- 23:             raise RuntimeError(
- 24:                 f"FaceMesh ONNX model not found. "
- 25:                 f"Set STEP5_FACEMESH_ONNX_PATH or place face_landmark.onnx under models/face_landmarks/"
- 26:             )
- 27: 
- 28:         try:
- 29:             import onnxruntime as ort
- 30:             self._ort = ort
- 31:             
- 32:             sess_options = ort.SessionOptions()
- 33:             sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
- 34:             
- 35:             # Configure threading for optimal CPU performance
- 36:             intra_threads = int(os.environ.get("STEP5_ONNX_INTRA_OP_THREADS", "2"))
- 37:             inter_threads = int(os.environ.get("STEP5_ONNX_INTER_OP_THREADS", "1"))
- 38:             sess_options.intra_op_num_threads = intra_threads
- 39:             sess_options.inter_op_num_threads = inter_threads
- 40:             
- 41:             # Enable memory optimizations
- 42:             sess_options.enable_cpu_mem_arena = True
- 43:             sess_options.enable_mem_pattern = True
- 44:             
- 45:             providers = []
- 46:             if use_gpu:
- 47:                 providers.append('CUDAExecutionProvider')
- 48:             providers.append('CPUExecutionProvider')
- 49:             
- 50:             self._session = ort.InferenceSession(
- 51:                 self._model_path,
- 52:                 sess_options=sess_options,
- 53:                 providers=providers
- 54:             )
- 55:             active_providers = self._session.get_providers()
- 56:             
- 57:             logger.info(
- 58:                 f"ONNX Runtime configured: intra_threads={intra_threads}, inter_threads={inter_threads}, "
- 59:                 f"use_gpu={use_gpu}"
- 60:             )
- 61:             logger.info("FaceMesh ONNX providers active: %s", active_providers)
- 62:             
- 63:             self._input_name = self._session.get_inputs()[0].name
- 64:             self._input_shape = self._session.get_inputs()[0].shape
- 65:             self._output_names = [output.name for output in self._session.get_outputs()]
- 66:             
- 67:             logger.info(f"FaceMesh ONNX model loaded: {self._model_path}")
- 68:             logger.info(f"Input shape: {self._input_shape}, Outputs: {self._output_names}")
- 69:         except ImportError:
- 70:             raise RuntimeError(
- 71:                 "onnxruntime is required for ONNX FaceMesh. "
- 72:                 "Install with: pip install onnxruntime"
- 73:             )
- 74:         except Exception as e:
- 75:             logger.error(f"Failed to load ONNX FaceMesh model: {e}")
- 76:             raise
- 77: 
- 78:     def _find_mediapipe_facemesh_model(self) -> Optional[str]:
- 79:         search_paths = [
- 80:             Path(__file__).parent / "models" / "face_landmarks" / "opencv" / "face_landmark.onnx",
- 81:             Path(__file__).parent / "models" / "face_landmarks" / "opencv" / "face_landmarker.onnx",
- 82:             Path(__file__).parent / "models" / "face_landmarks" / "opencv" / "facemesh.onnx",
- 83:             Path(__file__).parent / "models" / "face_landmark.onnx",
- 84:             Path(__file__).parent / "models" / "face_landmarker.onnx",
- 85:             Path(__file__).parent / "models" / "facemesh.onnx",
- 86:         ]
- 87:         
- 88:         for path in search_paths:
- 89:             if path.exists():
- 90:                 return str(path)
- 91:         
- 92:         return None
- 93: 
- 94:     def _resolve_model_path(self, model_path: Optional[str]) -> Optional[str]:
- 95:         if not model_path:
- 96:             return None
- 97: 
- 98:         candidate = Path(model_path)
- 99:         if candidate.is_absolute():
-100:             return str(candidate)
-101: 
-102:         if candidate.exists():
-103:             return str(candidate)
-104: 
-105:         step5_dir = Path(__file__).resolve().parent
-106:         project_root = step5_dir.parent.parent
-107: 
-108:         candidates = [
-109:             project_root / candidate,
-110:             step5_dir / candidate,
-111:         ]
-112:         for c in candidates:
-113:             if c.exists():
-114:                 return str(c)
-115: 
-116:         return str(candidate)
-117: 
-118:     def detect_landmarks(
-119:         self,
-120:         face_roi: np.ndarray,
-121:         original_bbox: Tuple[int, int, int, int]
-122:     ) -> Optional[np.ndarray]:
-123:         try:
-124:             input_size = 192
-125:             if len(self._input_shape) >= 3 and self._input_shape[2] is not None:
-126:                 input_size = self._input_shape[2]
-127:             
-128:             # Optimize resize and preprocessing
-129:             if face_roi.shape[:2] != (input_size, input_size):
-130:                 resized = cv2.resize(face_roi, (input_size, input_size), interpolation=cv2.INTER_LINEAR)
-131:             else:
-132:                 resized = face_roi
-133:             
-134:             # Single operation: convert to float32, normalize, transpose
-135:             input_tensor = np.ascontiguousarray(
-136:                 np.transpose(resized, (2, 0, 1))[np.newaxis, :, :, :].astype(np.float32) / 255.0
-137:             )
-138: 
-139:             x, y, w, h = original_bbox
-140:             feed_dict = {}
-141:             for input_meta in self._session.get_inputs():
-142:                 input_name = input_meta.name
-143:                 if input_name == self._input_name:
-144:                     feed_dict[input_name] = input_tensor
-145:                 elif input_name == "crop_x1":
-146:                     feed_dict[input_name] = np.array([[int(x)]], dtype=np.int32)
-147:                 elif input_name == "crop_y1":
-148:                     feed_dict[input_name] = np.array([[int(y)]], dtype=np.int32)
-149:                 elif input_name == "crop_width":
-150:                     feed_dict[input_name] = np.array([[int(w)]], dtype=np.int32)
-151:                 elif input_name == "crop_height":
-152:                     feed_dict[input_name] = np.array([[int(h)]], dtype=np.int32)
-153: 
-154:             missing_inputs = [i.name for i in self._session.get_inputs() if i.name not in feed_dict]
-155:             if missing_inputs:
-156:                 raise RuntimeError(
-157:                     f"FaceMesh ONNX model requires additional inputs not supported: {missing_inputs}"
-158:                 )
-159: 
-160:             outputs = self._session.run(self._output_names, feed_dict)
-161:             
-162:             landmarks_normalized = None
-163:             for output in outputs:
-164:                 if output.shape[-1] == 3 and output.shape[-2] >= 468:
-165:                     landmarks_normalized = output[0]
-166:                     break
-167:             
-168:             if landmarks_normalized is None:
-169:                 logger.warning("Could not find landmarks in ONNX output")
-170:                 return None
-171: 
-172:             landmarks_normalized = landmarks_normalized[:478, :]
-173: 
-174:             if landmarks_normalized.shape[0] < 478:
-175:                 pad_count = 478 - int(landmarks_normalized.shape[0])
-176:                 if pad_count > 0 and landmarks_normalized.shape[0] > 0:
-177:                     pad = np.repeat(landmarks_normalized[-1:, :], pad_count, axis=0)
-178:                     landmarks_normalized = np.concatenate([landmarks_normalized, pad], axis=0)
-179: 
-180:             if np.issubdtype(landmarks_normalized.dtype, np.integer):
-181:                 return landmarks_normalized.astype(np.float32)
-182: 
-183:             max_abs = float(np.nanmax(np.abs(landmarks_normalized[:, :2]))) if landmarks_normalized.size else 0.0
-184:             if max_abs > 2.0:
-185:                 return landmarks_normalized.astype(np.float32)
-186: 
-187:             landmarks_absolute = landmarks_normalized.copy()
-188:             landmarks_absolute[:, 0] = landmarks_normalized[:, 0] * w + x
-189:             landmarks_absolute[:, 1] = landmarks_normalized[:, 1] * h + y
-190: 
-191:             return landmarks_absolute.astype(np.float32)
-192:         
-193:         except Exception as e:
-194:             logger.warning(f"Failed to detect landmarks with ONNX: {e}")
-195:             return None
-```
-
-## File: workflow_scripts/step5/process_video_worker_multiprocessing.py
-```python
-  1: #!/usr/bin/env python3
-  2: # -*- coding: utf-8 -*-
-  3: """
-  4: Enhanced CPU Worker with Multiprocessing Optimization
-  5: Combines proven techniques from backup implementations for maximum CPU performance.
-  6: """
-  7: 
-  8: import os
-  9: import sys
- 10: import json
- 11: import argparse
- 12: import logging
- 13: import cv2
- 14: import numpy as np
- 15: try:
- 16:     import mediapipe as mp
- 17: except Exception:
- 18:     mp = None
- 19: import multiprocessing as mp_proc
- 20: import time
- 21: import math
- 22: from pathlib import Path
- 23: from functools import partial
- 24: from concurrent.futures import ProcessPoolExecutor, as_completed
- 25: 
- 26: # Load .env file before anything else (critical for multiprocessing workers)
- 27: try:
- 28:     from dotenv import load_dotenv
- 29:     env_path = Path(__file__).resolve().parent.parent.parent / '.env'
- 30:     if env_path.exists():
- 31:         load_dotenv(env_path)
- 32: except ImportError:
- 33:     pass  # dotenv not available, rely on system env vars
- 34: 
- 35: # Add project root to path
- 36: sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
- 37: from utils.tracking_optimizations import apply_tracking_and_management
- 38: from utils.resource_manager import safe_video_processing, get_video_metadata, resource_tracker
- 39: from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
- 40: from object_detector_registry import ObjectDetectorRegistry
- 41: 
- 42: # Configuration du logger
- 43: log_dir = Path(__file__).resolve().parent.parent.parent / "logs" / "step5"
- 44: log_dir.mkdir(parents=True, exist_ok=True)
- 45: worker_type_str = "CPU_MP" if "--mp_num_workers_internal" in sys.argv else "CPU"
- 46: video_name_for_log = Path(sys.argv[1]).stem if len(sys.argv) > 1 else "unknown"
- 47: log_file = log_dir / f"worker_{worker_type_str}_{video_name_for_log}_{os.getpid()}.log"
- 48: logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s',
- 49:                     handlers=[logging.FileHandler(log_file, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
- 50: 
- 51: 
- 52: def _parse_optional_positive_int(raw):
- 53:     if raw is None:
- 54:         return None
- 55:     raw_str = str(raw).strip()
- 56:     if not raw_str:
- 57:         return None
- 58:     try:
- 59:         value = int(raw_str)
- 60:     except Exception:
- 61:         return None
- 62:     if value <= 0:
- 63:         return None
- 64:     return value
- 65: 
- 66: 
- 67: def _is_truthy_env(raw):
- 68:     if raw is None:
- 69:         return False
- 70:     return str(raw).strip().lower() in {"1", "true", "yes"}
- 71: 
- 72: 
- 73: def _apply_jawopen_scale(blendshapes, scale):
- 74:     if not blendshapes or not isinstance(blendshapes, dict):
- 75:         return blendshapes
- 76:     try:
- 77:         jaw_open_raw = blendshapes.get("jawOpen")
- 78:         if jaw_open_raw is None:
- 79:             return blendshapes
- 80:         jaw_open_scaled = float(jaw_open_raw) * float(scale)
- 81:         jaw_open_scaled = float(np.clip(jaw_open_scaled, 0.0, 1.0))
- 82:         out = dict(blendshapes)
- 83:         out["jawOpen"] = jaw_open_scaled
- 84:         return out
- 85:     except Exception:
- 86:         return blendshapes
- 87: 
- 88: 
- 89: # Global variables for worker processes
- 90: landmarker_global = None
- 91: object_detector_global = None
- 92: face_engine_global = None
- 93: tracking_engine_type = None
- 94: 
- 95: 
- 96: def init_worker_process(models_dir, args_dict):
- 97:     """
- 98:     Initialize tracking models once per worker process.
- 99:     Supports MediaPipe and OpenCV-based engines.
-100:     """
-101:     global landmarker_global, object_detector_global, face_engine_global, tracking_engine_type
-102:     
-103:     worker_pid = os.getpid()
-104:     engine_name = args_dict.get('tracking_engine', '')
-105:     engine_norm = (str(engine_name).strip().lower() if engine_name else "")
-106:     
-107:     logging.info(f"[WORKER-{worker_pid}] Initializing process with engine: {engine_norm or 'mediapipe'}")
-108:     
-109:     try:
-110:         if engine_norm and engine_norm not in {"mediapipe", "mediapipe_landmarker"}:
-111:             # Inject env vars for OpenCV engines (not inherited from parent process)
-112:             if args_dict.get('yunet_model_path'):
-113:                 os.environ['STEP5_YUNET_MODEL_PATH'] = args_dict['yunet_model_path']
-114:             if args_dict.get('eos_models_dir'):
-115:                 os.environ['STEP5_EOS_MODELS_DIR'] = str(args_dict['eos_models_dir'])
-116:             if args_dict.get('eos_sfm_model_path'):
-117:                 os.environ['STEP5_EOS_SFM_MODEL_PATH'] = str(args_dict['eos_sfm_model_path'])
-118:             if args_dict.get('eos_expression_blendshapes_path'):
-119:                 os.environ['STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH'] = str(args_dict['eos_expression_blendshapes_path'])
-120:             if args_dict.get('eos_landmark_mapper_path'):
-121:                 os.environ['STEP5_EOS_LANDMARK_MAPPER_PATH'] = str(args_dict['eos_landmark_mapper_path'])
-122:             if args_dict.get('eos_edge_topology_path'):
-123:                 os.environ['STEP5_EOS_EDGE_TOPOLOGY_PATH'] = str(args_dict['eos_edge_topology_path'])
-124:             if args_dict.get('eos_model_contour_path'):
-125:                 os.environ['STEP5_EOS_MODEL_CONTOUR_PATH'] = str(args_dict['eos_model_contour_path'])
-126:             if args_dict.get('eos_contour_landmarks_path'):
-127:                 os.environ['STEP5_EOS_CONTOUR_LANDMARKS_PATH'] = str(args_dict['eos_contour_landmarks_path'])
-128:             if args_dict.get('eos_fit_every_n') is not None:
-129:                 os.environ['STEP5_EOS_FIT_EVERY_N'] = str(args_dict['eos_fit_every_n'])
-130:             if args_dict.get('eos_max_faces') is not None:
-131:                 os.environ['STEP5_EOS_MAX_FACES'] = str(args_dict['eos_max_faces'])
-132:             if args_dict.get('eos_max_width') is not None:
-133:                 os.environ['STEP5_EOS_MAX_WIDTH'] = str(args_dict['eos_max_width'])
-134:             if args_dict.get('eos_jawopen_scale') is not None:
-135:                 os.environ['STEP5_EOS_JAWOPEN_SCALE'] = str(args_dict['eos_jawopen_scale'])
-136:             if args_dict.get('opencv_max_faces') is not None:
-137:                 os.environ['STEP5_OPENCV_MAX_FACES'] = str(args_dict['opencv_max_faces'])
-138:             if args_dict.get('opencv_jawopen_scale') is not None:
-139:                 os.environ['STEP5_OPENCV_JAWOPEN_SCALE'] = str(args_dict['opencv_jawopen_scale'])
-140:             if args_dict.get('facemesh_onnx_path'):
-141:                 os.environ['STEP5_FACEMESH_ONNX_PATH'] = args_dict['facemesh_onnx_path']
-142:             if args_dict.get('pyfeat_model_path'):
-143:                 os.environ['STEP5_PYFEAT_MODEL_PATH'] = args_dict['pyfeat_model_path']
-144:             if args_dict.get('step5_onnx_intra_op_threads'):
-145:                 os.environ['STEP5_ONNX_INTRA_OP_THREADS'] = str(args_dict['step5_onnx_intra_op_threads'])
-146:             if args_dict.get('step5_onnx_inter_op_threads'):
-147:                 os.environ['STEP5_ONNX_INTER_OP_THREADS'] = str(args_dict['step5_onnx_inter_op_threads'])
-148:             if args_dict.get('openseeface_models_dir'):
-149:                 os.environ['STEP5_OPENSEEFACE_MODELS_DIR'] = str(args_dict['openseeface_models_dir'])
-150:             if args_dict.get('openseeface_model_id') is not None:
-151:                 os.environ['STEP5_OPENSEEFACE_MODEL_ID'] = str(args_dict['openseeface_model_id'])
-152:             if args_dict.get('openseeface_detection_model_path'):
-153:                 os.environ['STEP5_OPENSEEFACE_DETECTION_MODEL_PATH'] = str(args_dict['openseeface_detection_model_path'])
-154:             if args_dict.get('openseeface_landmark_model_path'):
-155:                 os.environ['STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH'] = str(args_dict['openseeface_landmark_model_path'])
-156:             if args_dict.get('openseeface_detect_every_n') is not None:
-157:                 os.environ['STEP5_OPENSEEFACE_DETECT_EVERY_N'] = str(args_dict['openseeface_detect_every_n'])
-158:             if args_dict.get('openseeface_detection_threshold') is not None:
-159:                 os.environ['STEP5_OPENSEEFACE_DETECTION_THRESHOLD'] = str(args_dict['openseeface_detection_threshold'])
-160:             if args_dict.get('openseeface_max_faces') is not None:
-161:                 os.environ['STEP5_OPENSEEFACE_MAX_FACES'] = str(args_dict['openseeface_max_faces'])
-162:             if args_dict.get('openseeface_jawopen_scale') is not None:
-163:                 os.environ['STEP5_OPENSEEFACE_JAWOPEN_SCALE'] = str(args_dict['openseeface_jawopen_scale'])
-164:             if args_dict.get('object_detector_model'):
-165:                 os.environ['STEP5_OBJECT_DETECTOR_MODEL'] = args_dict['object_detector_model']
-166:             if args_dict.get('object_detector_model_path'):
-167:                 os.environ['STEP5_OBJECT_DETECTOR_MODEL_PATH'] = args_dict['object_detector_model_path']
-168:             
-169:             
-170:             # Ensure profiling / throttling hints reach OpenCV-based engines
-171:             profiling_enabled = bool(args_dict.get('enable_profiling'))
-172:             os.environ['STEP5_ENABLE_PROFILING'] = "1" if profiling_enabled else "0"
-173: 
-174:             throttle_raw = args_dict.get('blendshapes_throttle_n', 1)
-175:             try:
-176:                 throttle_value = str(max(1, int(throttle_raw or 1)))
-177:             except Exception:
-178:                 throttle_value = "1"
-179:             os.environ['STEP5_BLENDSHAPES_THROTTLE_N'] = throttle_value
-180:             
-181:             if engine_norm == "openseeface":
-182:                 logging.info(
-183:                     f"[WORKER-{worker_pid}] OpenSeeFace config: "
-184:                     f"model_id={os.environ.get('STEP5_OPENSEEFACE_MODEL_ID')} "
-185:                     f"models_dir={os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')} "
-186:                     f"detection_model_path={os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')} "
-187:                     f"landmark_model_path={os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')} "
-188:                     f"detect_every_n={os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N')} "
-189:                     f"detection_threshold={os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD')} "
-190:                     f"max_faces={os.environ.get('STEP5_OPENSEEFACE_MAX_FACES')} "
-191:                     f"jawopen_scale={os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE')} "
-192:                     f"max_width={os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH') or os.environ.get('STEP5_YUNET_MAX_WIDTH')}"
-193:                 )
-194: 
-195:             from face_engines import create_face_engine
-196:             use_gpu = args_dict.get('use_gpu', False)
-197:             face_engine_global = create_face_engine(engine_norm, use_gpu=use_gpu)
-198: 
-199:             if args_dict.get('enable_object_detection', False):
-200:                 try:
-201:                     if mp is None:
-202:                         raise RuntimeError("mediapipe is not available")
-203: 
-204:                     BaseOptions = mp.tasks.BaseOptions
-205:                     VisionRunningMode = mp.tasks.vision.RunningMode
-206:                     ObjectDetector = mp.tasks.vision.ObjectDetector
-207:                     ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
-208: 
-209:                     delegate = BaseOptions.Delegate.CPU
-210: 
-211:                     object_detector_model_name = args_dict.get('object_detector_model', 'efficientdet_lite2')
-212:                     object_model_path = ObjectDetectorRegistry.resolve_model_path(
-213:                         model_name=object_detector_model_name,
-214:                         models_dir=models_dir,
-215:                         override_path=args_dict.get('object_detector_model_path'),
-216:                     )
-217:                     logging.info(
-218:                         f"[WORKER-{worker_pid}] Using object detector (face_engine mode): "
-219:                         f"{object_detector_model_name} at {object_model_path}"
-220:                     )
-221: 
-222:                     object_options = ObjectDetectorOptions(
-223:                         base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
-224:                         running_mode=VisionRunningMode.VIDEO,
-225:                         max_results=args_dict.get('object_max_results', 5),
-226:                         score_threshold=args_dict.get('object_score_threshold', 0.4),
-227:                     )
-228:                     object_detector_global = ObjectDetector.create_from_options(object_options)
-229:                 except Exception as e:
-230:                     logging.error(
-231:                         f"[WORKER-{worker_pid}] Failed to initialize object detector (face_engine mode): {e}"
-232:                     )
-233:                     object_detector_global = None
-234: 
-235:             tracking_engine_type = "face_engine"
-236:             logging.info(f"[WORKER-{worker_pid}] Initialized {engine_norm} engine")
-237:         else:
-238:             if mp is None:
-239:                 raise RuntimeError(
-240:                     "mediapipe is required for the default tracking engine but is not available in this environment"
-241:                 )
-242: 
-243:             BaseOptions = mp.tasks.BaseOptions
-244:             VisionRunningMode = mp.tasks.vision.RunningMode
-245:             FaceLandmarker = mp.tasks.vision.FaceLandmarker
-246:             FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
-247:             ObjectDetector = mp.tasks.vision.ObjectDetector
-248:             ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
-249:             
-250:             # Configure delegate (CPU or GPU)
-251:             use_gpu = args_dict.get('use_gpu', False)
-252:             if use_gpu:
-253:                 try:
-254:                     # Attempt to use GPU delegate for MediaPipe
-255:                     delegate = BaseOptions.Delegate.GPU
-256:                     logging.info(f"[WORKER-{worker_pid}] Attempting to use GPU delegate for MediaPipe")
-257:                 except AttributeError:
-258:                     logging.warning(f"[WORKER-{worker_pid}] GPU delegate not available in MediaPipe, falling back to CPU")
-259:                     delegate = BaseOptions.Delegate.CPU
-260:             else:
-261:                 delegate = BaseOptions.Delegate.CPU
-262:             face_model_candidates = [
-263:                 models_dir / "face_detectors" / "mediapipe" / "face_landmarker_v2_with_blendshapes.task",
-264:                 models_dir / "face_landmarker_v2_with_blendshapes.task",
-265:             ]
-266:             face_model_path = next((p for p in face_model_candidates if p.exists()), face_model_candidates[0])
-267:             
-268:             # Resolve object detector model using registry
-269:             object_detector_model_name = args_dict.get('object_detector_model', 'efficientdet_lite2')
-270:             try:
-271:                 object_model_path = ObjectDetectorRegistry.resolve_model_path(
-272:                     model_name=object_detector_model_name,
-273:                     models_dir=models_dir,
-274:                     override_path=args_dict.get('object_detector_model_path')
-275:                 )
-276:                 logging.info(f"[WORKER-{worker_pid}] Using object detector: {object_detector_model_name} at {object_model_path}")
-277:             except (ValueError, FileNotFoundError) as e:
-278:                 logging.error(f"[WORKER-{worker_pid}] Failed to resolve object detector model: {e}")
-279:                 raise
-280:             
-281:             env_max_faces = _parse_optional_positive_int(args_dict.get('mediapipe_max_faces'))
-282:             num_faces = int(env_max_faces if env_max_faces is not None else (args_dict.get('mp_landmarker_num_faces', 5) or 5))
-283: 
-284:             face_options = FaceLandmarkerOptions(
-285:                 base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
-286:                 running_mode=VisionRunningMode.VIDEO,
-287:                 num_faces=num_faces,
-288:                 min_face_detection_confidence=args_dict.get('mp_landmarker_min_face_detection_confidence', 0.3),
-289:                 min_face_presence_confidence=args_dict.get('mp_landmarker_min_face_presence_confidence', 0.2),
-290:                 min_tracking_confidence=args_dict.get('mp_landmarker_min_tracking_confidence', 0.3),
-291:                 output_face_blendshapes=True
-292:             )
-293:             
-294:             object_options = ObjectDetectorOptions(
-295:                 base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
-296:                 running_mode=VisionRunningMode.VIDEO,
-297:                 max_results=args_dict.get('object_max_results', 5),
-298:                 score_threshold=args_dict.get('object_score_threshold', 0.4)
-299:             )
-300:             
-301:             landmarker_global = FaceLandmarker.create_from_options(face_options)
-302:             object_detector_global = ObjectDetector.create_from_options(object_options)
-303:             tracking_engine_type = "mediapipe"
-304:             logging.info(f"[WORKER-{worker_pid}] Initialized MediaPipe engine")
-305:         
-306:         logging.info(f"[WORKER-{worker_pid}] Initialization complete")
-307:         
-308:     except Exception as e:
-309:         logging.error(f"[WORKER-{worker_pid}] Initialization failed: {e}")
-310:         landmarker_global = None
-311:         object_detector_global = None
-312:         face_engine_global = None
-313: 
-314: 
-315: def process_frame_chunk(chunk_data):
-316:     """
-317:     Process a chunk of frames using the initialized models.
-318:     Returns detection results for all frames in the chunk.
-319:     """
-320:     global landmarker_global, object_detector_global, face_engine_global, tracking_engine_type
-321:     
-322:     worker_pid = os.getpid()
-323:     
-324:     if tracking_engine_type == "face_engine":
-325:         if not face_engine_global:
-326:             logging.error(f"[WORKER-{worker_pid}] Face engine not properly initialized")
-327:             return []
-328:     elif tracking_engine_type == "mediapipe":
-329:         if not landmarker_global:
-330:             logging.error(f"[WORKER-{worker_pid}] MediaPipe not properly initialized")
-331:             return []
-332:     else:
-333:         logging.error(f"[WORKER-{worker_pid}] No tracking engine initialized")
-334:         return []
-335:     
-336:     chunk_start, chunk_end, video_path, args_dict = chunk_data
-337:     results = []
-338:     
-339:     try:
-340:         logging.info(f"[WORKER-{worker_pid}] Processing chunk [{chunk_start}, {chunk_end}] ({chunk_end - chunk_start + 1} frames)")
-341: 
-342:         enable_profiling = bool(args_dict.get('enable_profiling'))
-343:         profiling_stats = {
-344:             "to_rgb_total": 0.0,
-345:             "detect_total": 0.0,
-346:             "post_total": 0.0,
-347:             "frame_count": 0,
-348:         }
-349:         blendshapes_throttle_n = max(1, int(args_dict.get('blendshapes_throttle_n', 1) or 1))
-350:         jaw_open_scale = float(args_dict.get('mediapipe_jawopen_scale', 1.0) or 1.0)
-351:         max_width = _parse_optional_positive_int(args_dict.get('mediapipe_max_width'))
-352:         blendshapes_cache = {}
-353:         
-354:         # Open video capture for this chunk
-355:         cap = cv2.VideoCapture(video_path)
-356:         if not cap.isOpened():
-357:             logging.error(f"[WORKER-{worker_pid}] Failed to open video: {video_path}")
-358:             return []
-359:         
-360:         cap.read()
-361:         cap.set(cv2.CAP_PROP_POS_FRAMES, chunk_start)
-362:         
-363:         frames_processed = 0
-364:         for frame_idx in range(chunk_start, chunk_end + 1):
-365:             frames_processed += 1
-366:             
-367:             # Log progression every 10 frames
-368:             if frames_processed % 10 == 0:
-369:                 logging.debug(f"[WORKER-{worker_pid}] Chunk [{chunk_start}, {chunk_end}]: processed {frames_processed}/{chunk_end - chunk_start + 1} frames")
-370:             if enable_profiling:
-371:                 profiling_stats["frame_count"] += 1
-372:             ret, frame = cap.read()
-373:             if not ret:
-374:                 try:
-375:                     cap.release()
-376:                 except Exception:
-377:                     pass
-378: 
-379:                 cap = cv2.VideoCapture(video_path)
-380:                 if cap.isOpened():
-381:                     cap.read()
-382:                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-383:                     ret, frame = cap.read()
-384: 
-385:                     if (not ret) and frame_idx > 0:
-386:                         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx - 1)
-387:                         cap.read()
-388:                         ret, frame = cap.read()
-389: 
-390:                     if (not ret) and args_dict.get('fps'):
-391:                         try:
-392:                             cap.set(
-393:                                 cv2.CAP_PROP_POS_MSEC,
-394:                                 int(frame_idx * 1000 / float(args_dict.get('fps', 25))),
-395:                             )
-396:                             ret, frame = cap.read()
-397:                         except Exception:
-398:                             pass
-399: 
-400:                 if not ret:
-401:                     # Tolerate last frame read failures (common with certain codecs)
-402:                     if frame_idx >= args_dict.get('total_frames', 0) - 1:
-403:                         logging.debug(
-404:                             f"Skipping unreadable frame {frame_idx} (near end of video) "
-405:                             f"for chunk [{chunk_start}, {chunk_end}] in {Path(video_path).name}."
-406:                         )
-407:                     else:
-408:                         logging.warning(
-409:                             f"Failed to read frame {frame_idx} for chunk [{chunk_start}, {chunk_end}] "
-410:                             f"in {Path(video_path).name}."
-411:                         )
-412:                     results.append({
-413:                         'frame_idx': frame_idx,
-414:                         'detections': [],
-415:                         'face_detected': False
-416:                     })
-417: 
-418:                     next_frame_idx = frame_idx + 1
-419:                     if next_frame_idx <= chunk_end:
-420:                         try:
-421:                             cap.release()
-422:                         except Exception:
-423:                             pass
-424:                         cap = cv2.VideoCapture(video_path)
-425:                         if cap.isOpened():
-426:                             cap.read()
-427:                             cap.set(cv2.CAP_PROP_POS_FRAMES, next_frame_idx)
-428:                     continue
-429:             
-430:             current_detections = []
-431:             face_detected = False
-432:             
-433:             if tracking_engine_type == "face_engine":
-434:                 try:
-435:                     detections = face_engine_global.detect(frame)
-436:                     if detections:
-437:                         face_detected = True
-438:                         current_detections.extend(detections)
-439:                 except Exception as e:
-440:                     logging.warning(f"Face engine detection failed for frame {frame_idx}: {e}")
-441:             else:
-442:                 orig_h, orig_w = frame.shape[:2]
-443:                 work_frame = frame
-444:                 scale_to_original = 1.0
-445:                 if max_width is not None and orig_w > max_width:
-446:                     scale_factor = float(max_width) / float(orig_w)
-447:                     work_h = max(1, int(orig_h * scale_factor))
-448:                     work_frame = cv2.resize(frame, (int(max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
-449:                     scale_to_original = float(orig_w) / float(work_frame.shape[1])
-450: 
-451:                 t_to_rgb = time.perf_counter() if enable_profiling else 0.0
-452:                 mp_image = mp.Image(
-453:                     image_format=mp.ImageFormat.SRGB,
-454:                     data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
-455:                 )
-456:                 if enable_profiling:
-457:                     profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
-458: 
-459:                 timestamp_ms = int(frame_idx * 1000 / args_dict.get('fps', 25))
-460:                 
-461:                 try:
-462:                     t_detect = time.perf_counter() if enable_profiling else 0.0
-463:                     face_result = landmarker_global.detect_for_video(mp_image, timestamp_ms)
-464:                     if enable_profiling:
-465:                         profiling_stats["detect_total"] += time.perf_counter() - t_detect
-466:                     
-467:                     if face_result.face_landmarks:
-468:                         face_detected = True
-469:                         
-470:                         for i, landmarks in enumerate(face_result.face_landmarks):
-471:                             t_post = time.perf_counter() if enable_profiling else 0.0
-472:                             x_coords = [lm.x * orig_w for lm in landmarks]
-473:                             y_coords = [lm.y * orig_h for lm in landmarks]
-474:                             bbox = (
-475:                                 int(min(x_coords)), int(min(y_coords)),
-476:                                 int(max(x_coords) - min(x_coords)),
-477:                                 int(max(y_coords) - min(y_coords))
-478:                             )
-479:                             centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
-480:                             
-481:                             det = {
-482:                                 "bbox": bbox,
-483:                                 "centroid": centroid,
-484:                                 "source_detector": "face_landmarker",
-485:                                 "label": "face"
-486:                             }
-487:                             
-488:                             if face_result.face_blendshapes:
-489:                                 raw_blendshapes = {
-490:                                     cat.category_name: cat.score
-491:                                     for cat in face_result.face_blendshapes[i]
-492:                                 }
-493:                                 scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, jaw_open_scale)
-494: 
-495:                                 current_frame_num = frame_idx + 1
-496:                                 should_update_blendshapes = (blendshapes_throttle_n <= 1) or ((current_frame_num % blendshapes_throttle_n) == 0)
-497:                                 object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
-498:                                 if should_update_blendshapes or object_id not in blendshapes_cache:
-499:                                     blendshapes_cache[object_id] = scaled_blendshapes
-500:                                     det["blendshapes"] = scaled_blendshapes
-501:                                 else:
-502:                                     det["blendshapes"] = blendshapes_cache.get(object_id)
-503:                             
-504:                             current_detections.append(det)
-505: 
-506:                             if enable_profiling:
-507:                                 profiling_stats["post_total"] += time.perf_counter() - t_post
-508:                 
-509:                 except Exception as e:
-510:                     logging.warning(f"Face detection failed for frame {frame_idx}: {e}")
-511: 
-512:                 if enable_profiling:
-513:                     fc = int(profiling_stats.get("frame_count", 0) or 0)
-514:                     if fc > 0 and (fc % 20) == 0:
-515:                         to_rgb_ms = (profiling_stats["to_rgb_total"] / fc) * 1000.0
-516:                         detect_ms = (profiling_stats["detect_total"] / fc) * 1000.0
-517:                         post_ms = (profiling_stats["post_total"] / fc) * 1000.0
-518:                         logging.info(
-519:                             "[PROFILING] MediaPipe after %s frames: to_rgb=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
-520:                             fc,
-521:                             to_rgb_ms,
-522:                             detect_ms,
-523:                             post_ms,
-524:                         )
-525:             
-526:             # Object detection fallback if no faces detected
-527:             if not face_detected and args_dict.get('enable_object_detection', False) and object_detector_global:
-528:                 try:
-529:                     if tracking_engine_type == "face_engine":
-530:                         mp_image = mp.Image(
-531:                             image_format=mp.ImageFormat.SRGB,
-532:                             data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-533:                         )
-534:                         timestamp_ms = int(frame_idx * 1000 / args_dict.get('fps', 25))
-535:                     object_result = object_detector_global.detect_for_video(mp_image, timestamp_ms)
-536:                     
-537:                     if object_result.detections:
-538:                         for detection in object_result.detections:
-539:                             bbox = detection.bounding_box
-540:                             x_min = int(bbox.origin_x)
-541:                             y_min = int(bbox.origin_y)
-542:                             width = int(bbox.width)
-543:                             height = int(bbox.height)
-544: 
-545:                             if tracking_engine_type != "face_engine":
-546:                                 x_min = int(max(0, x_min * scale_to_original))
-547:                                 y_min = int(max(0, y_min * scale_to_original))
-548:                                 width = int(max(0, width * scale_to_original))
-549:                                 height = int(max(0, height * scale_to_original))
-550:                             
-551:                             centroid = (x_min + width // 2, y_min + height // 2)
-552:                             
-553:                             best_category = detection.categories[0] if detection.categories else None
-554:                             label = best_category.category_name if best_category else "object"
-555:                             confidence = best_category.score if best_category else 0.0
-556:                             
-557:                             det = {
-558:                                 "bbox": (x_min, y_min, width, height),
-559:                                 "centroid": centroid,
-560:                                 "source_detector": "object_detector",
-561:                                 "label": label,
-562:                                 "confidence": confidence,
-563:                                 "blendshapes": None,
-564:                                 "is_speaking": None
-565:                             }
-566:                             current_detections.append(det)
-567:                             
-568:                 except Exception as e:
-569:                     logging.warning(f"Object detection failed for frame {frame_idx}: {e}")
-570:             
-571:             results.append({
-572:                 'frame_idx': frame_idx,
-573:                 'detections': current_detections,
-574:                 'face_detected': face_detected
-575:             })
-576:         
-577:         cap.release()
-578:         logging.info(f"[WORKER-{worker_pid}] Chunk [{chunk_start}, {chunk_end}] completed: {len(results)} frames processed")
-579:         return results
-580:         
-581:     except Exception as e:
-582:         logging.error(f"[WORKER-{worker_pid}] CRITICAL ERROR in chunk [{chunk_start}, {chunk_end}]: {type(e).__name__}: {e}")
-583:         import traceback
-584:         logging.error(f"[WORKER-{worker_pid}] Traceback: {traceback.format_exc()}")
-585:         try:
-586:             cap.release()
-587:         except:
-588:             pass
-589:         return []
-590: 
-591: 
-592: def process_video_multiprocessing(args, video_capture, total_frames):
-593:     """
-594:     Process video using multiprocessing with frame chunking.
-595:     """
-596:     logging.info(f"Starting multiprocessing with {args.mp_num_workers_internal} workers")
-597:     
-598:     # Get video metadata
-599:     fps = video_capture.get(cv2.CAP_PROP_FPS)
-600:     
-601:     # Prepare arguments for workers
-602:     models_dir = Path(args.models_dir)
-603:     args_dict = {
-604:         'tracking_engine': getattr(args, 'tracking_engine', None),
-605:         'mp_landmarker_num_faces': args.mp_landmarker_num_faces,
-606:         'mp_landmarker_min_face_detection_confidence': args.mp_landmarker_min_face_detection_confidence,
-607:         'mp_landmarker_min_face_presence_confidence': args.mp_landmarker_min_face_presence_confidence,
-608:         'mp_landmarker_min_tracking_confidence': args.mp_landmarker_min_tracking_confidence,
-609:         'object_max_results': getattr(args, 'object_max_results', 5),
-610:         'object_score_threshold': getattr(args, 'object_score_threshold', 0.4),
-611:         'enable_object_detection': getattr(args, 'enable_object_detection', False),
-612:         'fps': fps,
-613:         'enable_profiling': _is_truthy_env(os.environ.get('STEP5_ENABLE_PROFILING', '0')),
-614:         'blendshapes_throttle_n': max(1, int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))),
-615:         'mediapipe_max_width': os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH'),
-616:         'mediapipe_max_faces': os.environ.get('STEP5_MEDIAPIPE_MAX_FACES'),
-617:         'mediapipe_jawopen_scale': os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'),
-618:         # OpenCV engine paths (env vars not inherited by ProcessPoolExecutor)
-619:         'yunet_model_path': os.environ.get('STEP5_YUNET_MODEL_PATH'),
-620:         'opencv_max_faces': os.environ.get('STEP5_OPENCV_MAX_FACES'),
-621:         'opencv_jawopen_scale': os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE'),
-622:         'facemesh_onnx_path': os.environ.get('STEP5_FACEMESH_ONNX_PATH'),
-623:         'pyfeat_model_path': os.environ.get('STEP5_PYFEAT_MODEL_PATH'),
-624:         # ONNX Runtime performance tuning (used by several engines)
-625:         'step5_onnx_intra_op_threads': os.environ.get('STEP5_ONNX_INTRA_OP_THREADS'),
-626:         'step5_onnx_inter_op_threads': os.environ.get('STEP5_ONNX_INTER_OP_THREADS'),
-627:         # OpenSeeFace engine configuration
-628:         'openseeface_models_dir': os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR'),
-629:         'openseeface_model_id': os.environ.get('STEP5_OPENSEEFACE_MODEL_ID'),
-630:         'openseeface_detection_model_path': os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH'),
-631:         'openseeface_landmark_model_path': os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH'),
-632:         'openseeface_detect_every_n': os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N'),
-633:         'openseeface_detection_threshold': os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD'),
-634:         'openseeface_max_faces': os.environ.get('STEP5_OPENSEEFACE_MAX_FACES'),
-635:         'openseeface_jawopen_scale': os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE'),
-636:         'eos_models_dir': os.environ.get('STEP5_EOS_MODELS_DIR'),
-637:         'eos_sfm_model_path': os.environ.get('STEP5_EOS_SFM_MODEL_PATH'),
-638:         'eos_expression_blendshapes_path': os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH'),
-639:         'eos_landmark_mapper_path': os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH'),
-640:         'eos_edge_topology_path': os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH'),
-641:         'eos_model_contour_path': os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH'),
-642:         'eos_contour_landmarks_path': os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH'),
-643:         'eos_fit_every_n': os.environ.get('STEP5_EOS_FIT_EVERY_N'),
-644:         'eos_max_faces': os.environ.get('STEP5_EOS_MAX_FACES'),
-645:         'eos_max_width': os.environ.get('STEP5_EOS_MAX_WIDTH'),
-646:         'eos_jawopen_scale': os.environ.get('STEP5_EOS_JAWOPEN_SCALE'),
-647:         'object_detector_model': getattr(args, 'object_detector_model', None) or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL'),
-648:         'object_detector_model_path': getattr(args, 'object_detector_model_path', None) or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
-649:         'total_frames': total_frames,
-650:     }
-651:     
-652:     # Create frame chunks (adaptive chunk size to keep CPU workers saturated)
-653:     # If chunk_size is provided (>0), honor it; otherwise, derive adaptively.
-654:     provided_chunk_size = int(getattr(args, 'chunk_size', 400))
-655:     if provided_chunk_size <= 0:
-656:         # Target ~5 chunks per worker, minimum 20 chunks overall.
-657:         mp_workers = max(1, int(getattr(args, 'mp_num_workers_internal', 1)))
-658:         target_chunks = max(mp_workers * 5, 20)
-659:         # Compute chunk size from total frames and clamp to avoid too fine granularity.
-660:         adaptive_chunk = int(math.ceil(total_frames / max(1, target_chunks)))
-661:         # Allow small chunks to reach ~5x workers (e.g., ~75 chunks for ~1600 frames & 15 workers)
-662:         # Bounds can be overridden via args.chunk_min/chunk_max if provided.
-663:         min_bound = int(getattr(args, 'chunk_min', 20) or 20)
-664:         max_bound = int(getattr(args, 'chunk_max', 400) or 400)
-665:         if min_bound > max_bound:
-666:             min_bound, max_bound = max_bound, min_bound
-667:         chunk_size = max(min_bound, min(max_bound, adaptive_chunk))
-668:         logging.info(
-669:             f"Adaptive chunking enabled: total_frames={total_frames}, workers={mp_workers}, "
-670:             f"target_chunks={target_chunks}, bounds=[{min_bound},{max_bound}], selected_chunk_size={chunk_size}"
-671:         )
-672:     else:
-673:         chunk_size = provided_chunk_size
-674:         logging.info(f"Using provided chunk_size={chunk_size}")
-675: 
-676:     chunks = []
-677:     
-678:     for start_frame in range(0, total_frames, chunk_size):
-679:         end_frame = min(start_frame + chunk_size - 1, total_frames - 1)
-680:         chunks.append((start_frame, end_frame, args.video_file_path, args_dict))
-681:     
-682:     logging.info(f"Created {len(chunks)} chunks for processing (chunk_size={chunk_size})")
-683:     
-684:     # Process chunks using multiprocessing
-685:     all_results = {}
-686:     face_detection_count = 0
-687:     processing_start_time = time.time()
-688:     
-689:     # Use ProcessPoolExecutor for better resource management
-690:     with ProcessPoolExecutor(
-691:         max_workers=args.mp_num_workers_internal,
-692:         initializer=init_worker_process,
-693:         initargs=(models_dir, args_dict)
-694:     ) as executor:
-695:         
-696:         # Submit all chunks
-697:         future_to_chunk = {executor.submit(process_frame_chunk, chunk): chunk for chunk in chunks}
-698:         
-699:         completed_chunks = 0
-700:         # Throttle progress logs to ~10% intervals
-701:         progress_every = max(1, len(chunks) // 10)
-702:         for future in as_completed(future_to_chunk):
-703:             chunk = future_to_chunk[future]
-704:             try:
-705:                 chunk_results = future.result()
-706:                 
-707:                 # Store results by frame index
-708:                 for result in chunk_results:
-709:                     all_results[result['frame_idx']] = result
-710:                     if result['face_detected']:
-711:                         face_detection_count += 1
-712:                 
-713:                 completed_chunks += 1
-714:                 
-715:                 # Progress logging (throttled)
-716:                 if completed_chunks % progress_every == 0:
-717:                     progress_percent = (completed_chunks / len(chunks)) * 100
-718:                     elapsed_time = time.time() - processing_start_time
-719:                     fps_rate = (completed_chunks * chunk_size) / elapsed_time if elapsed_time > 0 else 0
-720:                     print(f"[Progression]|{int(progress_percent)}|{min(completed_chunks * chunk_size, total_frames)}|{total_frames}")
-721:                     logging.info(f"Multiprocessing: {completed_chunks}/{len(chunks)} chunks ({progress_percent:.1f}%) - {fps_rate:.1f} fps (chunk_size={chunk_size})")
-722:                     
-723:             except Exception as e:
-724:                 logging.error(f"Chunk processing failed: {e}")
-725:     
-726:     logging.info("Multiprocessing complete, applying sequential tracking...")
-727:     
-728:     # Apply tracking sequentially (must be sequential for consistency)
-729:     tracked_objects = {}
-730:     next_id_counter = {'value': 0}
-731:     final_output = {
-732:         "metadata": {
-733:             "video_path": args.video_file_path,
-734:             "total_frames": total_frames,
-735:             "fps": fps
-736:         },
-737:         "frames": []
-738:     }
-739:     
-740:     # Initialize enhanced speaking detector
-741:     enhanced_speaking_detector = None
-742:     try:
-743:         enhanced_speaking_detector = EnhancedSpeakingDetector(
-744:             video_path=args.video_file_path,
-745:             jaw_threshold=args.speaking_detection_jaw_open_threshold
-746:         )
-747:         logging.info("Enhanced speaking detection initialized")
-748:     except Exception as e:
-749:         logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
-750:     
-751:     missing_frame_count = 0
-752:     first_missing_frame = None
-753:     for frame_idx in range(total_frames):
-754:         result = all_results.get(frame_idx)
-755:         if result is None:
-756:             missing_frame_count += 1
-757:             if first_missing_frame is None:
-758:                 first_missing_frame = frame_idx
-759:             detections = []
-760:         else:
-761:             detections = result.get('detections', [])
-762:         
-763:         tracked_for_frame = apply_tracking_and_management(
-764:             tracked_objects, detections, next_id_counter,
-765:             args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
-766:             args.speaking_detection_jaw_open_threshold,
-767:             enhanced_speaking_detector=enhanced_speaking_detector,
-768:             current_frame_num=frame_idx + 1
-769:         )
-770:         
-771:         final_output["frames"].append({
-772:             "frame": frame_idx + 1,
-773:             "tracked_objects": tracked_for_frame if tracked_for_frame else []
-774:         })
-775: 
-776:     if missing_frame_count > 0:
-777:         logging.warning(
-778:             f"Missing detection results for {missing_frame_count}/{total_frames} frames "
-779:             f"(first missing frame index: {first_missing_frame}). Output remains dense with empty tracked_objects." 
-780:         )
-781:     
-782:     # Calculate final statistics
-783:     face_detection_rate = (face_detection_count / total_frames * 100) if total_frames > 0 else 0
-784:     processing_time = time.time() - processing_start_time
-785:     
-786:     logging.info("Multiprocessing summary:")
-787:     logging.info(f"  Total frames expected: {total_frames}")
-788:     logging.info(f"  Total frames with detection results: {len(all_results)}")
-789:     logging.info(f"  Frames with faces: {face_detection_count}")
-790:     logging.info(f"  Face detection success rate: {face_detection_rate:.2f}%")
-791:     logging.info(f"  Processing time: {processing_time:.2f} seconds")
-792:     logging.info(f"  Average FPS: {total_frames / processing_time:.2f}")
-793:     logging.info(f"  Total frames exported: {len(final_output['frames'])}")
-794:     
-795:     return final_output
-796: 
-797: 
-798: def main(args):
-799:     """Main processing function with multiprocessing support."""
-800:     engine_norm = (str(getattr(args, 'tracking_engine', '') or '').strip().lower())
-801:     
-802:     worker_type = "CPU_MULTIPROCESSING" if getattr(args, 'mp_num_workers_internal', 1) > 1 else "CPU"
-803:     logging.info(f"Starting {worker_type} processing for: {Path(args.video_file_path).name}")
-804:     
-805:     # Use safe video processing with automatic resource cleanup
-806:     try:
-807:         with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
-808:             # Get video metadata safely
-809:             fps = video_capture.get(cv2.CAP_PROP_FPS)
-810:             total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-811:             
-812:             logging.info(f"Video metadata - FPS: {fps}, Total frames: {total_frames}")
-813:             
-814:             # Check if multiprocessing should be used
-815:             use_multiprocessing = (not getattr(args, 'use_gpu', False) and 
-816:                                  getattr(args, 'mp_num_workers_internal', 1) > 1)
-817:             
-818:             if use_multiprocessing:
-819:                 final_output = process_video_multiprocessing(args, video_capture, total_frames)
-820:             else:
-821:                 # Fallback to sequential processing (existing implementation)
-822:                 logging.info("Using sequential processing (fallback)")
-823:                 # ... existing sequential logic would go here
-824:                 return False
-825:                 
-826:     except Exception as e:
-827:         logging.error(f"Error processing video {args.video_file_path}: {e}")
-828:         raise
-829:     
-830:     # Save output
-831:     output_path = Path(args.video_file_path).with_suffix('.json')
-832:     try:
-833:         with open(output_path, 'w', encoding='utf-8') as f:
-834:             json.dump(final_output, f, indent=2, ensure_ascii=False)
-835:         logging.info(f"Processing complete. JSON saved: {output_path.name}")
-836:         print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
-837:     except Exception as e:
-838:         logging.error(f"Failed to save output file {output_path}: {e}")
-839:         raise
-840: 
-841: 
-842: if __name__ == "__main__":
-843:     parser = argparse.ArgumentParser(description="Enhanced CPU Worker with Multiprocessing")
-844:     parser.add_argument("video_file_path")
-845:     parser.add_argument("--models_dir", required=True)
-846:     parser.add_argument("--use_gpu", action="store_true")
-847:     parser.add_argument("--tracking_engine", default=None, help="Tracking engine: mediapipe_landmarker (default), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface")
-848:     parser.add_argument("--mp_landmarker_num_faces", type=int, default=5)
-849:     parser.add_argument("--mp_landmarker_min_face_detection_confidence", type=float, default=0.3)
-850:     parser.add_argument("--mp_landmarker_min_face_presence_confidence", type=float, default=0.2)
-851:     parser.add_argument("--mp_landmarker_min_tracking_confidence", type=float, default=0.3)
-852:     parser.add_argument("--mp_max_distance_tracking", type=int, default=80)
-853:     parser.add_argument("--mp_frames_unseen_deregister", type=int, default=7)
-854:     parser.add_argument("--speaking_detection_jaw_open_threshold", type=float, default=0.08)
-855:     parser.add_argument("--enable_object_detection", action="store_true")
-856:     parser.add_argument("--object_score_threshold", type=float, default=0.4)
-857:     parser.add_argument("--object_max_results", type=int, default=5)
-858:     parser.add_argument("--mp_num_workers_internal", type=int, default=1)
-859:     parser.add_argument("--chunk_size", type=int, default=0, help="Chunk size (frames) for multiprocessing splitting; 0=adaptive")
-860:     parser.add_argument("--chunk_min", type=int, default=None, help="Minimum chunk size when adaptive is used")
-861:     parser.add_argument("--chunk_max", type=int, default=None, help="Maximum chunk size when adaptive is used")
-862:     
-863:     args, _ = parser.parse_known_args()
-864:     
-865:     try:
-866:         mp_proc.freeze_support()  # Required for Windows compatibility
-867:         main(args)
-868:         sys.exit(0)
-869:     except Exception as e:
-870:         logging.error(f"Critical error in worker: {e}", exc_info=True)
-871:         sys.exit(1)
-```
-
-## File: workflow_scripts/step5/process_video_worker.py
-```python
-   1: #!/usr/bin/env python3
-   2: # -*- coding: utf-8 -*-
-   3: import os, sys, json, argparse, logging, importlib, cv2, numpy as np
-   4: import threading, queue, time
-   5: from concurrent.futures import ThreadPoolExecutor, as_completed
-   6: from pathlib import Path
-   7: 
-   8: sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-   9: from utils.tracking_optimizations import apply_tracking_and_management
-  10: from utils.resource_manager import safe_video_processing, get_video_metadata, resource_tracker
-  11: from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
-  12: 
-  13: from face_engines import create_face_engine
-  14: from object_detector_registry import ObjectDetectorRegistry
-  15: 
-  16: mp = None
-  17: 
-  18: 
-  19: def _ensure_mediapipe_loaded(required: bool = False):
-  20:     """Lazy import Mediapipe to avoid TensorFlow dependency unless needed."""
-  21:     global mp
-  22:     if mp is not None:
-  23:         return mp
-  24:     try:
-  25:         if not hasattr(np, "complex_"):
-  26:             np.complex_ = np.complex128
-  27:         mp = importlib.import_module("mediapipe")
-  28:         return mp
-  29:     except Exception as exc:
-  30:         msg = f"MediaPipe import failed: {exc}"
-  31:         if required:
-  32:             logging.error(msg)
-  33:             raise
-  34:         logging.warning(msg)
-  35:         return None
-  36: 
-  37: # Configuration du logger
-  38: log_dir = Path(__file__).resolve().parent.parent.parent / "logs" / "step5"
-  39: log_dir.mkdir(parents=True, exist_ok=True)
-  40: worker_type_str = "GPU" if "--use_gpu" in sys.argv else "CPU"
-  41: video_name_for_log = Path(sys.argv[1]).stem if len(sys.argv) > 1 else "unknown"
-  42: log_file = log_dir / f"worker_{worker_type_str}_{video_name_for_log}_{os.getpid()}.log"
-  43: logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s',
-  44:                     handlers=[logging.FileHandler(log_file, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
-  45: 
-  46: # Limiter le threading interne d'OpenCV pour éviter la contention avec nos propres pools
-  47: try:
-  48:     cv2.setNumThreads(1)
-  49:     cv2.ocl.setUseOpenCL(False)
-  50: except Exception:
-  51:     # Sécurité: ignorer si non supporté sur la plateforme
-  52:     pass
-  53: 
-  54: 
-  55: def _parse_optional_positive_int(raw):
-  56:     if raw is None:
-  57:         return None
-  58:     raw_str = str(raw).strip()
-  59:     if not raw_str:
-  60:         return None
-  61:     try:
-  62:         value = int(raw_str)
-  63:     except Exception:
-  64:         return None
-  65:     if value <= 0:
-  66:         return None
-  67:     return value
-  68: 
-  69: 
-  70: def _is_truthy_env(raw):
-  71:     if raw is None:
-  72:         return False
-  73:     return str(raw).strip().lower() in {"1", "true", "yes"}
-  74: 
-  75: 
-  76: def _apply_jawopen_scale(blendshapes, scale):
-  77:     if not blendshapes or not isinstance(blendshapes, dict):
-  78:         return blendshapes
-  79:     try:
-  80:         jaw_open_raw = blendshapes.get("jawOpen")
-  81:         if jaw_open_raw is None:
-  82:             return blendshapes
-  83:         jaw_open_scaled = float(jaw_open_raw) * float(scale)
-  84:         jaw_open_scaled = float(np.clip(jaw_open_scaled, 0.0, 1.0))
-  85:         out = dict(blendshapes)
-  86:         out["jawOpen"] = jaw_open_scaled
-  87:         return out
-  88:     except Exception:
-  89:         return blendshapes
-  90: 
-  91: 
-  92: class FrameProcessor:
-  93:     """Thread-safe frame processor for multi-threaded CPU processing."""
-  94: 
-  95:     def __init__(self, landmarker, object_detector, args, enhanced_speaking_detector=None):
-  96:         self.landmarker = landmarker
-  97:         self.object_detector = object_detector
-  98:         self.args = args
-  99:         self.enhanced_speaking_detector = enhanced_speaking_detector
- 100:         self.lock = threading.Lock()
- 101: 
- 102:         self._enable_profiling = _is_truthy_env(os.environ.get("STEP5_ENABLE_PROFILING", "0"))
- 103:         self._profiling_stats = {
- 104:             "to_rgb_total": 0.0,
- 105:             "detect_total": 0.0,
- 106:             "post_total": 0.0,
- 107:             "frame_count": 0,
- 108:         }
- 109:         self._blendshapes_throttle_n = max(1, int(os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")))
- 110:         self._jaw_open_scale = float(os.environ.get("STEP5_MEDIAPIPE_JAWOPEN_SCALE", "1.0"))
- 111:         self._max_width = _parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_WIDTH"))
- 112:         self._blendshapes_cache = {}
- 113: 
- 114:     def process_frame(self, frame_data):
- 115:         """Process a single frame and return detection results."""
- 116:         frame, frame_idx, timestamp_ms = frame_data
- 117: 
- 118:         try:
- 119:             orig_h, orig_w = frame.shape[:2]
- 120:             work_frame = frame
- 121:             scale_to_original = 1.0
- 122:             if self._max_width is not None and orig_w > self._max_width:
- 123:                 scale_factor = float(self._max_width) / float(orig_w)
- 124:                 work_h = max(1, int(orig_h * scale_factor))
- 125:                 work_frame = cv2.resize(frame, (int(self._max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
- 126:                 scale_to_original = float(orig_w) / float(work_frame.shape[1])
- 127: 
- 128:             if self._enable_profiling:
- 129:                 with self.lock:
- 130:                     self._profiling_stats["frame_count"] += 1
- 131: 
- 132:             t_to_rgb = time.perf_counter() if self._enable_profiling else 0.0
- 133:             mp_image = mp.Image(
- 134:                 image_format=mp.ImageFormat.SRGB,
- 135:                 data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
- 136:             )
- 137:             if self._enable_profiling:
- 138:                 with self.lock:
- 139:                     self._profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
- 140: 
- 141:             current_detections = []
- 142:             face_detected = False
- 143: 
- 144:             # Try face detection first
- 145:             t_detect = time.perf_counter() if self._enable_profiling else 0.0
- 146:             face_result = self.landmarker.detect_for_video(mp_image, timestamp_ms)
- 147:             if self._enable_profiling:
- 148:                 with self.lock:
- 149:                     self._profiling_stats["detect_total"] += time.perf_counter() - t_detect
- 150: 
- 151:             if face_result.face_landmarks:
- 152:                 face_detected = True
- 153: 
- 154:                 for i, landmarks in enumerate(face_result.face_landmarks):
- 155:                     t_post = time.perf_counter() if self._enable_profiling else 0.0
- 156:                     x_coords = [lm.x * orig_w for lm in landmarks]
- 157:                     y_coords = [lm.y * orig_h for lm in landmarks]
- 158:                     bbox = (
- 159:                         int(min(x_coords)), int(min(y_coords)),
- 160:                         int(max(x_coords) - min(x_coords)),
- 161:                         int(max(y_coords) - min(y_coords))
- 162:                     )
- 163:                     centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
- 164:                     det = {
- 165:                         "bbox": bbox,
- 166:                         "centroid": centroid,
- 167:                         "source_detector": "face_landmarker",
- 168:                         "label": "face"
- 169:                     }
- 170:                     if face_result.face_blendshapes:
- 171:                         raw_blendshapes = {
- 172:                             cat.category_name: cat.score
- 173:                             for cat in face_result.face_blendshapes[i]
- 174:                         }
- 175:                         scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, self._jaw_open_scale)
- 176: 
- 177:                         current_frame_num = frame_idx + 1
- 178:                         should_update_blendshapes = (self._blendshapes_throttle_n <= 1) or ((current_frame_num % self._blendshapes_throttle_n) == 0)
- 179:                         object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
- 180:                         with self.lock:
- 181:                             if should_update_blendshapes or object_id not in self._blendshapes_cache:
- 182:                                 self._blendshapes_cache[object_id] = scaled_blendshapes
- 183:                                 det["blendshapes"] = scaled_blendshapes
- 184:                             else:
- 185:                                 det["blendshapes"] = self._blendshapes_cache.get(object_id)
- 186:                     current_detections.append(det)
- 187: 
- 188:                     if self._enable_profiling:
- 189:                         with self.lock:
- 190:                             self._profiling_stats["post_total"] += time.perf_counter() - t_post
- 191: 
- 192:             if self._enable_profiling:
- 193:                 with self.lock:
- 194:                     fc = int(self._profiling_stats.get("frame_count", 0) or 0)
- 195:                     if fc > 0 and (fc % 20) == 0:
- 196:                         to_rgb_ms = (self._profiling_stats["to_rgb_total"] / fc) * 1000.0
- 197:                         detect_ms = (self._profiling_stats["detect_total"] / fc) * 1000.0
- 198:                         post_ms = (self._profiling_stats["post_total"] / fc) * 1000.0
- 199:                         logging.info(
- 200:                             "[PROFILING] MediaPipe after %s frames: to_rgb=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
- 201:                             fc,
- 202:                             to_rgb_ms,
- 203:                             detect_ms,
- 204:                             post_ms,
- 205:                         )
- 206: 
- 207:             # Use object detection fallback if no faces detected
- 208:             if not face_detected and getattr(self.args, 'enable_object_detection', False):
- 209:                 try:
- 210:                     object_result = self.object_detector.detect_for_video(mp_image, timestamp_ms)
- 211: 
- 212:                     if object_result.detections:
- 213:                         for detection in object_result.detections:
- 214:                             bbox = detection.bounding_box
- 215:                             x_min = int(bbox.origin_x)
- 216:                             y_min = int(bbox.origin_y)
- 217:                             width = int(bbox.width)
- 218:                             height = int(bbox.height)
- 219: 
- 220:                             if scale_to_original != 1.0:
- 221:                                 x_min = int(max(0, x_min * scale_to_original))
- 222:                                 y_min = int(max(0, y_min * scale_to_original))
- 223:                                 width = int(max(0, width * scale_to_original))
- 224:                                 height = int(max(0, height * scale_to_original))
- 225: 
- 226:                             centroid = (x_min + width // 2, y_min + height // 2)
- 227: 
- 228:                             best_category = detection.categories[0] if detection.categories else None
- 229:                             label = best_category.category_name if best_category else "object"
- 230:                             confidence = best_category.score if best_category else 0.0
- 231: 
- 232:                             det = {
- 233:                                 "bbox": (x_min, y_min, width, height),
- 234:                                 "centroid": centroid,
- 235:                                 "source_detector": "object_detector",
- 236:                                 "label": label,
- 237:                                 "confidence": confidence,
- 238:                                 "blendshapes": None,
- 239:                                 "is_speaking": None
- 240:                             }
- 241:                             current_detections.append(det)
- 242:                 except Exception as e:
- 243:                     logging.warning(f"Object detection failed for frame {frame_idx + 1}: {e}")
- 244: 
- 245:             return {
- 246:                 'frame_idx': frame_idx,
- 247:                 'detections': current_detections,
- 248:                 'face_detected': face_detected,
- 249:                 'timestamp_ms': timestamp_ms
- 250:             }
- 251: 
- 252:         except Exception as e:
- 253:             logging.error(f"Error processing frame {frame_idx + 1}: {e}")
- 254:             return {
- 255:                 'frame_idx': frame_idx,
- 256:                 'detections': [],
- 257:                 'face_detected': False,
- 258:                 'timestamp_ms': timestamp_ms,
- 259:                 'error': str(e)
- 260:             }
- 261: 
- 262: 
- 263: def process_video_multithreaded(args, video_capture, landmarker, object_detector, enhanced_speaking_detector, total_frames):
- 264:     """Process video using multiple threads for CPU workers."""
- 265:     logging.info(f"Starting multi-threaded processing with {args.mp_num_workers_internal} workers (bounded queue)")
- 266: 
- 267:     # Initialize tracking variables
- 268:     tracked_objects = {}
- 269:     next_id_counter = {'value': 0}
- 270: 
- 271:     # Get video metadata
- 272:     fps = video_capture.get(cv2.CAP_PROP_FPS)
- 273: 
- 274:     final_output = {
- 275:         "metadata": {
- 276:             "video_path": args.video_file_path,
- 277:             "total_frames": total_frames,
- 278:             "fps": fps
- 279:         },
- 280:         "frames": []
- 281:     }
- 282: 
- 283:     # Performance tracking
- 284:     face_detection_success_count = 0
- 285:     frames_processed = 0
- 286:     processing_start_time = time.time()
- 287: 
- 288:     # Create frame processor
- 289:     frame_processor = FrameProcessor(landmarker, object_detector, args, enhanced_speaking_detector)
- 290: 
- 291:     # Bounded queue pipeline: un thread lecteur + N threads workers
- 292:     q = queue.Queue(maxsize=64)
- 293:     results = {}
- 294:     results_lock = threading.Lock()
- 295: 
- 296:     def worker_loop(worker_id: int):
- 297:         nonlocal frames_processed
- 298:         completed_local = 0
- 299:         while True:
- 300:             item = q.get()
- 301:             if item is None:
- 302:                 q.task_done()
- 303:                 break
- 304:             frame, idx, ts_ms = item
- 305:             try:
- 306:                 result = frame_processor.process_frame((frame, idx, ts_ms))
- 307:                 with results_lock:
- 308:                     results[idx] = result
- 309:                 completed_local += 1
- 310:                 frames_processed += 1
- 311:                 if frames_processed % 50 == 0:
- 312:                     progress_percent = (frames_processed / total_frames) * 100 if total_frames else 0
- 313:                     elapsed_time = time.time() - processing_start_time
- 314:                     fps_now = frames_processed / elapsed_time if elapsed_time > 0 else 0
- 315:                     print(f"[Progression]|{int(progress_percent)}|{frames_processed}|{total_frames}", flush=True)
- 316:                     logging.info(f"MT workers: {frames_processed}/{total_frames} ({progress_percent:.1f}%) - {fps_now:.1f} fps")
- 317:             except Exception as e:
- 318:                 logging.error(f"Frame {idx} processing failed: {e}")
- 319:                 with results_lock:
- 320:                     results[idx] = {
- 321:                         'frame_idx': idx,
- 322:                         'detections': [],
- 323:                         'face_detected': False,
- 324:                         'error': str(e)
- 325:                     }
- 326:             finally:
- 327:                 # Libérer la référence à la frame pour GC
- 328:                 del frame
- 329:                 q.task_done()
- 330: 
- 331:     # Lancer les workers
- 332:     workers = [threading.Thread(target=worker_loop, args=(i,), daemon=True)
- 333:                for i in range(int(args.mp_num_workers_internal))]
- 334:     for t in workers:
- 335:         t.start()
- 336: 
- 337:     # Thread lecteur: lit et pousse les frames dans la queue (bornée)
- 338:     frame_read = 0
- 339:     logging.info("Reading frames and feeding bounded queue...")
- 340:     while video_capture.isOpened():
- 341:         ret, frame = video_capture.read()
- 342:         if not ret:
- 343:             break
- 344:         ts_ms = int(video_capture.get(cv2.CAP_PROP_POS_MSEC))
- 345:         q.put((frame, frame_read, ts_ms))
- 346:         frame_read += 1
- 347:         if frame_read % 100 == 0:
- 348:             logging.info(f"Read {frame_read} frames...")
- 349: 
- 350:     # Envoyer les sentinelles d'arrêt aux workers
- 351:     for _ in workers:
- 352:         q.put(None)
- 353: 
- 354:     # Attendre la fin du traitement
- 355:     q.join()
- 356:     for t in workers:
- 357:         t.join(timeout=1)
- 358: 
- 359:     logging.info("Parallel processing complete, applying tracking...")
- 360: 
- 361:     # Apply tracking in sequential order (must be sequential for consistency)
- 362:     for frame_idx in sorted(results.keys()):
- 363:         result = results[frame_idx]
- 364: 
- 365:         if result.get('face_detected', False):
- 366:             face_detection_success_count += 1
- 367: 
- 368:         # Apply tracking and management
- 369:         tracked_for_frame = apply_tracking_and_management(
- 370:             tracked_objects, result['detections'], next_id_counter,
- 371:             args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
- 372:             args.speaking_detection_jaw_open_threshold,
- 373:             enhanced_speaking_detector=enhanced_speaking_detector,
- 374:             current_frame_num=frame_idx + 1
- 375:         )
- 376: 
- 377:         # Add to final output
- 378:         final_output["frames"].append({
- 379:             "frame": frame_idx + 1,
- 380:             "tracked_objects": tracked_for_frame if tracked_for_frame else []
- 381:         })
- 382: 
- 383:     # Calculate final statistics
- 384:     face_detection_rate = (face_detection_success_count / frames_processed * 100) if frames_processed > 0 else 0
- 385:     processing_time = time.time() - processing_start_time
- 386: 
- 387:     logging.info("Multi-threaded processing summary:")
- 388:     logging.info(f"  Total frames processed: {frames_processed}")
- 389:     logging.info(f"  Frames with faces: {face_detection_success_count}")
- 390:     logging.info(f"  Face detection success rate: {face_detection_rate:.2f}%")
- 391:     logging.info(f"  Processing time: {processing_time:.2f} seconds")
- 392:     logging.info(f"  Average FPS: {frames_processed / processing_time:.2f}")
- 393:     logging.info(f"  Object detection fallback used: {getattr(args, 'enable_object_detection', False)}")
- 394:     logging.info(f"  Total frames exported: {len(final_output['frames'])}")
- 395: 
- 396:     return final_output
- 397: 
- 398: 
- 399: def main(args):
- 400:     """Traite une vidéo de manière séquentielle (un seul thread)."""
- 401:     worker_type = "GPU" if args.use_gpu else "CPU"
- 402:     logging.info(f"Démarrage du traitement séquentiel {worker_type} pour: {Path(args.video_file_path).name}")
- 403:     logging.info(f"LD_LIBRARY_PATH (worker) = {os.environ.get('LD_LIBRARY_PATH', '')}")
- 404:     logging.info(f"INSIGHTFACE_HOME (worker) = {os.environ.get('INSIGHTFACE_HOME', '')}")
- 405: 
- 406:     engine_name = getattr(args, 'tracking_engine', None)
- 407:     use_gpu_flag = bool(getattr(args, 'use_gpu', False))
- 408:     face_engine = None
- 409:     if engine_name:
- 410:         try:
- 411:             face_engine = create_face_engine(engine_name, use_gpu=use_gpu_flag)
- 412:         except Exception as e:
- 413:             logging.exception(f"Failed to initialize tracking engine '{engine_name}': {e}")
- 414:             sys.exit(1)
- 415: 
- 416:     final_output = None
- 417:     total_frames = 0
- 418: 
- 419:     if face_engine is not None:
- 420:         logging.info(f"Using OpenCV tracking engine: {engine_name}")
- 421:         try:
- 422:             with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
- 423:                 fps = video_capture.get(cv2.CAP_PROP_FPS)
- 424:                 total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
- 425: 
- 426:                 object_detector = None
- 427:                 object_options = None
- 428:                 mp_module = None
- 429:                 ObjectDetector = None
- 430:                 object_detection_workers = max(1, int(getattr(args, 'mp_num_workers_internal', 1) or 1))
- 431:                 if args.use_gpu and getattr(args, 'enable_object_detection', False):
- 432:                     logging.info(
- 433:                         "Object detection fallback workers (GPU face engine mode): %s",
- 434:                         object_detection_workers,
- 435:                     )
- 436:                 if getattr(args, 'enable_object_detection', False):
- 437:                     try:
- 438:                         mp_module = _ensure_mediapipe_loaded(required=False)
- 439:                         if mp_module is None:
- 440:                             raise RuntimeError("mediapipe is not available (lazy import failed)")
- 441: 
- 442:                         BaseOptions = mp_module.tasks.BaseOptions
- 443:                         VisionRunningMode = mp_module.tasks.vision.RunningMode
- 444:                         ObjectDetector = mp_module.tasks.vision.ObjectDetector
- 445:                         ObjectDetectorOptions = mp_module.tasks.vision.ObjectDetectorOptions
- 446: 
- 447:                         delegate = BaseOptions.Delegate.CPU
- 448:                         models_dir = Path(args.models_dir)
- 449:                         object_detector_model_name = (
- 450:                             getattr(args, 'object_detector_model', None)
- 451:                             or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2')
- 452:                         )
- 453:                         object_detector_model_path = (
- 454:                             getattr(args, 'object_detector_model_path', None)
- 455:                             or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
- 456:                         )
- 457:                         object_model_path = ObjectDetectorRegistry.resolve_model_path(
- 458:                             model_name=object_detector_model_name,
- 459:                             models_dir=models_dir,
- 460:                             override_path=object_detector_model_path,
- 461:                         )
- 462:                         logging.info(
- 463:                             f"Using object detector (face_engine mode): {object_detector_model_name} at {object_model_path}"
- 464:                         )
- 465:                         object_options = ObjectDetectorOptions(
- 466:                             base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
- 467:                             running_mode=VisionRunningMode.IMAGE,
- 468:                             max_results=getattr(args, 'object_max_results', 5),
- 469:                             score_threshold=getattr(args, 'object_score_threshold', 0.4),
- 470:                         )
- 471:                         object_detector = ObjectDetector.create_from_options(object_options)
- 472:                         if object_detection_workers > 1:
- 473:                             logging.info(
- 474:                                 "Object detection fallback: using one MediaPipe ObjectDetector instance per thread (IMAGE mode)."
- 475:                             )
- 476:                     except Exception as e:
- 477:                         logging.warning(
- 478:                             f"Failed to initialize object detector (face_engine mode); continuing without it: {e}"
- 479:                         )
- 480:                         object_detector = None
- 481:                         object_options = None
- 482:                         mp_module = None
- 483:                         ObjectDetector = None
- 484: 
- 485:                 final_output = {
- 486:                     "metadata": {
- 487:                         "video_path": args.video_file_path,
- 488:                         "total_frames": total_frames,
- 489:                         "fps": fps,
- 490:                         "tracking_engine": engine_name,
- 491:                     },
- 492:                     "frames": [],
- 493:                 }
- 494: 
- 495:                 tracked_objects, next_id_counter = {}, {'value': 0}
- 496: 
- 497:                 resource_id = resource_tracker.register_resource(
- 498:                     video_capture, 'video_capture', f"Processing {Path(args.video_file_path).name}"
- 499:                 )
- 500: 
- 501:                 try:
- 502:                     enhanced_speaking_detector = None
- 503:                     if getattr(args, 'speaking_detection_enabled', True):
- 504:                         try:
- 505:                             enhanced_speaking_detector = EnhancedSpeakingDetector(
- 506:                                 video_path=args.video_file_path,
- 507:                                 jaw_threshold=args.speaking_detection_jaw_open_threshold,
- 508:                             )
- 509:                             logging.info("Enhanced speaking detection initialized successfully")
- 510:                         except Exception as e:
- 511:                             logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
- 512:                             enhanced_speaking_detector = None
- 513: 
- 514:                     object_tasks = None
- 515:                     object_results = {}
- 516:                     object_results_lock = threading.Lock()
- 517:                     object_worker_threads = []
- 518: 
- 519:                     def _object_worker_loop(worker_id: int):
- 520:                         thread_object_detector = None
- 521:                         if object_options is not None and ObjectDetector is not None:
- 522:                             try:
- 523:                                 thread_object_detector = ObjectDetector.create_from_options(object_options)
- 524:                             except Exception as e:
- 525:                                 logging.warning(
- 526:                                     "Object detection failed to initialize detector for worker %s (face_engine mode): %s",
- 527:                                     worker_id,
- 528:                                     e,
- 529:                                 )
- 530:                                 thread_object_detector = None
- 531:                         while True:
- 532:                             task = object_tasks.get() if object_tasks is not None else None
- 533:                             if task is None:
- 534:                                 try:
- 535:                                     if thread_object_detector is not None and hasattr(thread_object_detector, 'close'):
- 536:                                         thread_object_detector.close()
- 537:                                 except Exception:
- 538:                                     pass
- 539:                                 if object_tasks is not None:
- 540:                                     object_tasks.task_done()
- 541:                                 break
- 542:                             frame_local, frame_idx_local, timestamp_ms_local = task
- 543:                             try:
- 544:                                 if mp_module is None or thread_object_detector is None:
- 545:                                     raise RuntimeError("object detector is not available for object detection fallback")
- 546:                                 mp_image = mp_module.Image(
- 547:                                     image_format=mp_module.ImageFormat.SRGB,
- 548:                                     data=cv2.cvtColor(frame_local, cv2.COLOR_BGR2RGB)
- 549:                                 )
- 550:                                 object_result = thread_object_detector.detect(mp_image)
- 551:                                 detections_out = []
- 552:                                 if object_result.detections:
- 553:                                     for detection in object_result.detections:
- 554:                                         bbox = detection.bounding_box
- 555:                                         x_min = int(bbox.origin_x)
- 556:                                         y_min = int(bbox.origin_y)
- 557:                                         width = int(bbox.width)
- 558:                                         height = int(bbox.height)
- 559:                                         centroid = (x_min + width // 2, y_min + height // 2)
- 560:                                         best_category = detection.categories[0] if detection.categories else None
- 561:                                         label = best_category.category_name if best_category else "object"
- 562:                                         confidence = best_category.score if best_category else 0.0
- 563:                                         detections_out.append(
- 564:                                             {
- 565:                                                 "bbox": (x_min, y_min, width, height),
- 566:                                                 "centroid": centroid,
- 567:                                                 "source_detector": "object_detector",
- 568:                                                 "label": label,
- 569:                                                 "confidence": confidence,
- 570:                                                 "blendshapes": None,
- 571:                                                 "is_speaking": None,
- 572:                                             }
- 573:                                         )
- 574:                                 with object_results_lock:
- 575:                                     object_results[frame_idx_local] = detections_out
- 576:                             except Exception as e:
- 577:                                 logging.warning(
- 578:                                     f"Object detection failed for frame {frame_idx_local + 1} (face_engine mode): {e}"
- 579:                                 )
- 580:                                 with object_results_lock:
- 581:                                     object_results[frame_idx_local] = []
- 582:                             finally:
- 583:                                 del frame_local
- 584:                                 object_tasks.task_done()
- 585: 
- 586:                     enable_object_fallback = bool(getattr(args, 'enable_object_detection', False))
- 587:                     enable_object_threads = bool(object_detector is not None and object_detection_workers > 1 and enable_object_fallback)
- 588:                     if enable_object_threads:
- 589:                         object_tasks = queue.Queue(maxsize=max(1, object_detection_workers) * 2)
- 590:                         for i in range(int(object_detection_workers)):
- 591:                             t = threading.Thread(target=_object_worker_loop, args=(i,), daemon=True)
- 592:                             object_worker_threads.append(t)
- 593:                             t.start()
- 594: 
- 595:                     frame_idx = 0
- 596:                     frame_detections = {}
- 597:                     while video_capture.isOpened():
- 598:                         ret, frame = video_capture.read()
- 599:                         if not ret:
- 600:                             break
- 601: 
- 602:                         current_detections = face_engine.detect(frame)
- 603:                         frame_idx += 1
- 604:                         if frame_idx % 50 == 0:
- 605:                             progress_percent = int((frame_idx / total_frames) * 90) if total_frames else 0
- 606:                             print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
- 607: 
- 608:                         if (not current_detections) and object_detector is not None and enable_object_fallback:
- 609:                             if enable_object_threads and object_tasks is not None:
- 610:                                 object_tasks.put((frame, frame_idx - 1, None))
- 611:                             else:
- 612:                                 try:
- 613:                                     if mp_module is None:
- 614:                                         raise RuntimeError("mediapipe is not available for object detection fallback")
- 615:                                     mp_image = mp_module.Image(
- 616:                                         image_format=mp_module.ImageFormat.SRGB,
- 617:                                         data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
- 618:                                     )
- 619:                                     object_result = object_detector.detect(mp_image)
- 620:                                     if object_result.detections:
- 621:                                         for detection in object_result.detections:
- 622:                                             bbox = detection.bounding_box
- 623:                                             x_min = int(bbox.origin_x)
- 624:                                             y_min = int(bbox.origin_y)
- 625:                                             width = int(bbox.width)
- 626:                                             height = int(bbox.height)
- 627:                                             centroid = (x_min + width // 2, y_min + height // 2)
- 628:                                             best_category = detection.categories[0] if detection.categories else None
- 629:                                             label = best_category.category_name if best_category else "object"
- 630:                                             confidence = best_category.score if best_category else 0.0
- 631:                                             current_detections.append(
- 632:                                                 {
- 633:                                                     "bbox": (x_min, y_min, width, height),
- 634:                                                     "centroid": centroid,
- 635:                                                     "source_detector": "object_detector",
- 636:                                                     "label": label,
- 637:                                                     "confidence": confidence,
- 638:                                                     "blendshapes": None,
- 639:                                                     "is_speaking": None,
- 640:                                                 }
- 641:                                             )
- 642:                                 except Exception as e:
- 643:                                     logging.warning(
- 644:                                         f"Object detection failed for frame {frame_idx} (face_engine mode): {e}"
- 645:                                     )
- 646: 
- 647:                         frame_detections[frame_idx - 1] = list(current_detections)
- 648:                         del frame
- 649: 
- 650:                     if enable_object_threads and object_tasks is not None:
- 651:                         object_tasks.join()
- 652:                         for _ in object_worker_threads:
- 653:                             object_tasks.put(None)
- 654:                         object_tasks.join()
- 655:                         for t in object_worker_threads:
- 656:                             t.join(timeout=1)
- 657: 
- 658:                     for frame_idx_out in range(total_frames):
- 659:                         current_detections = frame_detections.get(frame_idx_out, [])
- 660:                         if (not current_detections) and object_detector is not None and enable_object_fallback:
- 661:                             with object_results_lock:
- 662:                                 current_detections = list(object_results.get(frame_idx_out, []))
- 663: 
- 664:                         tracked_for_frame = apply_tracking_and_management(
- 665:                             tracked_objects,
- 666:                             current_detections,
- 667:                             next_id_counter,
- 668:                             args.mp_max_distance_tracking,
- 669:                             args.mp_frames_unseen_deregister,
- 670:                             args.speaking_detection_jaw_open_threshold,
- 671:                             enhanced_speaking_detector=enhanced_speaking_detector,
- 672:                             current_frame_num=frame_idx_out + 1,
- 673:                         )
- 674:                         final_output["frames"].append(
- 675:                             {
- 676:                                 "frame": frame_idx_out + 1,
- 677:                                 "tracked_objects": tracked_for_frame if tracked_for_frame else [],
- 678:                             }
- 679:                         )
- 680:                         if (frame_idx_out + 1) % 50 == 0:
- 681:                             progress_percent = 90 + int(((frame_idx_out + 1) / total_frames) * 10) if total_frames else 100
- 682:                             print(f"[Progression]|{progress_percent}|{frame_idx_out + 1}|{total_frames}", flush=True)
- 683: 
- 684:                     frame_idx = total_frames
- 685: 
- 686:                     if total_frames and frame_idx < total_frames:
- 687:                         for fill_idx in range(frame_idx, total_frames):
- 688:                             tracked_for_frame = apply_tracking_and_management(
- 689:                                 tracked_objects,
- 690:                                 [],
- 691:                                 next_id_counter,
- 692:                                 args.mp_max_distance_tracking,
- 693:                                 args.mp_frames_unseen_deregister,
- 694:                                 args.speaking_detection_jaw_open_threshold,
- 695:                                 enhanced_speaking_detector=enhanced_speaking_detector,
- 696:                                 current_frame_num=fill_idx + 1,
- 697:                             )
- 698:                             final_output["frames"].append(
- 699:                                 {
- 700:                                     "frame": fill_idx + 1,
- 701:                                     "tracked_objects": tracked_for_frame if tracked_for_frame else [],
- 702:                                 }
- 703:                             )
- 704:                 finally:
- 705:                     try:
- 706:                         if object_detector is not None and hasattr(object_detector, 'close'):
- 707:                             object_detector.close()
- 708:                     except Exception:
- 709:                         pass
- 710:                     resource_tracker.unregister_resource(resource_id)
- 711: 
- 712:         except Exception as e:
- 713:             logging.error(f"Error processing video {args.video_file_path} with OpenCV engine: {e}")
- 714:             raise
- 715: 
- 716:         output_path = Path(args.video_file_path).with_suffix('.json')
- 717:         try:
- 718:             with open(output_path, 'w', encoding='utf-8') as f:
- 719:                 json.dump(final_output, f, indent=2, ensure_ascii=False)
- 720:             logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
- 721:             print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
- 722:         except Exception as e:
- 723:             logging.error(f"Failed to save output file {output_path}: {e}")
- 724:             raise
- 725:         return
- 726: 
- 727:     mp_module = _ensure_mediapipe_loaded(required=True)
- 728:     BaseOptions = mp_module.tasks.BaseOptions
- 729:     VisionRunningMode = mp_module.tasks.vision.RunningMode
- 730:     FaceLandmarker = mp_module.tasks.vision.FaceLandmarker
- 731:     FaceLandmarkerOptions = mp_module.tasks.vision.FaceLandmarkerOptions
- 732:     ObjectDetector = mp_module.tasks.vision.ObjectDetector
- 733:     ObjectDetectorOptions = mp_module.tasks.vision.ObjectDetectorOptions
- 734: 
- 735:     delegate = BaseOptions.Delegate.GPU if args.use_gpu else BaseOptions.Delegate.CPU
- 736:     models_dir = Path(args.models_dir)
- 737:     face_model_candidates = [
- 738:         models_dir / "face_detectors" / "mediapipe" / "face_landmarker_v2_with_blendshapes.task",
- 739:         models_dir / "face_landmarker_v2_with_blendshapes.task",
- 740:     ]
- 741:     face_model_path = next((p for p in face_model_candidates if p.exists()), face_model_candidates[0])
- 742:     
- 743:     if not face_model_path.exists():
- 744:         logging.error(f"Modèle FaceLandmarker non trouvé: {face_model_path}");
- 745:         sys.exit(1)
- 746:     
- 747:     # Resolve object detector model using registry
- 748:     object_detector_model_name = getattr(args, 'object_detector_model', 'efficientdet_lite2')
- 749:     try:
- 750:         object_model_path = ObjectDetectorRegistry.resolve_model_path(
- 751:             model_name=object_detector_model_name,
- 752:             models_dir=models_dir,
- 753:             override_path=getattr(args, 'object_detector_model_path', None)
- 754:         )
- 755:         logging.info(f"Using object detector: {object_detector_model_name} at {object_model_path}")
- 756:     except (ValueError, FileNotFoundError) as e:
- 757:         logging.error(f"Failed to resolve object detector model: {e}")
- 758:         sys.exit(1)
- 759: 
- 760:     face_options = FaceLandmarkerOptions(
- 761:         base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
- 762:         running_mode=VisionRunningMode.VIDEO,
- 763:         num_faces=int(_parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_FACES")) or args.mp_landmarker_num_faces),
- 764:         min_face_detection_confidence=args.mp_landmarker_min_face_detection_confidence,
- 765:         min_face_presence_confidence=args.mp_landmarker_min_face_presence_confidence,
- 766:         min_tracking_confidence=args.mp_landmarker_min_tracking_confidence,
- 767:         output_face_blendshapes=True
- 768:     )
- 769: 
- 770:     object_options = ObjectDetectorOptions(
- 771:         base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
- 772:         running_mode=VisionRunningMode.VIDEO,
- 773:         max_results=getattr(args, 'object_max_results', 5),
- 774:         score_threshold=getattr(args, 'object_score_threshold', 0.5)
- 775:     )
- 776: 
- 777:     # Use safe video processing with automatic resource cleanup
- 778:     try:
- 779:         with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
- 780:             # Get video metadata safely
- 781:             fps = video_capture.get(cv2.CAP_PROP_FPS)
- 782:             total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
- 783: 
- 784:             logging.info(f"Video metadata - FPS: {fps}, Total frames: {total_frames}")
- 785: 
- 786:             # Register video capture for tracking
- 787:             resource_id = resource_tracker.register_resource(
- 788:                 video_capture, 'video_capture', f"Processing {Path(args.video_file_path).name}"
- 789:             )
- 790: 
- 791:             try:
- 792:                 with FaceLandmarker.create_from_options(face_options) as landmarker, \
- 793:                      ObjectDetector.create_from_options(object_options) as object_detector:
- 794: 
- 795:                     final_output = {
- 796:                         "metadata": {
- 797:                             "video_path": args.video_file_path,
- 798:                             "total_frames": total_frames,
- 799:                             "fps": fps
- 800:                         },
- 801:                         "frames": []
- 802:                     }
- 803:                     tracked_objects, next_id_counter = {}, {'value': 0}
- 804: 
- 805:                     # Fallback tracking variables
- 806:                     face_detection_success_count = 0
- 807:                     frames_processed = 0
- 808:                     use_object_detection_fallback = getattr(args, 'enable_object_detection', False)
- 809:                     fallback_threshold = 50  # Check every 50 frames for fallback decision
- 810: 
- 811:                     # Initialize enhanced speaking detector
- 812:                     enhanced_speaking_detector = None
- 813:                     # Speaking detector activé par défaut
- 814:                     if getattr(args, 'speaking_detection_enabled', True):
- 815:                         try:
- 816:                             enhanced_speaking_detector = EnhancedSpeakingDetector(
- 817:                                 video_path=args.video_file_path,
- 818:                                 jaw_threshold=args.speaking_detection_jaw_open_threshold
- 819:                             )
- 820:                             logging.info("Enhanced speaking detection initialized successfully")
- 821:                             logging.info(f"Detection stats: {enhanced_speaking_detector.get_detection_stats()}")
- 822:                         except Exception as e:
- 823:                             logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
- 824:                             enhanced_speaking_detector = None
- 825: 
- 826:                     # Check if multi-threading should be used (CPU workers with > 1 internal workers)
- 827:                     use_multithreading = (not args.use_gpu and
- 828:                                         getattr(args, 'mp_num_workers_internal', 1) > 1)
- 829: 
- 830:                     if use_multithreading:
- 831:                         logging.info(f"Using multi-threaded processing with {args.mp_num_workers_internal} workers")
- 832:                         final_output = process_video_multithreaded(
- 833:                             args, video_capture, landmarker, object_detector,
- 834:                             enhanced_speaking_detector, total_frames
- 835:                         )
- 836:                     else:
- 837:                         logging.info("Using sequential processing")
- 838:                         # Sequential processing (original logic)
- 839:                         frame_idx = 0
- 840:                         while video_capture.isOpened():
- 841:                             ret, frame = video_capture.read()
- 842:                             if not ret:
- 843:                                 break
- 844: 
- 845:                             mp_image = mp.Image(
- 846:                                 image_format=mp.ImageFormat.SRGB,
- 847:                                 data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
- 848:                             )
- 849:                             timestamp_ms = int(video_capture.get(cv2.CAP_PROP_POS_MSEC))
- 850: 
- 851:                             # Try face detection first
- 852:                             face_result = landmarker.detect_for_video(mp_image, timestamp_ms)
- 853:                             frames_processed += 1
- 854: 
- 855:                             current_detections = []
- 856:                             face_detected = False
- 857: 
- 858:                             if face_result.face_landmarks:
- 859:                                 face_detected = True
- 860:                                 face_detection_success_count += 1
- 861: 
- 862:                                 for i, landmarks in enumerate(face_result.face_landmarks):
- 863:                                     h, w, _ = frame.shape
- 864:                                     x_coords = [lm.x * w for lm in landmarks]
- 865:                                     y_coords = [lm.y * h for lm in landmarks]
- 866:                                     bbox = (
- 867:                                         int(min(x_coords)), int(min(y_coords)),
- 868:                                         int(max(x_coords) - min(x_coords)),
- 869:                                         int(max(y_coords) - min(y_coords))
- 870:                                     )
- 871:                                     centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
- 872:                                     det = {
- 873:                                         "bbox": bbox,
- 874:                                         "centroid": centroid,
- 875:                                         "source_detector": "face_landmarker",
- 876:                                         "label": "face"
- 877:                                     }
- 878:                                     if face_result.face_blendshapes:
- 879:                                         det["blendshapes"] = {
- 880:                                             cat.category_name: cat.score
- 881:                                             for cat in face_result.face_blendshapes[i]
- 882:                                         }
- 883:                                     current_detections.append(det)
- 884: 
- 885:                             # Check if we should enable object detection fallback
- 886:                             if frames_processed % fallback_threshold == 0:
- 887:                                 face_success_rate = face_detection_success_count / frames_processed
- 888:                                 if face_success_rate < 0.1:  # Less than 10% face detection success
- 889:                                     if not use_object_detection_fallback:
- 890:                                         logging.info(f"Low face detection rate ({face_success_rate:.2%}). Enabling object detection fallback.")
- 891:                                         use_object_detection_fallback = True
- 892: 
- 893:                             # Use object detection fallback if no faces detected and fallback is enabled
- 894:                             if not face_detected and use_object_detection_fallback:
- 895:                                 try:
- 896:                                     object_result = object_detector.detect_for_video(mp_image, timestamp_ms)
- 897: 
- 898:                                     if object_result.detections:
- 899:                                         for detection in object_result.detections:
- 900:                                             bbox = detection.bounding_box
- 901:                                             # MediaPipe object detection returns coordinates already in pixel format
- 902:                                             # No conversion needed - use values directly
- 903:                                             x_min = int(bbox.origin_x)
- 904:                                             y_min = int(bbox.origin_y)
- 905:                                             width = int(bbox.width)
- 906:                                             height = int(bbox.height)
- 907: 
- 908:                                             centroid = (x_min + width // 2, y_min + height // 2)
- 909: 
- 910:                                             # Get the best category
- 911:                                             best_category = detection.categories[0] if detection.categories else None
- 912:                                             label = best_category.category_name if best_category else "object"
- 913:                                             confidence = best_category.score if best_category else 0.0
- 914: 
- 915:                                             det = {
- 916:                                                 "bbox": (x_min, y_min, width, height),
- 917:                                                 "centroid": centroid,
- 918:                                                 "source_detector": "object_detector",
- 919:                                                 "label": label,
- 920:                                                 "confidence": confidence,
- 921:                                                 "blendshapes": None,  # Not applicable for objects
- 922:                                                 "is_speaking": None   # Not applicable for objects
- 923:                                             }
- 924:                                             current_detections.append(det)
- 925:                                 except Exception as e:
- 926:                                     logging.warning(f"Object detection failed for frame {frame_idx + 1}: {e}")
- 927: 
- 928:                             tracked_for_frame = apply_tracking_and_management(
- 929:                                 tracked_objects, current_detections, next_id_counter,
- 930:                                 args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
- 931:                                 args.speaking_detection_jaw_open_threshold,
- 932:                                 enhanced_speaking_detector=enhanced_speaking_detector,
- 933:                                 current_frame_num=frame_idx + 1
- 934:                             )
- 935: 
- 936:                             # Always export frame data to maintain consistent structure
- 937:                             # Even if no objects are tracked, we include the frame with empty tracked_objects
- 938:                             final_output["frames"].append({
- 939:                                 "frame": frame_idx + 1,
- 940:                                 "tracked_objects": tracked_for_frame if tracked_for_frame else []
- 941:                             })
- 942: 
- 943:                             frame_idx += 1
- 944:                             if frame_idx % 50 == 0:
- 945:                                 progress_percent = int((frame_idx / total_frames) * 100)
- 946:                                 print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
- 947: 
- 948:                         # Log processing summary for sequential processing
- 949:                         face_success_rate = face_detection_success_count / frames_processed if frames_processed > 0 else 0
- 950:                         logging.info(f"Processing summary:")
- 951:                         logging.info(f"  Total frames processed: {frames_processed}")
- 952:                         logging.info(f"  Frames with faces: {face_detection_success_count}")
- 953:                         logging.info(f"  Face detection success rate: {face_success_rate:.2%}")
- 954:                         logging.info(f"  Object detection fallback used: {use_object_detection_fallback}")
- 955:                         logging.info(f"  Total frames exported: {len(final_output['frames'])}")
- 956: 
- 957:             finally:
- 958:                 # Unregister the video capture resource
- 959:                 resource_tracker.unregister_resource(resource_id)
- 960: 
- 961:     except Exception as e:
- 962:         logging.error(f"Error processing video {args.video_file_path}: {e}")
- 963:         raise
- 964: 
- 965:     # Save output with proper error handling
- 966:     output_path = Path(args.video_file_path).with_suffix('.json')
- 967:     try:
- 968:         with open(output_path, 'w', encoding='utf-8') as f:
- 969:             json.dump(final_output, f, indent=2, ensure_ascii=False)
- 970:         logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
- 971:         print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
- 972:     except Exception as e:
- 973:         logging.error(f"Failed to save output file {output_path}: {e}")
- 974:         raise
- 975: 
- 976: 
- 977: if __name__ == "__main__":
- 978:     parser = argparse.ArgumentParser(description="Worker séquentiel pour MediaPipe.")
- 979:     parser.add_argument("video_file_path")
- 980:     parser.add_argument("--models_dir", required=True)
- 981:     parser.add_argument("--use_gpu", action="store_true")
- 982:     parser.add_argument("--tracking_engine", default=None, help="Tracking engine: mediapipe_landmarker (default), opencv_haar, opencv_yunet")
- 983:     # Conserver les arguments pour la compatibilité avec le manager, même s'ils ne sont pas tous utilisés
- 984:     parser.add_argument("--mp_landmarker_num_faces", type=int, default=1)
- 985:     parser.add_argument("--mp_landmarker_min_face_detection_confidence", type=float, default=0.5)
- 986:     parser.add_argument("--mp_landmarker_min_face_presence_confidence", type=float, default=0.3)
- 987:     parser.add_argument("--mp_landmarker_min_tracking_confidence", type=float, default=0.5)
- 988:     parser.add_argument("--mp_landmarker_output_blendshapes", action="store_true")
- 989:     parser.add_argument("--mp_max_distance_tracking", type=int, default=70)
- 990:     parser.add_argument("--mp_frames_unseen_deregister", type=int, default=7)
- 991:     parser.add_argument("--speaking_detection_jaw_open_threshold", type=float, default=0.08)
- 992:     parser.add_argument("--speaking_detection_enabled", action="store_true", default=True, help="Enable enhanced speaking detection module (enabled by default)")
- 993:     # Object detection parameters
- 994:     parser.add_argument("--enable_object_detection", action="store_true", help="Enable object detection fallback")
- 995:     parser.add_argument("--object_score_threshold", type=float, default=0.5, help="Object detection confidence threshold")
- 996:     parser.add_argument("--object_max_results", type=int, default=5, help="Maximum number of objects to detect")
- 997:     # Multi-threading parameter for CPU workers
- 998:     parser.add_argument("--mp_num_workers_internal", type=int, default=1, help="Number of internal worker threads for CPU processing")
- 999: 
-1000:     args, _ = parser.parse_known_args()
-1001: 
-1002:     try:
-1003:         main(args)
-1004:         sys.exit(0)
-1005:     except Exception as e:
-1006:         logging.error(f"Erreur critique dans le worker: {e}", exc_info=True)
-1007:         sys.exit(1)
-```
-
-## File: workflow_scripts/step5/pyfeat_blendshape_extractor.py
-```python
-  1: import logging
-  2: import os
-  3: from pathlib import Path
-  4: from typing import Optional, Dict, Any, List
-  5: 
-  6: import numpy as np
-  7: 
-  8: logger = logging.getLogger(__name__)
-  9: 
- 10: 
- 11: class PyFeatBlendshapeExtractor:
- 12:     def __init__(
- 13:         self,
- 14:         model_path: Optional[str] = None,
- 15:         device: Optional[str] = None,
- 16:         use_gpu: bool = False,
- 17:     ):
- 18:         self._model_path = model_path or os.environ.get("STEP5_PYFEAT_MODEL_PATH")
- 19:         self._model = None
- 20:         self._blendshape_names = None
- 21:         self._use_gpu = use_gpu
- 22:         
- 23:         try:
- 24:             import torch
- 25:             self._torch = torch
- 26:         except ImportError:
- 27:             raise RuntimeError(
- 28:                 "PyTorch is required for py-feat blendshape extraction. "
- 29:                 "Install with: pip install torch"
- 30:             )
- 31: 
- 32:         if device:
- 33:             self._device = device
- 34:         else:
- 35:             if use_gpu and torch.cuda.is_available():
- 36:                 self._device = "cuda"
- 37:             else:
- 38:                 if use_gpu and not torch.cuda.is_available():
- 39:                     logger.warning("CUDA requested for py-feat but no GPU detected; falling back to CPU mode")
- 40:                 self._device = "cpu"
- 41: 
- 42:         self._initialize_model()
- 43: 
- 44:     def _initialize_model(self):
- 45:         if not self._model_path:
- 46:             self._download_model()
- 47:         
- 48:         if not Path(self._model_path).exists():
- 49:             raise RuntimeError(f"py-feat model not found at: {self._model_path}")
- 50: 
- 51:         try:
- 52:             checkpoint = self._torch.load(
- 53:                 self._model_path,
- 54:                 map_location=self._device,
- 55:                 weights_only=True,
- 56:             )
- 57: 
- 58:             if isinstance(checkpoint, dict) and "net" in checkpoint:
- 59:                 state_dict = checkpoint["net"]
- 60:             else:
- 61:                 state_dict = checkpoint
- 62: 
- 63:             self._model = self._create_model_architecture(state_dict)
- 64:             self._model.load_state_dict(state_dict)
- 65:             self._model.eval()
- 66:             self._model.to(self._device)
- 67:             
- 68:             self._blendshape_names = self._get_blendshape_names()
- 69:             
- 70:             logger.info(f"py-feat blendshape model loaded: {self._model_path}")
- 71:         except Exception as e:
- 72:             logger.error(f"Failed to load py-feat model: {e}")
- 73:             raise
- 74: 
- 75:     def _download_model(self):
- 76:         try:
- 77:             from huggingface_hub import hf_hub_download
- 78:             
- 79:             preferred_cache_dir = (
- 80:                 Path(__file__).parent
- 81:                 / "models"
- 82:                 / "blendshapes"
- 83:                 / "opencv"
- 84:                 / "pyfeat_models"
- 85:             )
- 86:             legacy_cache_dir = Path(__file__).parent / "models" / "pyfeat"
- 87: 
- 88:             cache_dir = legacy_cache_dir if legacy_cache_dir.exists() else preferred_cache_dir
- 89:             cache_dir.mkdir(parents=True, exist_ok=True)
- 90:             
- 91:             self._model_path = hf_hub_download(
- 92:                 repo_id="py-feat/mp_blendshapes",
- 93:                 filename="face_blendshapes.pth",
- 94:                 cache_dir=str(cache_dir),
- 95:             )
- 96:             logger.info(f"Downloaded py-feat model to: {self._model_path}")
- 97:         except Exception as e:
- 98:             raise RuntimeError(
- 99:                 f"Failed to download py-feat model from HuggingFace: {e}. "
-100:                 "Set STEP5_PYFEAT_MODEL_PATH manually or install: pip install huggingface_hub"
-101:             )
-102: 
-103:     def _create_model_architecture(self, state_dict: Dict[str, Any]):
-104:         torch = self._torch
-105: 
-106:         if isinstance(state_dict, dict) and any(k.startswith("mlpmixer_blocks.") for k in state_dict.keys()):
-107: 
-108:             class _ChannelLayerNormNoBias(torch.nn.Module):
-109:                 def __init__(self, channels: int, eps: float = 1e-5):
-110:                     super().__init__()
-111:                     self.weight = torch.nn.Parameter(torch.ones(channels))
-112:                     self.eps = eps
-113: 
-114:                 def forward(self, x):
-115:                     mean = x.mean(dim=1, keepdim=True)
-116:                     var = (x - mean).pow(2).mean(dim=1, keepdim=True)
-117:                     x = (x - mean) / torch.sqrt(var + self.eps)
-118:                     return x * self.weight.view(1, -1, 1, 1)
-119: 
-120:             class _MLPMixerBlock(torch.nn.Module):
-121:                 def __init__(
-122:                     self,
-123:                     tokens: int,
-124:                     channels: int,
-125:                     token_mlp_dim: int,
-126:                     channel_mlp_dim: int,
-127:                 ):
-128:                     super().__init__()
-129:                     self.norm1 = _ChannelLayerNormNoBias(channels)
-130:                     self.mlp_token_mixing = torch.nn.Sequential(
-131:                         torch.nn.Conv2d(tokens, token_mlp_dim, kernel_size=1, bias=True),
-132:                         torch.nn.GELU(),
-133:                         torch.nn.Identity(),
-134:                         torch.nn.Conv2d(token_mlp_dim, tokens, kernel_size=1, bias=True),
-135:                     )
-136:                     self.norm2 = _ChannelLayerNormNoBias(channels)
-137:                     self.mlp_channel_mixing = torch.nn.Sequential(
-138:                         torch.nn.Conv2d(channels, channel_mlp_dim, kernel_size=1, bias=True),
-139:                         torch.nn.GELU(),
-140:                         torch.nn.Identity(),
-141:                         torch.nn.Conv2d(channel_mlp_dim, channels, kernel_size=1, bias=True),
-142:                     )
-143: 
-144:                 def forward(self, x):
-145:                     y = self.norm1(x)
-146:                     y = y.permute(0, 2, 1, 3)
-147:                     y = self.mlp_token_mixing(y)
-148:                     y = y.permute(0, 2, 1, 3)
-149:                     x = x + y
-150: 
-151:                     y = self.norm2(x)
-152:                     y = self.mlp_channel_mixing(y)
-153:                     x = x + y
-154:                     return x
-155: 
-156:             class MediaPipeBlendshapesMLPMixer(torch.nn.Module):
-157:                 def __init__(self, sd: Dict[str, Any]):
-158:                     super().__init__()
-159: 
-160:                     conv1_w = sd["conv1.weight"]
-161:                     conv2_w = sd["conv2.weight"]
-162:                     out_w = sd["output_mlp.weight"]
-163: 
-164:                     tokens_without_extra = int(conv1_w.shape[0])
-165:                     num_landmarks = int(conv1_w.shape[1])
-166:                     num_blendshapes = int(out_w.shape[0])
-167: 
-168:                     tokens = tokens_without_extra + 1
-169:                     channels = int(conv2_w.shape[0])
-170:                     token_mlp_dim = int(sd["mlpmixer_blocks.0.mlp_token_mixing.0.weight"].shape[0])
-171:                     channel_mlp_dim = int(sd["mlpmixer_blocks.0.mlp_channel_mixing.0.weight"].shape[0])
-172:                     num_blocks = len({k.split(".")[1] for k in sd.keys() if k.startswith("mlpmixer_blocks.")})
-173: 
-174:                     self.num_landmarks = num_landmarks
-175:                     self.num_blendshapes = num_blendshapes
-176: 
-177:                     self.conv1 = torch.nn.Conv2d(num_landmarks, tokens_without_extra, kernel_size=1, bias=True)
-178:                     self.conv2 = torch.nn.Conv2d(2, channels, kernel_size=1, bias=True)
-179:                     self.extra_token = torch.nn.Parameter(torch.zeros(1, channels, 1, 1))
-180: 
-181:                     self.mlpmixer_blocks = torch.nn.ModuleList(
-182:                         [
-183:                             _MLPMixerBlock(
-184:                                 tokens=tokens,
-185:                                 channels=channels,
-186:                                 token_mlp_dim=token_mlp_dim,
-187:                                 channel_mlp_dim=channel_mlp_dim,
-188:                             )
-189:                             for _ in range(int(num_blocks))
-190:                         ]
-191:                     )
-192: 
-193:                     self.output_mlp = torch.nn.Conv2d(channels, num_blendshapes, kernel_size=1, bias=True)
-194:                     self.sigmoid = torch.nn.Sigmoid()
-195: 
-196:                 def forward(self, landmarks_xy):
-197:                     if landmarks_xy.ndim != 3:
-198:                         raise ValueError(f"Expected landmarks_xy to have shape [B, N, 2], got {tuple(landmarks_xy.shape)}")
-199: 
-200:                     x = landmarks_xy.unsqueeze(-1)
-201:                     x = self.conv1(x)
-202:                     x = x.permute(0, 2, 1, 3)
-203:                     x = self.conv2(x)
-204: 
-205:                     extra = self.extra_token.expand(x.shape[0], -1, -1, -1)
-206:                     x = torch.cat([x, extra], dim=2)
-207: 
-208:                     for block in self.mlpmixer_blocks:
-209:                         x = block(x)
-210: 
-211:                     x = self.output_mlp(x)
-212:                     x = x[:, :, -1, 0]
-213:                     x = self.sigmoid(x)
-214:                     return x
-215: 
-216:             return MediaPipeBlendshapesMLPMixer(state_dict)
-217: 
-218:         class MediaPipeBlendshapesSimpleMLP(torch.nn.Module):
-219:             def __init__(self):
-220:                 super().__init__()
-221:                 self.num_landmarks = 146
-222:                 self.num_blendshapes = 52
-223: 
-224:                 self.fc1 = torch.nn.Linear(self.num_landmarks * 2, 256)
-225:                 self.bn1 = torch.nn.BatchNorm1d(256)
-226:                 self.fc2 = torch.nn.Linear(256, 256)
-227:                 self.bn2 = torch.nn.BatchNorm1d(256)
-228:                 self.fc3 = torch.nn.Linear(256, 128)
-229:                 self.bn3 = torch.nn.BatchNorm1d(128)
-230:                 self.fc4 = torch.nn.Linear(128, self.num_blendshapes)
-231:                 self.relu = torch.nn.ReLU()
-232:                 self.sigmoid = torch.nn.Sigmoid()
-233: 
-234:             def forward(self, x):
-235:                 x = x.view(x.size(0), -1)
-236:                 x = self.relu(self.bn1(self.fc1(x)))
-237:                 x = self.relu(self.bn2(self.fc2(x)))
-238:                 x = self.relu(self.bn3(self.fc3(x)))
-239:                 x = self.sigmoid(self.fc4(x))
-240:                 return x
-241: 
-242:         return MediaPipeBlendshapesSimpleMLP()
-243: 
-244:     def _get_blendshape_names(self) -> List[str]:
-245:         return [
-246:             "browDownLeft", "browDownRight", "browInnerUp", "browOuterUpLeft",
-247:             "browOuterUpRight", "cheekPuff", "cheekSquintLeft", "cheekSquintRight",
-248:             "eyeBlinkLeft", "eyeBlinkRight", "eyeLookDownLeft", "eyeLookDownRight",
-249:             "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight",
-250:             "eyeLookUpLeft", "eyeLookUpRight", "eyeSquintLeft", "eyeSquintRight",
-251:             "eyeWideLeft", "eyeWideRight", "jawForward", "jawLeft", "jawOpen",
-252:             "jawRight", "mouthClose", "mouthDimpleLeft", "mouthDimpleRight",
-253:             "mouthFrownLeft", "mouthFrownRight", "mouthFunnel", "mouthLeft",
-254:             "mouthLowerDownLeft", "mouthLowerDownRight", "mouthPressLeft",
-255:             "mouthPressRight", "mouthPucker", "mouthRight", "mouthRollLower",
-256:             "mouthRollUpper", "mouthShrugLower", "mouthShrugUpper", "mouthSmileLeft",
-257:             "mouthSmileRight", "mouthStretchLeft", "mouthStretchRight",
-258:             "mouthUpperUpLeft", "mouthUpperUpRight", "noseSneerLeft", "noseSneerRight",
-259:             "tongueOut"
-260:         ]
-261: 
-262:     def _select_landmark_subset(self, landmarks_478: np.ndarray) -> np.ndarray:
-263:         landmark_indices = [
-264:             0, 1, 4, 5, 6, 7, 8, 10, 13, 14, 17, 21, 33, 37, 39, 40, 46, 52, 53, 54,
-265:             55, 58, 61, 63, 65, 66, 67, 68, 69, 70, 78, 80, 81, 82, 84, 87, 88, 91,
-266:             93, 95, 103, 105, 107, 109, 127, 132, 133, 136, 144, 145, 146, 148, 149,
-267:             150, 152, 153, 154, 155, 157, 158, 159, 160, 161, 162, 163, 168, 172,
-268:             173, 176, 178, 181, 185, 191, 195, 197, 234, 246, 249, 251, 263, 267,
-269:             269, 270, 276, 282, 283, 284, 285, 288, 291, 293, 295, 296, 297, 298,
-270:             299, 300, 308, 310, 311, 312, 314, 317, 318, 321, 323, 324, 332, 334,
-271:             336, 338, 356, 361, 362, 365, 373, 374, 375, 377, 378, 379, 380, 381,
-272:             382, 384, 385, 386, 387, 388, 389, 390, 397, 398, 402, 405, 415, 466,
-273:             468, 469, 470, 471, 472, 473, 474, 475, 476
-274:         ]
-275:         expected = getattr(self._model, "num_landmarks", None)
-276:         if isinstance(expected, int) and expected > 0 and len(landmark_indices) != expected:
-277:             logger.warning(
-278:                 "py-feat landmark subset size mismatch (got %s, expected %s). Truncating indices.",
-279:                 len(landmark_indices),
-280:                 expected,
-281:             )
-282:             landmark_indices = landmark_indices[:expected]
-283:         return landmarks_478[landmark_indices, :2]
-284: 
-285:     def extract_blendshapes(
-286:         self,
-287:         landmarks_478: np.ndarray,
-288:         image_width: int,
-289:         image_height: int
-290:     ) -> Optional[Dict[str, float]]:
-291:         if landmarks_478 is None or len(landmarks_478) < 478:
-292:             return None
-293: 
-294:         try:
-295:             landmarks_subset = self._select_landmark_subset(landmarks_478)
-296:             
-297:             # Optimize: check normalization before tensor creation
-298:             max_coord = float(np.max(np.abs(landmarks_subset))) if landmarks_subset.size > 0 else 0.0
-299:             if max_coord <= 2.0:
-300:                 # Apply scaling in numpy (faster than tensor ops)
-301:                 landmarks_subset = landmarks_subset * np.array([image_width, image_height], dtype=np.float32)
-302:             
-303:             # Single tensor creation with optimal dtype
-304:             landmarks_tensor = self._torch.from_numpy(landmarks_subset.copy()).float().unsqueeze(0)
-305:             landmarks_tensor = landmarks_tensor.to(self._device)
-306: 
-307:             with self._torch.no_grad():
-308:                 blendshapes_tensor = self._model(landmarks_tensor)
-309: 
-310:             blendshapes_array = blendshapes_tensor.squeeze(0).detach().cpu().numpy()
-311:             
-312:             return {
-313:                 name: float(value)
-314:                 for name, value in zip(self._blendshape_names, blendshapes_array)
-315:             }
-316:         except Exception as e:
-317:             logger.warning(f"Failed to extract blendshapes: {e}")
-318:             return None
-```
-
-## File: workflow_scripts/step6/json_reducer.py
-```python
-  1: import os
-  2: import sys
-  3: import json
-  4: import argparse
-  5: import logging
-  6: from datetime import datetime
-  7: 
-  8: logger = logging.getLogger(__name__)
-  9: logger.setLevel(logging.INFO)
- 10: 
- 11: 
- 12: def setup_logging(log_dir: str):
- 13:     os.makedirs(log_dir, exist_ok=True)
- 14:     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
- 15:     log_path = os.path.join(log_dir, f"json_reducer_{timestamp}.log")
- 16: 
- 17:     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
- 18: 
- 19:     fh = logging.FileHandler(log_path, encoding='utf-8')
- 20:     fh.setLevel(logging.INFO)
- 21:     fh.setFormatter(formatter)
- 22: 
- 23:     ch = logging.StreamHandler(sys.stdout)
- 24:     ch.setLevel(logging.INFO)
- 25:     ch.setFormatter(formatter)
- 26: 
- 27:     logger.handlers.clear()
- 28:     logger.addHandler(fh)
- 29:     logger.addHandler(ch)
- 30:     logger.propagate = False
- 31: 
- 32:     logger.info(f"Log file initialized: {log_path}")
- 33:     return log_path
- 34: 
- 35: 
- 36: def reduce_video_json(data):
- 37:     """
- 38:     Réduit un objet JSON de données vidéo pour ne conserver que les clés
- 39:     utiles au script After Effects.
- 40:     """
- 41:     if "frames" not in data:
- 42:         return {"frames_analysis": []}  # Retourne une structure vide si le format est inattendu
- 43: 
- 44:     new_frames_data = []
- 45:     for frame in data["frames"]:
- 46:         new_tracked_objects = []
- 47:         if "tracked_objects" in frame and frame["tracked_objects"] is not None:
- 48:             for obj in frame["tracked_objects"]:
- 49:                 # Initialisation de l'objet simplifié
- 50:                 new_obj = {
- 51:                     "id": obj.get("id"),
- 52:                     "centroid_x": obj.get("centroid_x"),
- 53:                     "source": obj.get("source"),
- 54:                     "label": obj.get("label"),
- 55:                     "active_speakers": []  # Valeur par défaut
- 56:                 }
- 57: 
- 58:                 # Inclure la taille du bbox si disponible (ajout depuis l'étape 5)
- 59:                 bbox_w = obj.get("bbox_width")
- 60:                 bbox_h = obj.get("bbox_height")
- 61:                 if bbox_w is not None and bbox_h is not None:
- 62:                     new_obj["bbox_width"] = bbox_w
- 63:                     new_obj["bbox_height"] = bbox_h
- 64: 
- 65:                 # Extraction sécurisée de active_speakers
- 66:                 if (obj.get("speaking_sources") and
- 67:                         isinstance(obj["speaking_sources"], dict) and
- 68:                         obj["speaking_sources"].get("audio") and
- 69:                         isinstance(obj["speaking_sources"]["audio"], dict)):
- 70:                     new_obj["active_speakers"] = obj["speaking_sources"]["audio"].get("active_speakers", [])
- 71: 
- 72:                 new_tracked_objects.append(new_obj)
- 73: 
- 74:         new_frames_data.append({
- 75:             "frame": frame.get("frame"),
- 76:             "tracked_objects": new_tracked_objects
- 77:         })
- 78: 
- 79:     # La structure finale utilise "frames_analysis" pour correspondre au script AE
- 80:     return {"frames_analysis": new_frames_data}
- 81: 
- 82: 
- 83: def reduce_audio_json(data):
- 84:     """
- 85:     Réduit un objet JSON de données audio pour ne conserver que les clés
- 86:     utiles au script After Effects.
- 87:     """
- 88:     if "frames_analysis" not in data:
- 89:         return {"frames_analysis": []}  # Retourne une structure vide si le format est inattendu
- 90: 
- 91:     new_frames_analysis = []
- 92:     for frame_data in data["frames_analysis"]:
- 93:         if "audio_info" in frame_data and frame_data["audio_info"] is not None:
- 94:             new_audio_info = {
- 95:                 "is_speech_present": frame_data["audio_info"].get("is_speech_present", False),
- 96:                 "active_speaker_labels": frame_data["audio_info"].get("active_speaker_labels", [])
- 97:             }
- 98:             new_frames_analysis.append({
- 99:                 "frame": frame_data.get("frame"),
-100:                 "audio_info": new_audio_info
-101:             })
-102: 
-103:     return {"frames_analysis": new_frames_analysis}
-104: 
-105: 
-106: def process_directory(base_path, keyword="Camille"):
-107:     """
-108:     Analyse les dossiers dans le chemin de base, recherche le mot-clé,
-109:     et traite les paires de fichiers JSON trouvées dans les sous-dossiers "docs".
-110:     """
-111:     logger.info(f"Démarrage du scan dans : {base_path}")
-112:     if not os.path.isdir(base_path):
-113:         logger.error(f"Erreur : Le répertoire de base '{base_path}' n'existe pas.")
-114:         return
-115: 
-116:     # 1. Lister les dossiers de projet
-117:     project_folders = [d for d in os.listdir(base_path)
-118:                        if os.path.isdir(os.path.join(base_path, d)) and keyword in d]
-119: 
-120:     if not project_folders:
-121:         print(f"Aucun dossier contenant le mot-clé '{keyword}' n'a été trouvé.")
-122:         return
-123: 
-124:     logger.info(f"Dossiers de projet trouvés : {len(project_folders)}")
-125: 
-126:     for folder in project_folders:
-127:         docs_path = os.path.join(base_path, folder, "docs")
-128: 
-129:         if not os.path.isdir(docs_path):
-130:             logger.warning(f"-> Avertissement : Le dossier 'docs' est manquant dans '{folder}'.")
-131:             continue
-132: 
-133:         logger.info(f"\n--- Traitement du dossier : {docs_path} ---")
-134: 
-135:         # 2. Identifier les paires de fichiers JSON
-136:         all_files = os.listdir(docs_path)
-137:         video_json_files = [f for f in all_files if f.endswith(".json") and not f.endswith("_audio.json")]
-138: 
-139:         if not video_json_files:
-140:             logger.info("Aucun fichier JSON vidéo principal trouvé.")
-141:             continue
-142: 
-143:         for video_file in video_json_files:
-144:             base_name = video_file.rsplit('.', 1)[0]
-145:             audio_file = f"{base_name}_audio.json"
-146: 
-147:             video_path = os.path.join(docs_path, video_file)
-148:             audio_path = os.path.join(docs_path, audio_file)
-149: 
-150:             if audio_file not in all_files:
-151:                 logger.warning(f"  - Fichier audio '{audio_file}' manquant pour '{video_file}'. Ignoré.")
-152:                 continue
-153: 
-154:             logger.info(f"  - Paire trouvée : \n    - {video_file}\n    - {audio_file}")
-155: 
-156:             try:
-157:                 # 3. Traiter le JSON vidéo
-158:                 with open(video_path, 'r', encoding='utf-8') as f:
-159:                     video_data = json.load(f)
-160: 
-161:                 reduced_video_data = reduce_video_json(video_data)
-162: 
-163:                 with open(video_path, 'w', encoding='utf-8') as f:
-164:                     json.dump(reduced_video_data, f, indent=2)
-165: 
-166:                 logger.info("    - Fichier vidéo réduit avec succès.")
-167: 
-168:                 # 4. Traiter le JSON audio
-169:                 with open(audio_path, 'r', encoding='utf-8') as f:
-170:                     audio_data = json.load(f)
-171: 
-172:                 reduced_audio_data = reduce_audio_json(audio_data)
-173: 
-174:                 with open(audio_path, 'w', encoding='utf-8') as f:
-175:                     json.dump(reduced_audio_data, f, indent=2)
-176: 
-177:                 logger.info("    - Fichier audio réduit avec succès.")
-178: 
-179:             except json.JSONDecodeError as e:
-180:                 logger.error(f"    - ERREUR : Impossible de lire un fichier JSON. Erreur : {e}")
-181:             except Exception as e:
-182:                 logger.error(f"    - ERREUR : Une erreur inattendue est survenue. Erreur : {e}")
-183: 
-184:     logger.info("\n--- Traitement terminé ! ---")
-185: 
-186: 
-187: def main():
-188:     parser = argparse.ArgumentParser(description="Étape 6 - Réduction JSON (vidéo + audio)")
-189:     parser.add_argument('--base_dir', type=str, default=os.environ.get('BASE_PATH_SCRIPTS', ''), help='Chemin base du projet (contenant projets_extraits)')
-190:     parser.add_argument('--work_dir', type=str, default=None, help='Chemin explicite vers projets_extraits')
-191:     parser.add_argument('--keyword', type=str, default=os.environ.get('FOLDER_KEYWORD', 'Camille'), help='Mot-clé pour filtrer les dossiers projet')
-192:     parser.add_argument('--log_dir', type=str, default=str(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'logs', 'step6')),
-193:                         help='Répertoire pour les logs (par défaut logs/step6)')
-194: 
-195:     args = parser.parse_args()
-196: 
-197:     # Resolve working directory
-198:     if args.work_dir:
-199:         work_dir = args.work_dir
-200:     else:
-201:         base_dir = args.base_dir if args.base_dir else os.getcwd()
-202:         work_dir = os.path.join(base_dir, 'projets_extraits')
-203: 
-204:     # Setup logging
-205:     setup_logging(args.log_dir)
-206: 
-207:     # Progress total: count candidate projects
-208:     try:
-209:         if not os.path.isdir(work_dir):
-210:             logger.warning(f"Répertoire de travail introuvable: {work_dir}")
-211:             print(f"TOTAL_JSON_TO_REDUCE: 0")
-212:             sys.exit(0)
-213:         projects = [d for d in os.listdir(work_dir) if os.path.isdir(os.path.join(work_dir, d)) and args.keyword in d]
-214:         print(f"TOTAL_JSON_TO_REDUCE: {len(projects)}")
-215:     except Exception:
-216:         print("TOTAL_JSON_TO_REDUCE: 0")
-217: 
-218:     # Run processing
-219:     process_directory(work_dir, keyword=args.keyword)
-220: 
-221: 
-222: if __name__ == "__main__":
-223:     main()
 ```
 
 ## File: workflow_scripts/step7/finalize_and_copy.py
@@ -26629,6 +20745,1075 @@ app_new.py
 359:         return videos_to_process
 ```
 
+## File: services/lemonfox_audio_service.py
+```python
+   1: """
+   2: Lemonfox Audio Service
+   3: Provides integration with Lemonfox Speech-to-Text API for STEP4 (Audio Analysis).
+   4: 
+   5: This service:
+   6: - Calls Lemonfox API with video files
+   7: - Converts Lemonfox transcription output to STEP4-compatible JSON format
+   8: - Writes {video_stem}_audio.json files with frame-by-frame audio analysis
+   9: - Ensures compatibility with STEP5 (enhanced_speaking_detection.py) and STEP6 (json_reducer.py)
+  10: 
+  11: Architecture:
+  12: - Service layer only (business logic)
+  13: - Consumed by API routes (thin controllers)
+  14: - All secrets via config.settings
+  15: - Security: anti path traversal, input validation
+  16: """
+  17: 
+  18: import os
+  19: import json
+  20: import logging
+  21: import math
+  22: import subprocess
+  23: import tempfile
+  24: import requests
+  25: from pathlib import Path
+  26: from typing import Callable, Dict, List, Optional, Tuple, Any
+  27: from dataclasses import dataclass
+  28: 
+  29: from config.settings import config
+  30: 
+  31: logger = logging.getLogger(__name__)
+  32: 
+  33: # Constants matching STEP4 current implementation
+  34: AUDIO_SUFFIX = "_audio.json"
+  35: DEFAULT_FPS = 25.0
+  36: 
+  37: 
+  38: def _should_include_speaker_embeddings() -> bool:
+  39:     return (os.getenv("AUDIO_INCLUDE_SPEAKER_EMBEDDINGS") or "0") == "1"
+  40: 
+  41: 
+  42: def _get_speaker_embeddings_model_id() -> str:
+  43:     return (os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MODEL_ID") or "pyannote/embedding").strip()
+  44: 
+  45: 
+  46: def _get_speaker_embeddings_min_segment_sec() -> float:
+  47:     raw = os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC")
+  48:     if raw is None:
+  49:         return 0.5
+  50:     try:
+  51:         value = float(raw)
+  52:         return value if value > 0 else 0.5
+  53:     except Exception:
+  54:         return 0.5
+  55: 
+  56: 
+  57: def _get_speaker_embeddings_max_segments_per_speaker() -> int:
+  58:     raw = os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MAX_SEGMENTS_PER_SPEAKER")
+  59:     if raw is None:
+  60:         return 10
+  61:     try:
+  62:         value = int(raw)
+  63:         return value if value > 0 else 10
+  64:     except Exception:
+  65:         return 10
+  66: 
+  67: 
+  68: def _extract_audio_ffmpeg(input_video: Path, output_wav: Path) -> bool:
+  69:     try:
+  70:         cmd = [
+  71:             "ffmpeg",
+  72:             "-y",
+  73:             "-hide_banner",
+  74:             "-loglevel",
+  75:             "error",
+  76:             "-i",
+  77:             str(input_video),
+  78:             "-vn",
+  79:             "-ac",
+  80:             "1",
+  81:             "-ar",
+  82:             "16000",
+  83:             "-f",
+  84:             "wav",
+  85:             "-acodec",
+  86:             "pcm_s16le",
+  87:             str(output_wav),
+  88:         ]
+  89:         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  90:         return True
+  91:     except subprocess.CalledProcessError as e:
+  92:         logger.warning(f"speaker embeddings: ffmpeg extraction a échoué: {e}")
+  93:         return False
+  94: 
+  95: 
+  96: def _load_pyannote_embedding_model(model_id: str, hf_token: str):
+  97:     from pyannote.audio import Model
+  98:     try:
+  99:         return Model.from_pretrained(model_id, token=hf_token)
+ 100:     except TypeError as type_err:
+ 101:         if "token" not in str(type_err):
+ 102:             raise
+ 103:         return Model.from_pretrained(model_id, use_auth_token=hf_token)
+ 104: 
+ 105: 
+ 106: def _compute_speaker_embeddings_from_audio(
+ 107:     *,
+ 108:     input_media: Path,
+ 109:     segments: List[Tuple[float, float, str]],
+ 110:     hf_token: str,
+ 111: ) -> Dict[str, Any]:
+ 112:     if not segments:
+ 113:         return {}
+ 114: 
+ 115:     try:
+ 116:         import torch
+ 117:         from pyannote.audio import Inference
+ 118:         from pyannote.core import Segment
+ 119:     except Exception as import_e:
+ 120:         logger.warning(f"speaker embeddings: dépendances indisponibles: {import_e}")
+ 121:         return {}
+ 122: 
+ 123:     env_disable_gpu = os.getenv("AUDIO_DISABLE_GPU", "0") == "1"
+ 124:     device = "cuda" if (torch.cuda.is_available() and not env_disable_gpu) else "cpu"
+ 125: 
+ 126:     model_id = _get_speaker_embeddings_model_id()
+ 127:     min_segment_sec = _get_speaker_embeddings_min_segment_sec()
+ 128:     max_segments = _get_speaker_embeddings_max_segments_per_speaker()
+ 129: 
+ 130:     try:
+ 131:         model = _load_pyannote_embedding_model(model_id, hf_token)
+ 132:     except Exception as e:
+ 133:         logger.warning(f"speaker embeddings: impossible de charger le modèle '{model_id}': {e}")
+ 134:         return {}
+ 135: 
+ 136:     try:
+ 137:         if hasattr(model, "to"):
+ 138:             model.to(torch.device(device))
+ 139:     except Exception:
+ 140:         pass
+ 141: 
+ 142:     try:
+ 143:         inference = Inference(model, window="whole")
+ 144:     except Exception as e:
+ 145:         logger.warning(f"speaker embeddings: Inference init échouée: {e}")
+ 146:         return {}
+ 147: 
+ 148:     by_speaker: Dict[str, List[Tuple[float, float, float]]] = {}
+ 149:     for start_sec, end_sec, speaker_label in segments:
+ 150:         if not speaker_label:
+ 151:             continue
+ 152:         try:
+ 153:             start_f = float(start_sec)
+ 154:             end_f = float(end_sec)
+ 155:         except Exception:
+ 156:             continue
+ 157:         if end_f <= start_f:
+ 158:             continue
+ 159:         dur = end_f - start_f
+ 160:         if dur < min_segment_sec:
+ 161:             continue
+ 162:         by_speaker.setdefault(str(speaker_label), []).append((start_f, end_f, dur))
+ 163: 
+ 164:     if not by_speaker:
+ 165:         return {}
+ 166: 
+ 167:     tmp_dir_root = "/dev/shm" if os.path.isdir("/dev/shm") else None
+ 168:     with tempfile.TemporaryDirectory(dir=tmp_dir_root) as tmp_dir:
+ 169:         wav_path = Path(tmp_dir) / f"{input_media.stem}_embeddings.wav"
+ 170:         if not _extract_audio_ffmpeg(input_media, wav_path):
+ 171:             return {}
+ 172: 
+ 173:         dev_file = {"audio": str(wav_path)}
+ 174:         vectors_by_label: Dict[str, List[float]] = {}
+ 175:         num_segments_by_label: Dict[str, int] = {}
+ 176:         embedding_dim: Optional[int] = None
+ 177: 
+ 178:         for speaker_label, speaker_segments in by_speaker.items():
+ 179:             speaker_segments.sort(key=lambda item: item[2], reverse=True)
+ 180:             speaker_segments = speaker_segments[:max_segments]
+ 181: 
+ 182:             sum_vec: Optional[List[float]] = None
+ 183:             count = 0
+ 184: 
+ 185:             for start_f, end_f, _dur in speaker_segments:
+ 186:                 try:
+ 187:                     emb = inference.crop(dev_file, Segment(start_f, end_f))
+ 188:                 except Exception:
+ 189:                     continue
+ 190: 
+ 191:                 data = getattr(emb, "data", emb)
+ 192:                 try:
+ 193:                     if hasattr(data, "detach"):
+ 194:                         data = data.detach().cpu().numpy()
+ 195:                 except Exception:
+ 196:                     pass
+ 197: 
+ 198:                 try:
+ 199:                     if hasattr(data, "shape") and len(getattr(data, "shape", [])) >= 2:
+ 200:                         vec = data.mean(axis=0)
+ 201:                     else:
+ 202:                         vec = data
+ 203:                     vec = vec.tolist() if hasattr(vec, "tolist") else list(vec)
+ 204:                 except Exception:
+ 205:                     continue
+ 206: 
+ 207:                 try:
+ 208:                     norm = math.sqrt(sum((float(x) * float(x)) for x in vec))
+ 209:                     if norm > 0:
+ 210:                         vec = [float(x) / norm for x in vec]
+ 211:                     vec = [round(float(x), 4) for x in vec]
+ 212:                 except Exception:
+ 213:                     continue
+ 214: 
+ 215:                 if embedding_dim is None:
+ 216:                     embedding_dim = len(vec)
+ 217:                 if sum_vec is None:
+ 218:                     sum_vec = [0.0 for _ in range(len(vec))]
+ 219:                 if len(sum_vec) != len(vec):
+ 220:                     continue
+ 221: 
+ 222:                 for i, x in enumerate(vec):
+ 223:                     sum_vec[i] += float(x)
+ 224:                 count += 1
+ 225: 
+ 226:             if sum_vec is None or count <= 0:
+ 227:                 continue
+ 228: 
+ 229:             avg = [round(v / float(count), 4) for v in sum_vec]
+ 230:             vectors_by_label[speaker_label] = avg
+ 231:             num_segments_by_label[speaker_label] = count
+ 232: 
+ 233:         if not vectors_by_label:
+ 234:             return {}
+ 235: 
+ 236:         return {
+ 237:             "model_id": model_id,
+ 238:             "embedding_dim": embedding_dim or 0,
+ 239:             "normalized": True,
+ 240:             "device": device,
+ 241:             "vectors_by_label": vectors_by_label,
+ 242:             "num_segments_by_label": num_segments_by_label,
+ 243:         }
+ 244: 
+ 245: 
+ 246: @dataclass
+ 247: class LemonfoxTranscriptionResult:
+ 248:     """Result from Lemonfox API transcription."""
+ 249:     success: bool
+ 250:     segments: List[Dict[str, Any]]
+ 251:     words: Optional[List[Dict[str, Any]]]
+ 252:     duration: Optional[float]
+ 253:     error: Optional[str] = None
+ 254: 
+ 255: 
+ 256: @dataclass
+ 257: class AudioAnalysisResult:
+ 258:     """Result of audio analysis processing."""
+ 259:     success: bool
+ 260:     output_path: Optional[Path]
+ 261:     fps: float
+ 262:     total_frames: int
+ 263:     error: Optional[str] = None
+ 264: 
+ 265: 
+ 266: @dataclass
+ 267: class UploadPreparationResult:
+ 268:     """Upload artifact used for Lemonfox API requests."""
+ 269:     upload_path: Path
+ 270:     cleanup: Optional[Callable[[], None]]
+ 271:     original_size_mb: float
+ 272:     limit_mb: Optional[float]
+ 273:     transcoded: bool = False
+ 274: 
+ 275: 
+ 276: class LemonfoxAudioService:
+ 277:     """Service for Lemonfox-based audio analysis."""
+ 278: 
+ 279:     @staticmethod
+ 280:     def _apply_speech_smoothing(
+ 281:         timeline: Dict[int, set],
+ 282:         speech_frames: set[int],
+ 283:         total_frames: int,
+ 284:         fps: float,
+ 285:         gap_fill_sec: float,
+ 286:         min_on_sec: float,
+ 287:     ) -> Tuple[Dict[int, set], set[int]]:
+ 288:         if total_frames <= 0 or fps <= 0:
+ 289:             return timeline, speech_frames
+ 290: 
+ 291:         if not speech_frames:
+ 292:             return timeline, speech_frames
+ 293: 
+ 294:         try:
+ 295:             gap_fill_sec = float(gap_fill_sec or 0.0)
+ 296:         except Exception:
+ 297:             gap_fill_sec = 0.0
+ 298:         try:
+ 299:             min_on_sec = float(min_on_sec or 0.0)
+ 300:         except Exception:
+ 301:             min_on_sec = 0.0
+ 302: 
+ 303:         gap_fill_frames = 0
+ 304:         if gap_fill_sec > 0:
+ 305:             gap_fill_frames = int(math.ceil(gap_fill_sec * fps))
+ 306: 
+ 307:         min_on_frames = 0
+ 308:         if min_on_sec > 0:
+ 309:             min_on_frames = int(math.ceil(min_on_sec * fps))
+ 310: 
+ 311:         def _build_runs(frames_sorted: List[int]) -> List[Tuple[int, int]]:
+ 312:             runs: List[Tuple[int, int]] = []
+ 313:             run_start = frames_sorted[0]
+ 314:             run_end = frames_sorted[0]
+ 315:             for frame in frames_sorted[1:]:
+ 316:                 if frame == run_end + 1:
+ 317:                     run_end = frame
+ 318:                 else:
+ 319:                     runs.append((run_start, run_end))
+ 320:                     run_start = frame
+ 321:                     run_end = frame
+ 322:             runs.append((run_start, run_end))
+ 323:             return runs
+ 324: 
+ 325:         frames_sorted = sorted(speech_frames)
+ 326: 
+ 327:         if gap_fill_frames > 0:
+ 328:             runs = _build_runs(frames_sorted)
+ 329:             for (prev_start, prev_end), (next_start, next_end) in zip(runs, runs[1:]):
+ 330:                 gap_start = prev_end + 1
+ 331:                 gap_end = next_start - 1
+ 332:                 if gap_end < gap_start:
+ 333:                     continue
+ 334:                 gap_len = gap_end - gap_start + 1
+ 335:                 if gap_len <= gap_fill_frames:
+ 336:                     for f in range(gap_start, gap_end + 1):
+ 337:                         speech_frames.add(f)
+ 338: 
+ 339:             frames_sorted = sorted(speech_frames)
+ 340: 
+ 341:         if min_on_frames > 0 and speech_frames:
+ 342:             runs = _build_runs(frames_sorted)
+ 343:             for run_start, run_end in runs:
+ 344:                 run_len = run_end - run_start + 1
+ 345:                 if run_len >= min_on_frames:
+ 346:                     continue
+ 347:                 for f in range(run_start, run_end + 1):
+ 348:                     speech_frames.discard(f)
+ 349:                     timeline.pop(f, None)
+ 350: 
+ 351:         return timeline, speech_frames
+ 352: 
+ 353:     @staticmethod
+ 354:     def _validate_project_and_video(project_name: str, video_name: str) -> Tuple[bool, Optional[Path], Optional[str]]:
+ 355:         """
+ 356:         Validate and resolve project + video paths securely.
+ 357:         
+ 358:         Args:
+ 359:             project_name: Name of the project (must be a valid folder name)
+ 360:             video_name: Relative path to video within project
+ 361:             
+ 362:         Returns:
+ 363:             Tuple of (success, video_path, error_message)
+ 364:         """
+ 365:         # Security: Reject absolute paths
+ 366:         if os.path.isabs(video_name):
+ 367:             return False, None, "video_name must be a relative path"
+ 368:         
+ 369:         # Security: Reject path traversal attempts (sanitize separators)
+ 370:         sanitized_video_name = (video_name or "").replace("\\", "/").strip()
+ 371:         if ".." in project_name:
+ 372:             return False, None, "Path traversal not allowed"
+ 373:         video_rel_path = Path(sanitized_video_name)
+ 374:         if any(part == ".." for part in video_rel_path.parts):
+ 375:             return False, None, "Path traversal not allowed"
+ 376:         
+ 377:         # Normalize project name (should be a simple folder name)
+ 378:         if "/" in project_name or "\\" in project_name:
+ 379:             return False, None, "project_name must be a simple folder name"
+ 380:         
+ 381:         # Construct and validate project path
+ 382:         projects_dir = config.PROJECTS_DIR
+ 383:         project_path = projects_dir / project_name
+ 384:         
+ 385:         if not project_path.exists():
+ 386:             return False, None, f"Project not found: {project_name}"
+ 387:         
+ 388:         # Resolve video path
+ 389:         video_path = project_path / video_name
+ 390:         
+ 391:         # Security: Ensure final path is within project directory
+ 392:         try:
+ 393:             video_path_resolved = video_path.resolve()
+ 394:             project_path_resolved = project_path.resolve()
+ 395:             
+ 396:             if not str(video_path_resolved).startswith(str(project_path_resolved)):
+ 397:                 return False, None, "Invalid video path (outside project directory)"
+ 398:         except Exception as e:
+ 399:             logger.error(f"Path resolution error: {e}")
+ 400:             return False, None, "Invalid path"
+ 401:         
+ 402:         if not video_path.exists():
+ 403:             return False, None, f"Video not found: {video_name}"
+ 404:         
+ 405:         if not video_path.is_file():
+ 406:             return False, None, f"Video path is not a file: {video_name}"
+ 407:         
+ 408:         return True, video_path, None
+ 409: 
+ 410:     @staticmethod
+ 411:     def _get_video_duration_ffprobe(video_path: Path) -> Optional[float]:
+ 412:         """
+ 413:         Get video duration in seconds using ffprobe.
+ 414:         
+ 415:         Args:
+ 416:             video_path: Path to video file
+ 417:             
+ 418:         Returns:
+ 419:             Duration in seconds or None if failed
+ 420:         """
+ 421:         try:
+ 422:             result = subprocess.run(
+ 423:                 [
+ 424:                     "ffprobe", "-v", "error", "-show_entries", "format=duration",
+ 425:                     "-of", "default=nw=1:nk=1", str(video_path)
+ 426:                 ],
+ 427:                 stdout=subprocess.PIPE,
+ 428:                 stderr=subprocess.PIPE,
+ 429:                 check=True,
+ 430:                 text=True,
+ 431:                 timeout=30
+ 432:             )
+ 433:             return float(result.stdout.strip())
+ 434:         except Exception as e:
+ 435:             logger.warning(f"ffprobe failed for {video_path.name}: {e}")
+ 436:             return None
+ 437: 
+ 438:     @staticmethod
+ 439:     def _call_lemonfox_api(
+ 440:         video_path: Path,
+ 441:         *,
+ 442:         upload_filename: Optional[str] = None,
+ 443:         original_file_size_mb: Optional[float] = None,
+ 444:         limit_mb: Optional[float] = None,
+ 445:         language: Optional[str] = None,
+ 446:         prompt: Optional[str] = None,
+ 447:         speaker_labels: bool = True,
+ 448:         min_speakers: Optional[int] = None,
+ 449:         max_speakers: Optional[int] = None,
+ 450:         timestamp_granularities: Optional[List[str]] = None,
+ 451:         eu_processing: Optional[bool] = None
+ 452:     ) -> LemonfoxTranscriptionResult:
+ 453:         """
+ 454:         Call Lemonfox API to transcribe audio.
+ 455:         
+ 456:         Args:
+ 457:             video_path: Path to the (possibly transcodé) file to upload
+ 458:             upload_filename: Filename to expose to the API (defaults to video_path.name)
+ 459:             original_file_size_mb: Size of the original video (for logging/errors)
+ 460:             limit_mb: Configured upload limit (for logging/errors)
+ 461:             language: Optional language hint
+ 462:             prompt: Optional prompt to guide transcription
+ 463:             speaker_labels: Enable speaker diarization (default: True)
+ 464:             min_speakers: Minimum number of speakers
+ 465:             max_speakers: Maximum number of speakers
+ 466:             timestamp_granularities: List of granularities (e.g., ["word"])
+ 467:             eu_processing: Force EU processing (overrides default from config)
+ 468:             
+ 469:         Returns:
+ 470:             LemonfoxTranscriptionResult
+ 471:         """
+ 472:         api_key = config.LEMONFOX_API_KEY
+ 473:         if not api_key:
+ 474:             return LemonfoxTranscriptionResult(
+ 475:                 success=False,
+ 476:                 segments=[],
+ 477:                 words=None,
+ 478:                 duration=None,
+ 479:                 error="LEMONFOX_API_KEY not configured"
+ 480:             )
+ 481:         
+ 482:         # Determine endpoint (EU or standard)
+ 483:         use_eu = eu_processing if eu_processing is not None else config.LEMONFOX_EU_DEFAULT
+ 484:         base_url = "https://eu-api.lemonfox.ai" if use_eu else "https://api.lemonfox.ai"
+ 485:         endpoint = f"{base_url}/v1/audio/transcriptions"
+ 486:         
+ 487:         # Prepare request
+ 488:         headers = {
+ 489:             "Authorization": f"Bearer {api_key}"
+ 490:         }
+ 491: 
+ 492:         # Build form data as list of tuples to support repeated keys like timestamp_granularities[]
+ 493:         data: List[Tuple[str, str]] = [
+ 494:             ("response_format", "verbose_json"),
+ 495:         ]
+ 496: 
+ 497:         if language:
+ 498:             data.append(("language", language))
+ 499:         if prompt:
+ 500:             data.append(("prompt", prompt))
+ 501:         if speaker_labels:
+ 502:             data.append(("speaker_labels", "true"))
+ 503:         if min_speakers is not None:
+ 504:             data.append(("min_speakers", str(min_speakers)))
+ 505:         if max_speakers is not None:
+ 506:             data.append(("max_speakers", str(max_speakers)))
+ 507:         if timestamp_granularities:
+ 508:             for gran in timestamp_granularities:
+ 509:                 data.append(("timestamp_granularities[]", str(gran)))
+ 510:         
+ 511:         filename_for_api = upload_filename or video_path.name
+ 512: 
+ 513:         try:
+ 514:             with open(video_path, 'rb') as video_file:
+ 515:                 files = {
+ 516:                     "file": (filename_for_api, video_file, "video/mp4")
+ 517:                 }
+ 518:                 
+ 519:                 logger.info(f"Calling Lemonfox API for {video_path.name}...")
+ 520:                 response = requests.post(
+ 521:                     endpoint,
+ 522:                     headers=headers,
+ 523:                     data=data,
+ 524:                     files=files,
+ 525:                     timeout=config.LEMONFOX_TIMEOUT_SEC
+ 526:                 )
+ 527:                 
+ 528:                 if response.status_code != 200:
+ 529:                     if response.status_code == 413:
+ 530:                         size_clause = ""
+ 531:                         if original_file_size_mb is not None:
+ 532:                             size_clause = f" (taille locale ≈ {original_file_size_mb:.2f} MB)"
+ 533:                         limit_clause = ""
+ 534:                         if limit_mb is not None:
+ 535:                             limit_clause = f" (limite configurée: {limit_mb} MB)"
+ 536:                         error_msg = (
+ 537:                             "Lemonfox API error: HTTP 413 - fichier trop volumineux"
+ 538:                             f"{size_clause}{limit_clause}. "
+ 539:                             "Activez LEMONFOX_ENABLE_TRANSCODE ou réduisez la vidéo."
+ 540:                         )
+ 541:                     else:
+ 542:                         error_msg = f"Lemonfox API error: HTTP {response.status_code}"
+ 543:                     try:
+ 544:                         error_detail = response.json()
+ 545:                         error_msg += f" - {error_detail}"
+ 546:                     except Exception:
+ 547:                         error_msg += f" - {response.text[:200]}"
+ 548:                     
+ 549:                     logger.error(error_msg)
+ 550:                     return LemonfoxTranscriptionResult(
+ 551:                         success=False,
+ 552:                         segments=[],
+ 553:                         words=None,
+ 554:                         duration=None,
+ 555:                         error=error_msg
+ 556:                     )
+ 557:                 
+ 558:                 result = response.json()
+ 559:                 
+ 560:                 # Extract segments and words
+ 561:                 segments = result.get("segments", [])
+ 562:                 words = result.get("words", None)
+ 563:                 duration = result.get("duration", None)
+ 564:                 
+ 565:                 logger.info(f"Lemonfox API success: {len(segments)} segments, duration={duration}s")
+ 566:                 
+ 567:                 return LemonfoxTranscriptionResult(
+ 568:                     success=True,
+ 569:                     segments=segments,
+ 570:                     words=words,
+ 571:                     duration=duration,
+ 572:                     error=None
+ 573:                 )
+ 574:                 
+ 575:         except requests.Timeout:
+ 576:             error_msg = f"Lemonfox API timeout after {config.LEMONFOX_TIMEOUT_SEC}s"
+ 577:             logger.error(error_msg)
+ 578:             return LemonfoxTranscriptionResult(
+ 579:                 success=False,
+ 580:                 segments=[],
+ 581:                 words=None,
+ 582:                 duration=None,
+ 583:                 error=error_msg
+ 584:             )
+ 585:         except Exception as e:
+ 586:             error_msg = f"Lemonfox API call failed: {str(e)}"
+ 587:             logger.error(error_msg, exc_info=True)
+ 588:             return LemonfoxTranscriptionResult(
+ 589:                 success=False,
+ 590:                 segments=[],
+ 591:                 words=None,
+ 592:                 duration=None,
+ 593:                 error=error_msg
+ 594:             )
+ 595: 
+ 596:     @staticmethod
+ 597:     def _build_frame_timeline(
+ 598:         transcription: LemonfoxTranscriptionResult,
+ 599:         total_frames: int,
+ 600:         fps: float
+ 601:     ) -> Tuple[Dict[int, set], set]:
+ 602:         """
+ 603:         Build frame-by-frame timeline from Lemonfox segments/words.
+ 604:         
+ 605:         Args:
+ 606:             transcription: Lemonfox transcription result
+ 607:             total_frames: Total number of frames in video
+ 608:             fps: Frames per second
+ 609:             
+ 610:         Returns:
+ 611:             Tuple of:
+ 612:             - timeline: Dictionary mapping frame_num -> set of speaker labels
+ 613:             - speech_frames: Set of frame numbers where speech is present even if no speaker label is available
+ 614:         """
+ 615:         timeline: Dict[int, set] = {}  # frame_num -> set(speaker_labels)
+ 616:         speech_frames: set[int] = set()
+ 617:         
+ 618:         # Use words if available (more granular), otherwise use segments
+ 619:         source = transcription.words if transcription.words else transcription.segments
+ 620:         
+ 621:         if not source:
+ 622:             logger.warning("No segments or words in transcription, returning empty timeline")
+ 623:             return timeline, speech_frames
+ 624:         
+ 625:         # Build speaker label mapping (normalize to SPEAKER_XX format)
+ 626:         speaker_map = {}
+ 627:         speaker_counter = 0
+ 628: 
+ 629:         for item in source:
+ 630:             raw_speaker = item.get("speaker")
+ 631:             if raw_speaker and raw_speaker not in speaker_map:
+ 632:                 speaker_map[raw_speaker] = f"SPEAKER_{speaker_counter:02d}"
+ 633:                 speaker_counter += 1
+ 634: 
+ 635:         logger.info(f"Speaker mapping: {speaker_map}")
+ 636: 
+ 637:         # Build timeline
+ 638:         for item in source:
+ 639:             start = item.get("start")
+ 640:             end = item.get("end")
+ 641:             raw_speaker = item.get("speaker")
+ 642: 
+ 643:             if start is None or end is None:
+ 644:                 continue
+ 645: 
+ 646:             # Convert times to frame numbers (1-based)
+ 647:             start_frame = max(1, int(start * fps))
+ 648:             end_frame = min(total_frames, int(end * fps))
+ 649:             if end_frame < start_frame:
+ 650:                 continue
+ 651: 
+ 652:             # Get normalized speaker label
+ 653:             speaker_label = speaker_map.get(raw_speaker) if raw_speaker else None
+ 654: 
+ 655:             # Track speech presence for each frame in range
+ 656:             for frame_num in range(start_frame, end_frame + 1):
+ 657:                 speech_frames.add(frame_num)
+ 658:                 if frame_num not in timeline:
+ 659:                     timeline[frame_num] = set()
+ 660:                 if speaker_label:
+ 661:                     timeline[frame_num].add(speaker_label)
+ 662:         
+ 663:         logger.info(f"Built timeline with {len(speech_frames)} frames containing speech")
+ 664:         gap_fill_sec = float(getattr(config, "LEMONFOX_SPEECH_GAP_FILL_SEC", 0.0) or 0.0)
+ 665:         min_on_sec = float(getattr(config, "LEMONFOX_SPEECH_MIN_ON_SEC", 0.0) or 0.0)
+ 666:         timeline, speech_frames = LemonfoxAudioService._apply_speech_smoothing(
+ 667:             timeline=timeline,
+ 668:             speech_frames=speech_frames,
+ 669:             total_frames=total_frames,
+ 670:             fps=fps,
+ 671:             gap_fill_sec=gap_fill_sec,
+ 672:             min_on_sec=min_on_sec,
+ 673:         )
+ 674:         return timeline, speech_frames
+ 675: 
+ 676:     @staticmethod
+ 677:     def _calculate_file_size_mb(path: Path) -> float:
+ 678:         size_bytes = path.stat().st_size
+ 679:         return size_bytes / (1024 * 1024)
+ 680: 
+ 681:     @staticmethod
+ 682:     def _transcode_video_for_upload(video_path: Path) -> Tuple[Path, Callable[[], None]]:
+ 683:         """
+ 684:         Create an audio-only MP4 optimized for Lemonfox uploads.
+ 685: 
+ 686:         Returns:
+ 687:             Tuple[path_to_upload, cleanup_callback]
+ 688:         """
+ 689:         tmp_file = tempfile.NamedTemporaryFile(prefix="lemonfox_audio_upload_", suffix=".mp4", delete=False)
+ 690:         tmp_path = Path(tmp_file.name)
+ 691:         tmp_file.close()
+ 692: 
+ 693:         audio_codec = getattr(config, "LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
+ 694:         bitrate_kbps = int(getattr(config, "LEMONFOX_TRANSCODE_BITRATE_KBPS", 96))
+ 695: 
+ 696:         cmd = [
+ 697:             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+ 698:             "-i", str(video_path),
+ 699:             "-vn",
+ 700:             "-ac", "1",
+ 701:             "-ar", "16000",
+ 702:             "-c:a", audio_codec,
+ 703:             "-b:a", f"{bitrate_kbps}k",
+ 704:             "-movflags", "+faststart",
+ 705:             str(tmp_path),
+ 706:         ]
+ 707: 
+ 708:         logger.info(
+ 709:             "Transcodage Lemonfox audio-only pour %s via codec=%s bitrate=%skbps",
+ 710:             video_path.name,
+ 711:             audio_codec,
+ 712:             bitrate_kbps,
+ 713:         )
+ 714: 
+ 715:         try:
+ 716:             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+ 717:         except subprocess.CalledProcessError as exc:
+ 718:             raise RuntimeError(f"Transcodage Lemonfox échoué pour {video_path.name}: {exc}") from exc
+ 719: 
+ 720:         def _cleanup() -> None:
+ 721:             try:
+ 722:                 tmp_path.unlink(missing_ok=True)
+ 723:             except Exception:
+ 724:                 pass
+ 725: 
+ 726:         return tmp_path, _cleanup
+ 727: 
+ 728:     @staticmethod
+ 729:     def _prepare_upload_artifact(video_path: Path) -> UploadPreparationResult:
+ 730:         """
+ 731:         Ensure the file to upload respects Lemonfox size policy.
+ 732: 
+ 733:         Returns:
+ 734:             UploadPreparationResult describing the artifact to upload.
+ 735: 
+ 736:         Raises:
+ 737:             ValueError if the file exceeds the limit and transcode is disabled.
+ 738:             RuntimeError if transcode fails.
+ 739:         """
+ 740:         original_size_mb = LemonfoxAudioService._calculate_file_size_mb(video_path)
+ 741:         limit_mb = getattr(config, "LEMONFOX_MAX_UPLOAD_MB", None)
+ 742: 
+ 743:         if not limit_mb or original_size_mb <= float(limit_mb):
+ 744:             return UploadPreparationResult(
+ 745:                 upload_path=video_path,
+ 746:                 cleanup=None,
+ 747:                 original_size_mb=original_size_mb,
+ 748:                 limit_mb=limit_mb,
+ 749:                 transcoded=False,
+ 750:             )
+ 751: 
+ 752:         if not getattr(config, "LEMONFOX_ENABLE_TRANSCODE", False):
+ 753:             raise ValueError(
+ 754:                 f"La vidéo ({original_size_mb:.2f} MB) dépasse la limite Lemonfox "
+ 755:                 f"configurée ({limit_mb} MB) et LEMONFOX_ENABLE_TRANSCODE=0."
+ 756:             )
+ 757: 
+ 758:         tmp_path, cleanup = LemonfoxAudioService._transcode_video_for_upload(video_path)
+ 759:         transcoded_size_mb = LemonfoxAudioService._calculate_file_size_mb(tmp_path)
+ 760:         if limit_mb and transcoded_size_mb > float(limit_mb):
+ 761:             cleanup()
+ 762:             raise ValueError(
+ 763:                 f"Le fichier transcodé ({transcoded_size_mb:.2f} MB) dépasse toujours "
+ 764:                 f"la limite Lemonfox ({limit_mb} MB)."
+ 765:             )
+ 766: 
+ 767:         logger.info(
+ 768:             "Lemonfox upload: %s compressé de %.2f MB à %.2f MB (limite=%s MB)",
+ 769:             video_path.name,
+ 770:             original_size_mb,
+ 771:             transcoded_size_mb,
+ 772:             limit_mb,
+ 773:         )
+ 774: 
+ 775:         return UploadPreparationResult(
+ 776:             upload_path=tmp_path,
+ 777:             cleanup=cleanup,
+ 778:             original_size_mb=original_size_mb,
+ 779:             limit_mb=limit_mb,
+ 780:             transcoded=True,
+ 781:         )
+ 782: 
+ 783:     @staticmethod
+ 784:     def _write_step4_json_atomically(
+ 785:         output_path: Path,
+ 786:         video_filename: str,
+ 787:         fps: float,
+ 788:         total_frames: int,
+ 789:         timeline: Dict[int, set],
+ 790:         speech_frames: set,
+ 791:         speaker_embeddings: Optional[Dict[str, Any]] = None,
+ 792:     ) -> bool:
+ 793:         """
+ 794:         Write STEP4-compatible JSON atomically.
+ 795:         
+ 796:         Args:
+ 797:             output_path: Target output path
+ 798:             video_filename: Video filename for metadata
+ 799:             fps: Frames per second
+ 800:             total_frames: Total number of frames
+ 801:             timeline: Frame timeline (frame_num -> set of speakers)
+ 802:             speaker_embeddings: Optional speaker embeddings data
+ 803:             
+ 804:         Returns:
+ 805:             True if successful, False otherwise
+ 806:         """
+ 807:         try:
+ 808:             # Write to temporary file first (atomic write pattern)
+ 809:             tmp_path = output_path.with_suffix('.tmp')
+ 810:             
+ 811:             with open(tmp_path, 'w', encoding='utf-8') as f:
+ 812:                 # Write JSON header
+ 813:                 f.write('{\n')
+ 814:                 f.write(f'  "video_filename": "{video_filename}",\n')
+ 815:                 f.write(f'  "total_frames": {total_frames},\n')
+ 816:                 f.write(f'  "fps": {round(fps, 2)},\n')
+ 817:                 if isinstance(speaker_embeddings, dict) and speaker_embeddings:
+ 818:                     f.write(f'  "speaker_embeddings": {json.dumps(speaker_embeddings, ensure_ascii=False)},\n')
+ 819:                 f.write('  "frames_analysis": [\n')
+ 820:                 
+ 821:                 # Write frame-by-frame analysis
+ 822:                 for frame_num in range(1, total_frames + 1):
+ 823:                     speakers = sorted(timeline.get(frame_num, set()))
+ 824:                     is_speech = (frame_num in speech_frames) or (len(speakers) > 0)
+ 825:                     timecode_sec = round((frame_num - 1) / fps, 3)
+ 826:                     
+ 827:                     frame_obj = {
+ 828:                         "frame": frame_num,
+ 829:                         "audio_info": {
+ 830:                             "is_speech_present": is_speech,
+ 831:                             "num_distinct_speakers_audio": len(speakers),
+ 832:                             "active_speaker_labels": speakers,
+ 833:                             "timecode_sec": timecode_sec
+ 834:                         }
+ 835:                     }
+ 836:                     
+ 837:                     if frame_num > 1:
+ 838:                         f.write(',\n')
+ 839:                     f.write('    ' + json.dumps(frame_obj))
+ 840:                 
+ 841:                 f.write('\n  ]\n')
+ 842:                 f.write('}\n')
+ 843:             
+ 844:             # Atomic replace (overwrites existing file)
+ 845:             os.replace(tmp_path, output_path)
+ 846:             logger.info(f"Successfully wrote {output_path}")
+ 847:             return True
+ 848:             
+ 849:         except Exception as e:
+ 850:             logger.error(f"Failed to write JSON: {e}", exc_info=True)
+ 851:             # Clean up temp file if it exists
+ 852:             if tmp_path.exists():
+ 853:                 try:
+ 854:                     tmp_path.unlink()
+ 855:                 except Exception:
+ 856:                     pass
+ 857:             return False
+ 858: 
+ 859:     @staticmethod
+ 860:     def process_video_with_lemonfox(
+ 861:         project_name: str,
+ 862:         video_name: str,
+ 863:         language: Optional[str] = None,
+ 864:         prompt: Optional[str] = None,
+ 865:         speaker_labels: Optional[bool] = None,
+ 866:         min_speakers: Optional[int] = None,
+ 867:         max_speakers: Optional[int] = None,
+ 868:         timestamp_granularities: Optional[List[str]] = None,
+ 869:         eu_processing: Optional[bool] = None
+ 870:     ) -> AudioAnalysisResult:
+ 871:         """
+ 872:         Process a video with Lemonfox API and generate STEP4-compatible JSON.
+ 873:         
+ 874:         This is the main service method called by API routes.
+ 875:         
+ 876:         Args:
+ 877:             project_name: Name of the project
+ 878:             video_name: Relative path to video within project
+ 879:             language: Optional language hint
+ 880:             prompt: Optional prompt to guide transcription
+ 881:             speaker_labels: Enable speaker diarization
+ 882:             min_speakers: Minimum number of speakers
+ 883:             max_speakers: Maximum number of speakers
+ 884:             timestamp_granularities: List of granularities (e.g., ["word"])
+ 885:             eu_processing: Force EU processing
+ 886:             
+ 887:         Returns:
+ 888:             AudioAnalysisResult with success status and output details
+ 889:         """
+ 890:         # Step 1: Validate and resolve paths
+ 891:         valid, video_path, error = LemonfoxAudioService._validate_project_and_video(
+ 892:             project_name, video_name
+ 893:         )
+ 894:         if not valid:
+ 895:             return AudioAnalysisResult(
+ 896:                 success=False,
+ 897:                 output_path=None,
+ 898:                 fps=DEFAULT_FPS,
+ 899:                 total_frames=0,
+ 900:                 error=error
+ 901:             )
+ 902:         
+ 903:         # Step 2: Get video duration and calculate frames
+ 904:         duration_sec = LemonfoxAudioService._get_video_duration_ffprobe(video_path)
+ 905:         if duration_sec is None or duration_sec <= 0:
+ 906:             return AudioAnalysisResult(
+ 907:                 success=False,
+ 908:                 output_path=None,
+ 909:                 fps=DEFAULT_FPS,
+ 910:                 total_frames=0,
+ 911:                 error="Could not determine video duration"
+ 912:             )
+ 913:         
+ 914:         fps = DEFAULT_FPS
+ 915:         total_frames = int(round(duration_sec * fps))
+ 916:         
+ 917:         logger.info(f"Video: {video_path.name}, duration={duration_sec:.2f}s, fps={fps}, frames={total_frames}")
+ 918:         
+ 919:         # Step 3: Prepare file for upload (size policy + optional transcode)
+ 920:         try:
+ 921:             upload_prep = LemonfoxAudioService._prepare_upload_artifact(video_path)
+ 922:         except ValueError as size_error:
+ 923:             return AudioAnalysisResult(
+ 924:                 success=False,
+ 925:                 output_path=None,
+ 926:                 fps=fps,
+ 927:                 total_frames=total_frames,
+ 928:                 error=str(size_error),
+ 929:             )
+ 930: 
+ 931:         # Step 4: Call Lemonfox API
+ 932:         effective_language = language
+ 933:         if effective_language is None:
+ 934:             effective_language = getattr(config, "LEMONFOX_DEFAULT_LANGUAGE", None)
+ 935: 
+ 936:         effective_prompt = prompt
+ 937:         if effective_prompt is None:
+ 938:             effective_prompt = getattr(config, "LEMONFOX_DEFAULT_PROMPT", None)
+ 939: 
+ 940:         if speaker_labels is None:
+ 941:             effective_speaker_labels = bool(getattr(config, "LEMONFOX_SPEAKER_LABELS_DEFAULT", True))
+ 942:         else:
+ 943:             effective_speaker_labels = bool(speaker_labels)
+ 944: 
+ 945:         effective_min_speakers = min_speakers
+ 946:         if effective_min_speakers is None:
+ 947:             effective_min_speakers = getattr(config, "LEMONFOX_DEFAULT_MIN_SPEAKERS", None)
+ 948: 
+ 949:         effective_max_speakers = max_speakers
+ 950:         if effective_max_speakers is None:
+ 951:             effective_max_speakers = getattr(config, "LEMONFOX_DEFAULT_MAX_SPEAKERS", None)
+ 952: 
+ 953:         effective_timestamp_granularities = timestamp_granularities
+ 954:         if effective_timestamp_granularities is None:
+ 955:             effective_timestamp_granularities = list(getattr(config, "LEMONFOX_TIMESTAMP_GRANULARITIES", []) or [])
+ 956:         if not effective_timestamp_granularities:
+ 957:             effective_timestamp_granularities = None
+ 958: 
+ 959:         try:
+ 960:             transcription = LemonfoxAudioService._call_lemonfox_api(
+ 961:                 video_path=upload_prep.upload_path,
+ 962:                 upload_filename=video_path.name,
+ 963:                 original_file_size_mb=upload_prep.original_size_mb,
+ 964:                 limit_mb=upload_prep.limit_mb,
+ 965:                 language=effective_language,
+ 966:                 prompt=effective_prompt,
+ 967:                 speaker_labels=effective_speaker_labels,
+ 968:                 min_speakers=effective_min_speakers,
+ 969:                 max_speakers=effective_max_speakers,
+ 970:                 timestamp_granularities=effective_timestamp_granularities,
+ 971:                 eu_processing=eu_processing
+ 972:             )
+ 973:         finally:
+ 974:             if upload_prep.cleanup:
+ 975:                 upload_prep.cleanup()
+ 976:         
+ 977:         if not transcription.success:
+ 978:             return AudioAnalysisResult(
+ 979:                 success=False,
+ 980:                 output_path=None,
+ 981:                 fps=fps,
+ 982:                 total_frames=total_frames,
+ 983:                 error=transcription.error
+ 984:             )
+ 985:         
+ 986:         # Step 4: Build frame timeline
+ 987:         timeline, speech_frames = LemonfoxAudioService._build_frame_timeline(
+ 988:             transcription, total_frames, fps
+ 989:         )
+ 990:         
+ 991:         speaker_embeddings: Dict[str, Any] = {}
+ 992:         if _should_include_speaker_embeddings():
+ 993:             hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HF_AUTH_TOKEN")
+ 994:             if not hf_token:
+ 995:                 logger.warning("speaker embeddings: HUGGINGFACE_HUB_TOKEN/HF_AUTH_TOKEN absent, embeddings ignorés")
+ 996:             else:
+ 997:                 segments_for_embeddings: List[Tuple[float, float, str]] = []
+ 998:                 source_segments = transcription.segments or []
+ 999:                 if not source_segments and transcription.words:
+1000:                     source_segments = transcription.words
+1001: 
+1002:                 speaker_map: Dict[str, str] = {}
+1003:                 speaker_counter = 0
+1004:                 for item in source_segments:
+1005:                     raw_speaker = item.get("speaker")
+1006:                     if raw_speaker and raw_speaker not in speaker_map:
+1007:                         speaker_map[raw_speaker] = f"SPEAKER_{speaker_counter:02d}"
+1008:                         speaker_counter += 1
+1009: 
+1010:                 for item in source_segments:
+1011:                     start = item.get("start")
+1012:                     end = item.get("end")
+1013:                     raw_speaker = item.get("speaker")
+1014:                     if start is None or end is None:
+1015:                         continue
+1016:                     try:
+1017:                         start_f = float(start)
+1018:                         end_f = float(end)
+1019:                     except Exception:
+1020:                         continue
+1021: 
+1022:                     if not raw_speaker:
+1023:                         continue
+1024:                     speaker_label = speaker_map.get(raw_speaker)
+1025:                     if not speaker_label:
+1026:                         continue
+1027:                     segments_for_embeddings.append((start_f, end_f, speaker_label))
+1028: 
+1029:                 try:
+1030:                     speaker_embeddings = _compute_speaker_embeddings_from_audio(
+1031:                         input_media=video_path,
+1032:                         segments=segments_for_embeddings,
+1033:                         hf_token=hf_token,
+1034:                     )
+1035:                 except Exception as e:
+1036:                     logger.warning(f"speaker embeddings: erreur inattendue (ignorée): {e}")
+1037:         
+1038:         # Step 5: Write output JSON atomically
+1039:         output_path = video_path.with_name(f"{video_path.stem}{AUDIO_SUFFIX}")
+1040:         success = LemonfoxAudioService._write_step4_json_atomically(
+1041:             output_path=output_path,
+1042:             video_filename=video_path.name,
+1043:             fps=fps,
+1044:             total_frames=total_frames,
+1045:             timeline=timeline,
+1046:             speech_frames=speech_frames,
+1047:             speaker_embeddings=speaker_embeddings,
+1048:         )
+1049:         
+1050:         if not success:
+1051:             return AudioAnalysisResult(
+1052:                 success=False,
+1053:                 output_path=None,
+1054:                 fps=fps,
+1055:                 total_frames=total_frames,
+1056:                 error="Failed to write output JSON"
+1057:             )
+1058:         
+1059:         return AudioAnalysisResult(
+1060:             success=True,
+1061:             output_path=output_path,
+1062:             fps=fps,
+1063:             total_frames=total_frames,
+1064:             error=None
+1065:         )
+```
+
 ## File: services/workflow_state.py
 ```python
   1: #!/usr/bin/env python3
@@ -27341,833 +22526,6 @@ app_new.py
 388: }
 ```
 
-## File: static/css/components/steps.css
-```css
-  1: .step {
-  2:     background-color: var(--bg-card);
-  3:     border: 1px solid var(--border-color);
-  4:     border-left: 3px solid var(--border-color);
-  5:     padding: 25px;
-  6:     margin-bottom: 25px;
-  7:     border-radius: 12px;
-  8:     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-  9:     width: 100%;
- 10:     max-width: 700px;
- 11:     transition:
- 12:         transform 0.4s ease-out,
- 13:         opacity 0.4s ease-in-out,
- 14:         border-color 0.3s ease,
- 15:         border-left-color 0.3s ease,
- 16:         margin-bottom 0.4s ease-in-out,
- 17:         padding 0.4s ease-in-out,
- 18:         box-shadow 0.3s ease;
- 19:     scroll-margin-top: 0; /* Désactivé pour permettre un centrage parfait */
- 20: }
- 21: 
- 22: .step[data-status="running"],
- 23: .step[data-status="starting"],
- 24: .step[data-status="initiated"] {
- 25:     border-left-color: var(--status-running);
- 26: }
- 27: 
- 28: .step[data-status="completed"],
- 29: .step[data-status="success"] {
- 30:     border-left-color: var(--status-success);
- 31: }
- 32: 
- 33: .step[data-status="failed"],
- 34: .step[data-status="error"],
- 35: .step[data-status="cancelled"] {
- 36:     border-left-color: var(--status-error);
- 37: }
- 38: 
- 39: .step[data-status="warning"],
- 40: .step[data-status="paused"] {
- 41:     border-left-color: var(--status-warning);
- 42: }
- 43: 
- 44: /* Compact mode reduces padding/margins and typography to fit viewport */
- 45: .workflow-wrapper.compact-mode:not(.logs-active) .step {
- 46:     max-width: 100%;
- 47:     /* Reduce bottom padding to limit empty space below last controls/log buttons */
- 48:     padding: 14px 14px 10px; /* top right bottom left */
- 49:     margin-bottom: 0; /* handled by grid gap */
- 50:     box-shadow: 0 2px 6px rgba(0,0,0,0.12); /* softer shadow to reduce visual noise */
- 51:     align-self: start; /* avoid vertical stretch inside grid on desktop */
- 52: }
- 53: 
- 54: /* Smooth reappearance after closing logs panel - now only affects opacity/transform */
- 55: .workflow-wrapper.logs-leaving .steps-column .step {
- 56:     will-change: opacity, transform;
- 57: }
- 58: 
- 59: /* Utility class applied via JS for deterministic transitions */
- 60: .step.steps-hidden {
- 61:     opacity: 0 !important;
- 62:     transform: translateY(8px) scale(0.97) !important;
- 63:     pointer-events: none;
- 64: }
- 65: 
- 66: /* Staggered delays in compact mode - no longer needed since layout is stable */
- 67: .workflow-wrapper.compact-mode.logs-leaving .steps-column .step {
- 68:     transition-timing-function: cubic-bezier(0.2, 0.6, 0.2, 1);
- 69:     transition-duration: 0.4s;
- 70: }
- 71: .step:hover:not(.active-for-log-panel) {
- 72:      transform: translateY(-4px);
- 73:      box-shadow: 0 8px 18px rgba(0,0,0,0.28);
- 74: }
- 75:  .step.active-for-log-panel {
- 76:     border: 2px solid var(--accent-primary);
- 77:     box-shadow: 0 8px 25px rgba(121, 134, 203, 0.3), 0 0 0 1px var(--accent-primary);
- 78:     transform: translateY(-2px);
- 79: }
- 80: .step.custom-sequence-selected {
- 81:     border: 2px solid var(--orange);
- 82:     box-shadow: 0 0 15px var(--orange);
- 83: }
- 84: 
- 85: .step-header-content {
- 86:     display: flex;
- 87:     justify-content: space-between;
- 88:     align-items: center;
- 89:     border-bottom: 1px solid var(--border-color);
- 90:     padding-bottom: 10px;
- 91:     margin-bottom: 20px;
- 92: }
- 93: 
- 94: .step-title-group {
- 95:     display: flex;
- 96:     align-items: center;
- 97:     gap: 12px;
- 98:     flex-wrap: wrap;
- 99: }
-100: 
-101: .step h2 {
-102:     margin-top: 0;
-103:     font-size: 1.5em;
-104:     color: var(--accent-primary);
-105:     display: flex;
-106:     align-items: center;
-107:     font-weight: 500;
-108:     border-bottom: none;
-109:     padding-bottom: 0;
-110:     margin-bottom: 0;
-111: }
-112: .step h2 .step-icon { margin-right: 12px; font-size: 1.6em; }
-113: 
-114: /* Icon accent on hover for better affordance */
-115: .step:hover h2 .step-icon {
-116:     color: var(--accent-primary);
-117:     transform: translateY(-1px);
-118:     transition: color 0.2s ease, transform 0.2s ease;
-119: }
-120: 
-121: .workflow-wrapper.compact-mode:not(.logs-active) .step h2 {
-122:     font-size: 1.05em; /* slightly smaller titles in compact */
-123: }
-124: .workflow-wrapper.compact-mode:not(.logs-active) .step h2 .step-icon {
-125:     font-size: 1.1em;
-126:     margin-right: 6px;
-127: }
-128: 
-129: .step-state-chip {
-130:     display: inline-flex;
-131:     align-items: center;
-132:     gap: 6px;
-133:     padding: 4px 12px;
-134:     border-radius: 999px;
-135:     font-size: 0.78em;
-136:     font-weight: 600;
-137:     text-transform: capitalize;
-138:     border: 1px solid transparent;
-139:     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-140:     letter-spacing: 0.02em;
-141: }
-142: 
-143: .step-state-chip span {
-144:     font-size: 0.9em;
-145: }
-146: 
-147: .state-running {
-148:     background: color-mix(in oklab, var(--status-running) 18%, transparent);
-149:     color: var(--status-running);
-150:     border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
-151:     box-shadow: 0 0 12px color-mix(in oklab, var(--status-running) 16%, transparent);
-152: }
-153: 
-154: .state-success {
-155:     background: color-mix(in oklab, var(--status-success) 18%, transparent);
-156:     color: var(--status-success);
-157:     border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
-158: }
-159: 
-160: .state-error {
-161:     background: color-mix(in oklab, var(--status-error) 18%, transparent);
-162:     color: var(--status-error);
-163:     border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
-164: }
-165: 
-166: .state-warning {
-167:     background: color-mix(in oklab, var(--status-warning) 18%, transparent);
-168:     color: var(--status-warning);
-169:     border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
-170: }
-171: 
-172: .state-idle {
-173:     background: color-mix(in oklab, var(--status-idle) 18%, transparent);
-174:     color: var(--status-idle);
-175:     border-color: color-mix(in oklab, var(--status-idle) 35%, transparent);
-176: }
-177: 
-178: /* Hover tuning for processing/active steps: keep subtle, avoid large motion */
-179: .steps-column .step[data-status="running"]:hover,
-180: .steps-column .step[data-status="starting"]:hover,
-181: .steps-column .step[data-status="initiated"]:hover,
-182: .steps-column .step.active-for-log-panel:hover {
-183:     transform: translateY(-2px) scale(1.005);
-184:     box-shadow: 0 10px 24px rgba(121, 134, 203, 0.22), 0 2px 8px rgba(0,0,0,0.2);
-185: }
-186: 
-187: /* Respect reduced motion for hover effects */
-188: @media (prefers-reduced-motion: reduce) {
-189:     .step:hover:not(.active-for-log-panel),
-190:     .steps-column .step[data-status="running"]:hover,
-191:     .steps-column .step[data-status="starting"]:hover,
-192:     .steps-column .step[data-status="initiated"]:hover,
-193:     .steps-column .step.active-for-log-panel:hover {
-194:         transform: none !important;
-195:         box-shadow: 0 6px 16px rgba(0,0,0,0.18);
-196:     }
-197: }
-198: 
-199: .step-selection-control {
-200:     display: flex;
-201:     align-items: center;
-202: }
-203: .step-selection-control input[type="checkbox"] {
-204:     width: 20px;
-205:     height: 20px;
-206:     margin-right: 8px;
-207:     cursor: pointer;
-208: }
-209: .step-selection-order-number {
-210:     font-size: 1em;
-211:     font-weight: bold;
-212:     color: var(--orange);
-213:     min-width: 20px;
-214:     text-align: center;
-215: }
-216: 
-217: .step-controls button,
-218: .specific-log-button {
-219:     padding: 12px 22px;
-220:     margin-right: 12px;
-221:     margin-bottom: 12px;
-222:     font-size: 0.95em;
-223:     cursor: pointer;
-224:     border: none;
-225:     border-radius: 25px;
-226:     color: var(--bg-dark);
-227:     transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
-228:     font-weight: 600;
-229:     box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-230:     min-height: var(--touch-target-min);
-231: }
-232: .workflow-wrapper.compact-mode:not(.logs-active) .step-controls button,
-233: .workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button {
-234:     padding: var(--button-compact-padding);
-235:     font-size: 0.86em;
-236:     margin-right: 6px;
-237:     /* Reduce vertical gap below the last row of buttons */
-238:     margin-bottom: 3px;
-239:     border-radius: 16px;
-240: }
-241: 
-242: /* Remove extra bottom gap under the final log button in compact mode */
-243: .workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button:last-child {
-244:     margin-bottom: 0;
-245: }
-246: .step-controls button:hover, .specific-log-button:hover {
-247:      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-248: }
-249: .step-controls button:active, .specific-log-button:active { transform: scale(0.97); }
-250: 
-251: .run-button { background-color: var(--green); color: white; }
-252: .run-button:hover { background-color: #5cb85c; }
-253: .run-button:disabled,
-254: .cancel-button:disabled,
-255: .specific-log-button:disabled {
-256:     background: color-mix(in oklab, var(--bg-tertiary) 80%, black 8%);
-257:     color: var(--text-muted);
-258:     border-color: var(--border-color);
-259: }
-260: 
-261: .cancel-button { background-color: var(--red); color: white;}
-262: .cancel-button:hover { background-color: #d9534f; }
-263: /* Universal focus-visible for action buttons (keyboard accessibility) */
-264: .run-button:focus-visible,
-265: .cancel-button:focus-visible,
-266: .specific-log-button:focus-visible {
-267:     outline: none;
-268:     box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-primary) 35%, transparent);
-269:     border-color: var(--accent-primary);
-270: }
-271: 
-272: .specific-log-button { background-color: var(--yellow); color: #333; }
-273: .specific-log-button:hover { background-color: #ffeb3b; }
-274: 
-275: .status-line { margin-top: 15px; margin-bottom:10px; font-weight: bold; font-size: 1.05em; }
-276: .workflow-wrapper.compact-mode:not(.logs-active) .status-line {
-277:     margin-top: 6px;
-278:     margin-bottom: 4px;
-279:     font-size: 0.9em;
-280: }
-281: .status-line {
-282:     display: flex;
-283:     align-items: center;
-284:     gap: 10px;
-285:     flex-wrap: wrap;
-286: }
-287: .status-badge {
-288:     display: inline-flex;
-289:     align-items: center;
-290:     padding: 4px 10px;
-291:     border-radius: 999px;
-292:     font-weight: 600;
-293:     font-size: 0.85em;
-294:     letter-spacing: 0.01em;
-295:     text-transform: capitalize;
-296:     background: color-mix(in oklab, var(--status-idle) 18%, transparent);
-297:     color: var(--status-idle);
-298:     border: 1px solid color-mix(in oklab, var(--status-idle) 35%, transparent);
-299: }
-300: .status-running,
-301: .status-starting,
-302: .status-initiated {
-303:     background: color-mix(in oklab, var(--status-running) 18%, transparent);
-304:     color: var(--status-running);
-305:     border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
-306:     animation: pulseStatus 1.8s infinite ease-in-out;
-307: }
-308: .status-success,
-309: .status-completed {
-310:     background: color-mix(in oklab, var(--status-success) 18%, transparent);
-311:     color: var(--status-success);
-312:     border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
-313: }
-314: .status-error,
-315: .status-failed,
-316: .status-cancelled {
-317:     background: color-mix(in oklab, var(--status-error) 18%, transparent);
-318:     color: var(--status-error);
-319:     border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
-320: }
-321: .status-warning,
-322: .status-paused {
-323:     background: color-mix(in oklab, var(--status-warning) 18%, transparent);
-324:     color: var(--status-warning);
-325:     border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
-326: }
-327: .status-idle {
-328:     background: color-mix(in oklab, var(--status-idle) 18%, transparent);
-329:     color: var(--status-idle);
-330: }
-331: .status-line span.timer {
-332:     font-weight: normal;
-333:     font-size: 0.9em;
-334:     color: var(--text-secondary);
-335:     margin-left: 10px;
-336: }
-337: 
-338: .step-progress-container {
-339:     width: 100%;
-340:     margin-top:10px;
-341: }
-342: .workflow-wrapper.compact-mode:not(.logs-active) .step-progress-container { margin-top: 6px; }
-343: .progress-bar-wrapper {
-344:     background-color: var(--border-color);
-345:     border-radius: 8px;
-346:     padding: 3px;
-347: }
-348: .progress-bar-step {
-349:     width: 0%;
-350:     height: 18px;
-351:     background-color: var(--blue);
-352:     border-radius: 5px;
-353:     text-align: center;
-354:     line-height: 18px;
-355:     color: white;
-356:     font-size: 0.85em;
-357:     font-weight: bold;
-358:     /* Smoother width transition */
-359:     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
-360:     position: relative;
-361:     overflow: hidden; /* for shine effect */
-362: }
-363: .workflow-wrapper.compact-mode:not(.logs-active) .progress-bar-step {
-364:     height: 12px;
-365:     line-height: 12px;
-366:     font-size: 0.76em;
-367: }
-368: .progress-bar-step[data-active="true"]::after {
-369:     content: '';
-370:     position: absolute;
-371:     top: 0;
-372:     left: -100%;
-373:     width: 100%;
-374:     height: 100%;
-375:     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
-376:     animation: progressShine 2.0s infinite;
-377: }
-378: .progress-text-step {
-379:     text-align: center;
-380:     margin-top: 4px;
-381:     font-size: 0.85em;
-382:     color: var(--text-secondary);
-383:     white-space: pre-line;
-384:     overflow: hidden;
-385:     text-overflow: ellipsis;
-386:     max-height: 3.6em;
-387:     line-height: 1.2em;
-388: }
-389: .workflow-wrapper.compact-mode:not(.logs-active) .progress-text-step {
-390:     font-size: 0.76em;
-391: }
-392: 
-393: /* Subtle pulse for current filename while processing */
-394: .progress-text-step[data-processing="true"] {
-395:     animation: textPulse 1.5s ease-in-out infinite;
-396: }
-397: 
-398: /* Reduce extra spacing around specific log controls to avoid empty space under buttons */
-399: .workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper {
-400:     margin-top: 8px; /* was 15px in logs.css; tighter in compact mode */
-401:     margin-bottom: 0;
-402: }
-403: .workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper h4 {
-404:     margin-bottom: 6px; /* override logs.css (10px) to reduce vertical gap */
-405: }
-406: .workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper > div {
-407:     /* the immediate container of buttons; ensure no unintended bottom margin */
-408:     margin-bottom: 0;
-409: }
-410: 
-411: /* ========== Micro-interactions for steps ========== */
-412: /* Non-active steps get a very subtle halo when any step is running */
-413: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"],
-414: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"],
-415: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"] {
-416:     position: relative;
-417: }
-418: 
-419: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"]::after,
-420: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"]::after,
-421: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"]::after {
-422:     content: '';
-423:     position: absolute;
-424:     inset: 0;
-425:     border-radius: 12px;
-426:     pointer-events: none;
-427:     box-shadow: 0 0 0 2px rgba(121, 134, 203, 0.35);
-428:     opacity: 0.22;
-429:     animation: subtleOpacityPulse 2.8s ease-in-out infinite;
-430: }
-431: 
-432: /* Active/processing step: breathing effect to indicate ongoing work */
-433: .steps-column .step.active-for-log-panel,
-434: .steps-column .step[data-status="running"],
-435: .steps-column .step[data-status="starting"],
-436: .steps-column .step[data-status="initiated"] {
-437:     will-change: transform;
-438:     animation: cardBreath 3.2s ease-in-out infinite;
-439: }
-440: 
-441: /* Respect reduced motion preferences */
-442: @media (prefers-reduced-motion: reduce) {
-443:     .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status]::after,
-444:     .steps-column .step.active-for-log-panel,
-445:     .steps-column .step[data-status="running"],
-446:     .steps-column .step[data-status="starting"],
-447:     .steps-column .step[data-status="initiated"] {
-448:         animation: none !important;
-449:     }
-450: }
-451: 
-452: /* Override transform reset from layout.css to allow hover lift on idle steps */
-453: .workflow-wrapper:not(.logs-active) .steps-column .step:hover:not(.active-for-log-panel) {
-454:     transform: translateY(-4px);
-455:     box-shadow: 0 8px 18px rgba(0,0,0,0.28);
-456: }
-457: 
-458: .workflow-wrapper.compact-mode .steps-column {
-459:     display: flex;
-460:     flex-direction: column;
-461:     align-items: center;
-462:     gap: var(--pipeline-gap);
-463: }
-464: 
-465: .workflow-pipeline {
-466:     width: 100%;
-467: }
-468: 
-469: .pipeline-timeline {
-470:     position: relative;
-471:     width: 100%;
-472:     max-width: var(--pipeline-card-max-width);
-473:     margin: 0 auto;
-474:     display: flex;
-475:     flex-direction: column;
-476:     gap: var(--pipeline-gap);
-477: }
-478: 
-479: .timeline-scroll-spacer {
-480:     width: 100%;
-481:     height: calc(100vh - var(--topbar-height));
-482:     min-height: 520px;
-483: }
-484: 
-485: .timeline-row {
-486:     display: grid;
-487:     grid-template-columns: var(--pipeline-rail-column-width) minmax(0, 1fr);
-488:     column-gap: var(--pipeline-rail-gap);
-489:     align-items: stretch;
-490: }
-491: 
-492: .timeline-rail-column {
-493:     position: relative;
-494:     display: flex;
-495:     align-items: center;
-496:     justify-content: center;
-497:     padding: var(--pipeline-card-padding) 0;
-498: }
-499: 
-500: .timeline-cards-column {
-501:     display: flex;
-502:     flex-direction: column;
-503: }
-504: 
-505: .timeline-axis {
-506:     position: absolute;
-507:     left: calc((var(--pipeline-rail-column-width) / 2) - (var(--pipeline-axis-width) / 2));
-508:     top: 0;
-509:     bottom: 0;
-510:     width: var(--pipeline-axis-width);
-511:     background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
-512:     border-radius: 999px;
-513:     opacity: 0.9;
-514:     pointer-events: none;
-515:     z-index: 0;
-516: }
-517: 
-518: .timeline-step {
-519:     position: relative;
-520:     z-index: 2;
-521:     width: 100%;
-522:     max-width: var(--pipeline-card-max-width);
-523:     margin: 0;
-524:     border-left: none;
-525:     padding: 0;
-526:     border-radius: var(--pipeline-card-radius);
-527:     background: color-mix(in oklab, var(--bg-card) 92%, transparent);
-528:     border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
-529:     box-shadow: 0 10px 26px rgba(0,0,0,0.22);
-530:     scroll-margin-top: 0;
-531:     transition:
-532:         transform var(--motion-duration-slow) var(--motion-ease-standard),
-533:         box-shadow var(--motion-duration-medium) var(--motion-ease-standard),
-534:         background var(--motion-duration-medium) var(--motion-ease-standard),
-535:         border-color var(--motion-duration-medium) var(--motion-ease-standard);
-536: }
-537: 
-538: .timeline-step:hover:not(.active-for-log-panel) {
-539:     transform: translateY(-6px) scale(1.008);
-540:     box-shadow:
-541:         0 20px 40px rgba(0,0,0,0.25),
-542:         0 0 0 1px rgba(var(--accent-primary-rgb), 0.2);
-543: }
-544: 
-545: .timeline-step:focus-within:not(.active-for-log-panel) {
-546:     box-shadow:
-547:         0 16px 34px rgba(0,0,0,0.24),
-548:         0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
-549:     transform: translateY(-2px);
-550: }
-551: 
-552: .timeline-step[data-status="running"],
-553: .timeline-step[data-status="starting"],
-554: .timeline-step[data-status="initiated"] {
-555:     background: color-mix(in oklab, var(--status-running) 12%, var(--bg-card));
-556:     border-color: color-mix(in oklab, var(--status-running) 65%, var(--border-color));
-557:     box-shadow: 0 10px 30px rgba(var(--status-running-rgb), 0.25);
-558: }
-559: 
-560: .timeline-step[data-status="failed"],
-561: .timeline-step[data-status="error"],
-562: .timeline-step[data-status="cancelled"] {
-563:     background: color-mix(in oklab, var(--status-error) 10%, var(--bg-card));
-564:     border-color: color-mix(in oklab, var(--status-error) 55%, var(--border-color));
-565: }
-566: 
-567: .timeline-step[data-status="completed"],
-568: .timeline-step[data-status="success"] {
-569:     background: color-mix(in oklab, var(--status-success) 10%, var(--bg-card));
-570:     border-color: color-mix(in oklab, var(--status-success) 55%, var(--border-color));
-571: }
-572: 
-573: .timeline-step[data-status="warning"],
-574: .timeline-step[data-status="paused"],
-575: .timeline-step[data-status="pending"] {
-576:     background: color-mix(in oklab, var(--status-warning) 10%, var(--bg-card));
-577:     border-color: color-mix(in oklab, var(--status-warning) 55%, var(--border-color));
-578: }
-579: 
-580: .timeline-node {
-581:     position: relative;
-582:     z-index: 2;
-583:     width: var(--pipeline-node-dot-size);
-584:     height: var(--pipeline-node-dot-size);
-585:     border-radius: 50%;
-586:     background: color-mix(in oklab, var(--bg-dark) 72%, transparent);
-587:     border: var(--pipeline-node-border-width) solid var(--pipeline-color-idle);
-588:     box-shadow: 0 0 12px rgba(0,0,0,0.25);
-589:     transition:
-590:         transform var(--motion-duration-fast) var(--motion-ease-standard),
-591:         background var(--motion-duration-medium) var(--motion-ease-standard),
-592:         border-color var(--motion-duration-medium) var(--motion-ease-standard),
-593:         box-shadow var(--motion-duration-medium) var(--motion-ease-standard);
-594: }
-595: 
-596: .timeline-step:hover:not(.active-for-log-panel) .timeline-node {
-597:     transform: scale(1.08);
-598: }
-599: 
-600: .timeline-step.is-selected {
-601:     border-color: color-mix(in oklab, var(--accent-primary) 65%, var(--border-color));
-602:     box-shadow:
-603:         0 16px 34px rgba(0,0,0,0.24),
-604:         0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
-605: }
-606: 
-607: .timeline-step[data-status="running"] .timeline-node,
-608: .timeline-step[data-status="starting"] .timeline-node,
-609: .timeline-step[data-status="initiated"] .timeline-node {
-610:     border-color: var(--pipeline-color-running);
-611:     box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-running) 45%, transparent);
-612: }
-613: 
-614: .timeline-step[data-status="completed"] .timeline-node,
-615: .timeline-step[data-status="success"] .timeline-node {
-616:     border-color: var(--pipeline-color-success);
-617:     box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-success) 45%, transparent);
-618: }
-619: 
-620: .timeline-step[data-status="failed"] .timeline-node,
-621: .timeline-step[data-status="error"] .timeline-node,
-622: .timeline-step[data-status="cancelled"] .timeline-node {
-623:     border-color: var(--pipeline-color-error);
-624:     box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-error) 45%, transparent);
-625: }
-626: 
-627: .timeline-content {
-628:     display: grid;
-629:     gap: 0.85rem;
-630:     padding: var(--pipeline-card-padding);
-631: }
-632: 
-633: .timeline-head {
-634:     display: flex;
-635:     justify-content: space-between;
-636:     align-items: center;
-637:     gap: 12px;
-638:     padding-bottom: 10px;
-639:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-640: }
-641: 
-642: .node-actions {
-643:     display: flex;
-644:     flex-wrap: wrap;
-645:     align-items: center;
-646:     gap: 10px;
-647: }
-648: 
-649: .timeline-step .step-controls button,
-650: .timeline-step .specific-log-button {
-651:     border-radius: 999px;
-652:     padding: 10px 18px;
-653:     margin: 0;
-654: }
-655: 
-656: .timeline-step .specific-log-controls-wrapper {
-657:     margin-top: 4px;
-658: }
-659: 
-660: .steps-column .step[data-status="initiated"] {
-661:     animation: none !important;
-662: }
-663: 
-664: @media (prefers-reduced-motion: reduce) {
-665:     .timeline-step {
-666:         transition: none !important;
-667:     }
-668:     .timeline-step:hover:not(.active-for-log-panel) {
-669:         transform: none;
-670:     }
-671:     .timeline-axis {
-672:         transition: none !important;
-673:     }
-674:     .timeline-node {
-675:         transition: none !important;
-676:     }
-677: }
-678: 
-679: @media (max-width: 860px) {
-680:     .workflow-pipeline {
-681:         --pipeline-node-size: 68px;
-682:         --pipeline-card-padding: 1.25rem;
-683:         --pipeline-gap: 1.6rem;
-684:         --pipeline-rail-column-width: 84px;
-685:     }
-686: 
-687:     .timeline-step:hover:not(.active-for-log-panel) {
-688:         transform: translateY(-4px) scale(1.006);
-689:     }
-690: }
-691: 
-692: @media (max-width: 720px) {
-693:     .workflow-pipeline {
-694:         --pipeline-rail-column-width: 72px;
-695:         --pipeline-rail-gap: 0.85rem;
-696:     }
-697: }
-698: 
-699: @media (max-width: 620px) {
-700:     .timeline-axis {
-701:         display: none;
-702:     }
-703: 
-704:     .timeline-step {
-705:         grid-template-columns: 1fr;
-706:     }
-707: 
-708:     .timeline-rail {
-709:         flex-direction: row;
-710:         justify-content: flex-start;
-711:         margin-bottom: 10px;
-712:         gap: 12px;
-713:     }
-714: 
-715:     .timeline-head {
-716:         flex-direction: column;
-717:         align-items: flex-start;
-718:     }
-719: 
-720:     .step-selection-control {
-721:         align-self: flex-end;
-722:     }
-723: 
-724:     .node-actions {
-725:         gap: 8px;
-726:         align-items: stretch;
-727:     }
-728: 
-729:     .timeline-step .step-controls button,
-730:     .timeline-step .specific-log-button {
-731:         width: 100%;
-732:         justify-content: center;
-733:     }
-734: }
-735: 
-736: @media (max-width: 520px) {
-737:     .workflow-pipeline {
-738:         --pipeline-node-size: 60px;
-739:         --pipeline-card-padding: 1rem;
-740:         --pipeline-gap: 1.25rem;
-741:     }
-742: }
-743: 
-744: .step-details-panel {
-745:     background: color-mix(in oklab, var(--bg-card) 92%, transparent);
-746:     border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
-747:     border-radius: var(--pipeline-card-radius);
-748:     box-shadow: -5px 0 18px rgba(0,0,0,0.25);
-749:     overflow: hidden;
-750: }
-751: 
-752: .step-details-header {
-753:     display: flex;
-754:     align-items: center;
-755:     justify-content: space-between;
-756:     gap: 12px;
-757:     padding: 14px 14px 10px;
-758:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-759: }
-760: 
-761: .step-details-title {
-762:     font-weight: 700;
-763:     letter-spacing: 0.01em;
-764:     color: var(--text-primary);
-765: }
-766: 
-767: .step-details-close {
-768:     width: 38px;
-769:     height: 38px;
-770:     border-radius: 10px;
-771:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-772:     background: color-mix(in oklab, var(--bg-tertiary) 40%, transparent);
-773:     color: var(--text-primary);
-774:     cursor: pointer;
-775:     transition: background var(--motion-duration-medium) var(--motion-ease-standard);
-776: }
-777: 
-778: .step-details-close:hover {
-779:     background: color-mix(in oklab, var(--accent-primary) 18%, var(--bg-tertiary));
-780: }
-781: 
-782: .step-details-body {
-783:     padding: 14px;
-784:     display: grid;
-785:     gap: 12px;
-786: }
-787: 
-788: .step-details-meta {
-789:     display: flex;
-790:     align-items: center;
-791:     flex-wrap: wrap;
-792:     gap: 10px;
-793: }
-794: 
-795: .step-details-progress {
-796:     background: color-mix(in oklab, var(--bg-dark) 45%, transparent);
-797:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
-798:     border-radius: 12px;
-799:     padding: 10px;
-800: }
-801: 
-802: .step-details-actions {
-803:     display: flex;
-804:     flex-direction: column;
-805:     gap: 10px;
-806: }
-807: 
-808: .step-details-actions .run-button,
-809: .step-details-actions .cancel-button,
-810: .step-details-actions .step-details-open-logs {
-811:     width: 100%;
-812:     justify-content: center;
-813:     margin: 0;
-814: }
-815: 
-816: .step-details-open-logs {
-817:     background-color: color-mix(in oklab, var(--accent-primary) 60%, var(--bg-tertiary));
-818:     color: white;
-819: }
-820: 
-821: .step-details-open-logs:hover {
-822:     background-color: color-mix(in oklab, var(--accent-primary) 72%, var(--bg-tertiary));
-823: }
-```
-
 ## File: static/css/components/workflow-buttons.css
 ```css
   1: /* Workflow controls within unified section */
@@ -28353,85 +22711,6 @@ app_new.py
 45:     box-shadow: none !important;
 46:     filter: saturate(85%);
 47: }
-```
-
-## File: static/css/variables.css
-```css
- 1: :root {
- 2:     /* Backgrounds */
- 3:     --bg-dark: #1e1e2f;
- 4:     --bg-card: #2c2c3e;
- 5:     --bg-secondary: #2c2c3e; /* Secondary background for widgets */
- 6:     --bg-tertiary: #3a3a4e; /* Tertiary background for disabled elements */
- 7:     --bg-hover: rgba(121, 134, 203, 0.1);
- 8:     --log-bg: #161625;
- 9: 
-10:     /* Text */
-11:     --text-primary: #e0e0e0;
-12:     --text-secondary: #a0a0b0;
-13:     --text-muted: #707080; /* Muted text for disabled states */
-14:     --text-bright: #f0f0f0;
-15:     --log-text: #c0c0d0;
-16:     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-17: 
-18:     /* UI Elements */
-19:     --border-color: #39394d;
-20:     --border-color-translucent: #39394d88;
-21:     --border-bright: #4a4a5e;
-22:     --touch-target-min: 44px;
-23:     --button-compact-padding: 12px;
-24:     --topbar-height: 68px;
-25: 
-26:     --motion-duration-fast: 120ms;
-27:     --motion-duration-medium: 220ms;
-28:     --motion-duration-slow: 420ms;
-29:     --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-30:     --motion-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
-31: 
-32:     /* Standard Colors */
-33:     --accent-primary: #7986cb;
-34:     --accent-secondary: #ff8a65;
-35:     --green: #66bb6a;
-36:     --red: #ef5350;
-37:     --yellow: #ffee58;
-38:     --blue: #42a5f5;
-39:     --orange: #ffb74d;
-40: 
-41:     /* Status Colors (Hex) */
-42:     --status-running: #4dabf7;
-43:     --status-success: #4caf50;
-44:     --status-error: #e53935;
-45:     --status-warning: #ff9800;
-46:     --status-idle: #9e9e9e;
-47: 
-48:     /* RGB Values (for rgba usage) */
-49:     --accent-primary-rgb: 121 134 203;
-50:     --accent-secondary-rgb: 255 138 101;
-51:     --status-running-rgb: 77 171 247;
-52:     --status-success-rgb: 76 175 80;
-53:     --status-error-rgb: 229 57 53;
-54:     --status-warning-rgb: 255 152 0;
-55:     --status-idle-rgb: 158 158 158;
-56: 
-57:     /* Pipeline Visualization Variables */
-58:     --pipeline-node-size: 80px;
-59:     --pipeline-connector-width: 3px;
-60:     --pipeline-gap: 2rem;
-61:     --pipeline-card-radius: 20px;
-62:     --pipeline-card-padding: 1.5rem;
-63:     --pipeline-card-max-width: 980px;
-64:     --pipeline-node-dot-size: 18px;
-65:     --pipeline-node-border-width: 3px;
-66:     --pipeline-rail-column-width: 110px;
-67:     --pipeline-rail-gap: 1.25rem;
-68:     --pipeline-axis-width: 4px;
-69: 
-70:     /* Pipeline Status Colors mapped to Status Colors */
-71:     --pipeline-color-idle: var(--status-idle);
-72:     --pipeline-color-running: var(--status-running);
-73:     --pipeline-color-success: var(--status-success);
-74:     --pipeline-color-error: var(--status-error);
-75: }
 ```
 
 ## File: static/utils/PollingManager.js
@@ -29231,1651 +23510,3961 @@ app_new.py
 59: }
 ```
 
-## File: workflow_scripts/step5/run_tracking_manager.py
+## File: workflow_scripts/step4/run_audio_analysis.py
 ```python
   1: #!/usr/bin/env python3
   2: # -*- coding: utf-8 -*-
-  3: import os, sys, json, argparse, subprocess, threading, time, logging
-  4: from pathlib import Path
-  5: from collections import OrderedDict, deque
-  6: from datetime import datetime
-  7: from typing import Mapping, Optional
-  8: 
-  9: try:
- 10:     from dotenv import load_dotenv
- 11: except ImportError:
- 12:     load_dotenv = None
- 13: 
- 14: 
- 15: class _EnvConfig:
- 16:     def __init__(self, environ: Mapping[str, str]):
- 17:         self._environ = environ
- 18: 
- 19:     def get_optional_str(self, key: str) -> Optional[str]:
- 20:         raw = self._environ.get(key)
- 21:         if raw is None:
- 22:             return None
- 23:         value = str(raw).strip()
- 24:         return value if value else None
- 25: 
- 26:     def get_str(self, key: str, default: str = "") -> str:
- 27:         value = self.get_optional_str(key)
- 28:         return value if value is not None else default
- 29: 
- 30:     def get_int(self, key: str, default: int) -> int:
- 31:         raw = self._environ.get(key)
- 32:         if raw is None:
- 33:             return default
- 34:         try:
- 35:             return int(str(raw).strip())
- 36:         except Exception:
- 37:             return default
- 38: 
- 39:     def get_bool(self, key: str, default: bool) -> bool:
- 40:         raw = self._environ.get(key)
- 41:         if raw is None:
- 42:             return default
+  3: 
+  4: """
+  5: Script d'analyse audio (diarisation) avec Pyannote.audio
+  6: Version Ubuntu - Étape 4
+  7: 
+  8: Optimisations clés:
+  9: - Extraction audio via ffmpeg (remplace MoviePy) vers tmpfs si disponible
+ 10: - Suppression d'OpenCV/MoviePy pour les métadonnées (utilisation ffprobe + fallback FPS=25)
+ 11: - Écriture JSON en streaming (évite le stockage complet en mémoire)
+ 12: - Mapping segments->frames sans matérialiser toute la diarisation
+ 13: - Journalisation unique (suppression des prints dupliqués)
+ 14: - Inference PyTorch optimisée (CUDA prioritaire, CPU fallback; no_grad/inference_mode)
+ 15: - Politique device/workers configurable via variables d'environnement
+ 16: - Nettoyage robuste des répertoires temporaires
+ 17: - Compression gzip optionnelle (désactivée par défaut pour compatibilité STEP5)
+ 18: """
+ 19: 
+ 20: import os
+ 21: import sys
+ 22: import json
+ 23: import argparse
+ 24: import logging
+ 25: import subprocess
+ 26: import tempfile
+ 27: import gzip
+ 28: import time
+ 29: import gc
+ 30: import math
+ 31: from contextlib import nullcontext
+ 32: import torch
+ 33: from pathlib import Path
+ 34: from datetime import datetime
+ 35: 
+ 36: # --- Configuration ---
+ 37: WORK_DIR = Path(os.getcwd())
+ 38: VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm')
+ 39: OUTPUT_SUFFIX = "_audio.json"
+ 40: DEFAULT_FPS = 25
+ 41: 
+ 42: LOG_DIR_PATH = None
  43: 
- 44:         normalized = str(raw).strip().lower()
- 45:         if normalized in {"1", "true", "yes", "y", "on"}:
- 46:             return True
- 47:         if normalized in {"0", "false", "no", "n", "off"}:
- 48:             return False
- 49:         return default
- 50: 
- 51:     def get_csv_list(self, key: str) -> list[str]:
- 52:         raw = self.get_str(key, default="").strip().lower()
- 53:         return [p.strip() for p in raw.split(",") if p.strip()]
- 54: 
- 55:     def snapshot(self, keys: list[str]) -> dict[str, Optional[str]]:
- 56:         return {k: self.get_optional_str(k) for k in keys}
- 57: 
- 58: 
- 59: def _load_env_file():
- 60:     """Load the project .env even if python-dotenv is unavailable."""
- 61:     env_path = Path(__file__).resolve().parent.parent.parent / ".env"
- 62:     if not env_path.exists():
- 63:         return
- 64:     if load_dotenv:
- 65:         load_dotenv(env_path)
- 66:         return
- 67: 
- 68:     for raw_line in env_path.read_text(encoding="utf-8").splitlines():
- 69:         line = raw_line.strip()
- 70:         if not line or line.startswith("#") or "=" not in line:
- 71:             continue
- 72:         key, value = line.split("=", 1)
- 73:         key = key.strip()
- 74:         if not key:
- 75:             continue
- 76:         cleaned = value.strip().strip('"').strip("'")
- 77:         os.environ.setdefault(key, cleaned)
- 78: 
- 79: 
- 80: _load_env_file()
- 81: 
- 82: 
- 83: ENV = _EnvConfig(os.environ)
- 84: step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
+ 44: 
+ 45: def _load_optimal_tv_config() -> dict:
+ 46:     try:
+ 47:         repo_root = Path(__file__).resolve().parents[2]
+ 48:         config_path = repo_root / "config" / "optimal_tv_config.json"
+ 49:         if not config_path.exists():
+ 50:             return {}
+ 51:         with open(config_path, "r", encoding="utf-8") as f:
+ 52:             data = json.load(f)
+ 53:         if not isinstance(data, dict):
+ 54:             logging.warning("optimal_tv_config.json ignoré (JSON racine non-objet).")
+ 55:             return {}
+ 56:         logging.info(f"optimal_tv_config.json chargé: {config_path}")
+ 57:         return data
+ 58:     except Exception as e:
+ 59:         logging.warning(f"Impossible de charger optimal_tv_config.json: {e}")
+ 60:         return {}
+ 61: 
+ 62: # Le dossier de log est AUDIO_ANALYSIS_LOG_DIR, passé par argument
+ 63: # On configure un logger de base qui sera complété dans main()
+ 64: logging.basicConfig(
+ 65:     level=logging.INFO,
+ 66:     format='%(asctime)s - %(levelname)s - %(message)s',
+ 67:     handlers=[logging.StreamHandler(sys.stdout)]
+ 68: )
+ 69: 
+ 70: 
+ 71: def find_videos_for_audio_analysis():
+ 72:     """Trouve toutes les vidéos à analyser qui n'ont pas encore de fichier _audio.json."""
+ 73:     videos_to_process = []
+ 74:     logging.info(f"Recherche de vidéos dans {WORK_DIR}...")
+ 75: 
+ 76:     all_videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}')]
+ 77: 
+ 78:     skipped_mov = 0
+ 79:     filtered_videos = []
+ 80:     for video_path in all_videos:
+ 81:         if video_path.suffix.lower() == '.mov':
+ 82:             skipped_mov += 1
+ 83:             continue
+ 84:         filtered_videos.append(video_path)
  85: 
- 86: def _log_env_snapshot():
- 87:     relevant_keys = [
- 88:         "STEP5_ENABLE_GPU",
- 89:         "STEP5_GPU_ENGINES",
- 90:         "STEP5_TRACKING_ENGINE",
- 91:         "TRACKING_DISABLE_GPU",
- 92:         "TRACKING_CPU_WORKERS",
- 93:         "STEP5_GPU_FALLBACK_AUTO",
- 94:         "STEP5_ENABLE_OBJECT_DETECTION",
- 95:         "INSIGHTFACE_HOME",
- 96:     ]
- 97:     snapshot = ENV.snapshot(relevant_keys)
- 98:     logging.info(f"[EnvSnapshot] {snapshot}")
- 99: 
-100: 
-101: # --- CONFIGURATIONS GLOBALES ---
-102: BASE_DIR = Path(__file__).resolve().parent.parent.parent
-103: 
-104: try:
-105:     sys.path.insert(0, str(BASE_DIR))
-106:     from config.settings import config as app_config
-107:     TRACKING_ENV_PYTHON = app_config.get_venv_python("tracking_env")
-108:     EOS_ENV_PYTHON = app_config.get_venv_python("eos_env")
-109:     INSIGHTFACE_ENV_PYTHON = app_config.get_venv_python("insightface_env")
-110: except (ImportError, AttributeError):
-111:     TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
-112:     EOS_ENV_PYTHON = BASE_DIR / "eos_env" / "bin" / "python"
-113:     INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
-114: 
-115: TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
-116: EOS_ENV_PYTHON = Path(EOS_ENV_PYTHON)
-117: INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
-118: 
-119: WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
-120: 
-121: TRACKING_ENGINE = None
-122: 
-123: TF_GPU_ENV_PYTHON = ENV.get_str("STEP5_TF_GPU_ENV_PYTHON", "").strip()
-124: if TF_GPU_ENV_PYTHON:
-125:     TF_GPU_ENV_PYTHON = Path(TF_GPU_ENV_PYTHON)
-126: 
-127: CUDA_LIB_SUBDIRS = [
-128:     "cublas/lib",
-129:     "cuda_runtime/lib",
-130:     "cuda_nvrtc/lib",
-131:     "cufft/lib",
-132:     "curand/lib",
-133:     "cusolver/lib",
-134:     "cusparse/lib",
-135:     "cudnn/lib",
-136:     "nvjitlink/lib",
-137: ]
-138: 
-139: SYSTEM_CUDA_DEFAULTS = [
-140:     "/usr/local/cuda-12.4",
-141:     "/usr/local/cuda-12",
-142:     "/usr/local/cuda-11.8",
-143:     "/usr/local/cuda",
-144: ]
-145: 
-146: 
-147: def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
-148:     """Return CUDA library directories bundled in a venv (for ONNX Runtime CUDA provider)."""
-149:     try:
-150:         venv_dir = Path(python_exe).expanduser().parent.parent
-151:     except Exception:
-152:         return []
+ 86:     for video_path in filtered_videos:
+ 87:         output_json_path = video_path.with_name(f"{video_path.stem}{OUTPUT_SUFFIX}")
+ 88:         if not output_json_path.exists():
+ 89:             videos_to_process.append(video_path)
+ 90:     
+ 91:     return videos_to_process
+ 92: 
+ 93: 
+ 94: def _run_ffprobe_duration(video_path: Path) -> float:
+ 95:     """Retourne la durée (en secondes) via ffprobe, ou -1 en cas d'échec."""
+ 96:     try:
+ 97:         result = subprocess.run(
+ 98:             [
+ 99:                 "ffprobe", "-v", "error", "-show_entries", "format=duration",
+100:                 "-of", "default=nw=1:nk=1", str(video_path)
+101:             ],
+102:             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
+103:         )
+104:         return float(result.stdout.strip())
+105:     except Exception as e:
+106:         logging.warning(f"ffprobe a échoué pour {video_path.name}: {e}")
+107:         return -1.0
+108: 
+109: 
+110: def _extract_audio_ffmpeg(input_video: Path, output_wav: Path) -> bool:
+111:     """Extrait l'audio en WAV mono 16kHz via ffmpeg. Retourne True si OK."""
+112:     try:
+113:         cmd = [
+114:             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+115:             "-i", str(input_video),
+116:             "-vn", "-ac", "1", "-ar", "16000", "-f", "wav", "-acodec", "pcm_s16le",
+117:             str(output_wav)
+118:         ]
+119:         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+120:         return True
+121:     except subprocess.CalledProcessError as e:
+122:         logging.error(f"ffmpeg extraction audio a échoué pour {input_video.name}: {e}")
+123:         return False
+124: 
+125: 
+126: def _write_empty_audio_json_streaming(output_json_path: Path, video_name: str, total_frames: int, fps: float) -> None:
+127:     """Écrit un JSON vide compatible STEP5 en streaming."""
+128:     with open(output_json_path, 'w', encoding='utf-8') as f:
+129:         f.write('{\n')
+130:         f.write(f'  "video_filename": "{video_name}",\n')
+131:         f.write(f'  "total_frames": {total_frames},\n')
+132:         f.write(f'  "fps": {round(fps, 2)},\n')
+133:         f.write('  "frames_analysis": [')
+134:         if total_frames > 0:
+135:             f.write('\n')
+136:             for frame_num in range(1, total_frames + 1):
+137:                 timecode = round((frame_num - 1) / fps, 3)
+138:                 obj = {
+139:                     "frame": frame_num,
+140:                     "audio_info": {
+141:                         "is_speech_present": False,
+142:                         "num_distinct_speakers_audio": 0,
+143:                         "active_speaker_labels": [],
+144:                         "timecode_sec": timecode,
+145:                     },
+146:                 }
+147:                 if frame_num > 1:
+148:                     f.write(',\n')
+149:                 f.write(json.dumps(obj))
+150:         f.write('\n  ]\n')
+151:         f.write('}\n')
+152: 
 153: 
-154:     python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-155:     site_packages = venv_dir / "lib" / python_version / "site-packages"
-156:     nvidia_dir = site_packages / "nvidia"
-157:     if not nvidia_dir.exists():
-158:         return []
-159: 
-160:     paths = []
-161:     for sub in CUDA_LIB_SUBDIRS:
-162:         candidate = nvidia_dir / sub
-163:         if candidate.exists():
-164:             paths.append(str(candidate))
-165:     return paths
-166: 
-167: 
-168: def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
-169:     """
-170:     Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
-171:     Priority order:
-172:       1. Explicit STEP5_CUDA_LIB_PATH (colon-separated).
-173:       2. STEP5_CUDA_HOME / CUDA_HOME lib64 folders.
-174:       3. Common /usr/local/cuda-* lib64 folders.
-175:       4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
-176:     """
-177:     explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
-178:     if explicit_paths:
-179:         resolved = [
-180:             str(Path(p.strip()).expanduser())
-181:             for p in explicit_paths.split(":")
-182:             if p.strip() and Path(p.strip()).expanduser().exists()
-183:         ]
-184:         if resolved:
-185:             return resolved
-186: 
-187:     candidates: list[Path] = []
-188:     for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
-189:         value = env.get_str(env_var, "").strip()
-190:         if value:
-191:             candidates.append(Path(value).expanduser())
-192:     for default_path in SYSTEM_CUDA_DEFAULTS:
-193:         candidates.append(Path(default_path))
-194: 
-195:     discovered: list[str] = []
-196:     for base_dir in candidates:
-197:         if not base_dir.exists():
-198:             continue
-199:         for sub in ("lib64", "targets/x86_64-linux/lib"):
-200:             candidate = base_dir / sub
-201:             if candidate.exists():
-202:                 discovered.append(str(candidate))
-203:     debian_cuda = Path("/usr/lib/x86_64-linux-gnu")
-204:     if debian_cuda.exists():
-205:         expected = ["libcufft.so.11", "libcublas.so.12"]
-206:         if all((debian_cuda / lib_name).exists() for lib_name in expected):
-207:             discovered.append(str(debian_cuda))
-208:     return discovered
-209: 
-210: 
-211: # --- CONFIGURATION DU LOGGER ---
-212: LOG_DIR = BASE_DIR / "logs" / "step5"
-213: LOG_DIR.mkdir(parents=True, exist_ok=True)
-214: log_file = LOG_DIR / f"manager_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-215: logging.basicConfig(level=logging.INFO, format='%(asctime)s - [MANAGER] - %(message)s',
-216:                     handlers=[logging.FileHandler(log_file, 'w', 'utf-8'), logging.StreamHandler(sys.stdout)])
-217: 
-218: WORKER_CONFIG_TEMPLATE = {
-219:     "mp_landmarker_num_faces": 5, "mp_landmarker_min_face_detection_confidence": 0.5,
-220:     "mp_landmarker_min_face_presence_confidence": 0.3, "mp_landmarker_min_tracking_confidence": 0.5,
-221:     "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
-222:     "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
-223:     "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
-224:     "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
-225:     "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
-226: }
-227: 
-228: CPU_OPTIMIZED_CONFIG = {
-229:     "mp_landmarker_min_face_detection_confidence": 0.3,
-230:     "mp_landmarker_min_face_presence_confidence": 0.2,
-231:     "mp_landmarker_min_tracking_confidence": 0.3,
-232:     "object_score_threshold": 0.4,
-233:     "mp_max_distance_tracking": 80,
-234: }
-235: 
-236: 
-237: _DEFAULT_SUBPROCESS_ENV: dict[str, str] = {
-238:     'OMP_NUM_THREADS': '1',
-239:     'OPENBLAS_NUM_THREADS': '1',
-240:     'MKL_NUM_THREADS': '1',
-241:     'NUMEXPR_NUM_THREADS': '1',
-242:     'TF_CPP_MIN_LOG_LEVEL': '2',
-243:     'GLOG_minloglevel': '2',
-244:     'ABSL_LOGGING_MIN_LOG_LEVEL': '2',
-245: }
-246: 
-247: 
-248: def _collect_cuda_lib_paths(worker_python: Path, engine_norm: str) -> list[str]:
-249:     cuda_paths: list[str] = []
-250:     cuda_paths_worker = _build_venv_cuda_paths(worker_python)
-251:     cuda_paths_tracking = _build_venv_cuda_paths(TRACKING_ENV_PYTHON)
-252:     if cuda_paths_worker:
-253:         cuda_paths.extend(cuda_paths_worker)
-254:     elif cuda_paths_tracking:
-255:         cuda_paths.extend(cuda_paths_tracking)
-256: 
-257:     if engine_norm == "insightface":
-258:         system_cuda_paths = _discover_system_cuda_lib_paths(ENV)
-259:         for path in system_cuda_paths:
-260:             if path not in cuda_paths:
-261:                 cuda_paths.append(path)
-262:     return cuda_paths
-263: 
-264: 
-265: def _apply_ld_library_path(env: dict[str, str], extra_paths: list[str]) -> None:
-266:     if not extra_paths:
-267:         return
-268:     extra_ld_path = ":".join(extra_paths)
-269:     existing_ld_path = env.get("LD_LIBRARY_PATH", "")
-270:     env["LD_LIBRARY_PATH"] = (
-271:         f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
-272:     )
+154: def _cleanup_cuda_memory() -> None:
+155:     try:
+156:         if torch.cuda.is_available():
+157:             torch.cuda.empty_cache()
+158:     except Exception:
+159:         pass
+160:     try:
+161:         gc.collect()
+162:     except Exception:
+163:         pass
+164: 
+165: 
+166: def _get_total_vram_gb() -> float:
+167:     try:
+168:         if not torch.cuda.is_available():
+169:             return 0.0
+170:         props = torch.cuda.get_device_properties(0)
+171:         return float(props.total_memory) / (1024**3)
+172:     except Exception:
+173:         return 0.0
+174: 
+175: 
+176: def _is_low_vram_gpu(threshold_gb: float = 6.0) -> bool:
+177:     total_gb = _get_total_vram_gb()
+178:     return total_gb > 0.0 and total_gb <= threshold_gb
+179: 
+180: 
+181: def _should_enable_amp(device: str) -> bool:
+182:     if device != "cuda":
+183:         return False
+184:     env_value = os.getenv("AUDIO_ENABLE_AMP")
+185:     if env_value is not None:
+186:         return env_value == "1"
+187:     return _is_low_vram_gpu()
+188: 
+189: 
+190: def _get_pyannote_batch_size(device: str) -> int | None:
+191:     raw = os.getenv("AUDIO_PYANNOTE_BATCH_SIZE")
+192:     if raw is not None:
+193:         try:
+194:             value = int(raw)
+195:             return value if value > 0 else None
+196:         except Exception:
+197:             return None
+198:     if device == "cuda" and _is_low_vram_gpu():
+199:         return 1
+200:     return None
+201: 
+202: 
+203: def _import_pyannote_pipeline():
+204:     from pyannote.audio import Pipeline
+205:     return Pipeline
+206: 
+207: 
+208: def _load_pyannote_pipeline(model_id: str, hf_token: str, pipeline_cls=None):
+209:     """
+210:     Load pyannote Pipeline while handling token/use_auth_token compatibility.
+211:     """
+212:     pipeline_cls = pipeline_cls or _import_pyannote_pipeline()
+213:     try:
+214:         return pipeline_cls.from_pretrained(model_id, token=hf_token)
+215:     except TypeError as type_err:
+216:         if "token" not in str(type_err):
+217:             raise
+218:         logging.info(
+219:             "Pipeline.from_pretrained(%s) ne supporte pas 'token'. "
+220:             "Tentative avec use_auth_token.",
+221:             model_id,
+222:         )
+223:         return pipeline_cls.from_pretrained(model_id, use_auth_token=hf_token)
+224: 
+225: 
+226: def _run_diarization_and_extract_segments(diarization_pipeline, wav_path: Path, device: str) -> list:
+227:     use_amp = _should_enable_amp(device)
+228:     if use_amp and hasattr(torch, "cuda") and hasattr(torch.cuda, "amp"):
+229:         amp_ctx = torch.cuda.amp.autocast(dtype=torch.float16)
+230:     else:
+231:         amp_ctx = nullcontext()
+232: 
+233:     pyannote_batch_size = _get_pyannote_batch_size(device)
+234:     diarization_kwargs = {"num_speakers": None}
+235:     if pyannote_batch_size is not None:
+236:         diarization_kwargs["batch_size"] = pyannote_batch_size
+237:         logging.info(f"Diarisation paramètres: batch_size={pyannote_batch_size}")
+238: 
+239:     with torch.inference_mode():
+240:         with amp_ctx:
+241:             try:
+242:                 diarization = diarization_pipeline(str(wav_path), **diarization_kwargs)
+243:             except TypeError as e:
+244:                 if "batch_size" in str(e):
+245:                     diarization_kwargs.pop("batch_size", None)
+246:                     diarization = diarization_pipeline(str(wav_path), **diarization_kwargs)
+247:                 else:
+248:                     raise
+249:     segments = [(t.start, t.end, spk) for t, _, spk in diarization.itertracks(yield_label=True)]
+250:     del diarization
+251:     return segments
+252: 
+253: 
+254: def _apply_audio_profile_from_env() -> None:
+255:     profile = (os.getenv("AUDIO_PROFILE") or "").strip().lower()
+256:     if not profile:
+257:         return
+258: 
+259:     if profile == "gpu_optimized":
+260:         os.environ["AUDIO_DISABLE_GPU"] = "0"
+261:         os.environ["AUDIO_ENABLE_AMP"] = "1"
+262:         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
+263:         logging.info("AUDIO_PROFILE=gpu_optimized appliqué (AMP=1, batch_size=1)")
+264:         logging.warning("ATTENTION: AMP peut réduire significativement la qualité de diarisation (faux négatifs).")
+265:         return
+266: 
+267:     if profile == "gpu_fp32":
+268:         os.environ["AUDIO_DISABLE_GPU"] = "0"
+269:         os.environ["AUDIO_ENABLE_AMP"] = "0"
+270:         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
+271:         logging.info("AUDIO_PROFILE=gpu_fp32 appliqué (AMP=0, batch_size=1, FP32 pur - cohérence CPU)")
+272:         return
 273: 
-274: 
-275: def _build_subprocess_env(worker_python: Path, engine_norm: str) -> dict[str, str]:
-276:     env = os.environ.copy()
-277:     cuda_paths = _collect_cuda_lib_paths(worker_python, engine_norm)
-278:     if cuda_paths:
-279:         _apply_ld_library_path(env, cuda_paths)
-280:         logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
-281: 
-282:     for key, value in _DEFAULT_SUBPROCESS_ENV.items():
-283:         env.setdefault(key, value)
-284:     return env
-285: 
-286: 
-287: def log_reader_thread(process, video_name, progress_map, lock):
-288:     if process.stdout:
-289:         for line in iter(process.stdout.readline, ''):
-290:             line = line.strip()
-291:             logging.info(f"[{video_name}] {line}")
-292:             if line.startswith("[Progression]|"):
-293:                 try:
-294:                     _, percent, _, _ = line.split('|')
-295:                     with lock:
-296:                         progress_map[video_name] = f"{int(percent)}%"
-297:                     try:
-298:                         print(f"{video_name}: {int(percent)}%", flush=True)
-299:                     except Exception:
-300:                         pass
-301:                 except:
-302:                     pass
-303:         process.stdout.close()
+274:     if profile == "gpu_no_amp":
+275:         os.environ["AUDIO_DISABLE_GPU"] = "0"
+276:         os.environ["AUDIO_ENABLE_AMP"] = "0"
+277:         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
+278:         logging.info("AUDIO_PROFILE=gpu_no_amp appliqué (AMP=0, batch_size=1)")
+279:         return
+280: 
+281:     if profile == "cpu_only":
+282:         os.environ["AUDIO_DISABLE_GPU"] = "1"
+283:         os.environ["AUDIO_ENABLE_AMP"] = "0"
+284:         os.environ.pop("AUDIO_PYANNOTE_BATCH_SIZE", None)
+285:         logging.info("AUDIO_PROFILE=cpu_only appliqué (GPU désactivé)")
+286:         return
+287: 
+288:     logging.warning(
+289:         f"AUDIO_PROFILE inconnu: '{profile}'. Valeurs supportées: gpu_optimized, gpu_fp32, gpu_no_amp, cpu_only"
+290:     )
+291: 
+292: 
+293: def _run_cpu_diarization_subprocess(wav_path: Path, output_segments_json: Path, hf_token: str) -> None:
+294:     """Fallback CPU avec mêmes paramètres que GPU (sauf AMP) pour cohérence."""
+295:     env = os.environ.copy()
+296:     env["AUDIO_DISABLE_GPU"] = "1"
+297:     env["CUDA_VISIBLE_DEVICES"] = ""
+298:     env["HUGGINGFACE_HUB_TOKEN"] = hf_token
+299:     # Forcer FP32 (pas d'AMP) pour cohérence avec mode GPU sans AMP
+300:     env["AUDIO_ENABLE_AMP"] = "0"
+301:     pyannote_batch_size = os.getenv("AUDIO_PYANNOTE_BATCH_SIZE")
+302:     if pyannote_batch_size:
+303:         env["AUDIO_PYANNOTE_BATCH_SIZE"] = pyannote_batch_size
 304: 
-305: 
-306: def monitor_progress(processes, progress_map, lock, total_jobs_to_run):
-307:     while len(processes) < total_jobs_to_run or any(p.poll() is None for p in processes.values()):
-308:         time.sleep(1)
-309:         with lock:
-310:             progress_copy = progress_map.copy()
-311:         progress_parts = [f"{name}: {status}" for name, status in sorted(progress_copy.items())]
-312:         if progress_parts: print(f"[Progression-MultiLine]{' || '.join(progress_parts)}", flush=True)
-313:     time.sleep(1)
-314: 
-315: 
-316: def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engine=None):
-317:     video_name = Path(video_path).name
-318:     worker_type_log = "GPU" if use_gpu else f"CPU (x{internal_workers})"
-319:     logging.info(f"Préparation du job {worker_type_log} pour: {video_name}")
-320: 
-321:     config = WORKER_CONFIG_TEMPLATE.copy()
-322: 
-323:     engine_norm = (str(tracking_engine).strip().lower() if tracking_engine is not None else "")
-324:     if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
-325:         engine_norm = ""
-326: 
-327:     gpu_capable_engines = {"openseeface", "opencv_yunet_pyfeat", "insightface"}
-328:     
-329:     if engine_norm and engine_norm not in gpu_capable_engines:
-330:         if use_gpu:
-331:             logging.info(f"Engine {engine_norm} not GPU-capable, forcing CPU mode")
-332:         use_gpu = False
-333: 
-334:     if not use_gpu:
-335:         config.update(CPU_OPTIMIZED_CONFIG)
-336:         config["mp_num_workers_internal"] = internal_workers
+305:     cmd = [
+306:         sys.executable,
+307:         str(Path(__file__).resolve()),
+308:         "--log_dir",
+309:         str(LOG_DIR_PATH or Path(tempfile.gettempdir())),
+310:         "--disable_gpu",
+311:         "--cpu_diarize_wav",
+312:         str(wav_path),
+313:         "--cpu_diarize_out",
+314:         str(output_segments_json),
+315:     ]
+316:     subprocess.run(
+317:         cmd,
+318:         check=True,
+319:         env=env,
+320:         stdout=subprocess.DEVNULL,
+321:         stderr=subprocess.PIPE,
+322:         text=True,
+323:     )
+324: 
+325: 
+326: def _load_segments_from_json(segments_json: Path) -> list:
+327:     with open(segments_json, "r", encoding="utf-8") as f:
+328:         data = json.load(f)
+329:     segments = []
+330:     for item in data:
+331:         start = float(item["start"])
+332:         end = float(item["end"])
+333:         speaker = str(item["speaker"])
+334:         segments.append((start, end, speaker))
+335:     return segments
+336: 
 337: 
-338:         if internal_workers > 1:
-339:             worker_script = "process_video_worker_multiprocessing.py"
-340:             logging.info(f"Using multiprocessing worker with {internal_workers} processes")
-341:         else:
-342:             worker_script = "process_video_worker.py"
-343:             logging.info("Using single-threaded CPU worker")
+338: def _should_include_speaker_embeddings() -> bool:
+339:     return (os.getenv("AUDIO_INCLUDE_SPEAKER_EMBEDDINGS") or "0") == "1"
+340: 
+341: 
+342: def _get_speaker_embeddings_model_id() -> str:
+343:     return (os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MODEL_ID") or "pyannote/embedding").strip()
 344: 
-345:         logging.info(f"Applied CPU optimizations: lower confidence thresholds for better detection rate")
-346:     else:
-347:         worker_script = "process_video_worker.py"
-348:         logging.info("Using GPU worker with sequential processing")
-349:         if step5_enable_object_detection and internal_workers > 1:
-350:             config["mp_num_workers_internal"] = internal_workers
-351: 
-352:     models_dir_path = Path(__file__).resolve().parent / "models"
-353:     worker_script_path = Path(__file__).resolve().parent / worker_script
-354: 
-355:     worker_python_override_eos = ENV.get_optional_str("STEP5_EOS_ENV_PYTHON")
-356:     worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
-357:     worker_python = TRACKING_ENV_PYTHON
-358:     
-359:     if engine_norm == "eos":
-360:         worker_python = Path(worker_python_override_eos) if worker_python_override_eos else EOS_ENV_PYTHON
-361:         if not worker_python.exists():
-362:             raise RuntimeError(
-363:                 f"EOS engine selected but python interpreter not found: {worker_python}. "
-364:                 "Create eos_env or set STEP5_EOS_ENV_PYTHON to the eos_env python path."
-365:             )
-366:     elif engine_norm == "insightface":
-367:         if not use_gpu:
-368:             raise RuntimeError(
-369:                 "InsightFace engine is GPU-only. Enable STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
-370:             )
-371: 
-372:         worker_python = (
-373:             Path(worker_python_override_insightface)
-374:             if worker_python_override_insightface
-375:             else INSIGHTFACE_ENV_PYTHON
-376:         )
-377:         if not worker_python.exists():
-378:             raise RuntimeError(
-379:                 f"InsightFace engine selected but python interpreter not found: {worker_python}. "
-380:                 "Create insightface_env or set STEP5_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
-381:             )
-382:     elif use_gpu and not engine_norm:
-383:         if TF_GPU_ENV_PYTHON and isinstance(TF_GPU_ENV_PYTHON, Path):
-384:             if TF_GPU_ENV_PYTHON.exists():
-385:                 worker_python = TF_GPU_ENV_PYTHON
-386:                 logging.info(f"Using TensorFlow GPU interpreter for MediaPipe: {worker_python}")
-387:             else:
-388:                 logging.warning(
-389:                     "STEP5_TF_GPU_ENV_PYTHON is set but the interpreter was not found "
-390:                     f"({TF_GPU_ENV_PYTHON}). Falling back to tracking_env."
-391:                 )
-392: 
-393:     command_args = [str(worker_python), str(worker_script_path), video_path, "--models_dir", str(models_dir_path)]
-394:     if use_gpu: command_args.append("--use_gpu")
-395: 
-396:     if engine_norm:
-397:         command_args.extend(["--tracking_engine", engine_norm])
+345: 
+346: def _get_speaker_embeddings_min_segment_sec() -> float:
+347:     raw = os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC")
+348:     if raw is None:
+349:         return 0.5
+350:     try:
+351:         value = float(raw)
+352:         return value if value > 0 else 0.5
+353:     except Exception:
+354:         return 0.5
+355: 
+356: 
+357: def _get_speaker_embeddings_max_segments_per_speaker() -> int:
+358:     raw = os.getenv("AUDIO_SPEAKER_EMBEDDINGS_MAX_SEGMENTS_PER_SPEAKER")
+359:     if raw is None:
+360:         return 10
+361:     try:
+362:         value = int(raw)
+363:         return value if value > 0 else 10
+364:     except Exception:
+365:         return 10
+366: 
+367: 
+368: def _load_pyannote_embedding_model(model_id: str, hf_token: str):
+369:     from pyannote.audio import Model
+370:     try:
+371:         return Model.from_pretrained(model_id, token=hf_token)
+372:     except TypeError as type_err:
+373:         if "token" not in str(type_err):
+374:             raise
+375:         return Model.from_pretrained(model_id, use_auth_token=hf_token)
+376: 
+377: 
+378: def _compute_speaker_embeddings_from_wav(
+379:     *,
+380:     wav_path: Path,
+381:     segments: list,
+382:     hf_token: str,
+383:     device: str,
+384: ) -> dict:
+385:     if not segments:
+386:         return {}
+387: 
+388:     try:
+389:         from pyannote.audio import Inference
+390:         from pyannote.core import Segment
+391:     except Exception as import_e:
+392:         logging.warning(f"speaker embeddings: pyannote import impossible: {import_e}")
+393:         return {}
+394: 
+395:     model_id = _get_speaker_embeddings_model_id()
+396:     min_segment_sec = _get_speaker_embeddings_min_segment_sec()
+397:     max_segments = _get_speaker_embeddings_max_segments_per_speaker()
 398: 
-399:     for key, value in config.items():
-400:         if key == "mp_num_workers_internal" and use_gpu and not (step5_enable_object_detection and internal_workers > 1):
-401:             continue
-402:         if isinstance(value, bool):
-403:             if value:
-404:                 command_args.append(f"--{key}")
-405:             continue
-406:         if value is not None:
-407:             command_args.extend([f"--{key}", str(value)])
-408: 
-409:     if (not use_gpu) and internal_workers > 1:
-410:         command_args.extend(["--chunk_size", "0"])  # 0 = adaptive in worker
-411: 
-412:     try:
-413:         env = _build_subprocess_env(Path(worker_python), engine_norm)
-414: 
-415:         p = subprocess.Popen(
-416:             command_args,
-417:             stdout=subprocess.PIPE,
-418:             stderr=subprocess.STDOUT,
-419:             text=True,
-420:             encoding='utf-8',
-421:             errors='replace',
-422:             env=env,
-423:         )
-424:         return p
-425:     except Exception as e:
-426:         logging.error(f"ERREUR LANCEMENT de {video_name}: {e}")
-427:         return None
-428: 
-429: 
-430: def run_job_and_monitor(job_info, processes, progress_map, lock):
-431:     video_path = job_info['path']
-432:     video_name = Path(video_path).name
-433:     internal_workers = job_info.get('cpu_internal_workers', 15) if (not job_info['use_gpu'] or step5_enable_object_detection) else 1
-434:     tracking_engine = job_info.get('tracking_engine')
-435:     p = launch_worker_process(video_path, job_info['use_gpu'], internal_workers, tracking_engine=tracking_engine)
-436: 
-437:     if p:
-438:         with lock:
-439:             processes[video_name] = p
-440:             progress_map[video_name] = "Démarrage..."
+399:     try:
+400:         model = _load_pyannote_embedding_model(model_id, hf_token)
+401:     except Exception as e:
+402:         logging.warning(f"speaker embeddings: impossible de charger le modèle '{model_id}': {e}")
+403:         return {}
+404: 
+405:     try:
+406:         if hasattr(model, "to"):
+407:             model.to(torch.device(device))
+408:     except Exception:
+409:         pass
+410: 
+411:     try:
+412:         inference = Inference(model, window="whole")
+413:     except Exception as e:
+414:         logging.warning(f"speaker embeddings: Inference init échouée: {e}")
+415:         return {}
+416: 
+417:     by_speaker: dict[str, list[tuple[float, float, float]]] = {}
+418:     for start_sec, end_sec, speaker_label in segments:
+419:         if not speaker_label:
+420:             continue
+421:         try:
+422:             start_f = float(start_sec)
+423:             end_f = float(end_sec)
+424:         except Exception:
+425:             continue
+426:         if end_f <= start_f:
+427:             continue
+428:         dur = end_f - start_f
+429:         if dur < min_segment_sec:
+430:             continue
+431:         by_speaker.setdefault(str(speaker_label), []).append((start_f, end_f, dur))
+432: 
+433:     if not by_speaker:
+434:         return {}
+435: 
+436:     dev_file = {"audio": str(wav_path)}
+437: 
+438:     vectors_by_label: dict[str, list[float]] = {}
+439:     num_segments_by_label: dict[str, int] = {}
+440:     embedding_dim: int | None = None
 441: 
-442:         reader_thread = threading.Thread(target=log_reader_thread, args=(p, video_name, progress_map, lock),
-443:                                          daemon=True)
-444:         reader_thread.start()
-445:         p.wait()
-446:         reader_thread.join(timeout=1)
-447: 
-448:         try:
-449:             if p.returncode == 0:
-450:                 print(f"[Gestionnaire] Succès pour {video_name}", flush=True)
-451:             else:
-452:                 print(f"[Gestionnaire] Échec pour {video_name}", flush=True)
-453:         except Exception:
-454:             pass
-455: 
-456: 
-457: 
-458: def resource_worker_loop(resource_name, use_gpu, videos_deque, deque_lock, processes, progress_map, lock):
-459:     """Continuously pull videos from the shared deque and process them on the given resource.
-460: 
-461:     Args:
-462:         resource_name (str): Human-readable resource label (e.g., 'GPU' or 'CPU').
-463:         use_gpu (bool): Whether to use GPU for the worker process.
-464:         videos_deque (collections.deque): Shared queue of video paths to process.
-465:         deque_lock (threading.Lock): Lock protecting access to the shared deque.
-466:         processes (OrderedDict): Shared mapping of video_name -> subprocess.Popen.
-467:         progress_map (OrderedDict): Shared mapping of video_name -> progress string.
-468:         lock (threading.Lock): Lock protecting shared maps.
-469:     """
-470:     while True:
-471:         with deque_lock:
-472:             if videos_deque:
-473:                 video_path = videos_deque.popleft()
-474:             else:
-475:                 break
-476:         video_name = Path(video_path).name
-477:         logging.info(f"[Scheduler] Assigning {video_name} to {resource_name}")
-478:         run_job_and_monitor(
-479:             {
-480:                 'path': video_path,
-481:                 'use_gpu': use_gpu,
-482:                 'cpu_internal_workers': CPU_INTERNAL_WORKERS,
-483:                 'tracking_engine': TRACKING_ENGINE,
-484:             },
-485:             processes,
-486:             progress_map,
-487:             lock,
-488:         )
+442:     for speaker_label, speaker_segments in by_speaker.items():
+443:         speaker_segments.sort(key=lambda item: item[2], reverse=True)
+444:         speaker_segments = speaker_segments[:max_segments]
+445: 
+446:         sum_vec = None
+447:         count = 0
+448: 
+449:         for start_f, end_f, _dur in speaker_segments:
+450:             try:
+451:                 emb = inference.crop(dev_file, Segment(start_f, end_f))
+452:             except Exception:
+453:                 continue
+454: 
+455:             data = getattr(emb, "data", emb)
+456:             try:
+457:                 if hasattr(data, "detach"):
+458:                     data = data.detach().cpu().numpy()
+459:             except Exception:
+460:                 pass
+461: 
+462:             try:
+463:                 if hasattr(data, "shape") and len(getattr(data, "shape", [])) >= 2:
+464:                     vec = data.mean(axis=0)
+465:                 else:
+466:                     vec = data
+467:                 vec = vec.tolist() if hasattr(vec, "tolist") else list(vec)
+468:             except Exception:
+469:                 continue
+470: 
+471:             try:
+472:                 norm = math.sqrt(sum((float(x) * float(x)) for x in vec))
+473:                 if norm > 0:
+474:                     vec = [float(x) / norm for x in vec]
+475:                 vec = [round(float(x), 4) for x in vec]
+476:             except Exception:
+477:                 continue
+478: 
+479:             if embedding_dim is None:
+480:                 embedding_dim = len(vec)
+481:             if sum_vec is None:
+482:                 sum_vec = [0.0 for _ in range(len(vec))]
+483:             if len(sum_vec) != len(vec):
+484:                 continue
+485: 
+486:             for i, x in enumerate(vec):
+487:                 sum_vec[i] += float(x)
+488:             count += 1
 489: 
-490: 
-491: def main():
-492:     parser = argparse.ArgumentParser(description="Gestionnaire de tracking parallèle intelligent.")
-493:     parser.add_argument("--videos_json_path", required=True, help="Chemin JSON des vidéos.")
-494:     parser.add_argument("--disable_gpu", action="store_true", help="Désactiver le worker GPU et utiliser uniquement le CPU")
-495:     parser.add_argument("--cpu_internal_workers", type=int, default=15, help="Nombre de workers internes CPU par vidéo")
-496:     parser.add_argument(
-497:         "--tracking_engine",
-498:         default=None,
-499:         help="Moteur de tracking: mediapipe_landmarker (défaut), opencv_haar, opencv_yunet, opencv_yunet_pyfeat, openseeface, eos, insightface",
-500:     )
-501:     args = parser.parse_args()
-502:     try:
-503:         if ENV.get_bool('TRACKING_DISABLE_GPU', default=False):
-504:             args.disable_gpu = True
-505: 
-506:         args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
+490:         if sum_vec is None or count <= 0:
+491:             continue
+492: 
+493:         avg = [round(v / float(count), 4) for v in sum_vec]
+494:         vectors_by_label[speaker_label] = avg
+495:         num_segments_by_label[speaker_label] = count
+496: 
+497:     if not vectors_by_label:
+498:         return {}
+499: 
+500:     return {
+501:         "model_id": model_id,
+502:         "embedding_dim": embedding_dim or 0,
+503:         "normalized": True,
+504:         "vectors_by_label": vectors_by_label,
+505:         "num_segments_by_label": num_segments_by_label,
+506:     }
 507: 
-508:         if args.tracking_engine is None:
-509:             raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
-510:             if raw_engine:
-511:                 args.tracking_engine = raw_engine
-512:     except Exception:
-513:         pass
-514: 
-515:     _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
-516:     
-517:     gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
-518:     gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
-519:     gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
-520:     _log_env_snapshot()
-521:     
-522:     engine_normalized = _engine_norm if _engine_norm else "mediapipe_landmarker"
-523:     if engine_normalized in {"mediapipe", "mediapipe_landmarker"}:
-524:         engine_normalized = "mediapipe_landmarker"
-525:     
-526:     engine_supports_gpu = False
-527:     if gpu_enabled_global and not args.disable_gpu:
-528:         if engine_normalized == "insightface":
-529:             if engine_normalized in gpu_engines or 'all' in gpu_engines:
-530:                 engine_supports_gpu = True
-531:                 logging.info(f"GPU mode requested for engine: {engine_normalized}")
-532:                 
-533:                 try:
-534:                     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-535:                     from config.settings import Config
-536:                     gpu_status = Config.check_gpu_availability()
-537:                     
-538:                     if not gpu_status['available']:
-539:                         logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
-540:                         fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
-541:                         if fallback_auto:
-542:                             logging.info("Auto-fallback to CPU enabled")
-543:                             args.disable_gpu = True
-544:                             engine_supports_gpu = False
-545:                         else:
-546:                             logging.error("GPU fallback disabled, aborting")
-547:                             raise RuntimeError(f"GPU unavailable: {gpu_status['reason']}")
-548:                     else:
-549:                         logging.info(f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}")
-550:                 except ImportError as e:
-551:                     logging.error(f"Failed to import config.settings: {e}")
-552:                     args.disable_gpu = True
-553:                     engine_supports_gpu = False
-554:                 except Exception as e:
-555:                     logging.error(f"GPU validation failed: {e}")
-556:                     args.disable_gpu = True
-557:                     engine_supports_gpu = False
-558:             else:
-559:                 logging.warning(f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode")
-560:                 args.disable_gpu = True
-561:         else:
-562:             logging.info(f"GPU mode is reserved for InsightFace only. Engine '{engine_normalized}' will run in CPU-only mode.")
-563:             args.disable_gpu = True
-564:     
-565:     if _engine_norm in {"opencv_haar", "opencv_yunet", "eos"}:
-566:         if not args.disable_gpu:
-567:             args.disable_gpu = True
-568:             logging.info(f"Engine {_engine_norm} does not support GPU, forcing CPU-only mode")
-569:     
-570:     if not args.disable_gpu and engine_supports_gpu:
-571:         logging.info(f"✓ GPU mode ENABLED for {_engine_norm or 'mediapipe_landmarker'}")
-572:     else:
-573:         logging.info(f"CPU-only mode (GPU disabled or not supported for this engine)")
-574: 
-575:     if _engine_norm == "insightface" and (args.disable_gpu or not engine_supports_gpu):
-576:         logging.error(
-577:             "InsightFace engine is GPU-only, but GPU mode is disabled or not authorized. "
-578:             "Set STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
-579:         )
-580:         sys.exit(1)
-581: 
-582:     with open(args.videos_json_path, 'r') as f:
-583:         data = json.load(f)
-584:     
-585:     if isinstance(data, list):
-586:         videos_list = data
-587:     elif isinstance(data, dict) and 'videos' in data:
-588:         logging.info("Legacy videos JSON schema detected; using 'videos' key.")
-589:         videos_list = data['videos']
-590:     else:
-591:         logging.error(f"Invalid JSON format in {args.videos_json_path}. Expected a list or object with 'videos' key.")
-592:         sys.exit(1)
-593:     
-594:     videos_to_process = deque(videos_list)
-595:     if not videos_to_process: logging.info("Aucune vidéo à traiter."); return
-596: 
-597:     logging.info(f"--- DÉMARRAGE DU GESTIONNAIRE DE TRACKING (Planificateur Dynamique GPU/CPU) ---")
-598:     total_jobs = len(videos_to_process)
-599:     logging.info(f"Vidéos à traiter: {total_jobs}")
-600:     global CPU_INTERNAL_WORKERS
-601:     CPU_INTERNAL_WORKERS = max(1, int(args.cpu_internal_workers))
-602: 
-603:     global TRACKING_ENGINE
-604:     TRACKING_ENGINE = args.tracking_engine
-605:     if args.disable_gpu:
-606:         logging.info("Mode FULL CPU activé: le worker GPU est désactivé")
-607: 
-608:     processes, video_progress_map, progress_lock = OrderedDict(), OrderedDict(), threading.Lock()
+508: 
+509: def analyze_audio_file(video_path, diarization_pipeline, hf_token, device: str):
+510:     """Analyse une vidéo, extrait l'audio via ffmpeg, effectue la diarisation et sauvegarde le JSON (streaming)."""
+511:     output_json_path = video_path.with_name(f"{video_path.stem}{OUTPUT_SUFFIX}")
+512: 
+513:     duration_sec = _run_ffprobe_duration(video_path)
+514:     video_fps = DEFAULT_FPS
+515:     if duration_sec > 0:
+516:         total_frames = int(round(duration_sec * video_fps))
+517:     else:
+518:         logging.warning(f"Durée inconnue, fallback frames basé sur DEFAULT_FPS={DEFAULT_FPS} pour {video_path.name}")
+519:         # On fixera total_frames après avoir déterminé le max de frame touché par la timeline.
+520:         total_frames = -1
+521: 
+522:     tmp_dir_root = "/dev/shm" if os.path.isdir("/dev/shm") else None
+523:     try:
+524:         with tempfile.TemporaryDirectory(dir=tmp_dir_root) as tmp_dir:
+525:             tmp_wav = Path(tmp_dir) / f"{video_path.stem}_temp.wav"
+526: 
+527:             logging.info(f"Extraction audio (ffmpeg) de {video_path.name} -> {tmp_wav.name}...")
+528:             if not _extract_audio_ffmpeg(video_path, tmp_wav):
+529:                 if total_frames < 0:
+530:                     total_frames = 0
+531:                 _write_empty_audio_json_streaming(output_json_path, video_path.name, total_frames, video_fps)
+532:                 return True
+533: 
+534:             logging.info(f"Diarisation en cours sur {tmp_wav.name}...")
+535:             start_infer_t = time.time()
+536:             segments = None
+537:             try:
+538:                 if device == "cuda":
+539:                     _cleanup_cuda_memory()
+540:                 segments = _run_diarization_and_extract_segments(diarization_pipeline, tmp_wav, device)
+541:                 logging.info(f"Diarisation: {len(segments)} segment(s) détecté(s)")
+542:             except RuntimeError as e_oom:
+543:                 if "CUDA out of memory" in str(e_oom):
+544:                     logging.warning("CUDA OOM durant la diarisation, tentative de fallback CPU pour ce fichier...")
+545:                     _cleanup_cuda_memory()
+546:                     try:
+547:                         cpu_segments_json = Path(tmp_dir) / f"{video_path.stem}_cpu_segments.json"
+548:                         logging.info("Fallback CPU: mêmes paramètres que GPU (batch_size) sauf AMP, pour cohérence")
+549:                         _run_cpu_diarization_subprocess(tmp_wav, cpu_segments_json, hf_token)
+550:                         segments = _load_segments_from_json(cpu_segments_json)
+551:                         logging.info(f"Fallback CPU: {len(segments)} segment(s) détecté(s)")
+552:                     except subprocess.CalledProcessError as cpu_e:
+553:                         safe_stderr = (cpu_e.stderr or "")
+554:                         logging.error(
+555:                             "Echec du fallback CPU (subprocess). "
+556:                             f"returncode={cpu_e.returncode}. stderr:\n{safe_stderr}"
+557:                         )
+558:                         raise
+559:                     except Exception:
+560:                         logging.error("Echec du fallback CPU (erreur inattendue).", exc_info=True)
+561:                         raise
+562:                 else:
+563:                     segments = _run_diarization_and_extract_segments(diarization_pipeline, tmp_wav, device)
+564:             infer_ms = int((time.time() - start_infer_t) * 1000)
+565:             logging.info(f"Diarisation terminée en ~{infer_ms} ms")
+566: 
+567:             speaker_embeddings = {}
+568:             if _should_include_speaker_embeddings() and hf_token:
+569:                 try:
+570:                     speaker_embeddings = _compute_speaker_embeddings_from_wav(
+571:                         wav_path=tmp_wav,
+572:                         segments=segments or [],
+573:                         hf_token=hf_token,
+574:                         device=device,
+575:                     )
+576:                 except Exception as e:
+577:                     logging.warning(f"speaker embeddings: erreur inattendue (ignorée): {e}")
+578: 
+579:             audio_timeline = {}
+580:             max_frame_seen = 0
+581:             for start_sec, end_sec, speaker_label in (segments or []):
+582:                 start_frame = max(1, int(start_sec * video_fps))
+583:                 end_frame = int(end_sec * video_fps)
+584:                 if end_frame < start_frame:
+585:                     continue
+586:                 max_frame_seen = max(max_frame_seen, end_frame)
+587:                 for frame_num in range(start_frame, end_frame + 1):
+588:                     frame_entry = audio_timeline.get(frame_num)
+589:                     if frame_entry is None:
+590:                         frame_entry = set()
+591:                         audio_timeline[frame_num] = frame_entry
+592:                     frame_entry.add(speaker_label)
+593:             
+594:             num_speech_frames = len(audio_timeline)
+595:             speech_pct = (num_speech_frames / total_frames * 100) if total_frames > 0 else 0
+596:             logging.info(f"Timeline audio: {num_speech_frames}/{total_frames} frames avec parole ({speech_pct:.1f}%)")
+597: 
+598:             if total_frames < 0:
+599:                 total_frames = max_frame_seen
+600: 
+601:             # Écriture JSON streaming (préserve le schéma pour STEP5)
+602:             use_gzip = os.getenv("AUDIO_JSON_GZIP", "0") == "1"
+603:             if use_gzip:
+604:                 json_path = str(output_json_path) + ".gz"
+605:                 open_fn = lambda p: gzip.open(p, mode="wt", encoding="utf-8")
+606:             else:
+607:                 json_path = str(output_json_path)
+608:                 open_fn = lambda p: open(p, mode="w", encoding="utf-8")
 609: 
-610:     monitor_thread = threading.Thread(target=monitor_progress,
-611:                                       args=(processes, video_progress_map, progress_lock, total_jobs), daemon=True)
-612:     monitor_thread.start()
-613: 
-614:     deque_lock = threading.Lock()
-615: 
-616:     threads = []
-617:     if not args.disable_gpu:
-618:         gpu_thread = threading.Thread(
-619:             target=resource_worker_loop,
-620:             args=("GPU", True, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
-621:             daemon=True,
-622:         )
-623:         threads.append(gpu_thread)
-624:     if _engine_norm != "insightface":
-625:         cpu_thread = threading.Thread(
-626:             target=resource_worker_loop,
-627:             args=("CPU", False, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
-628:             daemon=True,
-629:         )
-630:         threads.append(cpu_thread)
-631:     else:
-632:         logging.info("InsightFace is GPU-only: CPU worker thread disabled")
-633: 
-634:     if args.disable_gpu:
-635:         workers_label = "CPU seul"
-636:     else:
-637:         workers_label = "GPU seul" if _engine_norm == "insightface" else "GPU et CPU"
-638:     logging.info("Lancement des workers: " + workers_label)
-639:     for t in threads:
-640:         t.start()
-641: 
-642:     for t in threads:
-643:         t.join()
-644: 
-645:     monitor_thread.join(timeout=2)
-646: 
-647:     success_count = sum(1 for p in processes.values() if p.returncode == 0)
-648:     logging.info(f"--- FIN DU GESTIONNAIRE ---")
-649:     logging.info(f"Traitement terminé. {success_count}/{total_jobs} jobs réussis.")
-650:     if success_count < total_jobs: sys.exit(1)
-651: 
-652: 
-653: if __name__ == "__main__":
-654:     main()
+610:             with open_fn(json_path) as f:
+611:                 f.write("{\n")
+612:                 f.write(f"  \"video_filename\": \"{video_path.name}\",\n")
+613:                 f.write(f"  \"total_frames\": {total_frames},\n")
+614:                 f.write(f"  \"fps\": {round(video_fps, 2)},\n")
+615:                 if isinstance(speaker_embeddings, dict) and speaker_embeddings:
+616:                     f.write(
+617:                         f"  \"speaker_embeddings\": {json.dumps(speaker_embeddings, ensure_ascii=False)},\n"
+618:                     )
+619:                 f.write("  \"frames_analysis\": [\n")
+620:     
+621:                 frames_processed = 0
+622:                 last_log_t = time.time()
+623:                 for frame_num in range(1, total_frames + 1):
+624:                     speakers = sorted(audio_timeline.get(frame_num, []))
+625:                     is_speech = len(speakers) > 0
+626:                     timecode = round((frame_num - 1) / video_fps, 3)
+627:                     obj = {
+628:                         "frame": frame_num,
+629:                         "audio_info": {
+630:                             "is_speech_present": is_speech,
+631:                             "num_distinct_speakers_audio": len(speakers),
+632:                             "active_speaker_labels": speakers,
+633:                             "timecode_sec": timecode,
+634:                         },
+635:                     }
+636:                     # Écriture streaming avec virgules correctes
+637:                     if frame_num > 1:
+638:                         f.write(",\n")
+639:                     f.write(json.dumps(obj))
+640:     
+641:                     frames_processed += 1
+642:                     if time.time() - last_log_t >= 2 or frames_processed == total_frames:
+643:                         progress_percent = int((frames_processed / total_frames) * 100) if total_frames else 100
+644:                         logging.info(
+645:                             f"INTERNAL_PROGRESS: {frames_processed}/{total_frames} frames ({progress_percent}%) - {video_path.name}")
+646:                         last_log_t = time.time()
+647:     
+648:                 f.write("\n  ]\n")
+649:                 f.write("}\n")
+650:     
+651:             logging.info(f"Succès: analyse audio terminée pour {video_path.name}")
+652:             return True
+653: 
+654:     except Exception as e:
+655:         logging.error(f"Erreur inattendue lors de l'analyse de {video_path.name}: {e}", exc_info=True)
+656:         return False
+657: 
+658: 
+659: def main():
+660:     parser = argparse.ArgumentParser(description="Analyse audio (diarisation) des vidéos.")
+661:     parser.add_argument("--log_dir", type=str, required=True, help="Répertoire de logs")
+662:     parser.add_argument("--hf_auth_token", type=str, help="Token d'authentification HuggingFace")
+663:     parser.add_argument("--disable_gpu", action="store_true", help="Forcer l'utilisation CPU")
+664:     parser.add_argument("--cpu_diarize_wav", type=str, help="Mode interne: diarisation CPU-only d'un WAV")
+665:     parser.add_argument("--cpu_diarize_out", type=str, help="Mode interne: sortie JSON segments")
+666:     args = parser.parse_args()
+667: 
+668:     log_dir_path = Path(args.log_dir)
+669:     log_dir_path.mkdir(parents=True, exist_ok=True)
+670:     global LOG_DIR_PATH
+671:     LOG_DIR_PATH = log_dir_path
+672:     log_file = log_dir_path / f"audio_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+673:     file_handler = logging.FileHandler(log_file, encoding='utf-8')
+674:     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+675:     logging.getLogger().addHandler(file_handler)
+676: 
+677:     logging.info("--- Démarrage du script d'analyse audio (Diarisation) ---")
+678: 
+679:     _apply_audio_profile_from_env()
+680: 
+681:     try:
+682:         os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:32")
+683: 
+684:         env_disable_gpu = os.getenv("AUDIO_DISABLE_GPU", "0") == "1"
+685:         use_cuda = torch.cuda.is_available() and not env_disable_gpu and not args.disable_gpu
+686:         device = "cuda" if use_cuda else "cpu"
+687:         if device == "cpu":
+688:             cpu_workers_env = os.getenv("AUDIO_CPU_WORKERS")
+689:             try:
+690:                 if cpu_workers_env:
+691:                     n_threads = max(1, int(cpu_workers_env))
+692:                     torch.set_num_threads(n_threads)
+693:                     os.environ.setdefault("OMP_NUM_THREADS", str(n_threads))
+694:                     os.environ.setdefault("MKL_NUM_THREADS", str(n_threads))
+695:             except Exception:
+696:                 pass
+697:         logging.info(f"Utilisation du device: {device}")
+698: 
+699:         hf_token = None
+700:         if args.hf_auth_token:
+701:             hf_token = args.hf_auth_token
+702:             try:
+703:                 os.environ["HUGGINGFACE_HUB_TOKEN"] = args.hf_auth_token
+704:             except Exception:
+705:                 pass
+706:         else:
+707:             hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN") or os.getenv("HF_AUTH_TOKEN")
+708: 
+709:         if not hf_token:
+710:             logging.critical(
+711:                 "Aucun token Hugging Face fourni. Passez --hf_auth_token ou définissez HUGGINGFACE_HUB_TOKEN/HF_AUTH_TOKEN."
+712:             )
+713:             sys.exit(1)
+714:         try:
+715:             from huggingface_hub import HfApi
+716:             try:
+717:                 from huggingface_hub.hf_api import HfFolder
+718:                 HfFolder.save_token(hf_token)
+719:             except Exception:
+720:                 pass
+721:             _id = HfApi().whoami(token=hf_token)
+722:             safe_tail = hf_token[-6:] if len(hf_token) >= 6 else "***"
+723:             logging.info(
+724:                 "Authentifié sur Hugging Face (token tail=***%s) en tant que: %s",
+725:                 safe_tail,
+726:                 _id.get("name") or _id.get("email"),
+727:             )
+728:         except Exception as auth_e:
+729:             logging.warning(
+730:                 "Impossible de valider le token Hugging Face: %s. On tente quand même le téléchargement.",
+731:                 auth_e,
+732:             )
+733: 
+734:         pipeline = None
+735:         try:
+736:             pipeline = _load_pyannote_pipeline("pyannote/speaker-diarization-3.1", hf_token)
+737:         except Exception as e_v3:
+738:             logging.warning(f"Impossible de charger la pipeline v3.1: {e_v3}. Tentative avec v2...")
+739:             try:
+740:                 pipeline = _load_pyannote_pipeline("pyannote/speaker-diarization", hf_token)
+741:             except Exception as e_v2:
+742:                 logging.critical(
+743:                     "Echec du chargement des pipelines pyannote (v3.1 et v2). "
+744:                     "Le modèle peut être privé/gated. Assurez-vous que votre token HF a accès "
+745:                     "(accepter les conditions sur la page du modèle) et réessayez."
+746:                 )
+747:                 logging.critical(f"Détails v3.1: {e_v3}")
+748:                 logging.critical(f"Détails v2: {e_v2}")
+749:                 sys.exit(1)
+750:         optimal_tv_config = _load_optimal_tv_config()
+751:         pyannote_batch_size = _get_pyannote_batch_size(device)
+752:         if pyannote_batch_size is not None:
+753:             for key in ("segmentation", "embedding"):
+754:                 section = optimal_tv_config.get(key)
+755:                 if not isinstance(section, dict):
+756:                     optimal_tv_config[key] = {}
+757:                 optimal_tv_config[key]["batch_size"] = pyannote_batch_size
+758: 
+759:         if optimal_tv_config and hasattr(pipeline, "instantiate"):
+760:             try:
+761:                 pipeline.instantiate(optimal_tv_config)
+762:                 if pyannote_batch_size is not None:
+763:                     logging.info(
+764:                         f"Pyannote configuration appliquée (optimal_tv_config + batch_size={pyannote_batch_size})"
+765:                     )
+766:                 else:
+767:                     logging.info("Pyannote configuration appliquée (optimal_tv_config)")
+768:             except Exception as e:
+769:                 msg = str(e)
+770:                 if pyannote_batch_size is not None and "batch_size" in msg and "does not exist" in msg:
+771:                     logging.info(
+772:                         f"Pipeline.instantiate ne supporte pas batch_size (AUDIO_PYANNOTE_BATCH_SIZE={pyannote_batch_size}). "
+773:                         "Le batch_size sera appliqué lors de l'appel diarization si possible."
+774:                     )
+775:                 else:
+776:                     logging.warning(f"Impossible d'appliquer optimal_tv_config.json via pipeline.instantiate: {e}")
+777: 
+778:                     if pyannote_batch_size is not None:
+779:                         try:
+780:                             pipeline.instantiate(
+781:                                 {
+782:                                     "segmentation": {"batch_size": pyannote_batch_size},
+783:                                     "embedding": {"batch_size": pyannote_batch_size},
+784:                                 }
+785:                             )
+786:                             logging.info(
+787:                                 "Fallback: configuration minimale appliquée (batch_size seulement) suite à un échec optimal_tv_config"
+788:                             )
+789:                         except Exception as fallback_e:
+790:                             logging.warning(
+791:                                 "Fallback: impossible d'appliquer la configuration minimale (batch_size seulement): "
+792:                                 f"{fallback_e}"
+793:                             )
+794: 
+795:         if _should_enable_amp(device):
+796:             total_gb = _get_total_vram_gb()
+797:             logging.info(f"AMP activé pour l'inférence (VRAM total ~{total_gb:.2f} GiB)")
+798: 
+799:         if args.cpu_diarize_wav:
+800:             if not args.cpu_diarize_out:
+801:                 logging.critical("Mode cpu_diarize_wav: --cpu_diarize_out est requis")
+802:                 sys.exit(1)
+803:             wav_path = Path(args.cpu_diarize_wav)
+804:             out_path = Path(args.cpu_diarize_out)
+805:             out_path.parent.mkdir(parents=True, exist_ok=True)
+806:             
+807:             diarization_kwargs = {"num_speakers": None}
+808:             pyannote_batch_size = _get_pyannote_batch_size("cpu")
+809:             if pyannote_batch_size is not None:
+810:                 diarization_kwargs["batch_size"] = pyannote_batch_size
+811:                 logging.info(f"CPU subprocess: batch_size={pyannote_batch_size}")
+812:             
+813:             with torch.inference_mode():
+814:                 try:
+815:                     diarization = pipeline(str(wav_path), **diarization_kwargs)
+816:                 except TypeError as e:
+817:                     if "batch_size" in str(e):
+818:                         diarization_kwargs.pop("batch_size", None)
+819:                         diarization = pipeline(str(wav_path), **diarization_kwargs)
+820:                     else:
+821:                         raise
+822:             
+823:             segments = [
+824:                 {"start": float(t.start), "end": float(t.end), "speaker": str(spk)}
+825:                 for t, _, spk in diarization.itertracks(yield_label=True)
+826:             ]
+827:             logging.info(f"CPU subprocess: {len(segments)} segment(s) extrait(s)")
+828:             with open(out_path, "w", encoding="utf-8") as f:
+829:                 json.dump(segments, f)
+830:             return
+831: 
+832:         if pipeline is None:
+833:             logging.critical(
+834:                 "Impossible de charger la pipeline pyannote (pipeline=None). Le modèle peut être privé/gated. "
+835:                 "Vérifiez votre token Hugging Face (HUGGINGFACE_HUB_TOKEN) et acceptez les conditions du modèle."
+836:             )
+837:             sys.exit(1)
+838: 
+839:         try:
+840:             if hasattr(pipeline, "to"):
+841:                 pipeline.to(torch.device(device))
+842:                 logging.info(f"Pipeline de diarisation chargée avec succès sur {device}.")
+843:             else:
+844:                 logging.info("Pipeline pyannote ne supporte pas .to(); continuation sans déplacement explicite de device.")
+845:         except RuntimeError as e:
+846:             if "NVIDIA driver" in str(e) or "CUDA" in str(e):
+847:                 logging.warning(f"GPU incompatible ({e}), fallback sur CPU.")
+848:                 device = "cpu"
+849:                 if hasattr(pipeline, "to"):
+850:                     pipeline.to(torch.device("cpu"))
+851:                 logging.info("Pipeline de diarisation chargée avec succès sur CPU (fallback).")
+852:             else:
+853:                 raise
+854:     except ImportError as e:
+855:         logging.critical(f"Erreur lors du chargement de la pipeline Pyannote: {e}")
+856:         sys.exit(1)
+857: 
+858:     videos = find_videos_for_audio_analysis()
+859:     total_videos = len(videos)
+860:     logging.info(f"TOTAL_AUDIO_TO_ANALYZE: {total_videos}")
+861: 
+862:     if total_videos == 0:
+863:         logging.info("Aucune nouvelle vidéo à analyser.")
+864:         return
+865: 
+866:     successful_count = 0
+867:     for i, video_path in enumerate(videos):
+868:         logging.info(f"ANALYZING_AUDIO: {i + 1}/{total_videos}: {video_path.name}")
+869: 
+870:         success = analyze_audio_file(video_path, pipeline, hf_token, device)
+871:         if success:
+872:             successful_count += 1
+873: 
+874:         try:
+875:             if device == "cuda" and torch.cuda.is_available():
+876:                 torch.cuda.empty_cache()
+877:         except Exception:
+878:             pass
+879: 
+880:     logging.info("--- Analyse audio terminée ---")
+881:     logging.info(f"Résumé: {successful_count}/{total_videos} analyse(s) réussie(s).")
+882: 
+883:     if successful_count < total_videos:
+884:         # Permettre un succès partiel si demandé (utile pour pipelines tolérantes)
+885:         allow_partial = os.getenv("AUDIO_PARTIAL_SUCCESS_OK", "0") == "1"
+886:         if allow_partial and successful_count > 0:
+887:             logging.warning(
+888:                 f"Partial success autorisé: {successful_count}/{total_videos} analyses ont réussi. Code de sortie 0."
+889:             )
+890:             return
+891:         sys.exit(1)
+892: 
+893: 
+894: if __name__ == "__main__":
+895:     try:
+896:         main()
+897:     except Exception as e:
+898:         logging.critical(f"Erreur critique non gérée: {e}", exc_info=True)
+899:         sys.exit(1)
 ```
 
-## File: config/settings.py
+## File: workflow_scripts/step5/face_engines.py
 ```python
-  1: """
-  2: Centralized configuration management for workflow_mediapipe.
-  3: 
-  4: This module provides environment-based configuration management
-  5: following the project's development guidelines.
+  1: import logging
+  2: import os
+  3: import threading
+  4: import time
+  5: from pathlib import Path
+  6: from typing import Optional
+  7: 
+  8: import cv2
+  9: import numpy as np
+ 10: 
+ 11: # Load .env file BEFORE reading any environment variables (critical for multiprocessing workers)
+ 12: try:
+ 13:     from dotenv import load_dotenv
+ 14:     _env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+ 15:     if _env_path.exists():
+ 16:         load_dotenv(_env_path)
+ 17: except ImportError:
+ 18:     pass  # dotenv not available, rely on system env vars
+ 19: 
+ 20: logger = logging.getLogger(__name__)
+ 21: 
+ 22: ARKIT_52_BLENDSHAPE_NAMES = [
+ 23:     "browDownLeft",
+ 24:     "browDownRight",
+ 25:     "browInnerUp",
+ 26:     "browOuterUpLeft",
+ 27:     "browOuterUpRight",
+ 28:     "cheekPuff",
+ 29:     "cheekSquintLeft",
+ 30:     "cheekSquintRight",
+ 31:     "eyeBlinkLeft",
+ 32:     "eyeBlinkRight",
+ 33:     "eyeLookDownLeft",
+ 34:     "eyeLookDownRight",
+ 35:     "eyeLookInLeft",
+ 36:     "eyeLookInRight",
+ 37:     "eyeLookOutLeft",
+ 38:     "eyeLookOutRight",
+ 39:     "eyeLookUpLeft",
+ 40:     "eyeLookUpRight",
+ 41:     "eyeSquintLeft",
+ 42:     "eyeSquintRight",
+ 43:     "eyeWideLeft",
+ 44:     "eyeWideRight",
+ 45:     "jawForward",
+ 46:     "jawLeft",
+ 47:     "jawOpen",
+ 48:     "jawRight",
+ 49:     "mouthClose",
+ 50:     "mouthDimpleLeft",
+ 51:     "mouthDimpleRight",
+ 52:     "mouthFrownLeft",
+ 53:     "mouthFrownRight",
+ 54:     "mouthFunnel",
+ 55:     "mouthLeft",
+ 56:     "mouthLowerDownLeft",
+ 57:     "mouthLowerDownRight",
+ 58:     "mouthPressLeft",
+ 59:     "mouthPressRight",
+ 60:     "mouthPucker",
+ 61:     "mouthRight",
+ 62:     "mouthRollLower",
+ 63:     "mouthRollUpper",
+ 64:     "mouthShrugLower",
+ 65:     "mouthShrugUpper",
+ 66:     "mouthSmileLeft",
+ 67:     "mouthSmileRight",
+ 68:     "mouthStretchLeft",
+ 69:     "mouthStretchRight",
+ 70:     "mouthUpperUpLeft",
+ 71:     "mouthUpperUpRight",
+ 72:     "noseSneerLeft",
+ 73:     "noseSneerRight",
+ 74:     "tongueOut",
+ 75: ]
+ 76: 
+ 77: 
+ 78: def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
+ 79:     if raw is None:
+ 80:         return None
+ 81:     raw = raw.strip()
+ 82:     if not raw:
+ 83:         return None
+ 84:     try:
+ 85:         value = int(raw)
+ 86:     except Exception:
+ 87:         return None
+ 88:     if value <= 0:
+ 89:         return None
+ 90:     return value
+ 91: 
+ 92: 
+ 93: 
+ 94: class InsightFaceEngine:
+ 95:     def __init__(
+ 96:         self,
+ 97:         model_name: Optional[str] = None,
+ 98:         det_size: Optional[int] = None,
+ 99:         use_gpu: bool = False,
+100:     ):
+101:         if not use_gpu:
+102:             raise RuntimeError(
+103:                 "InsightFace engine is GPU-only. Set STEP5_ENABLE_GPU=1, include 'insightface' in STEP5_GPU_ENGINES, "
+104:                 "and run with use_gpu=True."
+105:             )
+106: 
+107:         self._lock = threading.Lock()
+108:         self._use_gpu = True
+109: 
+110:         try:
+111:             import onnxruntime as ort
+112:         except ImportError as e:
+113:             raise RuntimeError(
+114:                 "InsightFace engine requires onnxruntime in insightface_env. Install it (and onnxruntime-gpu) in that venv."
+115:             ) from e
+116: 
+117:         available_providers = ort.get_available_providers()
+118:         logger.info(f"[InsightFace] Available ONNXRuntime providers: {available_providers}")
+119:         if "CUDAExecutionProvider" not in available_providers:
+120:             raise RuntimeError(
+121:                 "InsightFace engine requires CUDAExecutionProvider (onnxruntime-gpu). "
+122:                 "Install onnxruntime-gpu in insightface_env and ensure CUDA libs are available."
+123:             )
+124: 
+125:         try:
+126:             from insightface.app import FaceAnalysis
+127:         except ImportError as e:
+128:             raise RuntimeError(
+129:                 "InsightFace engine requires the 'insightface' Python package inside insightface_env."
+130:             ) from e
+131: 
+132:         self._enable_profiling = os.environ.get("STEP5_ENABLE_PROFILING", "0").strip().lower() in {
+133:             "1",
+134:             "true",
+135:             "yes",
+136:         }
+137:         self._profiling_stats = {
+138:             "resize_total": 0.0,
+139:             "detect_total": 0.0,
+140:             "post_total": 0.0,
+141:             "frame_count": 0,
+142:         }
+143: 
+144:         env_max_faces = os.environ.get("STEP5_INSIGHTFACE_MAX_FACES")
+145:         self._max_faces = _parse_optional_positive_int(env_max_faces)
+146: 
+147:         env_max_width = os.environ.get("STEP5_INSIGHTFACE_MAX_WIDTH")
+148:         if env_max_width is None or env_max_width.strip() == "":
+149:             env_max_width = "1280"
+150:         self._max_detection_width = max(1, int(str(env_max_width).strip() or "1280"))
+151: 
+152:         env_detect_every = os.environ.get("STEP5_INSIGHTFACE_DETECT_EVERY_N")
+153:         if env_detect_every is None or env_detect_every.strip() == "":
+154:             env_detect_every = os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")
+155:         self._detect_every_n = max(1, int(str(env_detect_every).strip() or "1"))
+156: 
+157:         self._jaw_open_scale = float(os.environ.get("STEP5_INSIGHTFACE_JAWOPEN_SCALE", "1.0"))
+158: 
+159:         env_model_name = os.environ.get("STEP5_INSIGHTFACE_MODEL_NAME")
+160:         self._model_name = (model_name or (env_model_name.strip() if env_model_name else "") or "antelopev2")
+161: 
+162:         env_det_size = os.environ.get("STEP5_INSIGHTFACE_DET_SIZE")
+163:         det_size_value = det_size
+164:         if det_size_value is None:
+165:             try:
+166:                 det_size_value = int(str(env_det_size).strip()) if env_det_size else 640
+167:             except Exception:
+168:                 det_size_value = 640
+169:         self._det_size = max(64, int(det_size_value))
+170: 
+171:         ctx_id_raw = os.environ.get("STEP5_INSIGHTFACE_CTX_ID")
+172:         try:
+173:             ctx_id = int(str(ctx_id_raw).strip()) if ctx_id_raw else 0
+174:         except Exception:
+175:             ctx_id = 0
+176:         if ctx_id < 0:
+177:             ctx_id = 0
+178: 
+179:         providers = ["CUDAExecutionProvider"]
+180:         insightface_root_raw = os.environ.get("INSIGHTFACE_HOME", "").strip()
+181:         insightface_root = str(Path(insightface_root_raw or "~/.insightface").expanduser())
+182: 
+183:         allowed_modules_env = os.environ.get("STEP5_INSIGHTFACE_ALLOWED_MODULES", "").strip()
+184:         allowed_modules = None
+185:         if allowed_modules_env:
+186:             allowed_modules = [m.strip() for m in allowed_modules_env.split(",") if m.strip()]
+187:             if "detection" not in allowed_modules:
+188:                 raise RuntimeError(
+189:                     "STEP5_INSIGHTFACE_ALLOWED_MODULES must include 'detection' (required by FaceAnalysis)."
+190:                 )
+191: 
+192:         try:
+193:             self._app = FaceAnalysis(
+194:                 name=self._model_name,
+195:                 root=insightface_root,
+196:                 providers=providers,
+197:                 allowed_modules=allowed_modules,
+198:             )
+199:         except FileExistsError as e:
+200:             model_dir = Path(insightface_root) / "models" / self._model_name
+201:             quarantine_suffix = f"corrupt_{int(time.time())}"
+202:             quarantine_dir = model_dir.with_name(f"{model_dir.name}.{quarantine_suffix}")
+203:             try:
+204:                 if model_dir.exists():
+205:                     model_dir.rename(quarantine_dir)
+206:                     logger.warning(
+207:                         "[InsightFace] Model cache directory already exists but download attempted; "
+208:                         "quarantined %s -> %s and retrying initialization.",
+209:                         model_dir,
+210:                         quarantine_dir,
+211:                     )
+212:             except Exception as rename_err:
+213:                 raise RuntimeError(
+214:                     f"InsightFace model cache appears corrupted at {model_dir}. "
+215:                     f"Automatic quarantine failed ({rename_err}). "
+216:                     "Please remove or rename the directory and retry."
+217:                 ) from e
+218: 
+219:             self._app = FaceAnalysis(
+220:                 name=self._model_name,
+221:                 root=insightface_root,
+222:                 providers=providers,
+223:                 allowed_modules=allowed_modules,
+224:             )
+225:         self._app.prepare(ctx_id=ctx_id, det_size=(self._det_size, self._det_size))
+226: 
+227:         self._frame_counter = 0
+228:         self._last_detections = []
+229: 
+230:         logger.info(
+231:             f"[InsightFace] Initialized model_name={self._model_name}, det_size={self._det_size}, "
+232:             f"max_width={self._max_detection_width}, max_faces={self._max_faces}, detect_every_n={self._detect_every_n}"
+233:         )
+234: 
+235:     def _build_arkit_blendshapes(self, jaw_open: float) -> dict:
+236:         out = {}
+237:         for name in ARKIT_52_BLENDSHAPE_NAMES:
+238:             out[name] = 0.0
+239:         out["jawOpen"] = float(jaw_open)
+240:         return out
+241: 
+242:     def _compute_jaw_open_from_dlib68(self, landmarks_68: np.ndarray) -> float:
+243:         lm = np.asarray(landmarks_68, dtype=np.float32)
+244:         if lm.ndim != 2 or lm.shape[0] < 68:
+245:             return 0.0
+246:         try:
+247:             upper_inner = float(np.mean(lm[60:65, 1], axis=0))
+248:             lower_inner = float(np.mean(lm[65:68, 1], axis=0))
+249:             mouth_open = abs(lower_inner - upper_inner)
+250: 
+251:             nose_y = float(lm[33, 1])
+252:             chin_y = float(lm[8, 1])
+253:             denom = max(abs(chin_y - nose_y), 1e-6)
+254:             ratio = (mouth_open / denom) * float(self._jaw_open_scale)
+255:             return float(np.clip(ratio, 0.0, 1.0))
+256:         except Exception:
+257:             return 0.0
+258: 
+259:     def _get_face_landmarks_68(self, face_obj) -> Optional[np.ndarray]:
+260:         candidates = [
+261:             "landmark_3d_68",
+262:             "landmark_2d_68",
+263:         ]
+264:         for attr in candidates:
+265:             try:
+266:                 val = getattr(face_obj, attr, None)
+267:             except Exception:
+268:                 val = None
+269:             if val is None:
+270:                 try:
+271:                     val = face_obj.get(attr) if hasattr(face_obj, "get") else None
+272:                 except Exception:
+273:                     val = None
+274:             if val is None:
+275:                 continue
+276: 
+277:             lm = np.asarray(val)
+278:             if lm.ndim != 2 or lm.shape[0] < 68:
+279:                 continue
+280:             if lm.shape[1] >= 2:
+281:                 return lm[:, :2].astype(np.float32)
+282:         return None
+283: 
+284:     def detect(self, frame_bgr):
+285:         self._frame_counter += 1
+286:         if (self._frame_counter % self._detect_every_n) != 0:
+287:             return list(self._last_detections)
+288: 
+289:         if frame_bgr is None or getattr(frame_bgr, "shape", None) is None:
+290:             self._last_detections = []
+291:             return []
+292: 
+293:         orig_h, orig_w = frame_bgr.shape[:2]
+294:         work_frame = frame_bgr
+295:         scale_x = 1.0
+296:         scale_y = 1.0
+297: 
+298:         t_resize_start = time.perf_counter() if self._enable_profiling else 0.0
+299:         if orig_w > self._max_detection_width:
+300:             detect_w = self._max_detection_width
+301:             scale_factor = detect_w / float(orig_w)
+302:             detect_h = max(1, int(orig_h * scale_factor))
+303:             work_frame = cv2.resize(frame_bgr, (detect_w, detect_h), interpolation=cv2.INTER_LINEAR)
+304:             scale_x = orig_w / float(detect_w)
+305:             scale_y = orig_h / float(detect_h)
+306:         if self._enable_profiling:
+307:             self._profiling_stats["resize_total"] += time.perf_counter() - t_resize_start
+308: 
+309:         t_detect_start = time.perf_counter() if self._enable_profiling else 0.0
+310:         try:
+311:             with self._lock:
+312:                 faces = self._app.get(work_frame)
+313:         except Exception as e:
+314:             logger.warning("[InsightFace] Detection failed: %s", e)
+315:             self._last_detections = []
+316:             return []
+317:         if self._enable_profiling:
+318:             self._profiling_stats["detect_total"] += time.perf_counter() - t_detect_start
+319: 
+320:         if not faces:
+321:             self._last_detections = []
+322:             return []
+323: 
+324:         if self._max_faces is not None:
+325:             faces = faces[: self._max_faces]
+326: 
+327:         detections = []
+328:         t_post_start = time.perf_counter() if self._enable_profiling else 0.0
+329:         for face in faces:
+330:             bbox = None
+331:             try:
+332:                 bbox = getattr(face, "bbox", None)
+333:             except Exception:
+334:                 bbox = None
+335:             if bbox is None:
+336:                 try:
+337:                     bbox = face.get("bbox") if hasattr(face, "get") else None
+338:                 except Exception:
+339:                     bbox = None
+340:             if bbox is None:
+341:                 continue
+342: 
+343:             bbox_arr = np.asarray(bbox, dtype=np.float32).reshape(-1)
+344:             if bbox_arr.size < 4:
+345:                 continue
+346: 
+347:             x1, y1, x2, y2 = [float(v) for v in bbox_arr[:4]]
+348:             if scale_x != 1.0 or scale_y != 1.0:
+349:                 x1 *= float(scale_x)
+350:                 x2 *= float(scale_x)
+351:                 y1 *= float(scale_y)
+352:                 y2 *= float(scale_y)
+353: 
+354:             x1_i = max(0, int(x1))
+355:             y1_i = max(0, int(y1))
+356:             x2_i = min(int(orig_w), int(x2))
+357:             y2_i = min(int(orig_h), int(y2))
+358:             if x2_i <= x1_i or y2_i <= y1_i:
+359:                 continue
+360: 
+361:             bbox_w = int(x2_i - x1_i)
+362:             bbox_h = int(y2_i - y1_i)
+363:             centroid = (x1_i + (bbox_w // 2), y1_i + (bbox_h // 2))
+364: 
+365:             try:
+366:                 score = float(getattr(face, "det_score", 1.0))
+367:             except Exception:
+368:                 score = 1.0
+369: 
+370:             landmarks_68 = self._get_face_landmarks_68(face)
+371:             if landmarks_68 is not None and (scale_x != 1.0 or scale_y != 1.0):
+372:                 landmarks_68 = landmarks_68.astype(np.float32, copy=True)
+373:                 landmarks_68[:, 0] *= float(scale_x)
+374:                 landmarks_68[:, 1] *= float(scale_y)
+375: 
+376:             jaw_open = self._compute_jaw_open_from_dlib68(landmarks_68) if landmarks_68 is not None else 0.0
+377:             blendshapes = self._build_arkit_blendshapes(jaw_open)
+378: 
+379:             detections.append(
+380:                 {
+381:                     "bbox": (x1_i, y1_i, bbox_w, bbox_h),
+382:                     "centroid": centroid,
+383:                     "source_detector": "face_landmarker",
+384:                     "label": "face",
+385:                     "confidence": score,
+386:                     "landmarks": landmarks_68.tolist() if landmarks_68 is not None else [],
+387:                     "blendshapes": blendshapes,
+388:                 }
+389:             )
+390: 
+391:         if self._enable_profiling:
+392:             self._profiling_stats["post_total"] += time.perf_counter() - t_post_start
+393:             self._profiling_stats["frame_count"] += 1
+394:             if (self._profiling_stats["frame_count"] % 20) == 0:
+395:                 frame_count = int(self._profiling_stats.get("frame_count", 0) or 0)
+396:                 if frame_count > 0:
+397:                     resize_ms = (self._profiling_stats["resize_total"] / frame_count) * 1000.0
+398:                     detect_ms = (self._profiling_stats["detect_total"] / frame_count) * 1000.0
+399:                     post_ms = (self._profiling_stats["post_total"] / frame_count) * 1000.0
+400:                     logger.info(
+401:                         "[PROFILING] InsightFace after %s frames: resize=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
+402:                         frame_count,
+403:                         resize_ms,
+404:                         detect_ms,
+405:                         post_ms,
+406:                     )
+407: 
+408:         self._last_detections = detections
+409:         return detections
+410: 
+411: 
+412: def create_face_engine(engine_name: str, use_gpu: bool = False):
+413:     """
+414:     Factory function to create face tracking engines.
+415:     
+416:     Args:
+417:         engine_name: Name of the engine (default is MediaPipe when empty/mediapipe)
+418:         use_gpu: If True, enable GPU acceleration for supported engines
+419:     
+420:     Returns:
+421:         Engine instance or None for MediaPipe (handled separately in workers)
+422:     """
+423:     normalized = (engine_name or "").strip().lower()
+424:     if not normalized or normalized in {"mediapipe", "mediapipe_landmarker"}:
+425:         return None
+426:     if normalized == "insightface":
+427:         return InsightFaceEngine(use_gpu=use_gpu)
+428:     raise ValueError(f"Unsupported tracking engine: {engine_name}")
+```
+
+## File: workflow_scripts/step5/process_video_worker_multiprocessing.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: """
+  4: Enhanced CPU Worker with Multiprocessing Optimization
+  5: Combines proven techniques from backup implementations for maximum CPU performance.
   6: """
   7: 
   8: import os
-  9: import logging
- 10: import subprocess
- 11: from pathlib import Path
- 12: from dataclasses import dataclass, field
- 13: from typing import Optional, List
- 14: 
- 15: logger = logging.getLogger(__name__)
- 16: 
- 17: 
- 18: def _parse_bool(raw: Optional[str], default: bool) -> bool:
- 19:     if raw is None:
- 20:         return default
- 21:     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
- 22: 
- 23: 
- 24: def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
- 25:     if raw is None:
- 26:         return None
- 27:     raw = raw.strip()
- 28:     if not raw:
- 29:         return None
- 30:     try:
- 31:         return int(raw)
- 32:     except Exception:
- 33:         return None
+  9: import sys
+ 10: import json
+ 11: import argparse
+ 12: import logging
+ 13: import cv2
+ 14: import numpy as np
+ 15: try:
+ 16:     import mediapipe as mp
+ 17: except Exception:
+ 18:     mp = None
+ 19: import multiprocessing as mp_proc
+ 20: import time
+ 21: import math
+ 22: from pathlib import Path
+ 23: from functools import partial
+ 24: from concurrent.futures import ProcessPoolExecutor, as_completed
+ 25: 
+ 26: # Load .env file before anything else (critical for multiprocessing workers)
+ 27: try:
+ 28:     from dotenv import load_dotenv
+ 29:     env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+ 30:     if env_path.exists():
+ 31:         load_dotenv(env_path)
+ 32: except ImportError:
+ 33:     pass  # dotenv not available, rely on system env vars
  34: 
- 35: 
- 36: def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
- 37:     value = _parse_optional_int(raw)
- 38:     if value is None:
- 39:         return None
- 40:     if value <= 0:
- 41:         return None
- 42:     return value
- 43: 
- 44: 
- 45: def _parse_csv_list(raw: Optional[str]) -> List[str]:
- 46:     if raw is None:
- 47:         return []
- 48:     parts = [p.strip() for p in raw.split(",")]
- 49:     return [p for p in parts if p]
+ 35: # Add project root to path
+ 36: sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+ 37: from utils.tracking_optimizations import apply_tracking_and_management
+ 38: from utils.resource_manager import safe_video_processing, get_video_metadata, resource_tracker
+ 39: from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
+ 40: from object_detector_registry import ObjectDetectorRegistry
+ 41: 
+ 42: # Configuration du logger
+ 43: log_dir = Path(__file__).resolve().parent.parent.parent / "logs" / "step5"
+ 44: log_dir.mkdir(parents=True, exist_ok=True)
+ 45: worker_type_str = "CPU_MP" if "--mp_num_workers_internal" in sys.argv else "CPU"
+ 46: video_name_for_log = Path(sys.argv[1]).stem if len(sys.argv) > 1 else "unknown"
+ 47: log_file = log_dir / f"worker_{worker_type_str}_{video_name_for_log}_{os.getpid()}.log"
+ 48: logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s',
+ 49:                     handlers=[logging.FileHandler(log_file, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
  50: 
  51: 
- 52: @dataclass
- 53: class Config:
- 54:     """
- 55:     Centralized configuration class for the workflow_mediapipe application.
- 56:     
- 57:     All configuration values are loaded from environment variables with
- 58:     sensible defaults to maintain backward compatibility.
- 59:     """
- 60:     
- 61:     # Flask Application Settings
- 62:     SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
- 63:     DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
- 64:     HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
- 65:     PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
- 66:     
- 67:     # Security Tokens (loaded from environment)
- 68:     INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
- 69:     RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
- 70:     
- 71:     # Webhook JSON Source (single data source for monitoring)
- 72:     WEBHOOK_JSON_URL: str = os.environ.get(
- 73:         'WEBHOOK_JSON_URL',
- 74:         'https://webhook.kidpixel.fr/data/webhook_links.json'
- 75:     )
- 76:     WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
- 77:     WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
- 78:     WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
- 79:     
- 80:     # Directory Configuration
- 81:     BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
- 82:         'BASE_PATH_SCRIPTS_ENV', 
- 83:         os.path.dirname(os.path.abspath(__file__ + '/../'))
- 84:     ))
- 85:     CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
- 86:     LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
- 87:         'LOCAL_DOWNLOADS_DIR', 
- 88:         Path.home() / 'Téléchargements'
- 89:     ))
- 90:     DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
- 91:     ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
- 92:     DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
- 93:     DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
- 94:     # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
- 95:     # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
- 96:     LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
- 97:     # Virtual environments base directory (defaults to project root if not set)
- 98:     VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
- 99:     # Projects directory for visualization/timeline features
-100:     PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
-101:     # Archives directory for persistent analysis results (timeline)
-102:     ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
-103:     
-104:     # Python Environment Configuration
-105:     PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
-106:     
-107:     # Processing Configuration
-108:     MAX_CPU_WORKERS: int = int(os.environ.get(
-109:         'MAX_CPU_WORKERS', 
-110:         str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
-111:     ))
-112:     
-113:     # Polling Intervals (in milliseconds for frontend, seconds for backend)
-114:     POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
-115:     LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
-116: 
-117:     SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
-118:     
-119:     # MediaPipe Configuration
-120:     MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
-121:         'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
-122:     ))
-123:     MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
-124:         'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
-125:     ))
-126:     
-127:     # GPU Configuration
-128:     ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
-129:     
-130:     # Lemonfox API Configuration (STEP4 alternative)
-131:     LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
-132:     LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
-133:     LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
+ 52: def _parse_optional_positive_int(raw):
+ 53:     if raw is None:
+ 54:         return None
+ 55:     raw_str = str(raw).strip()
+ 56:     if not raw_str:
+ 57:         return None
+ 58:     try:
+ 59:         value = int(raw_str)
+ 60:     except Exception:
+ 61:         return None
+ 62:     if value <= 0:
+ 63:         return None
+ 64:     return value
+ 65: 
+ 66: 
+ 67: def _is_truthy_env(raw):
+ 68:     if raw is None:
+ 69:         return False
+ 70:     return str(raw).strip().lower() in {"1", "true", "yes"}
+ 71: 
+ 72: 
+ 73: def _apply_jawopen_scale(blendshapes, scale):
+ 74:     if not blendshapes or not isinstance(blendshapes, dict):
+ 75:         return blendshapes
+ 76:     try:
+ 77:         jaw_open_raw = blendshapes.get("jawOpen")
+ 78:         if jaw_open_raw is None:
+ 79:             return blendshapes
+ 80:         jaw_open_scaled = float(jaw_open_raw) * float(scale)
+ 81:         jaw_open_scaled = float(np.clip(jaw_open_scaled, 0.0, 1.0))
+ 82:         out = dict(blendshapes)
+ 83:         out["jawOpen"] = jaw_open_scaled
+ 84:         return out
+ 85:     except Exception:
+ 86:         return blendshapes
+ 87: 
+ 88: 
+ 89: # Global variables for worker processes
+ 90: landmarker_global = None
+ 91: object_detector_global = None
+ 92: 
+ 93: 
+ 94: def init_worker_process(models_dir, args_dict):
+ 95:     """
+ 96:     Initialize tracking models once per worker process.
+ 97:     Supports MediaPipe.
+ 98:     """
+ 99:     global landmarker_global, object_detector_global
+100:     
+101:     worker_pid = os.getpid()
+102:     engine_name = args_dict.get('tracking_engine', '')
+103:     engine_norm = (str(engine_name).strip().lower() if engine_name else "")
+104:     if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+105:         engine_norm = ""
+106: 
+107:     logging.info(f"[WORKER-{worker_pid}] Initializing process with engine: {engine_norm or 'mediapipe'}")
+108: 
+109:     try:
+110:         if engine_norm:
+111:             raise RuntimeError(
+112:                 f"Unsupported STEP5 tracking engine for multiprocessing CPU worker: {engine_norm}. "
+113:                 "Supported values: empty (default MediaPipe)."
+114:             )
+115: 
+116:         if mp is None:
+117:             raise RuntimeError(
+118:                 "mediapipe is required for the default tracking engine but is not available in this environment"
+119:             )
+120: 
+121:         BaseOptions = mp.tasks.BaseOptions
+122:         VisionRunningMode = mp.tasks.vision.RunningMode
+123:         FaceLandmarker = mp.tasks.vision.FaceLandmarker
+124:         FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
+125:         ObjectDetector = mp.tasks.vision.ObjectDetector
+126:         ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
+127: 
+128:         delegate = BaseOptions.Delegate.CPU
+129:         face_model_candidates = [
+130:             models_dir / "face_detectors" / "mediapipe" / "face_landmarker_v2_with_blendshapes.task",
+131:             models_dir / "face_landmarker_v2_with_blendshapes.task",
+132:         ]
+133:         face_model_path = next((p for p in face_model_candidates if p.exists()), face_model_candidates[0])
 134: 
-135:     LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
-136:     LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
-137:     LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
-138:         os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
-139:         default=True,
-140:     )
-141:     LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
-142:         os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
-143:     )
-144:     LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
-145:         os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
-146:     )
-147:     LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
-148:         default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
-149:     )
-150:     LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
-151:     LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
-152:     LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
-153:         os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
-154:     )
-155:     LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
-156:         os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
-157:         default=False,
-158:     )
-159:     LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
-160:     LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
-161: 
-162:     STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
-163:     
-164:     # STEP5 Object Detection Configuration
-165:     # Model selection for fallback object detection when face detection fails (MediaPipe only)
-166:     STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
-167:         'STEP5_OBJECT_DETECTOR_MODEL',
-168:         'efficientdet_lite2'  # Default: current baseline, backward compatible
-169:     )
-170:     STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
-171:     STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
-172:     
-173:     # STEP5 Performance Optimizations (opencv_yunet_pyfeat)
-174:     STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
-175:     STEP5_ONNX_INTRA_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTRA_OP_THREADS', '2'))
-176:     STEP5_ONNX_INTER_OP_THREADS: int = int(os.environ.get('STEP5_ONNX_INTER_OP_THREADS', '1'))
-177:     STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
-178:     STEP5_YUNET_MAX_WIDTH: int = int(os.environ.get('STEP5_YUNET_MAX_WIDTH', '640'))  # Max width for YuNet detection (coordinates rescaled)
+135:         # Resolve object detector model using registry
+136:         object_detector_model_name = args_dict.get('object_detector_model', 'efficientdet_lite2')
+137:         try:
+138:             object_model_path = ObjectDetectorRegistry.resolve_model_path(
+139:                 model_name=object_detector_model_name,
+140:                 models_dir=models_dir,
+141:                 override_path=args_dict.get('object_detector_model_path')
+142:             )
+143:             logging.info(f"[WORKER-{worker_pid}] Using object detector: {object_detector_model_name} at {object_model_path}")
+144:         except (ValueError, FileNotFoundError) as e:
+145:             logging.error(f"[WORKER-{worker_pid}] Failed to resolve object detector model: {e}")
+146:             raise
+147: 
+148:         env_max_faces = _parse_optional_positive_int(args_dict.get('mediapipe_max_faces'))
+149:         num_faces = int(env_max_faces if env_max_faces is not None else (args_dict.get('mp_landmarker_num_faces', 5) or 5))
+150: 
+151:         face_options = FaceLandmarkerOptions(
+152:             base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
+153:             running_mode=VisionRunningMode.VIDEO,
+154:             num_faces=num_faces,
+155:             min_face_detection_confidence=args_dict.get('mp_landmarker_min_face_detection_confidence', 0.3),
+156:             min_face_presence_confidence=args_dict.get('mp_landmarker_min_face_presence_confidence', 0.2),
+157:             min_tracking_confidence=args_dict.get('mp_landmarker_min_tracking_confidence', 0.3),
+158:             output_face_blendshapes=True
+159:         )
+160: 
+161:         object_options = ObjectDetectorOptions(
+162:             base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
+163:             running_mode=VisionRunningMode.VIDEO,
+164:             max_results=args_dict.get('object_max_results', 5),
+165:             score_threshold=args_dict.get('object_score_threshold', 0.4)
+166:         )
+167: 
+168:         landmarker_global = FaceLandmarker.create_from_options(face_options)
+169:         object_detector_global = ObjectDetector.create_from_options(object_options)
+170:         logging.info(f"[WORKER-{worker_pid}] Initialized MediaPipe engine")
+171:         
+172:         logging.info(f"[WORKER-{worker_pid}] Initialization complete")
+173:         
+174:     except Exception as e:
+175:         logging.error(f"[WORKER-{worker_pid}] Initialization failed: {e}")
+176:         landmarker_global = None
+177:         object_detector_global = None
+178: 
 179: 
-180:     STEP5_OPENCV_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-181:         os.environ.get('STEP5_OPENCV_MAX_FACES')
-182:     )
-183:     STEP5_OPENCV_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENCV_JAWOPEN_SCALE', '1.0'))
-184: 
-185:     STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-186:         os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
-187:     )
-188:     STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
-189:     STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
-190:         os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
-191:     )
-192: 
-193:     # STEP5 OpenSeeFace Engine Configuration
-194:     # Lightweight CPU tracking via ONNX Runtime (OpenSeeFace-style models)
-195:     STEP5_OPENSEEFACE_MODELS_DIR: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_MODELS_DIR')
-196:     STEP5_OPENSEEFACE_MODEL_ID: int = int(os.environ.get('STEP5_OPENSEEFACE_MODEL_ID', '1'))
-197:     STEP5_OPENSEEFACE_DETECTION_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_DETECTION_MODEL_PATH')
-198:     STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OPENSEEFACE_LANDMARK_MODEL_PATH')
-199:     STEP5_OPENSEEFACE_DETECT_EVERY_N: int = int(os.environ.get('STEP5_OPENSEEFACE_DETECT_EVERY_N', '1'))
-200:     STEP5_OPENSEEFACE_MAX_WIDTH: int = int(
-201:         os.environ.get('STEP5_OPENSEEFACE_MAX_WIDTH')
-202:         or os.environ.get('STEP5_YUNET_MAX_WIDTH', '640')
-203:     )
-204:     STEP5_OPENSEEFACE_DETECTION_THRESHOLD: float = float(os.environ.get('STEP5_OPENSEEFACE_DETECTION_THRESHOLD', '0.6'))
-205:     STEP5_OPENSEEFACE_MAX_FACES: int = int(os.environ.get('STEP5_OPENSEEFACE_MAX_FACES', '1'))
-206:     STEP5_OPENSEEFACE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_OPENSEEFACE_JAWOPEN_SCALE', '1.0'))
-207: 
-208:     STEP5_EOS_ENV_PYTHON: Optional[str] = os.environ.get('STEP5_EOS_ENV_PYTHON')
-209:     STEP5_EOS_MODELS_DIR: Optional[str] = os.environ.get('STEP5_EOS_MODELS_DIR')
-210:     STEP5_EOS_SFM_MODEL_PATH: Optional[str] = os.environ.get('STEP5_EOS_SFM_MODEL_PATH')
-211:     STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH: Optional[str] = os.environ.get('STEP5_EOS_EXPRESSION_BLENDSHAPES_PATH')
-212:     STEP5_EOS_LANDMARK_MAPPER_PATH: Optional[str] = os.environ.get('STEP5_EOS_LANDMARK_MAPPER_PATH')
-213:     STEP5_EOS_EDGE_TOPOLOGY_PATH: Optional[str] = os.environ.get('STEP5_EOS_EDGE_TOPOLOGY_PATH')
-214:     STEP5_EOS_MODEL_CONTOUR_PATH: Optional[str] = os.environ.get('STEP5_EOS_MODEL_CONTOUR_PATH')
-215:     STEP5_EOS_CONTOUR_LANDMARKS_PATH: Optional[str] = os.environ.get('STEP5_EOS_CONTOUR_LANDMARKS_PATH')
-216:     STEP5_EOS_FIT_EVERY_N: int = int(os.environ.get('STEP5_EOS_FIT_EVERY_N', '1'))
-217:     STEP5_EOS_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-218:         os.environ.get('STEP5_EOS_MAX_FACES')
-219:     )
-220:     STEP5_EOS_MAX_WIDTH: int = int(os.environ.get('STEP5_EOS_MAX_WIDTH', '1280'))
-221:     STEP5_EOS_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_EOS_JAWOPEN_SCALE', '1.0'))
-222:     
-223:     def __post_init__(self):
-224:         """Post-initialization to ensure paths are Path objects and create directories."""
-225:         # Ensure all path attributes are Path objects
-226:         if isinstance(self.BASE_PATH_SCRIPTS, str):
-227:             self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
-228:         if isinstance(self.CACHE_ROOT_DIR, str):
-229:             self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
-230:         if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
-231:             self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
-232:         if isinstance(self.LOGS_DIR, str):
-233:             self.LOGS_DIR = Path(self.LOGS_DIR)
-234: 
-235:         if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
-236:             self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
-237:         
-238:         # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
-239:         if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
-240:             self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
-241:         elif isinstance(self.VENV_BASE_DIR, str):
-242:             self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
-243: 
-244:         # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
-245:         # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
-246:         if not self.PYTHON_VENV_EXE:
-247:             self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
-248:         else:
-249:             python_exe_path = Path(self.PYTHON_VENV_EXE)
-250:             if not python_exe_path.is_absolute():
-251:                 self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
-252:         
-253:         # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
-254:         # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
-255:         # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
-256:         # like 'projets_extraits/logs' when steps run with a different CWD.
-257:         if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
-258:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
-259:         elif not self.LOGS_DIR.is_absolute():
-260:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
-261: 
-262:         if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
-263:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
-264:         elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
-265:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
-266: 
-267:         if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
-268:             self.CACHE_ROOT_DIR = Path('/mnt/cache')
-269:         elif not self.CACHE_ROOT_DIR.is_absolute():
-270:             self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
-271:         else:
-272:             self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
-273: 
-274:         # Default PROJECTS_DIR if not set
-275:         if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
-276:             self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
-277:         elif isinstance(self.PROJECTS_DIR, str):
-278:             self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
-279:         # Default ARCHIVES_DIR if not set
-280:         if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
-281:             self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
-282:         elif isinstance(self.ARCHIVES_DIR, str):
-283:             self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
-284:             
-285:         # Create necessary directories
-286:         self._create_directories()
-287:     
-288:     def _create_directories(self) -> None:
-289:         """Create necessary directories if they don't exist."""
-290:         directories_to_create = [
-291:             self.LOGS_DIR,
-292:             self.LOGS_DIR / 'step1',
-293:             self.LOGS_DIR / 'step2',
-294:             self.LOGS_DIR / 'step3',
-295:             self.LOGS_DIR / 'step4',
-296:             self.LOGS_DIR / 'step5',
-297:             self.LOGS_DIR / 'step6',
-298:             self.LOGS_DIR / 'step7',
-299:             # Ensure projects directory exists by default to avoid confusion
-300:             self.PROJECTS_DIR,
-301:             # Ensure archives directory exists
-302:             self.ARCHIVES_DIR,
-303:         ]
-304:         
-305:         for directory in directories_to_create:
-306:             try:
-307:                 directory.mkdir(parents=True, exist_ok=True)
-308:                 logger.debug(f"Ensured directory exists: {directory}")
-309:             except Exception as e:
-310:                 logger.error(f"Failed to create directory {directory}: {e}")
-311:     
-312:     def validate(self, strict: bool = None) -> bool:
-313:         """
-314:         Validate the configuration and ensure all required settings are present.
-315: 
-316:         Args:
-317:             strict: If None, uses DEBUG mode to determine strictness.
-318:                    If True, raises errors. If False, logs warnings.
-319: 
-320:         Returns:
-321:             bool: True if configuration is valid
-322: 
-323:         Raises:
-324:             ValueError: If required configuration is missing or invalid and strict=True
-325:         """
-326:         if strict is None:
-327:             strict = not self.DEBUG  # Strict in production, lenient in development
+180: def process_frame_chunk(chunk_data):
+181:     """
+182:     Process a chunk of frames using the initialized models.
+183:     Returns detection results for all frames in the chunk.
+184:     """
+185:     global landmarker_global, object_detector_global
+186:     
+187:     worker_pid = os.getpid()
+188:     
+189:     if not landmarker_global:
+190:         logging.error(f"[WORKER-{worker_pid}] MediaPipe not properly initialized")
+191:         return []
+192:     
+193:     chunk_start, chunk_end, video_path, args_dict = chunk_data
+194:     results = []
+195:     
+196:     try:
+197:         logging.info(f"[WORKER-{worker_pid}] Processing chunk [{chunk_start}, {chunk_end}] ({chunk_end - chunk_start + 1} frames)")
+198: 
+199:         enable_profiling = bool(args_dict.get('enable_profiling'))
+200:         profiling_stats = {
+201:             "to_rgb_total": 0.0,
+202:             "detect_total": 0.0,
+203:             "post_total": 0.0,
+204:             "frame_count": 0,
+205:         }
+206:         blendshapes_throttle_n = max(1, int(args_dict.get('blendshapes_throttle_n', 1) or 1))
+207:         jaw_open_scale = float(args_dict.get('mediapipe_jawopen_scale', 1.0) or 1.0)
+208:         max_width = _parse_optional_positive_int(args_dict.get('mediapipe_max_width'))
+209:         blendshapes_cache = {}
+210:         
+211:         # Open video capture for this chunk
+212:         cap = cv2.VideoCapture(video_path)
+213:         if not cap.isOpened():
+214:             logging.error(f"[WORKER-{worker_pid}] Failed to open video: {video_path}")
+215:             return []
+216:         
+217:         cap.read()
+218:         cap.set(cv2.CAP_PROP_POS_FRAMES, chunk_start)
+219:         
+220:         frames_processed = 0
+221:         for frame_idx in range(chunk_start, chunk_end + 1):
+222:             frames_processed += 1
+223:             
+224:             # Log progression every 10 frames
+225:             if frames_processed % 10 == 0:
+226:                 logging.debug(f"[WORKER-{worker_pid}] Chunk [{chunk_start}, {chunk_end}]: processed {frames_processed}/{chunk_end - chunk_start + 1} frames")
+227:             if enable_profiling:
+228:                 profiling_stats["frame_count"] += 1
+229:             ret, frame = cap.read()
+230:             if not ret:
+231:                 try:
+232:                     cap.release()
+233:                 except Exception:
+234:                     pass
+235: 
+236:                 cap = cv2.VideoCapture(video_path)
+237:                 if cap.isOpened():
+238:                     cap.read()
+239:                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+240:                     ret, frame = cap.read()
+241: 
+242:                     if (not ret) and frame_idx > 0:
+243:                         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx - 1)
+244:                         cap.read()
+245:                         ret, frame = cap.read()
+246: 
+247:                     if (not ret) and args_dict.get('fps'):
+248:                         try:
+249:                             cap.set(
+250:                                 cv2.CAP_PROP_POS_MSEC,
+251:                                 int(frame_idx * 1000 / float(args_dict.get('fps', 25))),
+252:                             )
+253:                             ret, frame = cap.read()
+254:                         except Exception:
+255:                             pass
+256: 
+257:                 if not ret:
+258:                     # Tolerate last frame read failures (common with certain codecs)
+259:                     if frame_idx >= args_dict.get('total_frames', 0) - 1:
+260:                         logging.debug(
+261:                             f"Skipping unreadable frame {frame_idx} (near end of video) "
+262:                             f"for chunk [{chunk_start}, {chunk_end}] in {Path(video_path).name}."
+263:                         )
+264:                     else:
+265:                         logging.warning(
+266:                             f"Failed to read frame {frame_idx} for chunk [{chunk_start}, {chunk_end}] "
+267:                             f"in {Path(video_path).name}."
+268:                         )
+269:                     results.append({
+270:                         'frame_idx': frame_idx,
+271:                         'detections': [],
+272:                         'face_detected': False
+273:                     })
+274: 
+275:                     next_frame_idx = frame_idx + 1
+276:                     if next_frame_idx <= chunk_end:
+277:                         try:
+278:                             cap.release()
+279:                         except Exception:
+280:                             pass
+281:                         cap = cv2.VideoCapture(video_path)
+282:                         if cap.isOpened():
+283:                             cap.read()
+284:                             cap.set(cv2.CAP_PROP_POS_FRAMES, next_frame_idx)
+285:                     continue
+286:             
+287:             current_detections = []
+288:             face_detected = False
+289:             
+290:             orig_h, orig_w = frame.shape[:2]
+291:             work_frame = frame
+292:             scale_to_original = 1.0
+293:             if max_width is not None and orig_w > max_width:
+294:                 scale_factor = float(max_width) / float(orig_w)
+295:                 work_h = max(1, int(orig_h * scale_factor))
+296:                 work_frame = cv2.resize(frame, (int(max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
+297:                 scale_to_original = float(orig_w) / float(work_frame.shape[1])
+298: 
+299:             t_to_rgb = time.perf_counter() if enable_profiling else 0.0
+300:             mp_image = mp.Image(
+301:                 image_format=mp.ImageFormat.SRGB,
+302:                 data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
+303:             )
+304:             if enable_profiling:
+305:                 profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
+306: 
+307:             timestamp_ms = int(frame_idx * 1000 / args_dict.get('fps', 25))
+308: 
+309:             try:
+310:                 t_detect = time.perf_counter() if enable_profiling else 0.0
+311:                 face_result = landmarker_global.detect_for_video(mp_image, timestamp_ms)
+312:                 if enable_profiling:
+313:                     profiling_stats["detect_total"] += time.perf_counter() - t_detect
+314: 
+315:                 if face_result.face_landmarks:
+316:                     face_detected = True
+317: 
+318:                     for i, landmarks in enumerate(face_result.face_landmarks):
+319:                         t_post = time.perf_counter() if enable_profiling else 0.0
+320:                         x_coords = [lm.x * orig_w for lm in landmarks]
+321:                         y_coords = [lm.y * orig_h for lm in landmarks]
+322:                         bbox = (
+323:                             int(min(x_coords)), int(min(y_coords)),
+324:                             int(max(x_coords) - min(x_coords)),
+325:                             int(max(y_coords) - min(y_coords))
+326:                         )
+327:                         centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
 328: 
-329:         errors = []
-330:         warnings = []
-331: 
-332:         # Security validation
-333:         if not self.INTERNAL_WORKER_TOKEN:
-334:             msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
-335:             if strict:
-336:                 errors.append(msg)
-337:             else:
-338:                 warnings.append(msg)
-339:                 # Set development default
-340:                 self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-341: 
-342:         if not self.RENDER_REGISTER_TOKEN:
-343:             msg = "RENDER_REGISTER_TOKEN environment variable is required"
-344:             if strict:
-345:                 errors.append(msg)
-346:             else:
-347:                 warnings.append(msg)
-348:                 # Set development default
-349:                 self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
-350: 
-351:         # Production security checks
-352:         if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
-353:             errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
-354: 
-355:         # Webhook validation (single data source)
-356:         if not self.WEBHOOK_JSON_URL:
-357:             msg = "WEBHOOK_JSON_URL must be set"
-358:             if strict:
-359:                 errors.append(msg)
-360:             else:
-361:                 warnings.append(msg)
-362:         if self.WEBHOOK_TIMEOUT <= 0:
-363:             warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
-364:         if self.WEBHOOK_CACHE_TTL < 0:
-365:             warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
-366:         
-367:         # Path validation
-368:         if not self.BASE_PATH_SCRIPTS.exists():
-369:             warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
-370:         
-371:         if not self.LOCAL_DOWNLOADS_DIR.exists():
-372:             warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
-373:         
-374:         # Python executable validation
-375:         python_exe_path = Path(self.PYTHON_VENV_EXE)
-376:         if not python_exe_path.exists():
-377:             warnings.append(f"Python executable not found: {python_exe_path}")
-378:         
-379:         # Log warnings
-380:         for warning in warnings:
-381:             logger.warning(warning)
-382:         
-383:         # Log warnings
-384:         if warnings:
-385:             for warning in warnings:
-386:                 logger.warning(f"Configuration warning: {warning}")
-387:             if not strict:
-388:                 logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
-389: 
-390:         # Raise errors if any
-391:         if errors:
-392:             error_msg = f"Configuration validation failed: {'; '.join(errors)}"
-393:             logger.error(error_msg)
-394:             raise ValueError(error_msg)
-395: 
-396:         if warnings and not strict:
-397:             logger.info("Configuration validation completed with warnings (development mode)")
-398:         else:
-399:             logger.info("Configuration validation successful")
-400:         return True
-401:     
-402:     def get_venv_path(self, venv_name: str) -> Path:
-403:         """
-404:         Get the path to a virtual environment.
-405:         
-406:         Args:
-407:             venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
-408:             
-409:         Returns:
-410:             Path object to the virtual environment directory
-411:         """
-412:         return self.VENV_BASE_DIR / venv_name
-413:     
-414:     def get_venv_python(self, venv_name: str) -> Path:
-415:         """
-416:         Get the path to the Python executable in a virtual environment.
+329:                         det = {
+330:                             "bbox": bbox,
+331:                             "centroid": centroid,
+332:                             "source_detector": "face_landmarker",
+333:                             "label": "face"
+334:                         }
+335: 
+336:                         if face_result.face_blendshapes:
+337:                             raw_blendshapes = {
+338:                                 cat.category_name: cat.score
+339:                                 for cat in face_result.face_blendshapes[i]
+340:                             }
+341:                             scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, jaw_open_scale)
+342: 
+343:                             current_frame_num = frame_idx + 1
+344:                             should_update_blendshapes = (blendshapes_throttle_n <= 1) or ((current_frame_num % blendshapes_throttle_n) == 0)
+345:                             object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
+346:                             if should_update_blendshapes or object_id not in blendshapes_cache:
+347:                                 blendshapes_cache[object_id] = scaled_blendshapes
+348:                                 det["blendshapes"] = scaled_blendshapes
+349:                             else:
+350:                                 det["blendshapes"] = blendshapes_cache.get(object_id)
+351: 
+352:                         current_detections.append(det)
+353: 
+354:                         if enable_profiling:
+355:                             profiling_stats["post_total"] += time.perf_counter() - t_post
+356: 
+357:             except Exception as e:
+358:                 logging.warning(f"Face detection failed for frame {frame_idx}: {e}")
+359: 
+360:             if enable_profiling:
+361:                 fc = int(profiling_stats.get("frame_count", 0) or 0)
+362:                 if fc > 0 and (fc % 20) == 0:
+363:                     to_rgb_ms = (profiling_stats["to_rgb_total"] / fc) * 1000.0
+364:                     detect_ms = (profiling_stats["detect_total"] / fc) * 1000.0
+365:                     post_ms = (profiling_stats["post_total"] / fc) * 1000.0
+366:                     logging.info(
+367:                         "[PROFILING] MediaPipe after %s frames: to_rgb=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
+368:                         fc,
+369:                         to_rgb_ms,
+370:                         detect_ms,
+371:                         post_ms,
+372:                     )
+373:             
+374:             # Object detection fallback if no faces detected
+375:             if not face_detected and args_dict.get('enable_object_detection', False) and object_detector_global:
+376:                 try:
+377:                     object_result = object_detector_global.detect_for_video(mp_image, timestamp_ms)
+378:                     
+379:                     if object_result.detections:
+380:                         for detection in object_result.detections:
+381:                             bbox = detection.bounding_box
+382:                             x_min = int(bbox.origin_x)
+383:                             y_min = int(bbox.origin_y)
+384:                             width = int(bbox.width)
+385:                             height = int(bbox.height)
+386: 
+387:                             x_min = int(max(0, x_min * scale_to_original))
+388:                             y_min = int(max(0, y_min * scale_to_original))
+389:                             width = int(max(0, width * scale_to_original))
+390:                             height = int(max(0, height * scale_to_original))
+391:                             
+392:                             centroid = (x_min + width // 2, y_min + height // 2)
+393:                             
+394:                             best_category = detection.categories[0] if detection.categories else None
+395:                             label = best_category.category_name if best_category else "object"
+396:                             confidence = best_category.score if best_category else 0.0
+397:                             
+398:                             det = {
+399:                                 "bbox": (x_min, y_min, width, height),
+400:                                 "centroid": centroid,
+401:                                 "source_detector": "object_detector",
+402:                                 "label": label,
+403:                                 "confidence": confidence,
+404:                                 "blendshapes": None,
+405:                                 "is_speaking": None
+406:                             }
+407:                             current_detections.append(det)
+408:                             
+409:                 except Exception as e:
+410:                     logging.warning(f"Object detection failed for frame {frame_idx}: {e}")
+411:             
+412:             results.append({
+413:                 'frame_idx': frame_idx,
+414:                 'detections': current_detections,
+415:                 'face_detected': face_detected
+416:             })
 417:         
-418:         Args:
-419:             venv_name: Name of the virtual environment
-420:             
-421:         Returns:
-422:             Path object to the Python executable
-423:         """
-424:         return self.get_venv_path(venv_name) / "bin" / "python"
-425:     
-426:     def get_allowed_base_paths(self) -> List[Path]:
-427:         """
-428:         Get list of allowed base paths for file operations.
-429:         
-430:         Returns:
-431:             List of Path objects representing allowed base directories
-432:         """
-433:         return [
-434:             self.BASE_PATH_SCRIPTS,
-435:             self.LOCAL_DOWNLOADS_DIR,
-436:             self.LOGS_DIR,
-437:             self.BASE_PATH_SCRIPTS / 'workflow_scripts',
-438:             self.BASE_PATH_SCRIPTS / 'static',
-439:             self.BASE_PATH_SCRIPTS / 'templates',
-440:             self.BASE_PATH_SCRIPTS / 'utils',
-441:         ]
-442:     
-443:     def to_dict(self) -> dict:
-444:         """
-445:         Convert configuration to dictionary for serialization.
-446:         
-447:         Returns:
-448:             Dictionary representation of configuration (excluding sensitive data)
-449:         """
-450:         config_dict = {}
-451:         for key, value in self.__dict__.items():
-452:             # Exclude sensitive information
-453:             if 'TOKEN' in key or 'SECRET' in key:
-454:                 config_dict[key] = '***HIDDEN***' if value else None
-455:             elif isinstance(value, Path):
-456:                 config_dict[key] = str(value)
-457:             else:
-458:                 config_dict[key] = value
-459:         
-460:         return config_dict
-461:     
-462:     @staticmethod
-463:     def check_gpu_availability() -> dict:
-464:         """
-465:         Vérifier la disponibilité GPU pour STEP5 (MediaPipe + OpenSeeFace).
-466:         
-467:         Returns:
-468:             dict: {
-469:                 'available': bool,
-470:                 'reason': str (si non disponible),
-471:                 'vram_total_gb': float (si disponible),
-472:                 'vram_free_gb': float (si disponible),
-473:                 'cuda_version': str (si disponible),
-474:                 'onnx_cuda': bool,
-475:                 'tensorflow_gpu': bool
-476:             }
-477:         """
-478:         result = {
-479:             'available': False,
-480:             'reason': '',
-481:             'onnx_cuda': False,
-482:             'tensorflow_gpu': False
-483:         }
-484:         
-485:         # Check PyTorch CUDA (indicateur général)
-486:         try:
-487:             import torch
-488:             if not torch.cuda.is_available():
-489:                 result['reason'] = 'CUDA not available (PyTorch check)'
-490:                 return result
-491:             
-492:             # Vérifier VRAM
-493:             vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Go
-494:             vram_free = (torch.cuda.mem_get_info()[0]) / (1024**3)  # Go
-495:             
-496:             result['vram_total_gb'] = round(vram_total, 2)
-497:             result['vram_free_gb'] = round(vram_free, 2)
-498:             result['cuda_version'] = torch.version.cuda
-499:             
-500:             # Vérifier VRAM minimale (2 Go libres recommandés)
-501:             if vram_free < 1.5:
-502:                 result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
-503:                 return result
-504:         
-505:         except ImportError:
-506:             result['reason'] = 'PyTorch not installed in tracking_env'
-507:             return result
-508:         except Exception as e:
-509:             result['reason'] = f'PyTorch CUDA check failed: {e}'
-510:             return result
-511:         
-512:         # Check ONNXRuntime CUDA provider (requis pour OpenSeeFace / InsightFace)
-513:         try:
-514:             import onnxruntime as ort
-515:             if 'CUDAExecutionProvider' in ort.get_available_providers():
-516:                 result['onnx_cuda'] = True
-517:         except ImportError:
-518:             pass
-519:         except Exception as e:
-520:             logger.warning(f"ONNXRuntime check failed: {e}")
-521: 
-522:         # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
-523:         if not result.get('onnx_cuda'):
-524:             ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
-525:             if ort_gpu_python:
-526:                 try:
-527:                     ort_check_code = (
-528:                         "import sys\n"
-529:                         "import onnxruntime as ort\n"
-530:                         "providers = ort.get_available_providers()\n"
-531:                         "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
-532:                     )
-533:                     completed = subprocess.run(
-534:                         [ort_gpu_python, "-c", ort_check_code],
-535:                         capture_output=True,
-536:                         text=True,
-537:                         timeout=15,
-538:                     )
-539:                     if completed.returncode == 0:
-540:                         result['onnx_cuda'] = completed.stdout.strip() == "1"
-541:                     else:
-542:                         logger.warning(
-543:                             "ONNXRuntime GPU check failed (external env returned code %s): %s",
-544:                             completed.returncode,
-545:                             completed.stderr.strip(),
-546:                         )
-547:                 except FileNotFoundError:
-548:                     logger.warning(
-549:                         "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
-550:                         ort_gpu_python,
-551:                     )
-552:                 except subprocess.TimeoutExpired:
-553:                     logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
-554:                 except Exception as exc:
-555:                     logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
-556:         
-557:         # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
-558:         if result['onnx_cuda']:
-559:             result['available'] = True
-560:         else:
-561:             result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
-562:         
-563:         return result
-564:     
-565:     @staticmethod
-566:     def is_step5_gpu_enabled() -> bool:
-567:         """
-568:         Vérifier si le mode GPU STEP5 est activé via configuration.
-569:         
-570:         Returns:
-571:             bool: True si STEP5_ENABLE_GPU=1
-572:         """
-573:         return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
-574:     
-575:     @staticmethod
-576:     def get_step5_gpu_engines() -> List[str]:
-577:         """
-578:         Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
-579:         
-580:         Returns:
-581:             List[str]: ['mediapipe_landmarker', 'openseeface', ...]
-582:         """
-583:         engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
-584:         engines = _parse_csv_list(engines_str)
-585:         # Normaliser les noms
-586:         return [e.strip().lower() for e in engines if e.strip()]
-587:     
-588:     @staticmethod
-589:     def get_step5_gpu_max_vram_mb() -> int:
-590:         """
-591:         Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
-592:         
-593:         Returns:
-594:             int: Limite en Mo (défaut: 2048)
-595:         """
-596:         return _parse_optional_positive_int(
-597:             os.environ.get('STEP5_GPU_MAX_VRAM_MB')
-598:         ) or 2048
-599: 
-600: 
-601: # Global configuration instance
-602: config = Config()
+418:         cap.release()
+419:         logging.info(f"[WORKER-{worker_pid}] Chunk [{chunk_start}, {chunk_end}] completed: {len(results)} frames processed")
+420:         return results
+421:         
+422:     except Exception as e:
+423:         logging.error(f"[WORKER-{worker_pid}] CRITICAL ERROR in chunk [{chunk_start}, {chunk_end}]: {type(e).__name__}: {e}")
+424:         import traceback
+425:         logging.error(f"[WORKER-{worker_pid}] Traceback: {traceback.format_exc()}")
+426:         try:
+427:             cap.release()
+428:         except:
+429:             pass
+430:         return []
+431: 
+432: 
+433: def process_video_multiprocessing(args, video_capture, total_frames):
+434:     """
+435:     Process video using multiprocessing with frame chunking.
+436:     """
+437:     logging.info(f"Starting multiprocessing with {args.mp_num_workers_internal} workers")
+438:     
+439:     # Get video metadata
+440:     fps = video_capture.get(cv2.CAP_PROP_FPS)
+441:     
+442:     # Prepare arguments for workers
+443:     models_dir = Path(args.models_dir)
+444:     args_dict = {
+445:         'tracking_engine': getattr(args, 'tracking_engine', None),
+446:         'mp_landmarker_num_faces': args.mp_landmarker_num_faces,
+447:         'mp_landmarker_min_face_detection_confidence': args.mp_landmarker_min_face_detection_confidence,
+448:         'mp_landmarker_min_face_presence_confidence': args.mp_landmarker_min_face_presence_confidence,
+449:         'mp_landmarker_min_tracking_confidence': args.mp_landmarker_min_tracking_confidence,
+450:         'object_max_results': getattr(args, 'object_max_results', 5),
+451:         'object_score_threshold': getattr(args, 'object_score_threshold', 0.4),
+452:         'enable_object_detection': getattr(args, 'enable_object_detection', False),
+453:         'fps': fps,
+454:         'enable_profiling': _is_truthy_env(os.environ.get('STEP5_ENABLE_PROFILING', '0')),
+455:         'blendshapes_throttle_n': max(1, int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))),
+456:         'mediapipe_max_width': os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH'),
+457:         'mediapipe_max_faces': os.environ.get('STEP5_MEDIAPIPE_MAX_FACES'),
+458:         'mediapipe_jawopen_scale': os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'),
+459:         'object_detector_model': getattr(args, 'object_detector_model', None) or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL'),
+460:         'object_detector_model_path': getattr(args, 'object_detector_model_path', None) or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
+461:         'total_frames': total_frames,
+462:     }
+463:     
+464:     # Create frame chunks (adaptive chunk size to keep CPU workers saturated)
+465:     # If chunk_size is provided (>0), honor it; otherwise, derive adaptively.
+466:     provided_chunk_size = int(getattr(args, 'chunk_size', 400))
+467:     if provided_chunk_size <= 0:
+468:         # Target ~5 chunks per worker, minimum 20 chunks overall.
+469:         mp_workers = max(1, int(getattr(args, 'mp_num_workers_internal', 1)))
+470:         target_chunks = max(mp_workers * 5, 20)
+471:         # Compute chunk size from total frames and clamp to avoid too fine granularity.
+472:         adaptive_chunk = int(math.ceil(total_frames / max(1, target_chunks)))
+473:         # Allow small chunks to reach ~5x workers (e.g., ~75 chunks for ~1600 frames & 15 workers)
+474:         # Bounds can be overridden via args.chunk_min/chunk_max if provided.
+475:         min_bound = int(getattr(args, 'chunk_min', 20) or 20)
+476:         max_bound = int(getattr(args, 'chunk_max', 400) or 400)
+477:         if min_bound > max_bound:
+478:             min_bound, max_bound = max_bound, min_bound
+479:         chunk_size = max(min_bound, min(max_bound, adaptive_chunk))
+480:         logging.info(
+481:             f"Adaptive chunking enabled: total_frames={total_frames}, workers={mp_workers}, "
+482:             f"target_chunks={target_chunks}, bounds=[{min_bound},{max_bound}], selected_chunk_size={chunk_size}"
+483:         )
+484:     else:
+485:         chunk_size = provided_chunk_size
+486:         logging.info(f"Using provided chunk_size={chunk_size}")
+487: 
+488:     chunks = []
+489:     
+490:     for start_frame in range(0, total_frames, chunk_size):
+491:         end_frame = min(start_frame + chunk_size - 1, total_frames - 1)
+492:         chunks.append((start_frame, end_frame, args.video_file_path, args_dict))
+493:     
+494:     logging.info(f"Created {len(chunks)} chunks for processing (chunk_size={chunk_size})")
+495:     
+496:     # Process chunks using multiprocessing
+497:     all_results = {}
+498:     face_detection_count = 0
+499:     processing_start_time = time.time()
+500:     
+501:     # Use ProcessPoolExecutor for better resource management
+502:     with ProcessPoolExecutor(
+503:         max_workers=args.mp_num_workers_internal,
+504:         initializer=init_worker_process,
+505:         initargs=(models_dir, args_dict)
+506:     ) as executor:
+507:         
+508:         # Submit all chunks
+509:         future_to_chunk = {executor.submit(process_frame_chunk, chunk): chunk for chunk in chunks}
+510:         
+511:         completed_chunks = 0
+512:         # Throttle progress logs to ~10% intervals
+513:         progress_every = max(1, len(chunks) // 10)
+514:         for future in as_completed(future_to_chunk):
+515:             chunk = future_to_chunk[future]
+516:             try:
+517:                 chunk_results = future.result()
+518:                 
+519:                 # Store results by frame index
+520:                 for result in chunk_results:
+521:                     all_results[result['frame_idx']] = result
+522:                     if result['face_detected']:
+523:                         face_detection_count += 1
+524:                 
+525:                 completed_chunks += 1
+526:                 
+527:                 # Progress logging (throttled)
+528:                 if completed_chunks % progress_every == 0:
+529:                     progress_percent = (completed_chunks / len(chunks)) * 100
+530:                     elapsed_time = time.time() - processing_start_time
+531:                     fps_rate = (completed_chunks * chunk_size) / elapsed_time if elapsed_time > 0 else 0
+532:                     print(f"[Progression]|{int(progress_percent)}|{min(completed_chunks * chunk_size, total_frames)}|{total_frames}")
+533:                     logging.info(f"Multiprocessing: {completed_chunks}/{len(chunks)} chunks ({progress_percent:.1f}%) - {fps_rate:.1f} fps (chunk_size={chunk_size})")
+534:                     
+535:             except Exception as e:
+536:                 logging.error(f"Chunk processing failed: {e}")
+537:     
+538:     logging.info("Multiprocessing complete, applying sequential tracking...")
+539:     
+540:     # Apply tracking sequentially (must be sequential for consistency)
+541:     tracked_objects = {}
+542:     next_id_counter = {'value': 0}
+543:     final_output = {
+544:         "metadata": {
+545:             "video_path": args.video_file_path,
+546:             "total_frames": total_frames,
+547:             "fps": fps
+548:         },
+549:         "frames": []
+550:     }
+551:     
+552:     # Initialize enhanced speaking detector
+553:     enhanced_speaking_detector = None
+554:     try:
+555:         enhanced_speaking_detector = EnhancedSpeakingDetector(
+556:             video_path=args.video_file_path,
+557:             jaw_threshold=args.speaking_detection_jaw_open_threshold
+558:         )
+559:         logging.info("Enhanced speaking detection initialized")
+560:     except Exception as e:
+561:         logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
+562:     
+563:     missing_frame_count = 0
+564:     first_missing_frame = None
+565:     for frame_idx in range(total_frames):
+566:         result = all_results.get(frame_idx)
+567:         if result is None:
+568:             missing_frame_count += 1
+569:             if first_missing_frame is None:
+570:                 first_missing_frame = frame_idx
+571:             detections = []
+572:         else:
+573:             detections = result.get('detections', [])
+574:         
+575:         tracked_for_frame = apply_tracking_and_management(
+576:             tracked_objects, detections, next_id_counter,
+577:             args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
+578:             args.speaking_detection_jaw_open_threshold,
+579:             enhanced_speaking_detector=enhanced_speaking_detector,
+580:             current_frame_num=frame_idx + 1
+581:         )
+582:         
+583:         final_output["frames"].append({
+584:             "frame": frame_idx + 1,
+585:             "tracked_objects": tracked_for_frame if tracked_for_frame else []
+586:         })
+587: 
+588:     if missing_frame_count > 0:
+589:         logging.warning(
+590:             f"Missing detection results for {missing_frame_count}/{total_frames} frames "
+591:             f"(first missing frame index: {first_missing_frame}). Output remains dense with empty tracked_objects." 
+592:         )
+593:     
+594:     # Calculate final statistics
+595:     face_detection_rate = (face_detection_count / total_frames * 100) if total_frames > 0 else 0
+596:     processing_time = time.time() - processing_start_time
+597:     
+598:     logging.info("Multiprocessing summary:")
+599:     logging.info(f"  Total frames expected: {total_frames}")
+600:     logging.info(f"  Total frames with detection results: {len(all_results)}")
+601:     logging.info(f"  Frames with faces: {face_detection_count}")
+602:     logging.info(f"  Face detection success rate: {face_detection_rate:.2f}%")
+603:     logging.info(f"  Processing time: {processing_time:.2f} seconds")
+604:     logging.info(f"  Average FPS: {total_frames / processing_time:.2f}")
+605:     logging.info(f"  Total frames exported: {len(final_output['frames'])}")
+606:     
+607:     return final_output
+608: 
+609: 
+610: def main(args):
+611:     """Main processing function with multiprocessing support."""
+612:     engine_norm = (str(getattr(args, 'tracking_engine', '') or '').strip().lower())
+613:     
+614:     worker_type = "CPU_MULTIPROCESSING" if getattr(args, 'mp_num_workers_internal', 1) > 1 else "CPU"
+615:     logging.info(f"Starting {worker_type} processing for: {Path(args.video_file_path).name}")
+616:     
+617:     # Use safe video processing with automatic resource cleanup
+618:     try:
+619:         with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
+620:             # Get video metadata safely
+621:             fps = video_capture.get(cv2.CAP_PROP_FPS)
+622:             total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+623:             
+624:             logging.info(f"Video metadata - FPS: {fps}, Total frames: {total_frames}")
+625:             
+626:             # Check if multiprocessing should be used
+627:             use_multiprocessing = (not getattr(args, 'use_gpu', False) and 
+628:                                  getattr(args, 'mp_num_workers_internal', 1) > 1)
+629:             
+630:             if use_multiprocessing:
+631:                 final_output = process_video_multiprocessing(args, video_capture, total_frames)
+632:             else:
+633:                 # Fallback to sequential processing (existing implementation)
+634:                 logging.info("Using sequential processing (fallback)")
+635:                 # ... existing sequential logic would go here
+636:                 return False
+637:                 
+638:     except Exception as e:
+639:         logging.error(f"Error processing video {args.video_file_path}: {e}")
+640:         raise
+641:     
+642:     # Save output
+643:     output_path = Path(args.video_file_path).with_suffix('.json')
+644:     try:
+645:         with open(output_path, 'w', encoding='utf-8') as f:
+646:             json.dump(final_output, f, indent=2, ensure_ascii=False)
+647:         logging.info(f"Processing complete. JSON saved: {output_path.name}")
+648:         print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
+649:     except Exception as e:
+650:         logging.error(f"Failed to save output file {output_path}: {e}")
+651:         raise
+652: 
+653: 
+654: if __name__ == "__main__":
+655:     parser = argparse.ArgumentParser(description="Enhanced CPU Worker with Multiprocessing")
+656:     parser.add_argument("video_file_path")
+657:     parser.add_argument("--models_dir", required=True)
+658:     parser.add_argument("--use_gpu", action="store_true")
+659:     parser.add_argument(
+660:         "--tracking_engine",
+661:         default=None,
+662:         help="Tracking engine: vide (MediaPipe par défaut). 'insightface' n'est pas supporté en worker CPU multiprocessing.",
+663:     )
+664:     parser.add_argument("--mp_landmarker_num_faces", type=int, default=5)
+665:     parser.add_argument("--mp_landmarker_min_face_detection_confidence", type=float, default=0.3)
+666:     parser.add_argument("--mp_landmarker_min_face_presence_confidence", type=float, default=0.2)
+667:     parser.add_argument("--mp_landmarker_min_tracking_confidence", type=float, default=0.3)
+668:     parser.add_argument("--mp_max_distance_tracking", type=int, default=80)
+669:     parser.add_argument("--mp_frames_unseen_deregister", type=int, default=7)
+670:     parser.add_argument("--speaking_detection_jaw_open_threshold", type=float, default=0.08)
+671:     parser.add_argument("--enable_object_detection", action="store_true")
+672:     parser.add_argument("--object_score_threshold", type=float, default=0.4)
+673:     parser.add_argument("--object_max_results", type=int, default=5)
+674:     parser.add_argument("--mp_num_workers_internal", type=int, default=1)
+675:     parser.add_argument("--chunk_size", type=int, default=0, help="Chunk size (frames) for multiprocessing splitting; 0=adaptive")
+676:     parser.add_argument("--chunk_min", type=int, default=None, help="Minimum chunk size when adaptive is used")
+677:     parser.add_argument("--chunk_max", type=int, default=None, help="Maximum chunk size when adaptive is used")
+678:     
+679:     args, _ = parser.parse_known_args()
+680:     
+681:     try:
+682:         mp_proc.freeze_support()  # Required for Windows compatibility
+683:         main(args)
+684:         sys.exit(0)
+685:     except Exception as e:
+686:         logging.error(f"Critical error in worker: {e}", exc_info=True)
+687:         sys.exit(1)
 ```
 
-## File: static/css/components/logs.css
+## File: workflow_scripts/step5/process_video_worker.py
+```python
+   1: #!/usr/bin/env python3
+   2: # -*- coding: utf-8 -*-
+   3: import os, sys, json, argparse, logging, importlib, cv2, numpy as np
+   4: import threading, queue, time
+   5: from concurrent.futures import ThreadPoolExecutor, as_completed
+   6: from pathlib import Path
+   7: 
+   8: sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+   9: from utils.tracking_optimizations import apply_tracking_and_management
+  10: from utils.resource_manager import safe_video_processing, get_video_metadata, resource_tracker
+  11: from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
+  12: 
+  13: from face_engines import create_face_engine
+  14: from object_detector_registry import ObjectDetectorRegistry
+  15: 
+  16: mp = None
+  17: 
+  18: 
+  19: def _ensure_mediapipe_loaded(required: bool = False):
+  20:     """Lazy import Mediapipe to avoid TensorFlow dependency unless needed."""
+  21:     global mp
+  22:     if mp is not None:
+  23:         return mp
+  24:     try:
+  25:         if not hasattr(np, "complex_"):
+  26:             np.complex_ = np.complex128
+  27:         mp = importlib.import_module("mediapipe")
+  28:         return mp
+  29:     except Exception as exc:
+  30:         msg = f"MediaPipe import failed: {exc}"
+  31:         if required:
+  32:             logging.error(msg)
+  33:             raise
+  34:         logging.warning(msg)
+  35:         return None
+  36: 
+  37: # Configuration du logger
+  38: log_dir = Path(__file__).resolve().parent.parent.parent / "logs" / "step5"
+  39: log_dir.mkdir(parents=True, exist_ok=True)
+  40: worker_type_str = "GPU" if "--use_gpu" in sys.argv else "CPU"
+  41: video_name_for_log = Path(sys.argv[1]).stem if len(sys.argv) > 1 else "unknown"
+  42: log_file = log_dir / f"worker_{worker_type_str}_{video_name_for_log}_{os.getpid()}.log"
+  43: logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s',
+  44:                     handlers=[logging.FileHandler(log_file, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
+  45: 
+  46: # Limiter le threading interne d'OpenCV pour éviter la contention avec nos propres pools
+  47: try:
+  48:     cv2.setNumThreads(1)
+  49:     cv2.ocl.setUseOpenCL(False)
+  50: except Exception:
+  51:     # Sécurité: ignorer si non supporté sur la plateforme
+  52:     pass
+  53: 
+  54: 
+  55: def _parse_optional_positive_int(raw):
+  56:     if raw is None:
+  57:         return None
+  58:     raw_str = str(raw).strip()
+  59:     if not raw_str:
+  60:         return None
+  61:     try:
+  62:         value = int(raw_str)
+  63:     except Exception:
+  64:         return None
+  65:     if value <= 0:
+  66:         return None
+  67:     return value
+  68: 
+  69: 
+  70: def _is_truthy_env(raw):
+  71:     if raw is None:
+  72:         return False
+  73:     return str(raw).strip().lower() in {"1", "true", "yes"}
+  74: 
+  75: 
+  76: def _apply_jawopen_scale(blendshapes, scale):
+  77:     if not blendshapes or not isinstance(blendshapes, dict):
+  78:         return blendshapes
+  79:     try:
+  80:         jaw_open_raw = blendshapes.get("jawOpen")
+  81:         if jaw_open_raw is None:
+  82:             return blendshapes
+  83:         jaw_open_scaled = float(jaw_open_raw) * float(scale)
+  84:         jaw_open_scaled = float(np.clip(jaw_open_scaled, 0.0, 1.0))
+  85:         out = dict(blendshapes)
+  86:         out["jawOpen"] = jaw_open_scaled
+  87:         return out
+  88:     except Exception:
+  89:         return blendshapes
+  90: 
+  91: 
+  92: class FrameProcessor:
+  93:     """Thread-safe frame processor for multi-threaded CPU processing."""
+  94: 
+  95:     def __init__(self, landmarker, object_detector, args, enhanced_speaking_detector=None):
+  96:         self.landmarker = landmarker
+  97:         self.object_detector = object_detector
+  98:         self.args = args
+  99:         self.enhanced_speaking_detector = enhanced_speaking_detector
+ 100:         self.lock = threading.Lock()
+ 101: 
+ 102:         self._enable_profiling = _is_truthy_env(os.environ.get("STEP5_ENABLE_PROFILING", "0"))
+ 103:         self._profiling_stats = {
+ 104:             "to_rgb_total": 0.0,
+ 105:             "detect_total": 0.0,
+ 106:             "post_total": 0.0,
+ 107:             "frame_count": 0,
+ 108:         }
+ 109:         self._blendshapes_throttle_n = max(1, int(os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")))
+ 110:         self._jaw_open_scale = float(os.environ.get("STEP5_MEDIAPIPE_JAWOPEN_SCALE", "1.0"))
+ 111:         self._max_width = _parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_WIDTH"))
+ 112:         self._blendshapes_cache = {}
+ 113: 
+ 114:     def process_frame(self, frame_data):
+ 115:         """Process a single frame and return detection results."""
+ 116:         frame, frame_idx, timestamp_ms = frame_data
+ 117: 
+ 118:         try:
+ 119:             orig_h, orig_w = frame.shape[:2]
+ 120:             work_frame = frame
+ 121:             scale_to_original = 1.0
+ 122:             if self._max_width is not None and orig_w > self._max_width:
+ 123:                 scale_factor = float(self._max_width) / float(orig_w)
+ 124:                 work_h = max(1, int(orig_h * scale_factor))
+ 125:                 work_frame = cv2.resize(frame, (int(self._max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
+ 126:                 scale_to_original = float(orig_w) / float(work_frame.shape[1])
+ 127: 
+ 128:             if self._enable_profiling:
+ 129:                 with self.lock:
+ 130:                     self._profiling_stats["frame_count"] += 1
+ 131: 
+ 132:             t_to_rgb = time.perf_counter() if self._enable_profiling else 0.0
+ 133:             mp_image = mp.Image(
+ 134:                 image_format=mp.ImageFormat.SRGB,
+ 135:                 data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
+ 136:             )
+ 137:             if self._enable_profiling:
+ 138:                 with self.lock:
+ 139:                     self._profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
+ 140: 
+ 141:             current_detections = []
+ 142:             face_detected = False
+ 143: 
+ 144:             # Try face detection first
+ 145:             t_detect = time.perf_counter() if self._enable_profiling else 0.0
+ 146:             face_result = self.landmarker.detect_for_video(mp_image, timestamp_ms)
+ 147:             if self._enable_profiling:
+ 148:                 with self.lock:
+ 149:                     self._profiling_stats["detect_total"] += time.perf_counter() - t_detect
+ 150: 
+ 151:             if face_result.face_landmarks:
+ 152:                 face_detected = True
+ 153: 
+ 154:                 for i, landmarks in enumerate(face_result.face_landmarks):
+ 155:                     t_post = time.perf_counter() if self._enable_profiling else 0.0
+ 156:                     x_coords = [lm.x * orig_w for lm in landmarks]
+ 157:                     y_coords = [lm.y * orig_h for lm in landmarks]
+ 158:                     bbox = (
+ 159:                         int(min(x_coords)), int(min(y_coords)),
+ 160:                         int(max(x_coords) - min(x_coords)),
+ 161:                         int(max(y_coords) - min(y_coords))
+ 162:                     )
+ 163:                     centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
+ 164:                     det = {
+ 165:                         "bbox": bbox,
+ 166:                         "centroid": centroid,
+ 167:                         "source_detector": "face_landmarker",
+ 168:                         "label": "face"
+ 169:                     }
+ 170:                     if face_result.face_blendshapes:
+ 171:                         raw_blendshapes = {
+ 172:                             cat.category_name: cat.score
+ 173:                             for cat in face_result.face_blendshapes[i]
+ 174:                         }
+ 175:                         scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, self._jaw_open_scale)
+ 176: 
+ 177:                         current_frame_num = frame_idx + 1
+ 178:                         should_update_blendshapes = (self._blendshapes_throttle_n <= 1) or ((current_frame_num % self._blendshapes_throttle_n) == 0)
+ 179:                         object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
+ 180:                         with self.lock:
+ 181:                             if should_update_blendshapes or object_id not in self._blendshapes_cache:
+ 182:                                 self._blendshapes_cache[object_id] = scaled_blendshapes
+ 183:                                 det["blendshapes"] = scaled_blendshapes
+ 184:                             else:
+ 185:                                 det["blendshapes"] = self._blendshapes_cache.get(object_id)
+ 186:                     current_detections.append(det)
+ 187: 
+ 188:                     if self._enable_profiling:
+ 189:                         with self.lock:
+ 190:                             self._profiling_stats["post_total"] += time.perf_counter() - t_post
+ 191: 
+ 192:             if self._enable_profiling:
+ 193:                 with self.lock:
+ 194:                     fc = int(self._profiling_stats.get("frame_count", 0) or 0)
+ 195:                     if fc > 0 and (fc % 20) == 0:
+ 196:                         to_rgb_ms = (self._profiling_stats["to_rgb_total"] / fc) * 1000.0
+ 197:                         detect_ms = (self._profiling_stats["detect_total"] / fc) * 1000.0
+ 198:                         post_ms = (self._profiling_stats["post_total"] / fc) * 1000.0
+ 199:                         logging.info(
+ 200:                             "[PROFILING] MediaPipe after %s frames: to_rgb=%.2fms/frame, detect=%.2fms/frame, post=%.2fms/frame",
+ 201:                             fc,
+ 202:                             to_rgb_ms,
+ 203:                             detect_ms,
+ 204:                             post_ms,
+ 205:                         )
+ 206: 
+ 207:             # Use object detection fallback if no faces detected
+ 208:             if not face_detected and getattr(self.args, 'enable_object_detection', False):
+ 209:                 try:
+ 210:                     object_result = self.object_detector.detect_for_video(mp_image, timestamp_ms)
+ 211: 
+ 212:                     if object_result.detections:
+ 213:                         for detection in object_result.detections:
+ 214:                             bbox = detection.bounding_box
+ 215:                             x_min = int(bbox.origin_x)
+ 216:                             y_min = int(bbox.origin_y)
+ 217:                             width = int(bbox.width)
+ 218:                             height = int(bbox.height)
+ 219: 
+ 220:                             if scale_to_original != 1.0:
+ 221:                                 x_min = int(max(0, x_min * scale_to_original))
+ 222:                                 y_min = int(max(0, y_min * scale_to_original))
+ 223:                                 width = int(max(0, width * scale_to_original))
+ 224:                                 height = int(max(0, height * scale_to_original))
+ 225: 
+ 226:                             centroid = (x_min + width // 2, y_min + height // 2)
+ 227: 
+ 228:                             best_category = detection.categories[0] if detection.categories else None
+ 229:                             label = best_category.category_name if best_category else "object"
+ 230:                             confidence = best_category.score if best_category else 0.0
+ 231: 
+ 232:                             det = {
+ 233:                                 "bbox": (x_min, y_min, width, height),
+ 234:                                 "centroid": centroid,
+ 235:                                 "source_detector": "object_detector",
+ 236:                                 "label": label,
+ 237:                                 "confidence": confidence,
+ 238:                                 "blendshapes": None,
+ 239:                                 "is_speaking": None
+ 240:                             }
+ 241:                             current_detections.append(det)
+ 242:                 except Exception as e:
+ 243:                     logging.warning(f"Object detection failed for frame {frame_idx + 1}: {e}")
+ 244: 
+ 245:             return {
+ 246:                 'frame_idx': frame_idx,
+ 247:                 'detections': current_detections,
+ 248:                 'face_detected': face_detected,
+ 249:                 'timestamp_ms': timestamp_ms
+ 250:             }
+ 251: 
+ 252:         except Exception as e:
+ 253:             logging.error(f"Error processing frame {frame_idx + 1}: {e}")
+ 254:             return {
+ 255:                 'frame_idx': frame_idx,
+ 256:                 'detections': [],
+ 257:                 'face_detected': False,
+ 258:                 'timestamp_ms': timestamp_ms,
+ 259:                 'error': str(e)
+ 260:             }
+ 261: 
+ 262: 
+ 263: def process_video_multithreaded(args, video_capture, landmarker, object_detector, enhanced_speaking_detector, total_frames):
+ 264:     """Process video using multiple threads for CPU workers."""
+ 265:     logging.info(f"Starting multi-threaded processing with {args.mp_num_workers_internal} workers (bounded queue)")
+ 266: 
+ 267:     # Initialize tracking variables
+ 268:     tracked_objects = {}
+ 269:     next_id_counter = {'value': 0}
+ 270: 
+ 271:     # Get video metadata
+ 272:     fps = video_capture.get(cv2.CAP_PROP_FPS)
+ 273: 
+ 274:     final_output = {
+ 275:         "metadata": {
+ 276:             "video_path": args.video_file_path,
+ 277:             "total_frames": total_frames,
+ 278:             "fps": fps
+ 279:         },
+ 280:         "frames": []
+ 281:     }
+ 282: 
+ 283:     # Performance tracking
+ 284:     face_detection_success_count = 0
+ 285:     frames_processed = 0
+ 286:     processing_start_time = time.time()
+ 287: 
+ 288:     # Create frame processor
+ 289:     frame_processor = FrameProcessor(landmarker, object_detector, args, enhanced_speaking_detector)
+ 290: 
+ 291:     # Bounded queue pipeline: un thread lecteur + N threads workers
+ 292:     q = queue.Queue(maxsize=64)
+ 293:     results = {}
+ 294:     results_lock = threading.Lock()
+ 295: 
+ 296:     def worker_loop(worker_id: int):
+ 297:         nonlocal frames_processed
+ 298:         completed_local = 0
+ 299:         while True:
+ 300:             item = q.get()
+ 301:             if item is None:
+ 302:                 q.task_done()
+ 303:                 break
+ 304:             frame, idx, ts_ms = item
+ 305:             try:
+ 306:                 result = frame_processor.process_frame((frame, idx, ts_ms))
+ 307:                 with results_lock:
+ 308:                     results[idx] = result
+ 309:                 completed_local += 1
+ 310:                 frames_processed += 1
+ 311:                 if frames_processed % 50 == 0:
+ 312:                     progress_percent = (frames_processed / total_frames) * 100 if total_frames else 0
+ 313:                     elapsed_time = time.time() - processing_start_time
+ 314:                     fps_now = frames_processed / elapsed_time if elapsed_time > 0 else 0
+ 315:                     print(f"[Progression]|{int(progress_percent)}|{frames_processed}|{total_frames}", flush=True)
+ 316:                     logging.info(f"MT workers: {frames_processed}/{total_frames} ({progress_percent:.1f}%) - {fps_now:.1f} fps")
+ 317:             except Exception as e:
+ 318:                 logging.error(f"Frame {idx} processing failed: {e}")
+ 319:                 with results_lock:
+ 320:                     results[idx] = {
+ 321:                         'frame_idx': idx,
+ 322:                         'detections': [],
+ 323:                         'face_detected': False,
+ 324:                         'error': str(e)
+ 325:                     }
+ 326:             finally:
+ 327:                 # Libérer la référence à la frame pour GC
+ 328:                 del frame
+ 329:                 q.task_done()
+ 330: 
+ 331:     # Lancer les workers
+ 332:     workers = [threading.Thread(target=worker_loop, args=(i,), daemon=True)
+ 333:                for i in range(int(args.mp_num_workers_internal))]
+ 334:     for t in workers:
+ 335:         t.start()
+ 336: 
+ 337:     # Thread lecteur: lit et pousse les frames dans la queue (bornée)
+ 338:     frame_read = 0
+ 339:     logging.info("Reading frames and feeding bounded queue...")
+ 340:     while video_capture.isOpened():
+ 341:         ret, frame = video_capture.read()
+ 342:         if not ret:
+ 343:             break
+ 344:         ts_ms = int(video_capture.get(cv2.CAP_PROP_POS_MSEC))
+ 345:         q.put((frame, frame_read, ts_ms))
+ 346:         frame_read += 1
+ 347:         if frame_read % 100 == 0:
+ 348:             logging.info(f"Read {frame_read} frames...")
+ 349: 
+ 350:     # Envoyer les sentinelles d'arrêt aux workers
+ 351:     for _ in workers:
+ 352:         q.put(None)
+ 353: 
+ 354:     # Attendre la fin du traitement
+ 355:     q.join()
+ 356:     for t in workers:
+ 357:         t.join(timeout=1)
+ 358: 
+ 359:     logging.info("Parallel processing complete, applying tracking...")
+ 360: 
+ 361:     # Apply tracking in sequential order (must be sequential for consistency)
+ 362:     for frame_idx in sorted(results.keys()):
+ 363:         result = results[frame_idx]
+ 364: 
+ 365:         if result.get('face_detected', False):
+ 366:             face_detection_success_count += 1
+ 367: 
+ 368:         # Apply tracking and management
+ 369:         tracked_for_frame = apply_tracking_and_management(
+ 370:             tracked_objects, result['detections'], next_id_counter,
+ 371:             args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
+ 372:             args.speaking_detection_jaw_open_threshold,
+ 373:             enhanced_speaking_detector=enhanced_speaking_detector,
+ 374:             current_frame_num=frame_idx + 1
+ 375:         )
+ 376: 
+ 377:         # Add to final output
+ 378:         final_output["frames"].append({
+ 379:             "frame": frame_idx + 1,
+ 380:             "tracked_objects": tracked_for_frame if tracked_for_frame else []
+ 381:         })
+ 382: 
+ 383:     # Calculate final statistics
+ 384:     face_detection_rate = (face_detection_success_count / frames_processed * 100) if frames_processed > 0 else 0
+ 385:     processing_time = time.time() - processing_start_time
+ 386: 
+ 387:     logging.info("Multi-threaded processing summary:")
+ 388:     logging.info(f"  Total frames processed: {frames_processed}")
+ 389:     logging.info(f"  Frames with faces: {face_detection_success_count}")
+ 390:     logging.info(f"  Face detection success rate: {face_detection_rate:.2f}%")
+ 391:     logging.info(f"  Processing time: {processing_time:.2f} seconds")
+ 392:     logging.info(f"  Average FPS: {frames_processed / processing_time:.2f}")
+ 393:     logging.info(f"  Object detection fallback used: {getattr(args, 'enable_object_detection', False)}")
+ 394:     logging.info(f"  Total frames exported: {len(final_output['frames'])}")
+ 395: 
+ 396:     return final_output
+ 397: 
+ 398: 
+ 399: def main(args):
+ 400:     """Traite une vidéo de manière séquentielle (un seul thread)."""
+ 401:     worker_type = "GPU" if args.use_gpu else "CPU"
+ 402:     logging.info(f"Démarrage du traitement séquentiel {worker_type} pour: {Path(args.video_file_path).name}")
+ 403:     logging.info(f"LD_LIBRARY_PATH (worker) = {os.environ.get('LD_LIBRARY_PATH', '')}")
+ 404:     logging.info(f"INSIGHTFACE_HOME (worker) = {os.environ.get('INSIGHTFACE_HOME', '')}")
+ 405: 
+ 406:     engine_name = getattr(args, 'tracking_engine', None)
+ 407:     use_gpu_flag = bool(getattr(args, 'use_gpu', False))
+ 408:     face_engine = None
+ 409:     if engine_name:
+ 410:         try:
+ 411:             face_engine = create_face_engine(engine_name, use_gpu=use_gpu_flag)
+ 412:         except Exception as e:
+ 413:             logging.exception(f"Failed to initialize tracking engine '{engine_name}': {e}")
+ 414:             sys.exit(1)
+ 415: 
+ 416:     final_output = None
+ 417:     total_frames = 0
+ 418: 
+ 419:     if face_engine is not None:
+ 420:         logging.info(f"Using face engine: {engine_name}")
+ 421:         try:
+ 422:             with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
+ 423:                 fps = video_capture.get(cv2.CAP_PROP_FPS)
+ 424:                 total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+ 425: 
+ 426:                 object_detector = None
+ 427:                 object_options = None
+ 428:                 mp_module = None
+ 429:                 ObjectDetector = None
+ 430:                 object_detection_workers = max(1, int(getattr(args, 'mp_num_workers_internal', 1) or 1))
+ 431:                 if args.use_gpu and getattr(args, 'enable_object_detection', False):
+ 432:                     logging.info(
+ 433:                         "Object detection fallback workers (GPU face engine mode): %s",
+ 434:                         object_detection_workers,
+ 435:                     )
+ 436:                 if getattr(args, 'enable_object_detection', False):
+ 437:                     try:
+ 438:                         mp_module = _ensure_mediapipe_loaded(required=False)
+ 439:                         if mp_module is None:
+ 440:                             raise RuntimeError("mediapipe is not available (lazy import failed)")
+ 441: 
+ 442:                         BaseOptions = mp_module.tasks.BaseOptions
+ 443:                         VisionRunningMode = mp_module.tasks.vision.RunningMode
+ 444:                         ObjectDetector = mp_module.tasks.vision.ObjectDetector
+ 445:                         ObjectDetectorOptions = mp_module.tasks.vision.ObjectDetectorOptions
+ 446: 
+ 447:                         delegate = BaseOptions.Delegate.CPU
+ 448:                         models_dir = Path(args.models_dir)
+ 449:                         object_detector_model_name = (
+ 450:                             getattr(args, 'object_detector_model', None)
+ 451:                             or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2')
+ 452:                         )
+ 453:                         object_detector_model_path = (
+ 454:                             getattr(args, 'object_detector_model_path', None)
+ 455:                             or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+ 456:                         )
+ 457:                         object_model_path = ObjectDetectorRegistry.resolve_model_path(
+ 458:                             model_name=object_detector_model_name,
+ 459:                             models_dir=models_dir,
+ 460:                             override_path=object_detector_model_path,
+ 461:                         )
+ 462:                         logging.info(
+ 463:                             f"Using object detector (face_engine mode): {object_detector_model_name} at {object_model_path}"
+ 464:                         )
+ 465:                         object_options = ObjectDetectorOptions(
+ 466:                             base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
+ 467:                             running_mode=VisionRunningMode.IMAGE,
+ 468:                             max_results=getattr(args, 'object_max_results', 5),
+ 469:                             score_threshold=getattr(args, 'object_score_threshold', 0.4),
+ 470:                         )
+ 471:                         object_detector = ObjectDetector.create_from_options(object_options)
+ 472:                         if object_detection_workers > 1:
+ 473:                             logging.info(
+ 474:                                 "Object detection fallback: using one MediaPipe ObjectDetector instance per thread (IMAGE mode)."
+ 475:                             )
+ 476:                     except Exception as e:
+ 477:                         logging.warning(
+ 478:                             f"Failed to initialize object detector (face_engine mode); continuing without it: {e}"
+ 479:                         )
+ 480:                         object_detector = None
+ 481:                         object_options = None
+ 482:                         mp_module = None
+ 483:                         ObjectDetector = None
+ 484: 
+ 485:                 final_output = {
+ 486:                     "metadata": {
+ 487:                         "video_path": args.video_file_path,
+ 488:                         "total_frames": total_frames,
+ 489:                         "fps": fps,
+ 490:                         "tracking_engine": engine_name,
+ 491:                     },
+ 492:                     "frames": [],
+ 493:                 }
+ 494: 
+ 495:                 tracked_objects, next_id_counter = {}, {'value': 0}
+ 496: 
+ 497:                 resource_id = resource_tracker.register_resource(
+ 498:                     video_capture, 'video_capture', f"Processing {Path(args.video_file_path).name}"
+ 499:                 )
+ 500: 
+ 501:                 try:
+ 502:                     enhanced_speaking_detector = None
+ 503:                     if getattr(args, 'speaking_detection_enabled', True):
+ 504:                         try:
+ 505:                             enhanced_speaking_detector = EnhancedSpeakingDetector(
+ 506:                                 video_path=args.video_file_path,
+ 507:                                 jaw_threshold=args.speaking_detection_jaw_open_threshold,
+ 508:                             )
+ 509:                             logging.info("Enhanced speaking detection initialized successfully")
+ 510:                         except Exception as e:
+ 511:                             logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
+ 512:                             enhanced_speaking_detector = None
+ 513: 
+ 514:                     object_tasks = None
+ 515:                     object_results = {}
+ 516:                     object_results_lock = threading.Lock()
+ 517:                     object_worker_threads = []
+ 518: 
+ 519:                     def _object_worker_loop(worker_id: int):
+ 520:                         thread_object_detector = None
+ 521:                         if object_options is not None and ObjectDetector is not None:
+ 522:                             try:
+ 523:                                 thread_object_detector = ObjectDetector.create_from_options(object_options)
+ 524:                             except Exception as e:
+ 525:                                 logging.warning(
+ 526:                                     "Object detection failed to initialize detector for worker %s (face_engine mode): %s",
+ 527:                                     worker_id,
+ 528:                                     e,
+ 529:                                 )
+ 530:                                 thread_object_detector = None
+ 531:                         while True:
+ 532:                             task = object_tasks.get() if object_tasks is not None else None
+ 533:                             if task is None:
+ 534:                                 try:
+ 535:                                     if thread_object_detector is not None and hasattr(thread_object_detector, 'close'):
+ 536:                                         thread_object_detector.close()
+ 537:                                 except Exception:
+ 538:                                     pass
+ 539:                                 if object_tasks is not None:
+ 540:                                     object_tasks.task_done()
+ 541:                                 break
+ 542:                             frame_local, frame_idx_local, timestamp_ms_local = task
+ 543:                             try:
+ 544:                                 if mp_module is None or thread_object_detector is None:
+ 545:                                     raise RuntimeError("object detector is not available for object detection fallback")
+ 546:                                 mp_image = mp_module.Image(
+ 547:                                     image_format=mp_module.ImageFormat.SRGB,
+ 548:                                     data=cv2.cvtColor(frame_local, cv2.COLOR_BGR2RGB)
+ 549:                                 )
+ 550:                                 object_result = thread_object_detector.detect(mp_image)
+ 551:                                 detections_out = []
+ 552:                                 if object_result.detections:
+ 553:                                     for detection in object_result.detections:
+ 554:                                         bbox = detection.bounding_box
+ 555:                                         x_min = int(bbox.origin_x)
+ 556:                                         y_min = int(bbox.origin_y)
+ 557:                                         width = int(bbox.width)
+ 558:                                         height = int(bbox.height)
+ 559:                                         centroid = (x_min + width // 2, y_min + height // 2)
+ 560:                                         best_category = detection.categories[0] if detection.categories else None
+ 561:                                         label = best_category.category_name if best_category else "object"
+ 562:                                         confidence = best_category.score if best_category else 0.0
+ 563:                                         detections_out.append(
+ 564:                                             {
+ 565:                                                 "bbox": (x_min, y_min, width, height),
+ 566:                                                 "centroid": centroid,
+ 567:                                                 "source_detector": "object_detector",
+ 568:                                                 "label": label,
+ 569:                                                 "confidence": confidence,
+ 570:                                                 "blendshapes": None,
+ 571:                                                 "is_speaking": None,
+ 572:                                             }
+ 573:                                         )
+ 574:                                 with object_results_lock:
+ 575:                                     object_results[frame_idx_local] = detections_out
+ 576:                             except Exception as e:
+ 577:                                 logging.warning(
+ 578:                                     f"Object detection failed for frame {frame_idx_local + 1} (face_engine mode): {e}"
+ 579:                                 )
+ 580:                                 with object_results_lock:
+ 581:                                     object_results[frame_idx_local] = []
+ 582:                             finally:
+ 583:                                 del frame_local
+ 584:                                 object_tasks.task_done()
+ 585: 
+ 586:                     enable_object_fallback = bool(getattr(args, 'enable_object_detection', False))
+ 587:                     enable_object_threads = bool(object_detector is not None and object_detection_workers > 1 and enable_object_fallback)
+ 588:                     if enable_object_threads:
+ 589:                         object_tasks = queue.Queue(maxsize=max(1, object_detection_workers) * 2)
+ 590:                         for i in range(int(object_detection_workers)):
+ 591:                             t = threading.Thread(target=_object_worker_loop, args=(i,), daemon=True)
+ 592:                             object_worker_threads.append(t)
+ 593:                             t.start()
+ 594: 
+ 595:                     frame_idx = 0
+ 596:                     frame_detections = {}
+ 597:                     while video_capture.isOpened():
+ 598:                         ret, frame = video_capture.read()
+ 599:                         if not ret:
+ 600:                             break
+ 601: 
+ 602:                         current_detections = face_engine.detect(frame)
+ 603:                         frame_idx += 1
+ 604:                         if frame_idx % 50 == 0:
+ 605:                             progress_percent = int((frame_idx / total_frames) * 90) if total_frames else 0
+ 606:                             print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
+ 607: 
+ 608:                         if (not current_detections) and object_detector is not None and enable_object_fallback:
+ 609:                             if enable_object_threads and object_tasks is not None:
+ 610:                                 object_tasks.put((frame, frame_idx - 1, None))
+ 611:                             else:
+ 612:                                 try:
+ 613:                                     if mp_module is None:
+ 614:                                         raise RuntimeError("mediapipe is not available for object detection fallback")
+ 615:                                     mp_image = mp_module.Image(
+ 616:                                         image_format=mp_module.ImageFormat.SRGB,
+ 617:                                         data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+ 618:                                     )
+ 619:                                     object_result = object_detector.detect(mp_image)
+ 620:                                     if object_result.detections:
+ 621:                                         for detection in object_result.detections:
+ 622:                                             bbox = detection.bounding_box
+ 623:                                             x_min = int(bbox.origin_x)
+ 624:                                             y_min = int(bbox.origin_y)
+ 625:                                             width = int(bbox.width)
+ 626:                                             height = int(bbox.height)
+ 627:                                             centroid = (x_min + width // 2, y_min + height // 2)
+ 628:                                             best_category = detection.categories[0] if detection.categories else None
+ 629:                                             label = best_category.category_name if best_category else "object"
+ 630:                                             confidence = best_category.score if best_category else 0.0
+ 631:                                             current_detections.append(
+ 632:                                                 {
+ 633:                                                     "bbox": (x_min, y_min, width, height),
+ 634:                                                     "centroid": centroid,
+ 635:                                                     "source_detector": "object_detector",
+ 636:                                                     "label": label,
+ 637:                                                     "confidence": confidence,
+ 638:                                                     "blendshapes": None,
+ 639:                                                     "is_speaking": None,
+ 640:                                                 }
+ 641:                                             )
+ 642:                                 except Exception as e:
+ 643:                                     logging.warning(
+ 644:                                         f"Object detection failed for frame {frame_idx} (face_engine mode): {e}"
+ 645:                                     )
+ 646: 
+ 647:                         frame_detections[frame_idx - 1] = list(current_detections)
+ 648:                         del frame
+ 649: 
+ 650:                     if enable_object_threads and object_tasks is not None:
+ 651:                         object_tasks.join()
+ 652:                         for _ in object_worker_threads:
+ 653:                             object_tasks.put(None)
+ 654:                         object_tasks.join()
+ 655:                         for t in object_worker_threads:
+ 656:                             t.join(timeout=1)
+ 657: 
+ 658:                     for frame_idx_out in range(total_frames):
+ 659:                         current_detections = frame_detections.get(frame_idx_out, [])
+ 660:                         if (not current_detections) and object_detector is not None and enable_object_fallback:
+ 661:                             with object_results_lock:
+ 662:                                 current_detections = list(object_results.get(frame_idx_out, []))
+ 663: 
+ 664:                         tracked_for_frame = apply_tracking_and_management(
+ 665:                             tracked_objects,
+ 666:                             current_detections,
+ 667:                             next_id_counter,
+ 668:                             args.mp_max_distance_tracking,
+ 669:                             args.mp_frames_unseen_deregister,
+ 670:                             args.speaking_detection_jaw_open_threshold,
+ 671:                             enhanced_speaking_detector=enhanced_speaking_detector,
+ 672:                             current_frame_num=frame_idx_out + 1,
+ 673:                         )
+ 674:                         final_output["frames"].append(
+ 675:                             {
+ 676:                                 "frame": frame_idx_out + 1,
+ 677:                                 "tracked_objects": tracked_for_frame if tracked_for_frame else [],
+ 678:                             }
+ 679:                         )
+ 680:                         if (frame_idx_out + 1) % 50 == 0:
+ 681:                             progress_percent = 90 + int(((frame_idx_out + 1) / total_frames) * 10) if total_frames else 100
+ 682:                             print(f"[Progression]|{progress_percent}|{frame_idx_out + 1}|{total_frames}", flush=True)
+ 683: 
+ 684:                     frame_idx = total_frames
+ 685: 
+ 686:                     if total_frames and frame_idx < total_frames:
+ 687:                         for fill_idx in range(frame_idx, total_frames):
+ 688:                             tracked_for_frame = apply_tracking_and_management(
+ 689:                                 tracked_objects,
+ 690:                                 [],
+ 691:                                 next_id_counter,
+ 692:                                 args.mp_max_distance_tracking,
+ 693:                                 args.mp_frames_unseen_deregister,
+ 694:                                 args.speaking_detection_jaw_open_threshold,
+ 695:                                 enhanced_speaking_detector=enhanced_speaking_detector,
+ 696:                                 current_frame_num=fill_idx + 1,
+ 697:                             )
+ 698:                             final_output["frames"].append(
+ 699:                                 {
+ 700:                                     "frame": fill_idx + 1,
+ 701:                                     "tracked_objects": tracked_for_frame if tracked_for_frame else [],
+ 702:                                 }
+ 703:                             )
+ 704:                 finally:
+ 705:                     try:
+ 706:                         if object_detector is not None and hasattr(object_detector, 'close'):
+ 707:                             object_detector.close()
+ 708:                     except Exception:
+ 709:                         pass
+ 710:                     resource_tracker.unregister_resource(resource_id)
+ 711: 
+ 712:         except Exception as e:
+ 713:             logging.error(f"Error processing video {args.video_file_path} with OpenCV engine: {e}")
+ 714:             raise
+ 715: 
+ 716:         output_path = Path(args.video_file_path).with_suffix('.json')
+ 717:         try:
+ 718:             with open(output_path, 'w', encoding='utf-8') as f:
+ 719:                 json.dump(final_output, f, indent=2, ensure_ascii=False)
+ 720:             logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
+ 721:             print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
+ 722:         except Exception as e:
+ 723:             logging.error(f"Failed to save output file {output_path}: {e}")
+ 724:             raise
+ 725:         return
+ 726: 
+ 727:     mp_module = _ensure_mediapipe_loaded(required=True)
+ 728:     BaseOptions = mp_module.tasks.BaseOptions
+ 729:     VisionRunningMode = mp_module.tasks.vision.RunningMode
+ 730:     FaceLandmarker = mp_module.tasks.vision.FaceLandmarker
+ 731:     FaceLandmarkerOptions = mp_module.tasks.vision.FaceLandmarkerOptions
+ 732:     ObjectDetector = mp_module.tasks.vision.ObjectDetector
+ 733:     ObjectDetectorOptions = mp_module.tasks.vision.ObjectDetectorOptions
+ 734: 
+ 735:     delegate = BaseOptions.Delegate.GPU if args.use_gpu else BaseOptions.Delegate.CPU
+ 736:     models_dir = Path(args.models_dir)
+ 737:     face_model_candidates = [
+ 738:         models_dir / "face_detectors" / "mediapipe" / "face_landmarker_v2_with_blendshapes.task",
+ 739:         models_dir / "face_landmarker_v2_with_blendshapes.task",
+ 740:     ]
+ 741:     face_model_path = next((p for p in face_model_candidates if p.exists()), face_model_candidates[0])
+ 742:     
+ 743:     if not face_model_path.exists():
+ 744:         logging.error(f"Modèle FaceLandmarker non trouvé: {face_model_path}");
+ 745:         sys.exit(1)
+ 746:     
+ 747:     # Resolve object detector model using registry
+ 748:     object_detector_model_name = getattr(args, 'object_detector_model', 'efficientdet_lite2')
+ 749:     try:
+ 750:         object_model_path = ObjectDetectorRegistry.resolve_model_path(
+ 751:             model_name=object_detector_model_name,
+ 752:             models_dir=models_dir,
+ 753:             override_path=getattr(args, 'object_detector_model_path', None)
+ 754:         )
+ 755:         logging.info(f"Using object detector: {object_detector_model_name} at {object_model_path}")
+ 756:     except (ValueError, FileNotFoundError) as e:
+ 757:         logging.error(f"Failed to resolve object detector model: {e}")
+ 758:         sys.exit(1)
+ 759: 
+ 760:     face_options = FaceLandmarkerOptions(
+ 761:         base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
+ 762:         running_mode=VisionRunningMode.VIDEO,
+ 763:         num_faces=int(_parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_FACES")) or args.mp_landmarker_num_faces),
+ 764:         min_face_detection_confidence=args.mp_landmarker_min_face_detection_confidence,
+ 765:         min_face_presence_confidence=args.mp_landmarker_min_face_presence_confidence,
+ 766:         min_tracking_confidence=args.mp_landmarker_min_tracking_confidence,
+ 767:         output_face_blendshapes=True
+ 768:     )
+ 769: 
+ 770:     object_options = ObjectDetectorOptions(
+ 771:         base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
+ 772:         running_mode=VisionRunningMode.VIDEO,
+ 773:         max_results=getattr(args, 'object_max_results', 5),
+ 774:         score_threshold=getattr(args, 'object_score_threshold', 0.5)
+ 775:     )
+ 776: 
+ 777:     # Use safe video processing with automatic resource cleanup
+ 778:     try:
+ 779:         with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
+ 780:             # Get video metadata safely
+ 781:             fps = video_capture.get(cv2.CAP_PROP_FPS)
+ 782:             total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+ 783: 
+ 784:             logging.info(f"Video metadata - FPS: {fps}, Total frames: {total_frames}")
+ 785: 
+ 786:             # Register video capture for tracking
+ 787:             resource_id = resource_tracker.register_resource(
+ 788:                 video_capture, 'video_capture', f"Processing {Path(args.video_file_path).name}"
+ 789:             )
+ 790: 
+ 791:             try:
+ 792:                 with FaceLandmarker.create_from_options(face_options) as landmarker, \
+ 793:                      ObjectDetector.create_from_options(object_options) as object_detector:
+ 794: 
+ 795:                     final_output = {
+ 796:                         "metadata": {
+ 797:                             "video_path": args.video_file_path,
+ 798:                             "total_frames": total_frames,
+ 799:                             "fps": fps
+ 800:                         },
+ 801:                         "frames": []
+ 802:                     }
+ 803:                     tracked_objects, next_id_counter = {}, {'value': 0}
+ 804: 
+ 805:                     # Fallback tracking variables
+ 806:                     face_detection_success_count = 0
+ 807:                     frames_processed = 0
+ 808:                     use_object_detection_fallback = getattr(args, 'enable_object_detection', False)
+ 809:                     fallback_threshold = 50  # Check every 50 frames for fallback decision
+ 810: 
+ 811:                     # Initialize enhanced speaking detector
+ 812:                     enhanced_speaking_detector = None
+ 813:                     # Speaking detector activé par défaut
+ 814:                     if getattr(args, 'speaking_detection_enabled', True):
+ 815:                         try:
+ 816:                             enhanced_speaking_detector = EnhancedSpeakingDetector(
+ 817:                                 video_path=args.video_file_path,
+ 818:                                 jaw_threshold=args.speaking_detection_jaw_open_threshold
+ 819:                             )
+ 820:                             logging.info("Enhanced speaking detection initialized successfully")
+ 821:                             logging.info(f"Detection stats: {enhanced_speaking_detector.get_detection_stats()}")
+ 822:                         except Exception as e:
+ 823:                             logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
+ 824:                             enhanced_speaking_detector = None
+ 825: 
+ 826:                     # Check if multi-threading should be used (CPU workers with > 1 internal workers)
+ 827:                     use_multithreading = (not args.use_gpu and
+ 828:                                         getattr(args, 'mp_num_workers_internal', 1) > 1)
+ 829: 
+ 830:                     if use_multithreading:
+ 831:                         logging.info(f"Using multi-threaded processing with {args.mp_num_workers_internal} workers")
+ 832:                         final_output = process_video_multithreaded(
+ 833:                             args, video_capture, landmarker, object_detector,
+ 834:                             enhanced_speaking_detector, total_frames
+ 835:                         )
+ 836:                     else:
+ 837:                         logging.info("Using sequential processing")
+ 838:                         # Sequential processing (original logic)
+ 839:                         frame_idx = 0
+ 840:                         while video_capture.isOpened():
+ 841:                             ret, frame = video_capture.read()
+ 842:                             if not ret:
+ 843:                                 break
+ 844: 
+ 845:                             mp_image = mp.Image(
+ 846:                                 image_format=mp.ImageFormat.SRGB,
+ 847:                                 data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+ 848:                             )
+ 849:                             timestamp_ms = int(video_capture.get(cv2.CAP_PROP_POS_MSEC))
+ 850: 
+ 851:                             # Try face detection first
+ 852:                             face_result = landmarker.detect_for_video(mp_image, timestamp_ms)
+ 853:                             frames_processed += 1
+ 854: 
+ 855:                             current_detections = []
+ 856:                             face_detected = False
+ 857: 
+ 858:                             if face_result.face_landmarks:
+ 859:                                 face_detected = True
+ 860:                                 face_detection_success_count += 1
+ 861: 
+ 862:                                 for i, landmarks in enumerate(face_result.face_landmarks):
+ 863:                                     h, w, _ = frame.shape
+ 864:                                     x_coords = [lm.x * w for lm in landmarks]
+ 865:                                     y_coords = [lm.y * h for lm in landmarks]
+ 866:                                     bbox = (
+ 867:                                         int(min(x_coords)), int(min(y_coords)),
+ 868:                                         int(max(x_coords) - min(x_coords)),
+ 869:                                         int(max(y_coords) - min(y_coords))
+ 870:                                     )
+ 871:                                     centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
+ 872:                                     det = {
+ 873:                                         "bbox": bbox,
+ 874:                                         "centroid": centroid,
+ 875:                                         "source_detector": "face_landmarker",
+ 876:                                         "label": "face"
+ 877:                                     }
+ 878:                                     if face_result.face_blendshapes:
+ 879:                                         det["blendshapes"] = {
+ 880:                                             cat.category_name: cat.score
+ 881:                                             for cat in face_result.face_blendshapes[i]
+ 882:                                         }
+ 883:                                     current_detections.append(det)
+ 884: 
+ 885:                             # Check if we should enable object detection fallback
+ 886:                             if frames_processed % fallback_threshold == 0:
+ 887:                                 face_success_rate = face_detection_success_count / frames_processed
+ 888:                                 if face_success_rate < 0.1:  # Less than 10% face detection success
+ 889:                                     if not use_object_detection_fallback:
+ 890:                                         logging.info(f"Low face detection rate ({face_success_rate:.2%}). Enabling object detection fallback.")
+ 891:                                         use_object_detection_fallback = True
+ 892: 
+ 893:                             # Use object detection fallback if no faces detected and fallback is enabled
+ 894:                             if not face_detected and use_object_detection_fallback:
+ 895:                                 try:
+ 896:                                     object_result = object_detector.detect_for_video(mp_image, timestamp_ms)
+ 897: 
+ 898:                                     if object_result.detections:
+ 899:                                         for detection in object_result.detections:
+ 900:                                             bbox = detection.bounding_box
+ 901:                                             # MediaPipe object detection returns coordinates already in pixel format
+ 902:                                             # No conversion needed - use values directly
+ 903:                                             x_min = int(bbox.origin_x)
+ 904:                                             y_min = int(bbox.origin_y)
+ 905:                                             width = int(bbox.width)
+ 906:                                             height = int(bbox.height)
+ 907: 
+ 908:                                             centroid = (x_min + width // 2, y_min + height // 2)
+ 909: 
+ 910:                                             # Get the best category
+ 911:                                             best_category = detection.categories[0] if detection.categories else None
+ 912:                                             label = best_category.category_name if best_category else "object"
+ 913:                                             confidence = best_category.score if best_category else 0.0
+ 914: 
+ 915:                                             det = {
+ 916:                                                 "bbox": (x_min, y_min, width, height),
+ 917:                                                 "centroid": centroid,
+ 918:                                                 "source_detector": "object_detector",
+ 919:                                                 "label": label,
+ 920:                                                 "confidence": confidence,
+ 921:                                                 "blendshapes": None,  # Not applicable for objects
+ 922:                                                 "is_speaking": None   # Not applicable for objects
+ 923:                                             }
+ 924:                                             current_detections.append(det)
+ 925:                                 except Exception as e:
+ 926:                                     logging.warning(f"Object detection failed for frame {frame_idx + 1}: {e}")
+ 927: 
+ 928:                             tracked_for_frame = apply_tracking_and_management(
+ 929:                                 tracked_objects, current_detections, next_id_counter,
+ 930:                                 args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
+ 931:                                 args.speaking_detection_jaw_open_threshold,
+ 932:                                 enhanced_speaking_detector=enhanced_speaking_detector,
+ 933:                                 current_frame_num=frame_idx + 1
+ 934:                             )
+ 935: 
+ 936:                             # Always export frame data to maintain consistent structure
+ 937:                             # Even if no objects are tracked, we include the frame with empty tracked_objects
+ 938:                             final_output["frames"].append({
+ 939:                                 "frame": frame_idx + 1,
+ 940:                                 "tracked_objects": tracked_for_frame if tracked_for_frame else []
+ 941:                             })
+ 942: 
+ 943:                             frame_idx += 1
+ 944:                             if frame_idx % 50 == 0:
+ 945:                                 progress_percent = int((frame_idx / total_frames) * 100)
+ 946:                                 print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
+ 947: 
+ 948:                         # Log processing summary for sequential processing
+ 949:                         face_success_rate = face_detection_success_count / frames_processed if frames_processed > 0 else 0
+ 950:                         logging.info(f"Processing summary:")
+ 951:                         logging.info(f"  Total frames processed: {frames_processed}")
+ 952:                         logging.info(f"  Frames with faces: {face_detection_success_count}")
+ 953:                         logging.info(f"  Face detection success rate: {face_success_rate:.2%}")
+ 954:                         logging.info(f"  Object detection fallback used: {use_object_detection_fallback}")
+ 955:                         logging.info(f"  Total frames exported: {len(final_output['frames'])}")
+ 956: 
+ 957:             finally:
+ 958:                 # Unregister the video capture resource
+ 959:                 resource_tracker.unregister_resource(resource_id)
+ 960: 
+ 961:     except Exception as e:
+ 962:         logging.error(f"Error processing video {args.video_file_path}: {e}")
+ 963:         raise
+ 964: 
+ 965:     # Save output with proper error handling
+ 966:     output_path = Path(args.video_file_path).with_suffix('.json')
+ 967:     try:
+ 968:         with open(output_path, 'w', encoding='utf-8') as f:
+ 969:             json.dump(final_output, f, indent=2, ensure_ascii=False)
+ 970:         logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
+ 971:         print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
+ 972:     except Exception as e:
+ 973:         logging.error(f"Failed to save output file {output_path}: {e}")
+ 974:         raise
+ 975: 
+ 976: 
+ 977: if __name__ == "__main__":
+ 978:     parser = argparse.ArgumentParser(description="Worker séquentiel pour MediaPipe.")
+ 979:     parser.add_argument("video_file_path")
+ 980:     parser.add_argument("--models_dir", required=True)
+ 981:     parser.add_argument("--use_gpu", action="store_true")
+ 982:     parser.add_argument(
+ 983:         "--tracking_engine",
+ 984:         default=None,
+ 985:         help="Tracking engine: insightface (GPU) ou vide pour le mode MediaPipe par défaut",
+ 986:     )
+ 987:     # Conserver les arguments pour la compatibilité avec le manager, même s'ils ne sont pas tous utilisés
+ 988:     parser.add_argument("--mp_landmarker_num_faces", type=int, default=1)
+ 989:     parser.add_argument("--mp_landmarker_min_face_detection_confidence", type=float, default=0.5)
+ 990:     parser.add_argument("--mp_landmarker_min_face_presence_confidence", type=float, default=0.3)
+ 991:     parser.add_argument("--mp_landmarker_min_tracking_confidence", type=float, default=0.5)
+ 992:     parser.add_argument("--mp_landmarker_output_blendshapes", action="store_true")
+ 993:     parser.add_argument("--mp_max_distance_tracking", type=int, default=70)
+ 994:     parser.add_argument("--mp_frames_unseen_deregister", type=int, default=7)
+ 995:     parser.add_argument("--speaking_detection_jaw_open_threshold", type=float, default=0.08)
+ 996:     parser.add_argument("--speaking_detection_enabled", action="store_true", default=True, help="Enable enhanced speaking detection module (enabled by default)")
+ 997:     # Object detection parameters
+ 998:     parser.add_argument("--enable_object_detection", action="store_true", help="Enable object detection fallback")
+ 999:     parser.add_argument("--object_score_threshold", type=float, default=0.5, help="Object detection confidence threshold")
+1000:     parser.add_argument("--object_max_results", type=int, default=5, help="Maximum number of objects to detect")
+1001:     # Multi-threading parameter for CPU workers
+1002:     parser.add_argument("--mp_num_workers_internal", type=int, default=1, help="Number of internal worker threads for CPU processing")
+1003: 
+1004:     args, _ = parser.parse_known_args()
+1005: 
+1006:     try:
+1007:         main(args)
+1008:         sys.exit(0)
+1009:     except Exception as e:
+1010:         logging.error(f"Erreur critique dans le worker: {e}", exc_info=True)
+1011:         sys.exit(1)
+```
+
+## File: static/css/components/steps.css
 ```css
-  1: .logs-overlay-container {
-  2:     z-index: 1100;
-  3:     background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
-  4:     padding: clamp(16px, 3vw, 36px);
-  5: }
-  6: 
-  7: .logs-content-wrapper {
-  8:     width: min(80vw, 1100px);
-  9:     height: min(80vh, 780px);
- 10:     display: flex;
- 11:     flex-direction: column;
- 12:     gap: 18px;
- 13:     background: var(--bg-card);
- 14:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
- 15:     border-radius: 28px;
- 16:     padding: 20px 22px 24px;
- 17:     box-shadow:
- 18:         0 28px 60px rgba(0, 0, 0, 0.45),
- 19:         0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
- 20:     opacity: 0;
- 21:     transform: translateY(12px) scale(0.98);
- 22:     transition:
- 23:         opacity var(--motion-duration-medium) var(--motion-ease-standard),
- 24:         transform var(--motion-duration-medium) var(--motion-ease-standard);
- 25:     overflow: hidden;
+  1: .step {
+  2:     background-color: var(--bg-card);
+  3:     border: 1px solid var(--border-color);
+  4:     border-left: 3px solid var(--border-color);
+  5:     padding: 25px;
+  6:     margin-bottom: 25px;
+  7:     border-radius: 12px;
+  8:     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  9:     width: 100%;
+ 10:     max-width: 700px;
+ 11:     transition:
+ 12:         transform 0.4s ease-out,
+ 13:         opacity 0.4s ease-in-out,
+ 14:         border-color 0.3s ease,
+ 15:         border-left-color 0.3s ease,
+ 16:         margin-bottom 0.4s ease-in-out,
+ 17:         padding 0.4s ease-in-out,
+ 18:         box-shadow 0.3s ease;
+ 19:     scroll-margin-top: 0; /* Désactivé pour permettre un centrage parfait */
+ 20: }
+ 21: 
+ 22: .step[data-status="running"],
+ 23: .step[data-status="starting"],
+ 24: .step[data-status="initiated"] {
+ 25:     border-left-color: var(--status-running);
  26: }
  27: 
- 28: .logs-overlay-container[data-visible="true"] .logs-content-wrapper {
- 29:     opacity: 1;
- 30:     transform: translateY(0) scale(1);
+ 28: .step[data-status="completed"],
+ 29: .step[data-status="success"] {
+ 30:     border-left-color: var(--status-success);
  31: }
  32: 
- 33: @media (prefers-reduced-motion: reduce) {
- 34:     .logs-content-wrapper {
- 35:         transition: none;
- 36:         transform: none;
- 37:     }
- 38: }
- 39: 
- 40: @media (max-width: 900px) {
- 41:     .logs-content-wrapper {
- 42:         width: 95vw;
- 43:         height: 90vh;
- 44:         border-radius: 20px;
- 45:         padding: 18px;
- 46:     }
- 47: }
- 48: 
- 49: .log-panel-header {
- 50:     display: flex;
- 51:     flex-direction: column;
- 52:     align-items: stretch;
- 53:     gap: 10px;
- 54:     padding-bottom: 10px;
- 55:     margin-bottom: 15px;
- 56:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
- 57:     color: var(--accent-primary);
- 58:     font-size: 1.3em;
- 59:     font-weight: 500;
- 60:     flex-shrink: 0;
- 61:     transition: color var(--motion-duration-medium) var(--motion-ease-standard);
- 62: }
- 63: 
- 64: .log-panel-header-main {
- 65:     display: flex;
- 66:     justify-content: space-between;
- 67:     align-items: center;
- 68:     gap: 12px;
- 69: }
- 70: 
- 71: .log-panel-subheader {
- 72:     display: flex;
- 73:     flex-wrap: wrap;
- 74:     align-items: baseline;
- 75:     gap: 10px;
- 76:     font-size: 0.85em;
- 77:     color: var(--text-secondary);
- 78: }
- 79: 
- 80: #log-panel-context-step {
- 81:     color: var(--text-primary);
- 82:     font-weight: 500;
+ 33: .step[data-status="failed"],
+ 34: .step[data-status="error"],
+ 35: .step[data-status="cancelled"] {
+ 36:     border-left-color: var(--status-error);
+ 37: }
+ 38: 
+ 39: .step[data-status="warning"],
+ 40: .step[data-status="paused"] {
+ 41:     border-left-color: var(--status-warning);
+ 42: }
+ 43: 
+ 44: /* Compact mode reduces padding/margins and typography to fit viewport */
+ 45: .workflow-wrapper.compact-mode:not(.logs-active) .step {
+ 46:     max-width: 100%;
+ 47:     /* Reduce bottom padding to limit empty space below last controls/log buttons */
+ 48:     padding: 14px 14px 10px; /* top right bottom left */
+ 49:     margin-bottom: 0; /* handled by grid gap */
+ 50:     box-shadow: 0 2px 6px rgba(0,0,0,0.12); /* softer shadow to reduce visual noise */
+ 51:     align-self: start; /* avoid vertical stretch inside grid on desktop */
+ 52: }
+ 53: 
+ 54: /* Smooth reappearance after closing logs panel - now only affects opacity/transform */
+ 55: .workflow-wrapper.logs-leaving .steps-column .step {
+ 56:     will-change: opacity, transform;
+ 57: }
+ 58: 
+ 59: /* Utility class applied via JS for deterministic transitions */
+ 60: .step.steps-hidden {
+ 61:     opacity: 0 !important;
+ 62:     transform: translateY(8px) scale(0.97) !important;
+ 63:     pointer-events: none;
+ 64: }
+ 65: 
+ 66: /* Staggered delays in compact mode - no longer needed since layout is stable */
+ 67: .workflow-wrapper.compact-mode.logs-leaving .steps-column .step {
+ 68:     transition-timing-function: cubic-bezier(0.2, 0.6, 0.2, 1);
+ 69:     transition-duration: 0.4s;
+ 70: }
+ 71: .step:hover:not(.active-for-log-panel) {
+ 72:      transform: translateY(-4px);
+ 73:      box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+ 74: }
+ 75:  .step.active-for-log-panel {
+ 76:     border: 2px solid var(--accent-primary);
+ 77:     box-shadow: 0 8px 25px rgba(121, 134, 203, 0.3), 0 0 0 1px var(--accent-primary);
+ 78:     transform: translateY(-2px);
+ 79: }
+ 80: .step.custom-sequence-selected {
+ 81:     border: 2px solid var(--orange);
+ 82:     box-shadow: 0 0 15px var(--orange);
  83: }
  84: 
- 85: .log-panel-specific-buttons {
+ 85: .step-header-content {
  86:     display: flex;
- 87:     flex-wrap: wrap;
- 88:     gap: 10px;
- 89: }
- 90: 
- 91: .log-panel-specific-buttons .specific-log-button {
- 92:     display: inline-flex;
- 93:     align-items: center;
- 94:     justify-content: center;
- 95:     gap: 8px;
- 96:     border-radius: 999px;
- 97:     padding: 10px 18px;
- 98:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
- 99:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-100:     color: var(--text-secondary);
-101:     cursor: pointer;
-102:     transition:
-103:         color var(--motion-duration-fast) var(--motion-ease-standard),
-104:         background var(--motion-duration-fast) var(--motion-ease-standard),
-105:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-106:         transform var(--motion-duration-fast) var(--motion-ease-standard);
-107: }
-108: 
-109: .log-panel-specific-buttons .specific-log-button:hover {
-110:     color: var(--text-primary);
-111:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-112:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
-113: }
-114: 
-115: .log-panel-specific-buttons .specific-log-button:active {
-116:     transform: scale(0.98);
-117: }
-118: 
-119: #close-log-panel {
-120:     display: inline-flex;
-121:     align-items: center;
-122:     justify-content: center;
-123:     width: 44px;
-124:     height: 44px;
-125:     background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
-126:     border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
-127:     border-radius: 999px;
-128:     color: var(--text-bright);
-129:     font-size: 1.45em;
-130:     cursor: pointer;
-131:     box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
-132:     transition:
-133:         color var(--motion-duration-fast) var(--motion-ease-standard),
-134:         background var(--motion-duration-fast) var(--motion-ease-standard),
-135:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-136:         transform var(--motion-duration-fast) var(--motion-ease-standard),
-137:         box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
-138: }
-139: 
-140: #close-log-panel:hover {
-141:     color: var(--text-primary);
-142:     background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
-143:     border-color: rgb(var(--accent-primary-rgb) / 0.7);
-144:     box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+ 87:     justify-content: space-between;
+ 88:     align-items: center;
+ 89:     border-bottom: 1px solid var(--border-color);
+ 90:     padding-bottom: 10px;
+ 91:     margin-bottom: 20px;
+ 92: }
+ 93: 
+ 94: .step-title-group {
+ 95:     display: flex;
+ 96:     align-items: center;
+ 97:     gap: 12px;
+ 98:     flex-wrap: wrap;
+ 99: }
+100: 
+101: .step h2 {
+102:     margin-top: 0;
+103:     font-size: 1.5em;
+104:     color: var(--accent-primary);
+105:     display: flex;
+106:     align-items: center;
+107:     font-weight: 500;
+108:     border-bottom: none;
+109:     padding-bottom: 0;
+110:     margin-bottom: 0;
+111: }
+112: .step h2 .step-icon { margin-right: 12px; font-size: 1.6em; }
+113: 
+114: /* Icon accent on hover for better affordance */
+115: .step:hover h2 .step-icon {
+116:     color: var(--accent-primary);
+117:     transform: translateY(-1px);
+118:     transition: color 0.2s ease, transform 0.2s ease;
+119: }
+120: 
+121: .workflow-wrapper.compact-mode:not(.logs-active) .step h2 {
+122:     font-size: 1.05em; /* slightly smaller titles in compact */
+123: }
+124: .workflow-wrapper.compact-mode:not(.logs-active) .step h2 .step-icon {
+125:     font-size: 1.1em;
+126:     margin-right: 6px;
+127: }
+128: 
+129: .step-state-chip {
+130:     display: inline-flex;
+131:     align-items: center;
+132:     gap: 6px;
+133:     padding: 4px 12px;
+134:     border-radius: 999px;
+135:     font-size: 0.78em;
+136:     font-weight: 600;
+137:     text-transform: capitalize;
+138:     border: 1px solid transparent;
+139:     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+140:     letter-spacing: 0.02em;
+141: }
+142: 
+143: .step-state-chip span {
+144:     font-size: 0.9em;
 145: }
 146: 
-147: #close-log-panel:focus-visible {
-148:     outline: none;
-149:     box-shadow:
-150:         0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
-151:         0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+147: .state-running {
+148:     background: color-mix(in oklab, var(--status-running) 18%, transparent);
+149:     color: var(--status-running);
+150:     border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
+151:     box-shadow: 0 0 12px color-mix(in oklab, var(--status-running) 16%, transparent);
 152: }
 153: 
-154: #close-log-panel:active {
-155:     transform: scale(0.96);
-156: }
-157: 
-158: .log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
-159: .log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
-160: 
-161: .log-output,
-162: .specific-log-output {
-163:     background-color: var(--log-bg);
-164:     color: var(--text-bright);
-165:     padding: 15px;
-166:     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-167:     font-size: 1em;
-168:     line-height: 1.45;
-169:     max-height: 300px;
-170:     overflow-y: auto;
-171:     white-space: pre-wrap;
-172:     word-break: break-all;
-173:     border-radius: 0 0 8px 8px;
-174:     flex-grow: 1;
-175: }
-176: 
-177: /* Enhanced Log Styling - Different log types */
-178: .log-line {
-179:     display: block;
-180:     margin: 2px 0;
-181:     padding: 2px 6px;
-182:     border-radius: 3px;
-183:     position: relative;
-184: }
-185: 
-186: .log-line.log-success {
-187:     background-color: rgb(var(--status-success-rgb) / 0.12);
-188:     border-left: 3px solid var(--status-success);
-189:     color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
-190: }
-191: 
-192: .log-line.log-warning {
-193:     background-color: rgb(var(--status-warning-rgb) / 0.12);
-194:     border-left: 3px solid var(--status-warning);
-195:     color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
-196: }
-197: 
-198: .log-line.log-error {
-199:     background-color: rgb(var(--status-error-rgb) / 0.12);
-200:     border-left: 3px solid var(--status-error);
-201:     color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
-202:     font-weight: 500;
-203: }
-204: 
-205: .log-line.log-info {
-206:     background-color: rgb(var(--status-running-rgb) / 0.12);
-207:     border-left: 3px solid var(--status-running);
-208:     color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
-209: }
-210: 
-211: .log-line.log-debug {
-212:     background-color: rgba(158, 158, 158, 0.1);
-213:     border-left: 3px solid #9e9e9e;
-214:     color: #616161;
-215:     font-size: 0.85em;
-216: }
-217: 
-218: .log-line.log-command {
-219:     background-color: rgba(156, 39, 176, 0.1);
-220:     border-left: 3px solid #9c27b0;
-221:     color: #7b1fa2;
-222:     font-weight: 500;
-223: }
-224: 
-225: .log-line.log-progress {
-226:     background-color: rgb(var(--accent-primary-rgb) / 0.10);
-227:     border-left: 3px solid var(--accent-primary);
-228:     color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-229: }
-230: 
-231: /* Log icons for better visual distinction */
-232: .log-line::before {
-233:     content: '';
-234:     display: inline-block;
-235:     width: 12px;
-236:     height: 12px;
-237:     margin-right: 8px;
-238:     border-radius: 50%;
-239:     vertical-align: middle;
+154: .state-success {
+155:     background: color-mix(in oklab, var(--status-success) 18%, transparent);
+156:     color: var(--status-success);
+157:     border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
+158: }
+159: 
+160: .state-error {
+161:     background: color-mix(in oklab, var(--status-error) 18%, transparent);
+162:     color: var(--status-error);
+163:     border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
+164: }
+165: 
+166: .state-warning {
+167:     background: color-mix(in oklab, var(--status-warning) 18%, transparent);
+168:     color: var(--status-warning);
+169:     border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
+170: }
+171: 
+172: .state-idle {
+173:     background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+174:     color: var(--status-idle);
+175:     border-color: color-mix(in oklab, var(--status-idle) 35%, transparent);
+176: }
+177: 
+178: /* Hover tuning for processing/active steps: keep subtle, avoid large motion */
+179: .steps-column .step[data-status="running"]:hover,
+180: .steps-column .step[data-status="starting"]:hover,
+181: .steps-column .step[data-status="initiated"]:hover,
+182: .steps-column .step.active-for-log-panel:hover {
+183:     transform: translateY(-2px) scale(1.005);
+184:     box-shadow: 0 10px 24px rgba(121, 134, 203, 0.22), 0 2px 8px rgba(0,0,0,0.2);
+185: }
+186: 
+187: /* Respect reduced motion for hover effects */
+188: @media (prefers-reduced-motion: reduce) {
+189:     .step:hover:not(.active-for-log-panel),
+190:     .steps-column .step[data-status="running"]:hover,
+191:     .steps-column .step[data-status="starting"]:hover,
+192:     .steps-column .step[data-status="initiated"]:hover,
+193:     .steps-column .step.active-for-log-panel:hover {
+194:         transform: none !important;
+195:         box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+196:     }
+197: }
+198: 
+199: .step-selection-control {
+200:     display: flex;
+201:     align-items: center;
+202: }
+203: .step-selection-control input[type="checkbox"] {
+204:     width: 20px;
+205:     height: 20px;
+206:     margin-right: 8px;
+207:     cursor: pointer;
+208: }
+209: .step-selection-order-number {
+210:     font-size: 1em;
+211:     font-weight: bold;
+212:     color: var(--orange);
+213:     min-width: 20px;
+214:     text-align: center;
+215: }
+216: 
+217: .step-controls button,
+218: .specific-log-button {
+219:     padding: 12px 22px;
+220:     margin-right: 12px;
+221:     margin-bottom: 12px;
+222:     font-size: 0.95em;
+223:     cursor: pointer;
+224:     border: none;
+225:     border-radius: 25px;
+226:     color: var(--bg-dark);
+227:     transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+228:     font-weight: 600;
+229:     box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+230:     min-height: var(--touch-target-min);
+231: }
+232: .workflow-wrapper.compact-mode:not(.logs-active) .step-controls button,
+233: .workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button {
+234:     padding: var(--button-compact-padding);
+235:     font-size: 0.86em;
+236:     margin-right: 6px;
+237:     /* Reduce vertical gap below the last row of buttons */
+238:     margin-bottom: 3px;
+239:     border-radius: 16px;
 240: }
 241: 
-242: .log-line.log-success::before {
-243:     background-color: var(--status-success);
-244:     content: '✓';
-245:     color: white;
-246:     font-size: 8px;
-247:     text-align: center;
-248:     line-height: 12px;
-249:     font-weight: bold;
-250: }
-251: 
-252: .log-line.log-warning::before {
-253:     background-color: var(--status-warning);
-254:     content: '⚠';
-255:     color: white;
-256:     font-size: 8px;
-257:     text-align: center;
-258:     line-height: 12px;
+242: /* Remove extra bottom gap under the final log button in compact mode */
+243: .workflow-wrapper.compact-mode:not(.logs-active) .specific-log-button:last-child {
+244:     margin-bottom: 0;
+245: }
+246: .step-controls button:hover, .specific-log-button:hover {
+247:      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+248: }
+249: .step-controls button:active, .specific-log-button:active { transform: scale(0.97); }
+250: 
+251: .run-button { background-color: var(--green); color: white; }
+252: .run-button:hover { background-color: #5cb85c; }
+253: .run-button:disabled,
+254: .cancel-button:disabled,
+255: .specific-log-button:disabled {
+256:     background: color-mix(in oklab, var(--bg-tertiary) 80%, black 8%);
+257:     color: var(--text-muted);
+258:     border-color: var(--border-color);
 259: }
 260: 
-261: .log-line.log-error::before {
-262:     background-color: var(--status-error);
-263:     content: '✕';
-264:     color: white;
-265:     font-size: 8px;
-266:     text-align: center;
-267:     line-height: 12px;
-268:     font-weight: bold;
-269: }
-270: 
-271: .log-line.log-info::before {
-272:     background-color: var(--status-running);
-273:     content: 'ℹ';
-274:     color: white;
-275:     font-size: 8px;
-276:     text-align: center;
-277:     line-height: 12px;
-278: }
-279: 
-280: .log-line.log-debug::before {
-281:     background-color: #9e9e9e;
-282:     content: '•';
-283:     color: white;
-284:     font-size: 10px;
-285:     text-align: center;
-286:     line-height: 12px;
-287: }
-288: 
-289: .log-line.log-command::before {
-290:     background-color: #9c27b0;
-291:     content: '$';
-292:     color: white;
-293:     font-size: 8px;
-294:     text-align: center;
-295:     line-height: 12px;
-296:     font-weight: bold;
-297: }
-298: 
-299: .log-line.log-progress::before {
-300:     background-color: var(--accent-primary);
-301:     content: '⟳';
-302:     color: white;
-303:     font-size: 8px;
-304:     text-align: center;
-305:     line-height: 12px;
-306: }
-307: 
-308: /* Dark mode adjustments for log styling */
-309: @media (prefers-color-scheme: dark) {
-310:     .log-line.log-success {
-311:         background-color: rgb(var(--status-success-rgb) / 0.15);
-312:         color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
-313:     }
-314: 
-315:     .log-line.log-warning {
-316:         background-color: rgb(var(--status-warning-rgb) / 0.15);
-317:         color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
-318:     }
-319: 
-320:     .log-line.log-error {
-321:         background-color: rgb(var(--status-error-rgb) / 0.15);
-322:         color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
-323:     }
-324: 
-325:     .log-line.log-info {
-326:         background-color: rgb(var(--status-running-rgb) / 0.15);
-327:         color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
-328:     }
-329: 
-330:     .log-line.log-debug {
-331:         background-color: rgba(158, 158, 158, 0.15);
-332:         color: #bdbdbd;
-333:     }
-334: 
-335:     .log-line.log-command {
-336:         background-color: rgba(156, 39, 176, 0.15);
-337:         color: #ba68c8;
-338:     }
-339: 
-340:     .log-line.log-progress {
-341:         background-color: rgb(var(--accent-primary-rgb) / 0.15);
-342:         color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-343:     }
-344: }
-345: 
-346: /* Hover effects for better interactivity */
-347: .log-line:hover {
-348:     background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
-349:     transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
-350: }
-351: 
-352: /* Improved spacing and readability */
-353: .log-output .log-line:first-child {
-354:     margin-top: 0;
-355: }
-356: 
-357: .log-output .log-line:last-child {
-358:     margin-bottom: 0;
-359: }
-360: .log-output:empty:before {
-361:     content: "En attente de logs...";
-362:     color: var(--text-secondary);
-363:     font-style: italic;
-364: }
-365: .specific-log-output:empty:before {
-366:     content: "Aucun log spécifique chargé.";
-367:     color: var(--text-secondary);
-368:     font-style: italic;
-369: }
-370: 
-371: .specific-log-controls-wrapper { margin-top: 15px; }
-372: .specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
-373: 
-374: .specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
-375: 
-376: .log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
-377: .log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
-378: .log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
-379: .log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
+261: .cancel-button { background-color: var(--red); color: white;}
+262: .cancel-button:hover { background-color: #d9534f; }
+263: /* Universal focus-visible for action buttons (keyboard accessibility) */
+264: .run-button:focus-visible,
+265: .cancel-button:focus-visible,
+266: .specific-log-button:focus-visible {
+267:     outline: none;
+268:     box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-primary) 35%, transparent);
+269:     border-color: var(--accent-primary);
+270: }
+271: 
+272: .specific-log-button { background-color: var(--yellow); color: #333; }
+273: .specific-log-button:hover { background-color: #ffeb3b; }
+274: 
+275: .status-line { margin-top: 15px; margin-bottom:10px; font-weight: bold; font-size: 1.05em; }
+276: .workflow-wrapper.compact-mode:not(.logs-active) .status-line {
+277:     margin-top: 6px;
+278:     margin-bottom: 4px;
+279:     font-size: 0.9em;
+280: }
+281: .status-line {
+282:     display: flex;
+283:     align-items: center;
+284:     gap: 10px;
+285:     flex-wrap: wrap;
+286: }
+287: .status-badge {
+288:     display: inline-flex;
+289:     align-items: center;
+290:     padding: 4px 10px;
+291:     border-radius: 999px;
+292:     font-weight: 600;
+293:     font-size: 0.85em;
+294:     letter-spacing: 0.01em;
+295:     text-transform: capitalize;
+296:     background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+297:     color: var(--status-idle);
+298:     border: 1px solid color-mix(in oklab, var(--status-idle) 35%, transparent);
+299: }
+300: .status-running,
+301: .status-starting,
+302: .status-initiated {
+303:     background: color-mix(in oklab, var(--status-running) 18%, transparent);
+304:     color: var(--status-running);
+305:     border-color: color-mix(in oklab, var(--status-running) 35%, transparent);
+306:     animation: pulseStatus 1.8s infinite ease-in-out;
+307: }
+308: .status-success,
+309: .status-completed {
+310:     background: color-mix(in oklab, var(--status-success) 18%, transparent);
+311:     color: var(--status-success);
+312:     border-color: color-mix(in oklab, var(--status-success) 35%, transparent);
+313: }
+314: .status-error,
+315: .status-failed,
+316: .status-cancelled {
+317:     background: color-mix(in oklab, var(--status-error) 18%, transparent);
+318:     color: var(--status-error);
+319:     border-color: color-mix(in oklab, var(--status-error) 35%, transparent);
+320: }
+321: .status-warning,
+322: .status-paused {
+323:     background: color-mix(in oklab, var(--status-warning) 18%, transparent);
+324:     color: var(--status-warning);
+325:     border-color: color-mix(in oklab, var(--status-warning) 35%, transparent);
+326: }
+327: .status-idle {
+328:     background: color-mix(in oklab, var(--status-idle) 18%, transparent);
+329:     color: var(--status-idle);
+330: }
+331: .status-line span.timer {
+332:     font-weight: normal;
+333:     font-size: 0.9em;
+334:     color: var(--text-secondary);
+335:     margin-left: 10px;
+336: }
+337: 
+338: .step-progress-container {
+339:     width: 100%;
+340:     margin-top:10px;
+341: }
+342: .workflow-wrapper.compact-mode:not(.logs-active) .step-progress-container { margin-top: 6px; }
+343: .progress-bar-wrapper {
+344:     background-color: var(--border-color);
+345:     border-radius: 8px;
+346:     padding: 3px;
+347: }
+348: .progress-bar-step {
+349:     width: 0%;
+350:     height: 18px;
+351:     background-color: var(--blue);
+352:     border-radius: 5px;
+353:     text-align: center;
+354:     line-height: 18px;
+355:     color: white;
+356:     font-size: 0.85em;
+357:     font-weight: bold;
+358:     /* Smoother width transition */
+359:     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+360:     position: relative;
+361:     overflow: hidden; /* for shine effect */
+362: }
+363: .workflow-wrapper.compact-mode:not(.logs-active) .progress-bar-step {
+364:     height: 12px;
+365:     line-height: 12px;
+366:     font-size: 0.76em;
+367: }
+368: .progress-bar-step[data-active="true"]::after {
+369:     content: '';
+370:     position: absolute;
+371:     top: 0;
+372:     left: -100%;
+373:     width: 100%;
+374:     height: 100%;
+375:     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+376:     animation: progressShine 2.0s infinite;
+377: }
+378: .progress-text-step {
+379:     text-align: center;
+380:     margin-top: 4px;
+381:     font-size: 0.85em;
+382:     color: var(--text-secondary);
+383:     white-space: pre-line;
+384:     overflow: hidden;
+385:     text-overflow: ellipsis;
+386:     max-height: 3.6em;
+387:     line-height: 1.2em;
+388: }
+389: .workflow-wrapper.compact-mode:not(.logs-active) .progress-text-step {
+390:     font-size: 0.76em;
+391: }
+392: 
+393: /* Subtle pulse for current filename while processing */
+394: .progress-text-step[data-processing="true"] {
+395:     animation: textPulse 1.5s ease-in-out infinite;
+396: }
+397: 
+398: /* Reduce extra spacing around specific log controls to avoid empty space under buttons */
+399: .workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper {
+400:     margin-top: 8px; /* was 15px in logs.css; tighter in compact mode */
+401:     margin-bottom: 0;
+402: }
+403: .workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper h4 {
+404:     margin-bottom: 6px; /* override logs.css (10px) to reduce vertical gap */
+405: }
+406: .workflow-wrapper.compact-mode:not(.logs-active) .step .specific-log-controls-wrapper > div {
+407:     /* the immediate container of buttons; ensure no unintended bottom margin */
+408:     margin-bottom: 0;
+409: }
+410: 
+411: /* ========== Micro-interactions for steps ========== */
+412: /* Non-active steps get a very subtle halo when any step is running */
+413: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"],
+414: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"],
+415: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"] {
+416:     position: relative;
+417: }
+418: 
+419: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="idle"]::after,
+420: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="completed"]::after,
+421: .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status="failed"]::after {
+422:     content: '';
+423:     position: absolute;
+424:     inset: 0;
+425:     border-radius: 12px;
+426:     pointer-events: none;
+427:     box-shadow: 0 0 0 2px rgba(121, 134, 203, 0.35);
+428:     opacity: 0.22;
+429:     animation: subtleOpacityPulse 2.8s ease-in-out infinite;
+430: }
+431: 
+432: /* Active/processing step: breathing effect to indicate ongoing work */
+433: .steps-column .step.active-for-log-panel,
+434: .steps-column .step[data-status="running"],
+435: .steps-column .step[data-status="starting"],
+436: .steps-column .step[data-status="initiated"] {
+437:     will-change: transform;
+438:     animation: cardBreath 3.2s ease-in-out infinite;
+439: }
+440: 
+441: /* Respect reduced motion preferences */
+442: @media (prefers-reduced-motion: reduce) {
+443:     .workflow-wrapper.any-step-running .steps-column .step:not(.active-for-log-panel)[data-status]::after,
+444:     .steps-column .step.active-for-log-panel,
+445:     .steps-column .step[data-status="running"],
+446:     .steps-column .step[data-status="starting"],
+447:     .steps-column .step[data-status="initiated"] {
+448:         animation: none !important;
+449:     }
+450: }
+451: 
+452: /* Override transform reset from layout.css to allow hover lift on idle steps */
+453: .workflow-wrapper:not(.logs-active) .steps-column .step:hover:not(.active-for-log-panel) {
+454:     transform: translateY(-4px);
+455:     box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+456: }
+457: 
+458: .workflow-wrapper.compact-mode .steps-column {
+459:     display: flex;
+460:     flex-direction: column;
+461:     align-items: center;
+462:     gap: var(--pipeline-gap);
+463: }
+464: 
+465: .workflow-pipeline {
+466:     width: 100%;
+467: }
+468: 
+469: .pipeline-timeline {
+470:     position: relative;
+471:     width: 100%;
+472:     max-width: var(--pipeline-card-max-width);
+473:     margin: 0 auto;
+474:     transform: translateX(calc(-1 * var(--pipeline-card-alignment-offset)));
+475:     display: flex;
+476:     flex-direction: column;
+477:     gap: var(--pipeline-gap);
+478: }
+479: 
+480: @media (max-width: 768px) {
+481:     .pipeline-timeline {
+482:         transform: none;
+483:     }
+484: }
+485: 
+486: .timeline-scroll-spacer {
+487:     width: 100%;
+488:     height: calc(100vh - var(--topbar-height));
+489:     min-height: 520px;
+490: }
+491: 
+492: .timeline-row {
+493:     display: grid;
+494:     grid-template-columns: var(--pipeline-rail-column-width) minmax(0, 1fr);
+495:     column-gap: var(--pipeline-rail-gap);
+496:     align-items: stretch;
+497: }
+498: 
+499: .timeline-rail-column {
+500:     position: relative;
+501:     display: flex;
+502:     align-items: center;
+503:     justify-content: center;
+504:     padding: var(--pipeline-card-padding) 0;
+505: }
+506: 
+507: .timeline-cards-column {
+508:     display: flex;
+509:     flex-direction: column;
+510: }
+511: 
+512: .timeline-axis {
+513:     position: absolute;
+514:     left: calc((var(--pipeline-rail-column-width) / 2) - (var(--pipeline-axis-width) / 2));
+515:     top: 0;
+516:     bottom: 0;
+517:     width: var(--pipeline-axis-width);
+518:     background: color-mix(in oklab, var(--accent-primary) 45%, transparent);
+519:     border-radius: 999px;
+520:     opacity: 0.9;
+521:     pointer-events: none;
+522:     z-index: 0;
+523: }
+524: 
+525: .timeline-step {
+526:     position: relative;
+527:     z-index: 2;
+528:     width: 100%;
+529:     max-width: var(--pipeline-card-max-width);
+530:     margin: 0;
+531:     border-left: none;
+532:     padding: 0;
+533:     border-radius: var(--pipeline-card-radius);
+534:     background: color-mix(in oklab, var(--bg-card) 92%, transparent);
+535:     border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
+536:     box-shadow: 0 10px 26px rgba(0,0,0,0.22);
+537:     scroll-margin-top: 0;
+538:     transition:
+539:         transform var(--motion-duration-slow) var(--motion-ease-standard),
+540:         box-shadow var(--motion-duration-medium) var(--motion-ease-standard),
+541:         background var(--motion-duration-medium) var(--motion-ease-standard),
+542:         border-color var(--motion-duration-medium) var(--motion-ease-standard);
+543: }
+544: 
+545: .timeline-step:hover:not(.active-for-log-panel) {
+546:     transform: translateY(-6px) scale(1.008);
+547:     box-shadow:
+548:         0 20px 40px rgba(0,0,0,0.25),
+549:         0 0 0 1px rgba(var(--accent-primary-rgb), 0.2);
+550: }
+551: 
+552: .timeline-step:focus-within:not(.active-for-log-panel) {
+553:     box-shadow:
+554:         0 16px 34px rgba(0,0,0,0.24),
+555:         0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+556:     transform: translateY(-2px);
+557: }
+558: 
+559: .timeline-step[data-status="running"],
+560: .timeline-step[data-status="starting"],
+561: .timeline-step[data-status="initiated"] {
+562:     background: color-mix(in oklab, var(--status-running) 12%, var(--bg-card));
+563:     border-color: color-mix(in oklab, var(--status-running) 65%, var(--border-color));
+564:     box-shadow: 0 10px 30px rgba(var(--status-running-rgb), 0.25);
+565: }
+566: 
+567: .timeline-step[data-status="failed"],
+568: .timeline-step[data-status="error"],
+569: .timeline-step[data-status="cancelled"] {
+570:     background: color-mix(in oklab, var(--status-error) 10%, var(--bg-card));
+571:     border-color: color-mix(in oklab, var(--status-error) 55%, var(--border-color));
+572: }
+573: 
+574: .timeline-step[data-status="completed"],
+575: .timeline-step[data-status="success"] {
+576:     background: color-mix(in oklab, var(--status-success) 10%, var(--bg-card));
+577:     border-color: color-mix(in oklab, var(--status-success) 55%, var(--border-color));
+578: }
+579: 
+580: .timeline-step[data-status="warning"],
+581: .timeline-step[data-status="paused"],
+582: .timeline-step[data-status="pending"] {
+583:     background: color-mix(in oklab, var(--status-warning) 10%, var(--bg-card));
+584:     border-color: color-mix(in oklab, var(--status-warning) 55%, var(--border-color));
+585: }
+586: 
+587: .timeline-node {
+588:     position: relative;
+589:     z-index: 2;
+590:     width: var(--pipeline-node-dot-size);
+591:     height: var(--pipeline-node-dot-size);
+592:     border-radius: 50%;
+593:     background: color-mix(in oklab, var(--bg-dark) 72%, transparent);
+594:     border: var(--pipeline-node-border-width) solid var(--pipeline-color-idle);
+595:     box-shadow: 0 0 12px rgba(0,0,0,0.25);
+596:     transition:
+597:         transform var(--motion-duration-fast) var(--motion-ease-standard),
+598:         background var(--motion-duration-medium) var(--motion-ease-standard),
+599:         border-color var(--motion-duration-medium) var(--motion-ease-standard),
+600:         box-shadow var(--motion-duration-medium) var(--motion-ease-standard);
+601: }
+602: 
+603: .timeline-step:hover:not(.active-for-log-panel) .timeline-node {
+604:     transform: scale(1.08);
+605: }
+606: 
+607: .timeline-step.is-selected {
+608:     border-color: color-mix(in oklab, var(--accent-primary) 65%, var(--border-color));
+609:     box-shadow:
+610:         0 16px 34px rgba(0,0,0,0.24),
+611:         0 0 0 2px rgba(var(--accent-primary-rgb), 0.26);
+612: }
+613: 
+614: .timeline-step[data-status="running"] .timeline-node,
+615: .timeline-step[data-status="starting"] .timeline-node,
+616: .timeline-step[data-status="initiated"] .timeline-node {
+617:     border-color: var(--pipeline-color-running);
+618:     box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-running) 45%, transparent);
+619: }
+620: 
+621: .timeline-step[data-status="completed"] .timeline-node,
+622: .timeline-step[data-status="success"] .timeline-node {
+623:     border-color: var(--pipeline-color-success);
+624:     box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-success) 45%, transparent);
+625: }
+626: 
+627: .timeline-step[data-status="failed"] .timeline-node,
+628: .timeline-step[data-status="error"] .timeline-node,
+629: .timeline-step[data-status="cancelled"] .timeline-node {
+630:     border-color: var(--pipeline-color-error);
+631:     box-shadow: 0 0 16px color-mix(in oklab, var(--pipeline-color-error) 45%, transparent);
+632: }
+633: 
+634: .timeline-content {
+635:     display: grid;
+636:     gap: 0.85rem;
+637:     padding: var(--pipeline-card-padding);
+638: }
+639: 
+640: .timeline-head {
+641:     display: flex;
+642:     justify-content: space-between;
+643:     align-items: center;
+644:     gap: 12px;
+645:     padding-bottom: 10px;
+646:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+647: }
+648: 
+649: .node-actions {
+650:     display: flex;
+651:     flex-wrap: wrap;
+652:     align-items: center;
+653:     gap: 10px;
+654: }
+655: 
+656: .timeline-step .step-controls button,
+657: .timeline-step .specific-log-button {
+658:     border-radius: 999px;
+659:     padding: 10px 18px;
+660:     margin: 0;
+661: }
+662: 
+663: .timeline-step .specific-log-controls-wrapper {
+664:     margin-top: 4px;
+665: }
+666: 
+667: .steps-column .step[data-status="initiated"] {
+668:     animation: none !important;
+669: }
+670: 
+671: @media (prefers-reduced-motion: reduce) {
+672:     .timeline-step {
+673:         transition: none !important;
+674:     }
+675:     .timeline-step:hover:not(.active-for-log-panel) {
+676:         transform: none;
+677:     }
+678:     .timeline-axis {
+679:         transition: none !important;
+680:     }
+681:     .timeline-node {
+682:         transition: none !important;
+683:     }
+684: }
+685: 
+686: @media (max-width: 860px) {
+687:     .workflow-pipeline {
+688:         --pipeline-node-size: 68px;
+689:         --pipeline-card-padding: 1.25rem;
+690:         --pipeline-gap: 1.6rem;
+691:         --pipeline-rail-column-width: 84px;
+692:     }
+693: 
+694:     .timeline-step:hover:not(.active-for-log-panel) {
+695:         transform: translateY(-4px) scale(1.006);
+696:     }
+697: }
+698: 
+699: @media (max-width: 720px) {
+700:     .workflow-pipeline {
+701:         --pipeline-rail-column-width: 72px;
+702:         --pipeline-rail-gap: 0.85rem;
+703:     }
+704: }
+705: 
+706: @media (max-width: 620px) {
+707:     .timeline-axis {
+708:         display: none;
+709:     }
+710: 
+711:     .timeline-step {
+712:         grid-template-columns: 1fr;
+713:     }
+714: 
+715:     .timeline-rail {
+716:         flex-direction: row;
+717:         justify-content: flex-start;
+718:         margin-bottom: 10px;
+719:         gap: 12px;
+720:     }
+721: 
+722:     .timeline-head {
+723:         flex-direction: column;
+724:         align-items: flex-start;
+725:     }
+726: 
+727:     .step-selection-control {
+728:         align-self: flex-end;
+729:     }
+730: 
+731:     .node-actions {
+732:         gap: 8px;
+733:         align-items: stretch;
+734:     }
+735: 
+736:     .timeline-step .step-controls button,
+737:     .timeline-step .specific-log-button {
+738:         width: 100%;
+739:         justify-content: center;
+740:     }
+741: }
+742: 
+743: @media (max-width: 520px) {
+744:     .workflow-pipeline {
+745:         --pipeline-node-size: 60px;
+746:         --pipeline-card-padding: 1rem;
+747:         --pipeline-gap: 1.25rem;
+748:     }
+749: }
+750: 
+751: .step-details-panel {
+752:     background: color-mix(in oklab, var(--bg-card) 92%, transparent);
+753:     border: 1px solid color-mix(in oklab, var(--border-color) 75%, transparent);
+754:     border-radius: var(--pipeline-card-radius);
+755:     box-shadow: -5px 0 18px rgba(0,0,0,0.25);
+756:     overflow: hidden;
+757: }
+758: 
+759: .step-details-header {
+760:     display: flex;
+761:     align-items: center;
+762:     justify-content: space-between;
+763:     gap: 12px;
+764:     padding: 14px 14px 10px;
+765:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+766: }
+767: 
+768: .step-details-title {
+769:     font-weight: 700;
+770:     letter-spacing: 0.01em;
+771:     color: var(--text-primary);
+772: }
+773: 
+774: .step-details-close {
+775:     width: 38px;
+776:     height: 38px;
+777:     border-radius: 10px;
+778:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+779:     background: color-mix(in oklab, var(--bg-tertiary) 40%, transparent);
+780:     color: var(--text-primary);
+781:     cursor: pointer;
+782:     transition: background var(--motion-duration-medium) var(--motion-ease-standard);
+783: }
+784: 
+785: .step-details-close:hover {
+786:     background: color-mix(in oklab, var(--accent-primary) 18%, var(--bg-tertiary));
+787: }
+788: 
+789: .step-details-body {
+790:     padding: 14px;
+791:     display: grid;
+792:     gap: 12px;
+793: }
+794: 
+795: .step-details-meta {
+796:     display: flex;
+797:     align-items: center;
+798:     flex-wrap: wrap;
+799:     gap: 10px;
+800: }
+801: 
+802: .step-details-progress {
+803:     background: color-mix(in oklab, var(--bg-dark) 45%, transparent);
+804:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+805:     border-radius: 12px;
+806:     padding: 10px;
+807: }
+808: 
+809: .step-details-actions {
+810:     display: flex;
+811:     flex-direction: column;
+812:     gap: 10px;
+813: }
+814: 
+815: .step-details-actions .run-button,
+816: .step-details-actions .cancel-button,
+817: .step-details-actions .step-details-open-logs {
+818:     width: 100%;
+819:     justify-content: center;
+820:     margin: 0;
+821: }
+822: 
+823: .step-details-open-logs {
+824:     background-color: color-mix(in oklab, var(--accent-primary) 60%, var(--bg-tertiary));
+825:     color: white;
+826: }
+827: 
+828: .step-details-open-logs:hover {
+829:     background-color: color-mix(in oklab, var(--accent-primary) 72%, var(--bg-tertiary));
+830: }
+```
+
+## File: static/css/variables.css
+```css
+ 1: :root {
+ 2:     /* Backgrounds */
+ 3:     --bg-dark: #1e1e2f;
+ 4:     --bg-card: #2c2c3e;
+ 5:     --bg-secondary: #2c2c3e; /* Secondary background for widgets */
+ 6:     --bg-tertiary: #3a3a4e; /* Tertiary background for disabled elements */
+ 7:     --bg-hover: rgba(121, 134, 203, 0.1);
+ 8:     --log-bg: #161625;
+ 9: 
+10:     /* Text */
+11:     --text-primary: #e0e0e0;
+12:     --text-secondary: #a0a0b0;
+13:     --text-muted: #707080; /* Muted text for disabled states */
+14:     --text-bright: #f0f0f0;
+15:     --log-text: #c0c0d0;
+16:     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+17: 
+18:     /* UI Elements */
+19:     --border-color: #39394d;
+20:     --border-color-translucent: #39394d88;
+21:     --border-bright: #4a4a5e;
+22:     --touch-target-min: 44px;
+23:     --button-compact-padding: 12px;
+24:     --topbar-height: 68px;
+25: 
+26:     --motion-duration-fast: 120ms;
+27:     --motion-duration-medium: 220ms;
+28:     --motion-duration-slow: 420ms;
+29:     --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+30:     --motion-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+31:     --motion-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+32:     --motion-ease-in-expo: cubic-bezier(0.7, 0, 0.84, 0);
+33: 
+34:     /* Standard Colors */
+35:     --accent-primary: #7986cb;
+36:     --accent-secondary: #ff8a65;
+37:     --green: #66bb6a;
+38:     --red: #ef5350;
+39:     --yellow: #ffee58;
+40:     --blue: #42a5f5;
+41:     --orange: #ffb74d;
+42: 
+43:     /* Status Colors (Hex) */
+44:     --status-running: #4dabf7;
+45:     --status-success: #4caf50;
+46:     --status-error: #e53935;
+47:     --status-warning: #ff9800;
+48:     --status-idle: #9e9e9e;
+49: 
+50:     /* RGB Values (for rgba usage) */
+51:     --accent-primary-rgb: 121 134 203;
+52:     --accent-secondary-rgb: 255 138 101;
+53:     --status-running-rgb: 77 171 247;
+54:     --status-success-rgb: 76 175 80;
+55:     --status-error-rgb: 229 57 53;
+56:     --status-warning-rgb: 255 152 0;
+57:     --status-idle-rgb: 158 158 158;
+58: 
+59:     /* Pipeline Visualization Variables */
+60:     --pipeline-node-size: 80px;
+61:     --pipeline-connector-width: 3px;
+62:     --pipeline-gap: 2rem;
+63:     --pipeline-card-radius: 20px;
+64:     --pipeline-card-padding: 1.5rem;
+65:     --pipeline-card-max-width: 980px;
+66:     --pipeline-node-dot-size: 18px;
+67:     --pipeline-node-border-width: 3px;
+68:     --pipeline-rail-column-width: 110px;
+69:     --pipeline-rail-gap: 1.25rem;
+70:     --pipeline-axis-width: 4px;
+71:     --pipeline-card-alignment-offset: calc((var(--pipeline-rail-column-width) + var(--pipeline-rail-gap)) / 2);
+72: 
+73:     /* Pipeline Status Colors mapped to Status Colors */
+74:     --pipeline-color-idle: var(--status-idle);
+75:     --pipeline-color-running: var(--status-running);
+76:     --pipeline-color-success: var(--status-success);
+77:     --pipeline-color-error: var(--status-error);
+78: }
 ```
 
 ## File: static/state/AppState.js
@@ -31873,6 +28462,1539 @@ app_new.py
 147: 
 148: // Export the appState for direct access to modern state management
 149: export { appState };
+```
+
+## File: workflow_scripts/step5/run_tracking_manager.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: import os, sys, json, argparse, subprocess, threading, time, logging
+  4: from pathlib import Path
+  5: from collections import OrderedDict, deque
+  6: from datetime import datetime
+  7: from typing import Mapping, Optional
+  8: 
+  9: try:
+ 10:     from dotenv import load_dotenv
+ 11: except ImportError:
+ 12:     load_dotenv = None
+ 13: 
+ 14: 
+ 15: class _EnvConfig:
+ 16:     def __init__(self, environ: Mapping[str, str]):
+ 17:         self._environ = environ
+ 18: 
+ 19:     def get_optional_str(self, key: str) -> Optional[str]:
+ 20:         raw = self._environ.get(key)
+ 21:         if raw is None:
+ 22:             return None
+ 23:         value = str(raw).strip()
+ 24:         return value if value else None
+ 25: 
+ 26:     def get_str(self, key: str, default: str = "") -> str:
+ 27:         value = self.get_optional_str(key)
+ 28:         return value if value is not None else default
+ 29: 
+ 30:     def get_int(self, key: str, default: int) -> int:
+ 31:         raw = self._environ.get(key)
+ 32:         if raw is None:
+ 33:             return default
+ 34:         try:
+ 35:             return int(str(raw).strip())
+ 36:         except Exception:
+ 37:             return default
+ 38: 
+ 39:     def get_bool(self, key: str, default: bool) -> bool:
+ 40:         raw = self._environ.get(key)
+ 41:         if raw is None:
+ 42:             return default
+ 43: 
+ 44:         normalized = str(raw).strip().lower()
+ 45:         if normalized in {"1", "true", "yes", "y", "on"}:
+ 46:             return True
+ 47:         if normalized in {"0", "false", "no", "n", "off"}:
+ 48:             return False
+ 49:         return default
+ 50: 
+ 51:     def get_csv_list(self, key: str) -> list[str]:
+ 52:         raw = self.get_str(key, default="").strip().lower()
+ 53:         return [p.strip() for p in raw.split(",") if p.strip()]
+ 54: 
+ 55:     def snapshot(self, keys: list[str]) -> dict[str, Optional[str]]:
+ 56:         return {k: self.get_optional_str(k) for k in keys}
+ 57: 
+ 58: 
+ 59: def _load_env_file():
+ 60:     """Load the project .env even if python-dotenv is unavailable."""
+ 61:     env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+ 62:     if not env_path.exists():
+ 63:         return
+ 64:     if load_dotenv:
+ 65:         load_dotenv(env_path)
+ 66:         return
+ 67: 
+ 68:     for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+ 69:         line = raw_line.strip()
+ 70:         if not line or line.startswith("#") or "=" not in line:
+ 71:             continue
+ 72:         key, value = line.split("=", 1)
+ 73:         key = key.strip()
+ 74:         if not key:
+ 75:             continue
+ 76:         cleaned = value.strip().strip('"').strip("'")
+ 77:         os.environ.setdefault(key, cleaned)
+ 78: 
+ 79: 
+ 80: _load_env_file()
+ 81: 
+ 82: 
+ 83: ENV = _EnvConfig(os.environ)
+ 84: step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
+ 85: 
+ 86: def _log_env_snapshot():
+ 87:     relevant_keys = [
+ 88:         "STEP5_ENABLE_GPU",
+ 89:         "STEP5_GPU_ENGINES",
+ 90:         "STEP5_TRACKING_ENGINE",
+ 91:         "TRACKING_DISABLE_GPU",
+ 92:         "TRACKING_CPU_WORKERS",
+ 93:         "STEP5_GPU_FALLBACK_AUTO",
+ 94:         "STEP5_ENABLE_OBJECT_DETECTION",
+ 95:         "INSIGHTFACE_HOME",
+ 96:     ]
+ 97:     snapshot = ENV.snapshot(relevant_keys)
+ 98:     logging.info(f"[EnvSnapshot] {snapshot}")
+ 99: 
+100: 
+101: # --- CONFIGURATIONS GLOBALES ---
+102: BASE_DIR = Path(__file__).resolve().parent.parent.parent
+103: 
+104: try:
+105:     sys.path.insert(0, str(BASE_DIR))
+106:     from config.settings import config as app_config
+107:     TRACKING_ENV_PYTHON = app_config.get_venv_python("tracking_env")
+108:     INSIGHTFACE_ENV_PYTHON = app_config.get_venv_python("insightface_env")
+109: except (ImportError, AttributeError):
+110:     TRACKING_ENV_PYTHON = BASE_DIR / "tracking_env" / "bin" / "python"
+111:     INSIGHTFACE_ENV_PYTHON = BASE_DIR / "insightface_env" / "bin" / "python"
+112: 
+113: TRACKING_ENV_PYTHON = Path(TRACKING_ENV_PYTHON)
+114: INSIGHTFACE_ENV_PYTHON = Path(INSIGHTFACE_ENV_PYTHON)
+115: 
+116: WORKER_SCRIPT = Path(__file__).parent / "process_video_worker.py"
+117: 
+118: TRACKING_ENGINE = None
+119: 
+120: CUDA_LIB_SUBDIRS = [
+121:     "cublas/lib",
+122:     "cuda_runtime/lib",
+123:     "cuda_nvrtc/lib",
+124:     "cufft/lib",
+125:     "curand/lib",
+126:     "cusolver/lib",
+127:     "cusparse/lib",
+128:     "cudnn/lib",
+129:     "nvjitlink/lib",
+130: ]
+131: 
+132: SYSTEM_CUDA_DEFAULTS = [
+133:     "/usr/local/cuda-12.4",
+134:     "/usr/local/cuda-12",
+135:     "/usr/local/cuda-11.8",
+136:     "/usr/local/cuda",
+137: ]
+138: 
+139: 
+140: def _build_venv_cuda_paths(python_exe: Path) -> list[str]:
+141:     """Return CUDA library directories bundled in a venv (for ONNX Runtime CUDA provider)."""
+142:     try:
+143:         venv_dir = Path(python_exe).expanduser().parent.parent
+144:     except Exception:
+145:         return []
+146: 
+147:     python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+148:     site_packages = venv_dir / "lib" / python_version / "site-packages"
+149:     nvidia_dir = site_packages / "nvidia"
+150:     if not nvidia_dir.exists():
+151:         return []
+152: 
+153:     paths = []
+154:     for sub in CUDA_LIB_SUBDIRS:
+155:         candidate = nvidia_dir / sub
+156:         if candidate.exists():
+157:             paths.append(str(candidate))
+158:     return paths
+159: 
+160: 
+161: def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
+162:     """
+163:     Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
+164:     Priority order:
+165:       1. Explicit STEP5_CUDA_LIB_PATH (colon-separated).
+166:       2. STEP5_CUDA_HOME / CUDA_HOME lib64 folders.
+167:       3. Common /usr/local/cuda-* lib64 folders.
+168:       4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
+169:     """
+170:     explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
+171:     if explicit_paths:
+172:         resolved = [
+173:             str(Path(p.strip()).expanduser())
+174:             for p in explicit_paths.split(":")
+175:             if p.strip() and Path(p.strip()).expanduser().exists()
+176:         ]
+177:         if resolved:
+178:             return resolved
+179: 
+180:     candidates: list[Path] = []
+181:     for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
+182:         value = env.get_str(env_var, "").strip()
+183:         if value:
+184:             candidates.append(Path(value).expanduser())
+185:     for default_path in SYSTEM_CUDA_DEFAULTS:
+186:         candidates.append(Path(default_path))
+187: 
+188:     discovered: list[str] = []
+189:     for base_dir in candidates:
+190:         if not base_dir.exists():
+191:             continue
+192:         for sub in ("lib64", "targets/x86_64-linux/lib"):
+193:             candidate = base_dir / sub
+194:             if candidate.exists():
+195:                 discovered.append(str(candidate))
+196:     debian_cuda = Path("/usr/lib/x86_64-linux-gnu")
+197:     if debian_cuda.exists():
+198:         expected = ["libcufft.so.11", "libcublas.so.12"]
+199:         if all((debian_cuda / lib_name).exists() for lib_name in expected):
+200:             discovered.append(str(debian_cuda))
+201:     return discovered
+202: 
+203: 
+204: # --- CONFIGURATION DU LOGGER ---
+205: LOG_DIR = BASE_DIR / "logs" / "step5"
+206: LOG_DIR.mkdir(parents=True, exist_ok=True)
+207: log_file = LOG_DIR / f"manager_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+208: logging.basicConfig(level=logging.INFO, format='%(asctime)s - [MANAGER] - %(message)s',
+209:                     handlers=[logging.FileHandler(log_file, 'w', 'utf-8'), logging.StreamHandler(sys.stdout)])
+210: 
+211: WORKER_CONFIG_TEMPLATE = {
+212:     "mp_landmarker_num_faces": 5, "mp_landmarker_min_face_detection_confidence": 0.5,
+213:     "mp_landmarker_min_face_presence_confidence": 0.3, "mp_landmarker_min_tracking_confidence": 0.5,
+214:     "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
+215:     "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
+216:     "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
+217:     "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
+218:     "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
+219: }
+220: 
+221: CPU_OPTIMIZED_CONFIG = {
+222:     "mp_landmarker_min_face_detection_confidence": 0.3,
+223:     "mp_landmarker_min_face_presence_confidence": 0.2,
+224:     "mp_landmarker_min_tracking_confidence": 0.3,
+225:     "object_score_threshold": 0.4,
+226:     "mp_max_distance_tracking": 80,
+227: }
+228: 
+229: 
+230: _DEFAULT_SUBPROCESS_ENV: dict[str, str] = {
+231:     'OMP_NUM_THREADS': '1',
+232:     'OPENBLAS_NUM_THREADS': '1',
+233:     'MKL_NUM_THREADS': '1',
+234:     'NUMEXPR_NUM_THREADS': '1',
+235:     'TF_CPP_MIN_LOG_LEVEL': '2',
+236:     'GLOG_minloglevel': '2',
+237:     'ABSL_LOGGING_MIN_LOG_LEVEL': '2',
+238: }
+239: 
+240: 
+241: def _collect_cuda_lib_paths(worker_python: Path, engine_norm: str) -> list[str]:
+242:     cuda_paths: list[str] = []
+243:     cuda_paths_worker = _build_venv_cuda_paths(worker_python)
+244:     cuda_paths_tracking = _build_venv_cuda_paths(TRACKING_ENV_PYTHON)
+245:     if cuda_paths_worker:
+246:         cuda_paths.extend(cuda_paths_worker)
+247:     elif cuda_paths_tracking:
+248:         cuda_paths.extend(cuda_paths_tracking)
+249: 
+250:     if engine_norm == "insightface":
+251:         system_cuda_paths = _discover_system_cuda_lib_paths(ENV)
+252:         for path in system_cuda_paths:
+253:             if path not in cuda_paths:
+254:                 cuda_paths.append(path)
+255:     return cuda_paths
+256: 
+257: 
+258: def _apply_ld_library_path(env: dict[str, str], extra_paths: list[str]) -> None:
+259:     if not extra_paths:
+260:         return
+261:     extra_ld_path = ":".join(extra_paths)
+262:     existing_ld_path = env.get("LD_LIBRARY_PATH", "")
+263:     env["LD_LIBRARY_PATH"] = (
+264:         f"{extra_ld_path}:{existing_ld_path}" if existing_ld_path else extra_ld_path
+265:     )
+266: 
+267: 
+268: def _build_subprocess_env(worker_python: Path, engine_norm: str) -> dict[str, str]:
+269:     env = os.environ.copy()
+270:     cuda_paths = _collect_cuda_lib_paths(worker_python, engine_norm)
+271:     if cuda_paths:
+272:         _apply_ld_library_path(env, cuda_paths)
+273:         logging.info("[MANAGER] Injected CUDA library paths for ONNX Runtime")
+274: 
+275:     for key, value in _DEFAULT_SUBPROCESS_ENV.items():
+276:         env.setdefault(key, value)
+277:     return env
+278: 
+279: 
+280: def log_reader_thread(process, video_name, progress_map, lock):
+281:     if process.stdout:
+282:         for line in iter(process.stdout.readline, ''):
+283:             line = line.strip()
+284:             logging.info(f"[{video_name}] {line}")
+285:             if line.startswith("[Progression]|"):
+286:                 try:
+287:                     _, percent, _, _ = line.split('|')
+288:                     with lock:
+289:                         progress_map[video_name] = f"{int(percent)}%"
+290:                     try:
+291:                         print(f"{video_name}: {int(percent)}%", flush=True)
+292:                     except Exception:
+293:                         pass
+294:                 except:
+295:                     pass
+296:         process.stdout.close()
+297: 
+298: 
+299: def monitor_progress(processes, progress_map, lock, total_jobs_to_run):
+300:     while len(processes) < total_jobs_to_run or any(p.poll() is None for p in processes.values()):
+301:         time.sleep(1)
+302:         with lock:
+303:             progress_copy = progress_map.copy()
+304:         progress_parts = [f"{name}: {status}" for name, status in sorted(progress_copy.items())]
+305:         if progress_parts: print(f"[Progression-MultiLine]{' || '.join(progress_parts)}", flush=True)
+306:     time.sleep(1)
+307: 
+308: 
+309: def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engine=None):
+310:     video_name = Path(video_path).name
+311:     worker_type_log = "GPU" if use_gpu else f"CPU (x{internal_workers})"
+312:     logging.info(f"Préparation du job {worker_type_log} pour: {video_name}")
+313: 
+314:     config = WORKER_CONFIG_TEMPLATE.copy()
+315: 
+316:     engine_norm = (str(tracking_engine).strip().lower() if tracking_engine is not None else "")
+317:     if engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+318:         engine_norm = ""
+319: 
+320:     if engine_norm not in {"", "insightface"}:
+321:         raise RuntimeError(
+322:             f"Unsupported STEP5 tracking engine: {engine_norm}. Supported values: insightface (GPU) or default (empty)."
+323:         )
+324: 
+325:     if use_gpu and engine_norm != "insightface":
+326:         logging.info("GPU worker requested but only InsightFace supports GPU; forcing CPU mode")
+327:         use_gpu = False
+328: 
+329:     if not use_gpu:
+330:         config.update(CPU_OPTIMIZED_CONFIG)
+331:         config["mp_num_workers_internal"] = internal_workers
+332: 
+333:         if internal_workers > 1:
+334:             worker_script = "process_video_worker_multiprocessing.py"
+335:             logging.info(f"Using multiprocessing worker with {internal_workers} processes")
+336:         else:
+337:             worker_script = "process_video_worker.py"
+338:             logging.info("Using single-threaded CPU worker")
+339: 
+340:         logging.info(f"Applied CPU optimizations: lower confidence thresholds for better detection rate")
+341:     else:
+342:         worker_script = "process_video_worker.py"
+343:         logging.info("Using GPU worker with sequential processing")
+344:         if step5_enable_object_detection and internal_workers > 1:
+345:             config["mp_num_workers_internal"] = internal_workers
+346: 
+347:     models_dir_path = Path(__file__).resolve().parent / "models"
+348:     worker_script_path = Path(__file__).resolve().parent / worker_script
+349: 
+350:     worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
+351:     worker_python = TRACKING_ENV_PYTHON
+352:     
+353:     if engine_norm == "insightface":
+354:         if not use_gpu:
+355:             raise RuntimeError(
+356:                 "InsightFace engine is GPU-only. Enable STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
+357:             )
+358: 
+359:         worker_python = (
+360:             Path(worker_python_override_insightface)
+361:             if worker_python_override_insightface
+362:             else INSIGHTFACE_ENV_PYTHON
+363:         )
+364:         if not worker_python.exists():
+365:             raise RuntimeError(
+366:                 f"InsightFace engine selected but python interpreter not found: {worker_python}. "
+367:                 "Create insightface_env or set STEP5_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
+368:             )
+369:     command_args = [str(worker_python), str(worker_script_path), video_path, "--models_dir", str(models_dir_path)]
+370:     if use_gpu: command_args.append("--use_gpu")
+371: 
+372:     if engine_norm:
+373:         command_args.extend(["--tracking_engine", engine_norm])
+374: 
+375:     for key, value in config.items():
+376:         if key == "mp_num_workers_internal" and use_gpu and not (step5_enable_object_detection and internal_workers > 1):
+377:             continue
+378:         if isinstance(value, bool):
+379:             if value:
+380:                 command_args.append(f"--{key}")
+381:             continue
+382:         if value is not None:
+383:             command_args.extend([f"--{key}", str(value)])
+384: 
+385:     if (not use_gpu) and internal_workers > 1:
+386:         command_args.extend(["--chunk_size", "0"])  # 0 = adaptive in worker
+387: 
+388:     try:
+389:         env = _build_subprocess_env(Path(worker_python), engine_norm)
+390: 
+391:         p = subprocess.Popen(
+392:             command_args,
+393:             stdout=subprocess.PIPE,
+394:             stderr=subprocess.STDOUT,
+395:             text=True,
+396:             encoding='utf-8',
+397:             errors='replace',
+398:             env=env,
+399:         )
+400:         return p
+401:     except Exception as e:
+402:         logging.error(f"ERREUR LANCEMENT de {video_name}: {e}")
+403:         return None
+404: 
+405: 
+406: def run_job_and_monitor(job_info, processes, progress_map, lock):
+407:     video_path = job_info['path']
+408:     video_name = Path(video_path).name
+409:     internal_workers = job_info.get('cpu_internal_workers', 15) if (not job_info['use_gpu'] or step5_enable_object_detection) else 1
+410:     tracking_engine = job_info.get('tracking_engine')
+411:     p = launch_worker_process(video_path, job_info['use_gpu'], internal_workers, tracking_engine=tracking_engine)
+412: 
+413:     if p:
+414:         with lock:
+415:             processes[video_name] = p
+416:             progress_map[video_name] = "Démarrage..."
+417: 
+418:         reader_thread = threading.Thread(target=log_reader_thread, args=(p, video_name, progress_map, lock),
+419:                                          daemon=True)
+420:         reader_thread.start()
+421:         p.wait()
+422:         reader_thread.join(timeout=1)
+423: 
+424:         try:
+425:             if p.returncode == 0:
+426:                 print(f"[Gestionnaire] Succès pour {video_name}", flush=True)
+427:             else:
+428:                 print(f"[Gestionnaire] Échec pour {video_name}", flush=True)
+429:         except Exception:
+430:             pass
+431: 
+432: 
+433: 
+434: def resource_worker_loop(resource_name, use_gpu, videos_deque, deque_lock, processes, progress_map, lock):
+435:     """Continuously pull videos from the shared deque and process them on the given resource.
+436: 
+437:     Args:
+438:         resource_name (str): Human-readable resource label (e.g., 'GPU' or 'CPU').
+439:         use_gpu (bool): Whether to use GPU for the worker process.
+440:         videos_deque (collections.deque): Shared queue of video paths to process.
+441:         deque_lock (threading.Lock): Lock protecting access to the shared deque.
+442:         processes (OrderedDict): Shared mapping of video_name -> subprocess.Popen.
+443:         progress_map (OrderedDict): Shared mapping of video_name -> progress string.
+444:         lock (threading.Lock): Lock protecting shared maps.
+445:     """
+446:     while True:
+447:         with deque_lock:
+448:             if videos_deque:
+449:                 video_path = videos_deque.popleft()
+450:             else:
+451:                 break
+452:         video_name = Path(video_path).name
+453:         logging.info(f"[Scheduler] Assigning {video_name} to {resource_name}")
+454:         run_job_and_monitor(
+455:             {
+456:                 'path': video_path,
+457:                 'use_gpu': use_gpu,
+458:                 'cpu_internal_workers': CPU_INTERNAL_WORKERS,
+459:                 'tracking_engine': TRACKING_ENGINE,
+460:             },
+461:             processes,
+462:             progress_map,
+463:             lock,
+464:         )
+465: 
+466: 
+467: def main():
+468:     parser = argparse.ArgumentParser(description="Gestionnaire de tracking parallèle intelligent.")
+469:     parser.add_argument("--videos_json_path", required=True, help="Chemin JSON des vidéos.")
+470:     parser.add_argument("--disable_gpu", action="store_true", help="Désactiver le worker GPU et utiliser uniquement le CPU")
+471:     parser.add_argument("--cpu_internal_workers", type=int, default=15, help="Nombre de workers internes CPU par vidéo")
+472:     parser.add_argument(
+473:         "--tracking_engine",
+474:         default=None,
+475:         help="Moteur de tracking: insightface (GPU) ou vide pour le mode MediaPipe par défaut",
+476:     )
+477:     args = parser.parse_args()
+478:     try:
+479:         if ENV.get_bool('TRACKING_DISABLE_GPU', default=False):
+480:             args.disable_gpu = True
+481: 
+482:         args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
+483: 
+484:         if args.tracking_engine is None:
+485:             raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
+486:             if raw_engine:
+487:                 args.tracking_engine = raw_engine
+488:     except Exception:
+489:         pass
+490: 
+491:     _engine_norm = (str(args.tracking_engine).strip().lower() if args.tracking_engine is not None else "")
+492:     if _engine_norm in {"mediapipe", "mediapipe_landmarker"}:
+493:         _engine_norm = ""
+494:     if _engine_norm not in {"", "insightface"}:
+495:         logging.error(
+496:             "Unsupported STEP5_TRACKING_ENGINE '%s'. Supported values: insightface (GPU) or empty (default MediaPipe).",
+497:             _engine_norm,
+498:         )
+499:         sys.exit(1)
+500:     
+501:     gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
+502:     gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
+503:     gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
+504:     _log_env_snapshot()
+505:     
+506:     engine_normalized = "insightface" if _engine_norm == "insightface" else "mediapipe"
+507:     
+508:     engine_supports_gpu = False
+509:     if gpu_enabled_global and not args.disable_gpu:
+510:         if engine_normalized == "insightface":
+511:             if engine_normalized in gpu_engines or 'all' in gpu_engines:
+512:                 engine_supports_gpu = True
+513:                 logging.info(f"GPU mode requested for engine: {engine_normalized}")
+514: 
+515:                 try:
+516:                     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+517:                     from config.settings import Config
+518:                     gpu_status = Config.check_gpu_availability()
+519: 
+520:                     if not gpu_status['available']:
+521:                         logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
+522:                         fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
+523:                         if fallback_auto:
+524:                             logging.info("Auto-fallback to CPU enabled")
+525:                             args.disable_gpu = True
+526:                             engine_supports_gpu = False
+527:                         else:
+528:                             logging.error("GPU fallback disabled, aborting")
+529:                             raise RuntimeError(f"GPU unavailable: {gpu_status['reason']}")
+530:                     else:
+531:                         logging.info(
+532:                             f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}"
+533:                         )
+534:                 except ImportError as e:
+535:                     logging.error(f"Failed to import config.settings: {e}")
+536:                     args.disable_gpu = True
+537:                     engine_supports_gpu = False
+538:                 except Exception as e:
+539:                     logging.error(f"GPU validation failed: {e}")
+540:                     args.disable_gpu = True
+541:                     engine_supports_gpu = False
+542:             else:
+543:                 logging.warning(
+544:                     f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode"
+545:                 )
+546:                 args.disable_gpu = True
+547:         else:
+548:             args.disable_gpu = True
+549:     
+550:     if not args.disable_gpu and engine_supports_gpu:
+551:         logging.info(f"✓ GPU mode ENABLED for {_engine_norm or 'mediapipe'}")
+552:     else:
+553:         logging.info("CPU-only mode (GPU disabled or not supported for this engine)")
+554: 
+555:     if _engine_norm == "insightface" and (args.disable_gpu or not engine_supports_gpu):
+556:         logging.error(
+557:             "InsightFace engine is GPU-only, but GPU mode is disabled or not authorized. "
+558:             "Set STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
+559:         )
+560:         sys.exit(1)
+561: 
+562:     with open(args.videos_json_path, 'r') as f:
+563:         data = json.load(f)
+564:     
+565:     if isinstance(data, list):
+566:         videos_list = data
+567:     elif isinstance(data, dict) and 'videos' in data:
+568:         logging.info("Legacy videos JSON schema detected; using 'videos' key.")
+569:         videos_list = data['videos']
+570:     else:
+571:         logging.error(f"Invalid JSON format in {args.videos_json_path}. Expected a list or object with 'videos' key.")
+572:         sys.exit(1)
+573:     
+574:     videos_to_process = deque(videos_list)
+575:     if not videos_to_process: logging.info("Aucune vidéo à traiter."); return
+576: 
+577:     logging.info(f"--- DÉMARRAGE DU GESTIONNAIRE DE TRACKING (Planificateur Dynamique GPU/CPU) ---")
+578:     total_jobs = len(videos_to_process)
+579:     logging.info(f"Vidéos à traiter: {total_jobs}")
+580:     global CPU_INTERNAL_WORKERS
+581:     CPU_INTERNAL_WORKERS = max(1, int(args.cpu_internal_workers))
+582: 
+583:     global TRACKING_ENGINE
+584:     TRACKING_ENGINE = args.tracking_engine
+585:     if args.disable_gpu:
+586:         logging.info("Mode FULL CPU activé: le worker GPU est désactivé")
+587: 
+588:     processes, video_progress_map, progress_lock = OrderedDict(), OrderedDict(), threading.Lock()
+589: 
+590:     monitor_thread = threading.Thread(target=monitor_progress,
+591:                                       args=(processes, video_progress_map, progress_lock, total_jobs), daemon=True)
+592:     monitor_thread.start()
+593: 
+594:     deque_lock = threading.Lock()
+595: 
+596:     threads = []
+597:     if not args.disable_gpu:
+598:         gpu_thread = threading.Thread(
+599:             target=resource_worker_loop,
+600:             args=("GPU", True, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
+601:             daemon=True,
+602:         )
+603:         threads.append(gpu_thread)
+604:     if _engine_norm != "insightface":
+605:         cpu_thread = threading.Thread(
+606:             target=resource_worker_loop,
+607:             args=("CPU", False, videos_to_process, deque_lock, processes, video_progress_map, progress_lock),
+608:             daemon=True,
+609:         )
+610:         threads.append(cpu_thread)
+611:     else:
+612:         logging.info("InsightFace is GPU-only: CPU worker thread disabled")
+613: 
+614:     if args.disable_gpu:
+615:         workers_label = "CPU seul"
+616:     else:
+617:         workers_label = "GPU seul" if _engine_norm == "insightface" else "GPU et CPU"
+618:     logging.info("Lancement des workers: " + workers_label)
+619:     for t in threads:
+620:         t.start()
+621: 
+622:     for t in threads:
+623:         t.join()
+624: 
+625:     monitor_thread.join(timeout=2)
+626: 
+627:     success_count = sum(1 for p in processes.values() if p.returncode == 0)
+628:     logging.info(f"--- FIN DU GESTIONNAIRE ---")
+629:     logging.info(f"Traitement terminé. {success_count}/{total_jobs} jobs réussis.")
+630:     if success_count < total_jobs: sys.exit(1)
+631: 
+632: 
+633: if __name__ == "__main__":
+634:     main()
+```
+
+## File: workflow_scripts/step6/json_reducer.py
+```python
+  1: import os
+  2: import sys
+  3: import json
+  4: import argparse
+  5: import logging
+  6: from datetime import datetime
+  7: from pathlib import Path
+  8: from typing import Any, Dict, List, Optional, Tuple
+  9: 
+ 10: logger = logging.getLogger(__name__)
+ 11: logger.setLevel(logging.INFO)
+ 12: 
+ 13: VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm")
+ 14: AUDIO_SUFFIX = "_audio.json"
+ 15: TRACKING_SUFFIX = "_tracking.json"
+ 16: 
+ 17: _ENRICHMENT_SAMPLE_MAX_FRAMES = 50
+ 18: _ENRICHMENT_SAMPLE_MAX_OBJECTS_PER_FRAME = 20
+ 19: _TRACKING_ENRICH_FIELDS = (
+ 20:     "confidence",
+ 21:     "bbox_width",
+ 22:     "bbox_height",
+ 23:     "source",
+ 24:     "label",
+ 25: )
+ 26: 
+ 27: _CONFIDENCE_HISTOGRAM_BUCKETS = (
+ 28:     (0.0, 0.25),
+ 29:     (0.25, 0.5),
+ 30:     (0.5, 0.75),
+ 31:     (0.75, 0.9),
+ 32:     (0.9, 1.0000001),
+ 33: )
+ 34: 
+ 35: 
+ 36: def _extract_top_level_metadata(data: Dict[str, Any]) -> Tuple[Optional[float], Optional[int]]:
+ 37:     fps = None
+ 38:     total_frames = None
+ 39: 
+ 40:     raw_fps = data.get("fps")
+ 41:     raw_total = data.get("total_frames")
+ 42:     if raw_fps is not None:
+ 43:         try:
+ 44:             fps = float(raw_fps)
+ 45:         except Exception:
+ 46:             fps = None
+ 47:     if raw_total is not None:
+ 48:         try:
+ 49:             total_frames = int(raw_total)
+ 50:         except Exception:
+ 51:             total_frames = None
+ 52: 
+ 53:     meta = data.get("metadata")
+ 54:     if isinstance(meta, dict):
+ 55:         if fps is None and meta.get("fps") is not None:
+ 56:             try:
+ 57:                 fps = float(meta.get("fps"))
+ 58:             except Exception:
+ 59:                 fps = None
+ 60:         if total_frames is None and meta.get("total_frames") is not None:
+ 61:             try:
+ 62:                 total_frames = int(meta.get("total_frames"))
+ 63:             except Exception:
+ 64:                 total_frames = None
+ 65: 
+ 66:     return fps, total_frames
+ 67: 
+ 68: 
+ 69: def _write_json_atomically(path: Path, payload: Dict[str, Any]) -> None:
+ 70:     tmp_path = path.with_suffix(path.suffix + ".tmp")
+ 71:     with open(tmp_path, "w", encoding="utf-8") as f:
+ 72:         json.dump(payload, f, indent=2, ensure_ascii=False)
+ 73:     os.replace(tmp_path, path)
+ 74: 
+ 75: 
+ 76: def _is_reduced_tracking_schema(data: Dict[str, Any]) -> bool:
+ 77:     frames = data.get("frames_analysis")
+ 78:     return isinstance(frames, list)
+ 79: 
+ 80: 
+ 81: def _is_raw_tracking_schema(data: Dict[str, Any]) -> bool:
+ 82:     frames = data.get("frames")
+ 83:     return isinstance(frames, list)
+ 84: 
+ 85: 
+ 86: def setup_logging(log_dir: str):
+ 87:     os.makedirs(log_dir, exist_ok=True)
+ 88:     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+ 89:     log_path = os.path.join(log_dir, f"json_reducer_{timestamp}.log")
+ 90: 
+ 91:     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+ 92: 
+ 93:     fh = logging.FileHandler(log_path, encoding='utf-8')
+ 94:     fh.setLevel(logging.INFO)
+ 95:     fh.setFormatter(formatter)
+ 96: 
+ 97:     ch = logging.StreamHandler(sys.stdout)
+ 98:     ch.setLevel(logging.INFO)
+ 99:     ch.setFormatter(formatter)
+100: 
+101:     logger.handlers.clear()
+102:     logger.addHandler(fh)
+103:     logger.addHandler(ch)
+104:     logger.propagate = False
+105: 
+106:     logger.info(f"Log file initialized: {log_path}")
+107:     return log_path
+108: 
+109: 
+110: def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+111:     """
+112:     Réduit un objet JSON de données vidéo pour ne conserver que les clés
+113:     utiles au script After Effects.
+114:     """
+115:     fps, total_frames = _extract_top_level_metadata(data)
+116: 
+117:     frames_in: Optional[List[Dict[str, Any]]] = None
+118:     if _is_raw_tracking_schema(data):
+119:         frames_in = data.get("frames")
+120:     elif _is_reduced_tracking_schema(data):
+121:         frames_in = data.get("frames_analysis")
+122:     else:
+123:         return None
+124: 
+125:     new_frames_data: List[Dict[str, Any]] = []
+126:     max_frame_seen: int = 0
+127: 
+128:     expression_summary_enabled = (
+129:         os.environ.get("STEP6_INCLUDE_EXPRESSION_SUMMARY", "0").strip().lower()
+130:         in {"1", "true", "yes", "on"}
+131:     )
+132:     expression_keys_raw = os.environ.get("STEP6_EXPRESSION_KEYS", "jawOpen").strip()
+133:     expression_keys = [k.strip() for k in expression_keys_raw.split(",") if k.strip()]
+134:     expression_stats: Dict[str, Dict[str, Any]] = {}
+135: 
+136:     for frame in frames_in or []:
+137:         new_tracked_objects = []
+138:         if "tracked_objects" in frame and frame["tracked_objects"] is not None:
+139:             for obj in frame["tracked_objects"]:
+140:                 # Initialisation de l'objet simplifié
+141:                 new_obj = {
+142:                     "id": obj.get("id"),
+143:                     "centroid_x": obj.get("centroid_x"),
+144:                     "source": obj.get("source"),
+145:                     "label": obj.get("label"),
+146:                     "confidence": obj.get("confidence"),
+147:                     "active_speakers": []  # Valeur par défaut
+148:                 }
+149: 
+150:                 # Inclure la taille du bbox si disponible (ajout depuis l'étape 5)
+151:                 bbox_w = obj.get("bbox_width")
+152:                 bbox_h = obj.get("bbox_height")
+153:                 if bbox_w is not None and bbox_h is not None:
+154:                     new_obj["bbox_width"] = bbox_w
+155:                     new_obj["bbox_height"] = bbox_h
+156: 
+157:                 # Extraction sécurisée de active_speakers
+158:                 if isinstance(obj.get("active_speakers"), list):
+159:                     new_obj["active_speakers"] = obj.get("active_speakers") or []
+160:                 if (obj.get("speaking_sources") and
+161:                         isinstance(obj["speaking_sources"], dict) and
+162:                         obj["speaking_sources"].get("audio") and
+163:                         isinstance(obj["speaking_sources"]["audio"], dict)):
+164:                     new_obj["active_speakers"] = obj["speaking_sources"]["audio"].get("active_speakers", [])
+165: 
+166:                 if expression_summary_enabled:
+167:                     obj_id = obj.get("id")
+168:                     blend = obj.get("blendshapes")
+169:                     if isinstance(obj_id, str) and obj_id and isinstance(blend, dict) and blend:
+170:                         stats = expression_stats.get(obj_id)
+171:                         if stats is None:
+172:                             stats = {"count": 0, "sum": {}, "max": {}}
+173:                             expression_stats[obj_id] = stats
+174:                         stats["count"] = int(stats.get("count", 0) or 0) + 1
+175: 
+176:                         sum_map = stats.get("sum")
+177:                         if not isinstance(sum_map, dict):
+178:                             sum_map = {}
+179:                             stats["sum"] = sum_map
+180:                         max_map = stats.get("max")
+181:                         if not isinstance(max_map, dict):
+182:                             max_map = {}
+183:                             stats["max"] = max_map
+184: 
+185:                         for key in expression_keys:
+186:                             if key not in blend:
+187:                                 continue
+188:                             try:
+189:                                 val = float(blend.get(key))
+190:                             except Exception:
+191:                                 continue
+192:                             sum_map[key] = float(sum_map.get(key, 0.0) or 0.0) + val
+193:                             prev_max = max_map.get(key)
+194:                             if prev_max is None:
+195:                                 max_map[key] = val
+196:                             else:
+197:                                 try:
+198:                                     max_map[key] = max(float(prev_max), val)
+199:                                 except Exception:
+200:                                     max_map[key] = val
+201: 
+202:                 new_tracked_objects.append(new_obj)
+203: 
+204:         frame_num = frame.get("frame")
+205:         try:
+206:             if frame_num is not None:
+207:                 max_frame_seen = max(max_frame_seen, int(frame_num))
+208:         except Exception:
+209:             pass
+210: 
+211:         new_frames_data.append({
+212:             "frame": frame_num,
+213:             "tracked_objects": new_tracked_objects
+214:         })
+215: 
+216:     if total_frames is None and max_frame_seen > 0:
+217:         total_frames = max_frame_seen
+218: 
+219:     out: Dict[str, Any] = {"frames_analysis": new_frames_data}
+220:     if fps is not None:
+221:         out["fps"] = fps
+222:     if total_frames is not None:
+223:         out["total_frames"] = total_frames
+224: 
+225:     if expression_summary_enabled and expression_stats:
+226:         summary_objects: Dict[str, Any] = {}
+227:         for obj_id, stats in expression_stats.items():
+228:             try:
+229:                 count = int(stats.get("count") or 0)
+230:             except Exception:
+231:                 count = 0
+232:             if count <= 0:
+233:                 continue
+234:             sum_map = stats.get("sum")
+235:             max_map = stats.get("max")
+236:             if not isinstance(sum_map, dict) or not isinstance(max_map, dict):
+237:                 continue
+238: 
+239:             mean_map: Dict[str, Any] = {}
+240:             for key, raw_sum in sum_map.items():
+241:                 try:
+242:                     mean_map[key] = round(float(raw_sum) / float(count), 4)
+243:                 except Exception:
+244:                     continue
+245: 
+246:             rounded_max: Dict[str, Any] = {}
+247:             for key, raw_max in max_map.items():
+248:                 try:
+249:                     rounded_max[key] = round(float(raw_max), 4)
+250:                 except Exception:
+251:                     continue
+252: 
+253:             if mean_map or rounded_max:
+254:                 summary_objects[obj_id] = {
+255:                     "count": count,
+256:                     "mean": mean_map,
+257:                     "max": rounded_max,
+258:                 }
+259: 
+260:         if summary_objects:
+261:             out["expression_summary"] = {
+262:                 "keys": expression_keys,
+263:                 "objects": summary_objects,
+264:             }
+265:     return out
+266: 
+267: 
+268: def _compute_tracking_analytics(reduced_tracking: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+269:     frames = reduced_tracking.get("frames_analysis")
+270:     if not isinstance(frames, list) or not frames:
+271:         return None
+272: 
+273:     total_frames_raw = reduced_tracking.get("total_frames")
+274:     total_frames: Optional[int]
+275:     try:
+276:         total_frames = int(total_frames_raw) if total_frames_raw is not None else None
+277:     except Exception:
+278:         total_frames = None
+279: 
+280:     if total_frames is None:
+281:         max_frame_seen = 0
+282:         for frame in frames:
+283:             if not isinstance(frame, dict):
+284:                 continue
+285:             frame_num = frame.get("frame")
+286:             try:
+287:                 if frame_num is not None:
+288:                     max_frame_seen = max(max_frame_seen, int(frame_num))
+289:             except Exception:
+290:                 continue
+291:         total_frames = max_frame_seen if max_frame_seen > 0 else None
+292: 
+293:     frames_with_objects = 0
+294:     objects_per_frame_sum = 0
+295:     confidence_histogram: Dict[str, int] = {}
+296:     objects_stats: Dict[str, Dict[str, Any]] = {}
+297: 
+298:     for bucket_min, bucket_max in _CONFIDENCE_HISTOGRAM_BUCKETS:
+299:         label = f"{bucket_min:.2f}-{min(bucket_max, 1.0):.2f}"
+300:         confidence_histogram[label] = 0
+301: 
+302:     for frame in frames:
+303:         if not isinstance(frame, dict):
+304:             continue
+305:         tracked = frame.get("tracked_objects")
+306:         if not isinstance(tracked, list) or not tracked:
+307:             continue
+308:         frames_with_objects += 1
+309:         objects_per_frame_sum += len(tracked)
+310: 
+311:         for obj in tracked:
+312:             if not isinstance(obj, dict):
+313:                 continue
+314:             obj_id = obj.get("id")
+315:             if not isinstance(obj_id, str) or not obj_id:
+316:                 continue
+317: 
+318:             stats = objects_stats.get(obj_id)
+319:             if stats is None:
+320:                 stats = {
+321:                     "presence_frames": 0,
+322:                     "confidence_sum": 0.0,
+323:                     "confidence_count": 0,
+324:                     "bbox_surface_sum": 0.0,
+325:                     "bbox_surface_count": 0,
+326:                     "centroid_x_min": None,
+327:                     "centroid_x_max": None,
+328:                     "source": obj.get("source"),
+329:                     "label": obj.get("label"),
+330:                 }
+331:                 objects_stats[obj_id] = stats
+332: 
+333:             stats["presence_frames"] = int(stats.get("presence_frames", 0) or 0) + 1
+334: 
+335:             conf = obj.get("confidence")
+336:             conf_f: Optional[float]
+337:             try:
+338:                 conf_f = float(conf) if conf is not None else None
+339:             except Exception:
+340:                 conf_f = None
+341:             if conf_f is not None:
+342:                 if conf_f < 0.0:
+343:                     conf_f = 0.0
+344:                 if conf_f > 1.0:
+345:                     conf_f = 1.0
+346:                 stats["confidence_sum"] = float(stats.get("confidence_sum", 0.0) or 0.0) + conf_f
+347:                 stats["confidence_count"] = int(stats.get("confidence_count", 0) or 0) + 1
+348: 
+349:                 for bucket_min, bucket_max in _CONFIDENCE_HISTOGRAM_BUCKETS:
+350:                     if bucket_min <= conf_f < bucket_max:
+351:                         label = f"{bucket_min:.2f}-{min(bucket_max, 1.0):.2f}"
+352:                         confidence_histogram[label] = int(confidence_histogram.get(label, 0) or 0) + 1
+353:                         break
+354: 
+355:             bbox_w = obj.get("bbox_width")
+356:             bbox_h = obj.get("bbox_height")
+357:             try:
+358:                 bbox_w_f = float(bbox_w) if bbox_w is not None else None
+359:                 bbox_h_f = float(bbox_h) if bbox_h is not None else None
+360:             except Exception:
+361:                 bbox_w_f = None
+362:                 bbox_h_f = None
+363:             if bbox_w_f is not None and bbox_h_f is not None:
+364:                 surface = max(0.0, bbox_w_f) * max(0.0, bbox_h_f)
+365:                 stats["bbox_surface_sum"] = float(stats.get("bbox_surface_sum", 0.0) or 0.0) + surface
+366:                 stats["bbox_surface_count"] = int(stats.get("bbox_surface_count", 0) or 0) + 1
+367: 
+368:             cx = obj.get("centroid_x")
+369:             try:
+370:                 cx_f = float(cx) if cx is not None else None
+371:             except Exception:
+372:                 cx_f = None
+373:             if cx_f is not None:
+374:                 cx_min = stats.get("centroid_x_min")
+375:                 cx_max = stats.get("centroid_x_max")
+376:                 try:
+377:                     stats["centroid_x_min"] = cx_f if cx_min is None else min(float(cx_min), cx_f)
+378:                 except Exception:
+379:                     stats["centroid_x_min"] = cx_f
+380:                 try:
+381:                     stats["centroid_x_max"] = cx_f if cx_max is None else max(float(cx_max), cx_f)
+382:                 except Exception:
+383:                     stats["centroid_x_max"] = cx_f
+384: 
+385:     objects_out: Dict[str, Any] = {}
+386:     for obj_id, stats in objects_stats.items():
+387:         try:
+388:             presence_frames = int(stats.get("presence_frames") or 0)
+389:         except Exception:
+390:             presence_frames = 0
+391: 
+392:         conf_count = 0
+393:         try:
+394:             conf_count = int(stats.get("confidence_count") or 0)
+395:         except Exception:
+396:             conf_count = 0
+397:         avg_conf: Optional[float] = None
+398:         if conf_count > 0:
+399:             try:
+400:                 avg_conf = float(stats.get("confidence_sum") or 0.0) / float(conf_count)
+401:             except Exception:
+402:                 avg_conf = None
+403: 
+404:         bbox_count = 0
+405:         try:
+406:             bbox_count = int(stats.get("bbox_surface_count") or 0)
+407:         except Exception:
+408:             bbox_count = 0
+409:         avg_bbox_surface: Optional[float] = None
+410:         if bbox_count > 0:
+411:             try:
+412:                 avg_bbox_surface = float(stats.get("bbox_surface_sum") or 0.0) / float(bbox_count)
+413:             except Exception:
+414:                 avg_bbox_surface = None
+415: 
+416:         cx_spread: Optional[float] = None
+417:         cx_min = stats.get("centroid_x_min")
+418:         cx_max = stats.get("centroid_x_max")
+419:         try:
+420:             if cx_min is not None and cx_max is not None:
+421:                 cx_spread = float(cx_max) - float(cx_min)
+422:         except Exception:
+423:             cx_spread = None
+424: 
+425:         presence_ratio: Optional[float] = None
+426:         if total_frames is not None and total_frames > 0:
+427:             presence_ratio = presence_frames / float(total_frames)
+428: 
+429:         obj_out: Dict[str, Any] = {
+430:             "presence_frames": presence_frames,
+431:             "source": stats.get("source"),
+432:             "label": stats.get("label"),
+433:         }
+434:         if presence_ratio is not None:
+435:             obj_out["presence_ratio"] = round(float(presence_ratio), 4)
+436:         if avg_conf is not None:
+437:             obj_out["avg_confidence"] = round(float(avg_conf), 4)
+438:         if avg_bbox_surface is not None:
+439:             obj_out["avg_bbox_surface"] = round(float(avg_bbox_surface), 2)
+440:         if cx_spread is not None:
+441:             obj_out["centroid_x_spread"] = round(float(cx_spread), 2)
+442: 
+443:         objects_out[obj_id] = obj_out
+444: 
+445:     frames_total_count = total_frames if total_frames is not None else len(frames)
+446:     avg_objects_per_frame: Optional[float] = None
+447:     if frames_with_objects > 0:
+448:         avg_objects_per_frame = objects_per_frame_sum / float(frames_with_objects)
+449: 
+450:     global_out: Dict[str, Any] = {
+451:         "frames_total": frames_total_count,
+452:         "frames_with_objects": frames_with_objects,
+453:         "objects_total": len(objects_stats),
+454:         "confidence_histogram": confidence_histogram,
+455:     }
+456:     if avg_objects_per_frame is not None:
+457:         global_out["avg_objects_per_frame"] = round(float(avg_objects_per_frame), 4)
+458: 
+459:     return {
+460:         "schema_version": 1,
+461:         "global": global_out,
+462:         "objects": objects_out,
+463:     }
+464: 
+465: 
+466: def reduce_audio_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+467:     """
+468:     Réduit un objet JSON de données audio pour ne conserver que les clés
+469:     utiles au script After Effects.
+470:     """
+471:     if "frames_analysis" not in data:
+472:         return None
+473: 
+474:     fps, total_frames = _extract_top_level_metadata(data)
+475: 
+476:     new_frames_analysis: List[Dict[str, Any]] = []
+477:     speaker_frame_counts: Dict[str, int] = {}
+478:     max_frame_seen: int = 0
+479:     for frame_data in data["frames_analysis"]:
+480:         if "audio_info" in frame_data and frame_data["audio_info"] is not None:
+481:             new_audio_info = {
+482:                 "is_speech_present": frame_data["audio_info"].get("is_speech_present", False),
+483:                 "active_speaker_labels": frame_data["audio_info"].get("active_speaker_labels", [])
+484:             }
+485:             if frame_data["audio_info"].get("timecode_sec") is not None:
+486:                 new_audio_info["timecode_sec"] = frame_data["audio_info"].get("timecode_sec")
+487: 
+488:             frame_num = frame_data.get("frame")
+489:             try:
+490:                 if frame_num is not None:
+491:                     max_frame_seen = max(max_frame_seen, int(frame_num))
+492:             except Exception:
+493:                 pass
+494:             new_frames_analysis.append({
+495:                 "frame": frame_num,
+496:                 "audio_info": new_audio_info
+497:             })
+498: 
+499:             labels = new_audio_info.get("active_speaker_labels")
+500:             if isinstance(labels, list):
+501:                 for label in labels:
+502:                     if not isinstance(label, str) or not label:
+503:                         continue
+504:                     speaker_frame_counts[label] = speaker_frame_counts.get(label, 0) + 1
+505: 
+506:     if total_frames is None and max_frame_seen > 0:
+507:         total_frames = max_frame_seen
+508: 
+509:     out: Dict[str, Any] = {"frames_analysis": new_frames_analysis}
+510:     if fps is not None:
+511:         out["fps"] = fps
+512:     if total_frames is not None:
+513:         out["total_frames"] = total_frames
+514:     if speaker_frame_counts:
+515:         out["speaker_stats"] = {
+516:             "unique_speakers": sorted(list(speaker_frame_counts.keys())),
+517:             "speaker_frame_counts": speaker_frame_counts,
+518:         }
+519: 
+520:     speaker_embeddings = data.get("speaker_embeddings")
+521:     if isinstance(speaker_embeddings, dict) and speaker_embeddings:
+522:         out["speaker_embeddings"] = speaker_embeddings
+523:     return out
+524: 
+525: 
+526: def _compute_temporal_alignment(
+527:     reduced_tracking: Dict[str, Any],
+528:     reduced_audio: Optional[Dict[str, Any]],
+529: ) -> Optional[Dict[str, Any]]:
+530:     if not reduced_audio:
+531:         return None
+532: 
+533:     v_total = reduced_tracking.get("total_frames")
+534:     a_total = reduced_audio.get("total_frames")
+535:     v_fps = reduced_tracking.get("fps")
+536:     a_fps = reduced_audio.get("fps")
+537: 
+538:     try:
+539:         v_total_i = int(v_total) if v_total is not None else None
+540:     except Exception:
+541:         v_total_i = None
+542:     try:
+543:         a_total_i = int(a_total) if a_total is not None else None
+544:     except Exception:
+545:         a_total_i = None
+546: 
+547:     try:
+548:         v_fps_f = float(v_fps) if v_fps is not None else None
+549:     except Exception:
+550:         v_fps_f = None
+551:     try:
+552:         a_fps_f = float(a_fps) if a_fps is not None else None
+553:     except Exception:
+554:         a_fps_f = None
+555: 
+556:     if v_total_i is None and a_total_i is None and v_fps_f is None and a_fps_f is None:
+557:         return None
+558: 
+559:     warnings: list[str] = []
+560:     if v_total_i is not None and a_total_i is not None:
+561:         ratio = abs(v_total_i - a_total_i) / float(max(a_total_i, 1))
+562:         if ratio > 0.05:
+563:             warnings.append(f"frame_count_mismatch video={v_total_i} audio={a_total_i}")
+564: 
+565:     if v_fps_f is not None and a_fps_f is not None:
+566:         if abs(v_fps_f - a_fps_f) > 0.5:
+567:             warnings.append(f"fps_mismatch video={v_fps_f} audio={a_fps_f}")
+568: 
+569:     return {
+570:         "video_total_frames": v_total_i,
+571:         "audio_total_frames": a_total_i,
+572:         "video_fps": v_fps_f,
+573:         "audio_fps": a_fps_f,
+574:         "warnings": warnings,
+575:     }
+576: 
+577: 
+578: def _resolve_tracking_paths(
+579:     docs_path: Path,
+580:     video_stem: str,
+581: ) -> Tuple[Optional[Path], Optional[Path], Optional[Path]]:
+582:     preferred = docs_path / f"{video_stem}{TRACKING_SUFFIX}"
+583:     legacy = docs_path / f"{video_stem}.json"
+584:     if preferred.exists():
+585:         fallback = legacy if legacy.exists() else None
+586:         return preferred, preferred, fallback
+587:     if legacy.exists():
+588:         return legacy, preferred, None
+589:     return None, None, None
+590: 
+591: 
+592: def _reduced_tracking_needs_enrichment(reduced_tracking: Dict[str, Any]) -> bool:
+593:     frames = reduced_tracking.get("frames_analysis")
+594:     if not isinstance(frames, list) or not frames:
+595:         return False
+596: 
+597:     sampled_frames = frames[:_ENRICHMENT_SAMPLE_MAX_FRAMES]
+598:     for frame in sampled_frames:
+599:         if not isinstance(frame, dict):
+600:             continue
+601:         tracked = frame.get("tracked_objects")
+602:         if not isinstance(tracked, list) or not tracked:
+603:             continue
+604:         sampled_objs = tracked[:_ENRICHMENT_SAMPLE_MAX_OBJECTS_PER_FRAME]
+605:         for obj in sampled_objs:
+606:             if not isinstance(obj, dict):
+607:                 continue
+608:             for key in _TRACKING_ENRICH_FIELDS:
+609:                 if key not in obj or obj.get(key) is None:
+610:                     return True
+611:     return False
+612: 
+613: 
+614: def _index_reduced_tracking_by_frame_and_id(reduced_tracking: Dict[str, Any]) -> Dict[int, Dict[str, Dict[str, Any]]]:
+615:     frames = reduced_tracking.get("frames_analysis")
+616:     if not isinstance(frames, list):
+617:         return {}
+618: 
+619:     index: Dict[int, Dict[str, Dict[str, Any]]] = {}
+620:     for frame in frames:
+621:         if not isinstance(frame, dict):
+622:             continue
+623:         frame_num = frame.get("frame")
+624:         try:
+625:             frame_i = int(frame_num)
+626:         except Exception:
+627:             continue
+628:         tracked = frame.get("tracked_objects")
+629:         if not isinstance(tracked, list):
+630:             continue
+631:         frame_map: Dict[str, Dict[str, Any]] = {}
+632:         for obj in tracked:
+633:             if not isinstance(obj, dict):
+634:                 continue
+635:             obj_id = obj.get("id")
+636:             if not isinstance(obj_id, str) or not obj_id:
+637:                 continue
+638:             frame_map[obj_id] = obj
+639:         if frame_map:
+640:             index[frame_i] = frame_map
+641:     return index
+642: 
+643: 
+644: def _merge_reduced_tracking(
+645:     base_tracking: Dict[str, Any],
+646:     supplemental_tracking: Dict[str, Any],
+647: ) -> Dict[str, Any]:
+648:     supplemental_index = _index_reduced_tracking_by_frame_and_id(supplemental_tracking)
+649:     frames = base_tracking.get("frames_analysis")
+650:     if not isinstance(frames, list) or not supplemental_index:
+651:         return base_tracking
+652: 
+653:     for frame in frames:
+654:         if not isinstance(frame, dict):
+655:             continue
+656:         frame_num = frame.get("frame")
+657:         try:
+658:             frame_i = int(frame_num)
+659:         except Exception:
+660:             continue
+661:         supp_frame = supplemental_index.get(frame_i)
+662:         if not supp_frame:
+663:             continue
+664:         tracked = frame.get("tracked_objects")
+665:         if not isinstance(tracked, list):
+666:             continue
+667: 
+668:         for obj in tracked:
+669:             if not isinstance(obj, dict):
+670:                 continue
+671:             obj_id = obj.get("id")
+672:             if not isinstance(obj_id, str) or not obj_id:
+673:                 continue
+674:             supp_obj = supp_frame.get(obj_id)
+675:             if not supp_obj:
+676:                 continue
+677: 
+678:             for key in _TRACKING_ENRICH_FIELDS:
+679:                 if (key not in obj) or (obj.get(key) is None):
+680:                     if supp_obj.get(key) is not None:
+681:                         obj[key] = supp_obj.get(key)
+682: 
+683:             base_speakers = obj.get("active_speakers")
+684:             supp_speakers = supp_obj.get("active_speakers")
+685:             if (
+686:                 (base_speakers is None or base_speakers == [])
+687:                 and isinstance(supp_speakers, list)
+688:                 and supp_speakers
+689:             ):
+690:                 obj["active_speakers"] = supp_speakers
+691: 
+692:     base_total = base_tracking.get("total_frames")
+693:     supp_total = supplemental_tracking.get("total_frames")
+694:     try:
+695:         base_total_i = int(base_total) if base_total is not None else None
+696:     except Exception:
+697:         base_total_i = None
+698:     try:
+699:         supp_total_i = int(supp_total) if supp_total is not None else None
+700:     except Exception:
+701:         supp_total_i = None
+702: 
+703:     if base_total_i is None and supp_total_i is not None:
+704:         base_tracking["total_frames"] = supp_total_i
+705:     elif base_total_i is not None and supp_total_i is not None:
+706:         base_tracking["total_frames"] = max(base_total_i, supp_total_i)
+707: 
+708:     if base_tracking.get("fps") is None and supplemental_tracking.get("fps") is not None:
+709:         base_tracking["fps"] = supplemental_tracking.get("fps")
+710: 
+711:     return base_tracking
+712: 
+713: 
+714: def process_directory(base_path: str, keyword: str = "Camille"):
+715:     """
+716:     Analyse les dossiers dans le chemin de base, recherche le mot-clé,
+717:     et traite les paires de fichiers JSON trouvées dans les sous-dossiers "docs".
+718:     """
+719:     base = Path(base_path)
+720:     tracking_analytics_enabled = (
+721:         os.environ.get("STEP6_INCLUDE_TRACKING_ANALYTICS", "1").strip().lower()
+722:         in {"1", "true", "yes", "on"}
+723:     )
+724:     logger.info(f"Démarrage du scan dans : {base}")
+725:     if not base.is_dir():
+726:         logger.error(f"Erreur : Le répertoire de base '{base_path}' n'existe pas.")
+727:         return
+728: 
+729:     # 1. Lister les dossiers de projet
+730:     project_folders = [
+731:         d.name
+732:         for d in base.iterdir()
+733:         if d.is_dir() and keyword in d.name
+734:     ]
+735: 
+736:     if not project_folders:
+737:         print(f"Aucun dossier contenant le mot-clé '{keyword}' n'a été trouvé.")
+738:         return
+739: 
+740:     logger.info(f"Dossiers de projet trouvés : {len(project_folders)}")
+741: 
+742:     total_projects = len(project_folders)
+743:     for idx, folder in enumerate(project_folders, start=1):
+744:         print(f"REDUCING_JSON: {idx}/{total_projects}: {folder}")
+745:         docs_path = base / folder / "docs"
+746: 
+747:         if not docs_path.is_dir():
+748:             logger.warning(f"-> Avertissement : Le dossier 'docs' est manquant dans '{folder}'.")
+749:             continue
+750: 
+751:         logger.info(f"\n--- Traitement du dossier : {docs_path} ---")
+752: 
+753:         video_files = [
+754:             p for p in docs_path.iterdir()
+755:             if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS
+756:         ]
+757:         if not video_files:
+758:             logger.info("Aucune vidéo trouvée dans docs/.")
+759:             continue
+760: 
+761:         for v_idx, video_path in enumerate(video_files, start=1):
+762:             stem = video_path.stem
+763:             audio_path = docs_path / f"{stem}{AUDIO_SUFFIX}"
+764:             tracking_in, tracking_out, tracking_fallback = _resolve_tracking_paths(docs_path, stem)
+765: 
+766:             if tracking_in is None:
+767:                 logger.warning(f"  - Tracking JSON introuvable pour '{video_path.name}'.")
+768:                 continue
+769:             if not audio_path.exists():
+770:                 logger.warning(f"  - Fichier audio '{audio_path.name}' manquant pour '{video_path.name}'.")
+771: 
+772:             logger.info(
+773:                 "  - Cible: %s | tracking_in=%s | tracking_out=%s | audio=%s",
+774:                 video_path.name,
+775:                 tracking_in.name,
+776:                 tracking_out.name if tracking_out else "(none)",
+777:                 audio_path.name,
+778:             )
+779:             print(f"INTERNAL_PROGRESS: {v_idx}/{len(video_files)} items ({int(round((v_idx / float(len(video_files))) * 100))}%) - {video_path.name}")
+780: 
+781:             try:
+782:                 with open(tracking_in, "r", encoding="utf-8") as f:
+783:                     tracking_data = json.load(f)
+784: 
+785:                 reduced_tracking = reduce_video_json(tracking_data)
+786:                 if reduced_tracking is None:
+787:                     logger.warning(f"    - Tracking JSON ignoré (schéma inattendu): {tracking_in}")
+788:                 else:
+789:                     assert tracking_out is not None
+790: 
+791:                     if (
+792:                         tracking_fallback is not None
+793:                         and tracking_fallback.exists()
+794:                         and tracking_in.resolve() != tracking_fallback.resolve()
+795:                         and _reduced_tracking_needs_enrichment(reduced_tracking)
+796:                     ):
+797:                         try:
+798:                             with open(tracking_fallback, "r", encoding="utf-8") as f:
+799:                                 legacy_tracking_data = json.load(f)
+800:                             legacy_reduced = reduce_video_json(legacy_tracking_data)
+801:                             if legacy_reduced is not None:
+802:                                 reduced_tracking = _merge_reduced_tracking(reduced_tracking, legacy_reduced)
+803:                                 logger.info(
+804:                                     "    - Tracking enrichi depuis legacy: %s -> %s",
+805:                                     tracking_fallback.name,
+806:                                     tracking_out.name,
+807:                                 )
+808:                         except Exception as e:
+809:                             logger.warning(
+810:                                 "    - Enrichissement legacy ignoré (erreur non bloquante) pour %s: %s",
+811:                                 tracking_fallback.name,
+812:                                 e,
+813:                             )
+814: 
+815:                     reduced_audio = None
+816:                     if audio_path.exists():
+817:                         with open(audio_path, "r", encoding="utf-8") as f:
+818:                             audio_data = json.load(f)
+819:                         reduced_audio = reduce_audio_json(audio_data)
+820:                         if reduced_audio is None:
+821:                             logger.warning(f"    - Audio JSON ignoré (schéma inattendu): {audio_path}")
+822:                         else:
+823:                             _write_json_atomically(audio_path, reduced_audio)
+824:                             logger.info("    - Audio réduit avec succès: %s", audio_path.name)
+825: 
+826:                     temporal = _compute_temporal_alignment(reduced_tracking, reduced_audio)
+827:                     if temporal:
+828:                         reduced_tracking["temporal_alignment"] = temporal
+829: 
+830:                     if tracking_analytics_enabled:
+831:                         analytics = _compute_tracking_analytics(reduced_tracking)
+832:                         if analytics:
+833:                             reduced_tracking["tracking_analytics"] = analytics
+834: 
+835:                     _write_json_atomically(tracking_out, reduced_tracking)
+836:                     logger.info("    - Tracking réduit avec succès: %s", tracking_out.name)
+837: 
+838:                     if temporal and temporal.get("warnings"):
+839:                         logger.warning(
+840:                             "    - Désalignement temporel détecté (%s): %s",
+841:                             stem,
+842:                             ", ".join([str(w) for w in temporal.get("warnings") or []]),
+843:                         )
+844: 
+845:             except json.JSONDecodeError as e:
+846:                 logger.error(f"    - ERREUR : Impossible de lire un fichier JSON. Erreur : {e}")
+847:             except Exception as e:
+848:                 logger.error(f"    - ERREUR : Une erreur inattendue est survenue. Erreur : {e}")
+849: 
+850:         print(f"Succès: réduction JSON terminée pour {folder}")
+851: 
+852:     logger.info("\n--- Traitement terminé ! ---")
+853: 
+854: 
+855: def main():
+856:     parser = argparse.ArgumentParser(description="Étape 6 - Réduction JSON (vidéo + audio)")
+857:     parser.add_argument('--base_dir', type=str, default=os.environ.get('BASE_PATH_SCRIPTS', ''), help='Chemin base du projet (contenant projets_extraits)')
+858:     parser.add_argument('--work_dir', type=str, default=None, help='Chemin explicite vers projets_extraits')
+859:     parser.add_argument('--keyword', type=str, default=os.environ.get('FOLDER_KEYWORD', 'Camille'), help='Mot-clé pour filtrer les dossiers projet')
+860:     parser.add_argument('--log_dir', type=str, default=str(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'logs', 'step6')),
+861:                         help='Répertoire pour les logs (par défaut logs/step6)')
+862: 
+863:     args = parser.parse_args()
+864: 
+865:     # Resolve working directory
+866:     if args.work_dir:
+867:         work_dir = args.work_dir
+868:     else:
+869:         base_dir = args.base_dir if args.base_dir else os.getcwd()
+870:         work_dir = os.path.join(base_dir, 'projets_extraits')
+871: 
+872:     # Setup logging
+873:     setup_logging(args.log_dir)
+874: 
+875:     # Progress total: count candidate projects
+876:     try:
+877:         if not os.path.isdir(work_dir):
+878:             logger.warning(f"Répertoire de travail introuvable: {work_dir}")
+879:             print(f"TOTAL_JSON_TO_REDUCE: 0")
+880:             sys.exit(0)
+881:         projects = [d for d in os.listdir(work_dir) if os.path.isdir(os.path.join(work_dir, d)) and args.keyword in d]
+882:         print(f"TOTAL_JSON_TO_REDUCE: {len(projects)}")
+883:     except Exception:
+884:         print("TOTAL_JSON_TO_REDUCE: 0")
+885: 
+886:     # Run processing
+887:     process_directory(work_dir, keyword=args.keyword)
+888: 
+889: 
+890: if __name__ == "__main__":
+891:     main()
 ```
 
 ## File: app_new.py
@@ -32940,6 +31062,1040 @@ app_new.py
 1061:         threaded=True,
 1062:         use_reloader=False
 1063:     )
+```
+
+## File: config/settings.py
+```python
+  1: """
+  2: Centralized configuration management for workflow_mediapipe.
+  3: 
+  4: This module provides environment-based configuration management
+  5: following the project's development guidelines.
+  6: """
+  7: 
+  8: import os
+  9: import logging
+ 10: import subprocess
+ 11: from pathlib import Path
+ 12: from dataclasses import dataclass, field
+ 13: from typing import Optional, List
+ 14: 
+ 15: logger = logging.getLogger(__name__)
+ 16: 
+ 17: 
+ 18: def _parse_bool(raw: Optional[str], default: bool) -> bool:
+ 19:     if raw is None:
+ 20:         return default
+ 21:     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+ 22: 
+ 23: 
+ 24: def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+ 25:     if raw is None:
+ 26:         return None
+ 27:     raw = raw.strip()
+ 28:     if not raw:
+ 29:         return None
+ 30:     try:
+ 31:         return int(raw)
+ 32:     except Exception:
+ 33:         return None
+ 34: 
+ 35: 
+ 36: def _parse_optional_positive_int(raw: Optional[str]) -> Optional[int]:
+ 37:     value = _parse_optional_int(raw)
+ 38:     if value is None:
+ 39:         return None
+ 40:     if value <= 0:
+ 41:         return None
+ 42:     return value
+ 43: 
+ 44: 
+ 45: def _parse_csv_list(raw: Optional[str]) -> List[str]:
+ 46:     if raw is None:
+ 47:         return []
+ 48:     parts = [p.strip() for p in raw.split(",")]
+ 49:     return [p for p in parts if p]
+ 50: 
+ 51: 
+ 52: @dataclass
+ 53: class Config:
+ 54:     """
+ 55:     Centralized configuration class for the workflow_mediapipe application.
+ 56:     
+ 57:     All configuration values are loaded from environment variables with
+ 58:     sensible defaults to maintain backward compatibility.
+ 59:     """
+ 60:     
+ 61:     # Flask Application Settings
+ 62:     SECRET_KEY: str = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
+ 63:     DEBUG: bool = os.environ.get('DEBUG', 'false').lower() == 'true'
+ 64:     HOST: str = os.environ.get('FLASK_HOST', '0.0.0.0')
+ 65:     PORT: int = int(os.environ.get('FLASK_PORT', '5000'))
+ 66:     
+ 67:     # Security Tokens (loaded from environment)
+ 68:     INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
+ 69:     RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
+ 70:     
+ 71:     # Webhook JSON Source (single data source for monitoring)
+ 72:     WEBHOOK_JSON_URL: str = os.environ.get(
+ 73:         'WEBHOOK_JSON_URL',
+ 74:         'https://webhook.kidpixel.fr/data/webhook_links.json'
+ 75:     )
+ 76:     WEBHOOK_TIMEOUT: int = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
+ 77:     WEBHOOK_CACHE_TTL: int = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
+ 78:     WEBHOOK_MONITOR_INTERVAL: int = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
+ 79:     
+ 80:     # Directory Configuration
+ 81:     BASE_PATH_SCRIPTS: Path = Path(os.environ.get(
+ 82:         'BASE_PATH_SCRIPTS_ENV', 
+ 83:         os.path.dirname(os.path.abspath(__file__ + '/../'))
+ 84:     ))
+ 85:     CACHE_ROOT_DIR: Path = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
+ 86:     LOCAL_DOWNLOADS_DIR: Path = Path(os.environ.get(
+ 87:         'LOCAL_DOWNLOADS_DIR', 
+ 88:         Path.home() / 'Téléchargements'
+ 89:     ))
+ 90:     DISABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
+ 91:     ENABLE_EXPLORER_OPEN: bool = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
+ 92:     DOWNLOAD_HISTORY_SHARED_GROUP: Optional[str] = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
+ 93:     DOWNLOAD_HISTORY_DB_PATH: Path = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
+ 94:     # LOGS_DIR is normalized in __post_init__ to be absolute under BASE_PATH_SCRIPTS by default.
+ 95:     # If LOGS_DIR is set in env and is relative, it will be resolved against BASE_PATH_SCRIPTS.
+ 96:     LOGS_DIR: Path = Path(os.environ.get('LOGS_DIR', ''))
+ 97:     # Virtual environments base directory (defaults to project root if not set)
+ 98:     VENV_BASE_DIR: Optional[Path] = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
+ 99:     # Projects directory for visualization/timeline features
+100:     PROJECTS_DIR: Path = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
+101:     # Archives directory for persistent analysis results (timeline)
+102:     ARCHIVES_DIR: Path = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
+103:     
+104:     # Python Environment Configuration
+105:     PYTHON_VENV_EXE: str = os.environ.get('PYTHON_VENV_EXE_ENV', '')
+106:     
+107:     # Processing Configuration
+108:     MAX_CPU_WORKERS: int = int(os.environ.get(
+109:         'MAX_CPU_WORKERS', 
+110:         str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
+111:     ))
+112:     
+113:     # Polling Intervals (in milliseconds for frontend, seconds for backend)
+114:     POLLING_INTERVAL: int = int(os.environ.get('POLLING_INTERVAL', '1000'))
+115:     LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
+116: 
+117:     SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+118:     
+119:     # MediaPipe Configuration
+120:     MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
+121:         'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
+122:     ))
+123:     MP_LANDMARKER_MIN_TRACKING_CONFIDENCE: float = float(os.environ.get(
+124:         'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
+125:     ))
+126:     
+127:     # GPU Configuration
+128:     ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
+129:     
+130:     # Lemonfox API Configuration (STEP4 alternative)
+131:     LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
+132:     LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
+133:     LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
+134: 
+135:     LEMONFOX_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
+136:     LEMONFOX_DEFAULT_PROMPT: Optional[str] = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
+137:     LEMONFOX_SPEAKER_LABELS_DEFAULT: bool = _parse_bool(
+138:         os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
+139:         default=True,
+140:     )
+141:     LEMONFOX_DEFAULT_MIN_SPEAKERS: Optional[int] = _parse_optional_int(
+142:         os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
+143:     )
+144:     LEMONFOX_DEFAULT_MAX_SPEAKERS: Optional[int] = _parse_optional_int(
+145:         os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
+146:     )
+147:     LEMONFOX_TIMESTAMP_GRANULARITIES: List[str] = field(
+148:         default_factory=lambda: _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
+149:     )
+150:     LEMONFOX_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
+151:     LEMONFOX_SPEECH_MIN_ON_SEC: float = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
+152:     LEMONFOX_MAX_UPLOAD_MB: Optional[int] = _parse_optional_positive_int(
+153:         os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
+154:     )
+155:     LEMONFOX_ENABLE_TRANSCODE: bool = _parse_bool(
+156:         os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
+157:         default=False,
+158:     )
+159:     LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
+160:     LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
+161: 
+162:     STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+163:     
+164:     # STEP5 Object Detection Configuration
+165:     # Model selection for fallback object detection when face detection fails (MediaPipe only)
+166:     STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
+167:         'STEP5_OBJECT_DETECTOR_MODEL',
+168:         'efficientdet_lite2'  # Default: current baseline, backward compatible
+169:     )
+170:     STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+171:     STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
+172:     
+173:     # STEP5 Tracking configuration
+174:     STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
+175:     STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
+176: 
+177:     STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+178:         os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
+179:     )
+180:     STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+181:     STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
+182:         os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+183:     )
+184:     
+185:     def __post_init__(self):
+186:         """Post-initialization to ensure paths are Path objects and create directories."""
+187:         # Ensure all path attributes are Path objects
+188:         if isinstance(self.BASE_PATH_SCRIPTS, str):
+189:             self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)
+190:         if isinstance(self.CACHE_ROOT_DIR, str):
+191:             self.CACHE_ROOT_DIR = Path(self.CACHE_ROOT_DIR)
+192:         if isinstance(self.LOCAL_DOWNLOADS_DIR, str):
+193:             self.LOCAL_DOWNLOADS_DIR = Path(self.LOCAL_DOWNLOADS_DIR)
+194:         if isinstance(self.LOGS_DIR, str):
+195:             self.LOGS_DIR = Path(self.LOGS_DIR)
+196: 
+197:         if isinstance(self.DOWNLOAD_HISTORY_DB_PATH, str):
+198:             self.DOWNLOAD_HISTORY_DB_PATH = Path(self.DOWNLOAD_HISTORY_DB_PATH)
+199:         
+200:         # Default VENV_BASE_DIR to BASE_PATH_SCRIPTS if not set
+201:         if self.VENV_BASE_DIR is None or (isinstance(self.VENV_BASE_DIR, str) and not self.VENV_BASE_DIR):
+202:             self.VENV_BASE_DIR = self.BASE_PATH_SCRIPTS
+203:         elif isinstance(self.VENV_BASE_DIR, str):
+204:             self.VENV_BASE_DIR = Path(self.VENV_BASE_DIR)
+205: 
+206:         # Resolve PYTHON_VENV_EXE via VENV_BASE_DIR logic.
+207:         # If PYTHON_VENV_EXE_ENV is provided and is relative, resolve it against VENV_BASE_DIR.
+208:         if not self.PYTHON_VENV_EXE:
+209:             self.PYTHON_VENV_EXE = str(self.get_venv_python("env"))
+210:         else:
+211:             python_exe_path = Path(self.PYTHON_VENV_EXE)
+212:             if not python_exe_path.is_absolute():
+213:                 self.PYTHON_VENV_EXE = str((self.VENV_BASE_DIR / python_exe_path).resolve())
+214:         
+215:         # Normalize LOGS_DIR to avoid CWD-dependent side effects when importing config from step scripts.
+216:         # Default to <BASE_PATH_SCRIPTS>/logs if not provided. If provided and relative, make it absolute
+217:         # under BASE_PATH_SCRIPTS. This prevents accidental creation of logs under working directories
+218:         # like 'projets_extraits/logs' when steps run with a different CWD.
+219:         if (not str(self.LOGS_DIR)) or (str(self.LOGS_DIR).strip() == '.'):
+220:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / 'logs').resolve()
+221:         elif not self.LOGS_DIR.is_absolute():
+222:             self.LOGS_DIR = (self.BASE_PATH_SCRIPTS / self.LOGS_DIR).resolve()
+223: 
+224:         if (not str(self.DOWNLOAD_HISTORY_DB_PATH)) or (str(self.DOWNLOAD_HISTORY_DB_PATH).strip() == '.'):
+225:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / 'download_history.sqlite3').resolve()
+226:         elif not self.DOWNLOAD_HISTORY_DB_PATH.is_absolute():
+227:             self.DOWNLOAD_HISTORY_DB_PATH = (self.BASE_PATH_SCRIPTS / self.DOWNLOAD_HISTORY_DB_PATH).resolve()
+228: 
+229:         if (not str(self.CACHE_ROOT_DIR)) or (str(self.CACHE_ROOT_DIR).strip() == '.'):
+230:             self.CACHE_ROOT_DIR = Path('/mnt/cache')
+231:         elif not self.CACHE_ROOT_DIR.is_absolute():
+232:             self.CACHE_ROOT_DIR = (self.BASE_PATH_SCRIPTS / self.CACHE_ROOT_DIR).resolve()
+233:         else:
+234:             self.CACHE_ROOT_DIR = self.CACHE_ROOT_DIR.resolve()
+235: 
+236:         # Default PROJECTS_DIR if not set
+237:         if self.PROJECTS_DIR is None or (isinstance(self.PROJECTS_DIR, str) and not self.PROJECTS_DIR):
+238:             self.PROJECTS_DIR = self.BASE_PATH_SCRIPTS / 'projets_extraits'
+239:         elif isinstance(self.PROJECTS_DIR, str):
+240:             self.PROJECTS_DIR = Path(self.PROJECTS_DIR)
+241:         # Default ARCHIVES_DIR if not set
+242:         if self.ARCHIVES_DIR is None or (isinstance(self.ARCHIVES_DIR, str) and not self.ARCHIVES_DIR):
+243:             self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
+244:         elif isinstance(self.ARCHIVES_DIR, str):
+245:             self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
+246:             
+247:         # Create necessary directories
+248:         self._create_directories()
+249:     
+250:     def _create_directories(self) -> None:
+251:         """Create necessary directories if they don't exist."""
+252:         directories_to_create = [
+253:             self.LOGS_DIR,
+254:             self.LOGS_DIR / 'step1',
+255:             self.LOGS_DIR / 'step2',
+256:             self.LOGS_DIR / 'step3',
+257:             self.LOGS_DIR / 'step4',
+258:             self.LOGS_DIR / 'step5',
+259:             self.LOGS_DIR / 'step6',
+260:             self.LOGS_DIR / 'step7',
+261:             # Ensure projects directory exists by default to avoid confusion
+262:             self.PROJECTS_DIR,
+263:             # Ensure archives directory exists
+264:             self.ARCHIVES_DIR,
+265:         ]
+266:         
+267:         for directory in directories_to_create:
+268:             try:
+269:                 directory.mkdir(parents=True, exist_ok=True)
+270:                 logger.debug(f"Ensured directory exists: {directory}")
+271:             except Exception as e:
+272:                 logger.error(f"Failed to create directory {directory}: {e}")
+273:     
+274:     def validate(self, strict: bool = None) -> bool:
+275:         """
+276:         Validate the configuration and ensure all required settings are present.
+277: 
+278:         Args:
+279:             strict: If None, uses DEBUG mode to determine strictness.
+280:                    If True, raises errors. If False, logs warnings.
+281: 
+282:         Returns:
+283:             bool: True if configuration is valid
+284: 
+285:         Raises:
+286:             ValueError: If required configuration is missing or invalid and strict=True
+287:         """
+288:         if strict is None:
+289:             strict = not self.DEBUG  # Strict in production, lenient in development
+290: 
+291:         errors = []
+292:         warnings = []
+293: 
+294:         # Security validation
+295:         if not self.INTERNAL_WORKER_TOKEN:
+296:             msg = "INTERNAL_WORKER_COMMS_TOKEN environment variable is required"
+297:             if strict:
+298:                 errors.append(msg)
+299:             else:
+300:                 warnings.append(msg)
+301:                 # Set development default
+302:                 self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
+303: 
+304:         if not self.RENDER_REGISTER_TOKEN:
+305:             msg = "RENDER_REGISTER_TOKEN environment variable is required"
+306:             if strict:
+307:                 errors.append(msg)
+308:             else:
+309:                 warnings.append(msg)
+310:                 # Set development default
+311:                 self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
+312: 
+313:         # Production security checks
+314:         if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
+315:             errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
+316: 
+317:         # Webhook validation (single data source)
+318:         if not self.WEBHOOK_JSON_URL:
+319:             msg = "WEBHOOK_JSON_URL must be set"
+320:             if strict:
+321:                 errors.append(msg)
+322:             else:
+323:                 warnings.append(msg)
+324:         if self.WEBHOOK_TIMEOUT <= 0:
+325:             warnings.append("WEBHOOK_TIMEOUT should be > 0; using default")
+326:         if self.WEBHOOK_CACHE_TTL < 0:
+327:             warnings.append("WEBHOOK_CACHE_TTL should be >= 0; using default")
+328:         
+329:         # Path validation
+330:         if not self.BASE_PATH_SCRIPTS.exists():
+331:             warnings.append(f"Base scripts path does not exist: {self.BASE_PATH_SCRIPTS}")
+332:         
+333:         if not self.LOCAL_DOWNLOADS_DIR.exists():
+334:             warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
+335:         
+336:         # Python executable validation
+337:         python_exe_path = Path(self.PYTHON_VENV_EXE)
+338:         if not python_exe_path.exists():
+339:             warnings.append(f"Python executable not found: {python_exe_path}")
+340:         
+341:         # Log warnings
+342:         for warning in warnings:
+343:             logger.warning(warning)
+344:         
+345:         # Log warnings
+346:         if warnings:
+347:             for warning in warnings:
+348:                 logger.warning(f"Configuration warning: {warning}")
+349:             if not strict:
+350:                 logger.warning("Using development defaults - NOT SUITABLE FOR PRODUCTION")
+351: 
+352:         # Raise errors if any
+353:         if errors:
+354:             error_msg = f"Configuration validation failed: {'; '.join(errors)}"
+355:             logger.error(error_msg)
+356:             raise ValueError(error_msg)
+357: 
+358:         if warnings and not strict:
+359:             logger.info("Configuration validation completed with warnings (development mode)")
+360:         else:
+361:             logger.info("Configuration validation successful")
+362:         return True
+363:     
+364:     def get_venv_path(self, venv_name: str) -> Path:
+365:         """
+366:         Get the path to a virtual environment.
+367:         
+368:         Args:
+369:             venv_name: Name of the virtual environment (e.g., 'env', 'audio_env', 'tracking_env')
+370:             
+371:         Returns:
+372:             Path object to the virtual environment directory
+373:         """
+374:         return self.VENV_BASE_DIR / venv_name
+375:     
+376:     def get_venv_python(self, venv_name: str) -> Path:
+377:         """
+378:         Get the path to the Python executable in a virtual environment.
+379:         
+380:         Args:
+381:             venv_name: Name of the virtual environment
+382:             
+383:         Returns:
+384:             Path object to the Python executable
+385:         """
+386:         return self.get_venv_path(venv_name) / "bin" / "python"
+387:     
+388:     def get_allowed_base_paths(self) -> List[Path]:
+389:         """
+390:         Get list of allowed base paths for file operations.
+391:         
+392:         Returns:
+393:             List of Path objects representing allowed base directories
+394:         """
+395:         return [
+396:             self.BASE_PATH_SCRIPTS,
+397:             self.LOCAL_DOWNLOADS_DIR,
+398:             self.LOGS_DIR,
+399:             self.BASE_PATH_SCRIPTS / 'workflow_scripts',
+400:             self.BASE_PATH_SCRIPTS / 'static',
+401:             self.BASE_PATH_SCRIPTS / 'templates',
+402:             self.BASE_PATH_SCRIPTS / 'utils',
+403:         ]
+404:     
+405:     def to_dict(self) -> dict:
+406:         """
+407:         Convert configuration to dictionary for serialization.
+408:         
+409:         Returns:
+410:             Dictionary representation of configuration (excluding sensitive data)
+411:         """
+412:         config_dict = {}
+413:         for key, value in self.__dict__.items():
+414:             # Exclude sensitive information
+415:             if 'TOKEN' in key or 'SECRET' in key:
+416:                 config_dict[key] = '***HIDDEN***' if value else None
+417:             elif isinstance(value, Path):
+418:                 config_dict[key] = str(value)
+419:             else:
+420:                 config_dict[key] = value
+421:         
+422:         return config_dict
+423:     
+424:     @staticmethod
+425:     def check_gpu_availability() -> dict:
+426:         """
+427:         Vérifier la disponibilité GPU pour STEP5 (InsightFace uniquement).
+428:         
+429:         Returns:
+430:             dict: {
+431:                 'available': bool,
+432:                 'reason': str (si non disponible),
+433:                 'vram_total_gb': float (si disponible),
+434:                 'vram_free_gb': float (si disponible),
+435:                 'cuda_version': str (si disponible),
+436:                 'onnx_cuda': bool
+437:             }
+438:         """
+439:         result = {
+440:             'available': False,
+441:             'reason': '',
+442:             'onnx_cuda': False,
+443:         }
+444:         
+445:         # Check GPU availability via pynv (NVML) first, fallback to nvidia-smi
+446:         gpu_checked = False
+447:         try:
+448:             import pynvml
+449: 
+450:             pynvml.nvmlInit()
+451:             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+452:             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+453:             vram_total = mem_info.total / (1024 ** 3)
+454:             vram_free = mem_info.free / (1024 ** 3)
+455:             result['vram_total_gb'] = round(vram_total, 2)
+456:             result['vram_free_gb'] = round(vram_free, 2)
+457:             result['cuda_version'] = os.environ.get('CUDA_VERSION') or ''
+458:             gpu_checked = True
+459: 
+460:             if vram_free < 1.5:
+461:                 result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+462:                 return result
+463:         except ImportError:
+464:             logger.debug('pynvml not available; falling back to nvidia-smi for GPU detection')
+465:         except Exception as e:
+466:             logger.warning(f"pynvml check failed: {e}; falling back to nvidia-smi")
+467: 
+468:         if not gpu_checked:
+469:             try:
+470:                 completed = subprocess.run(
+471:                     ['nvidia-smi', '--query-gpu=memory.total,memory.free', '--format=csv,noheader,nounits'],
+472:                     capture_output=True,
+473:                     text=True,
+474:                     timeout=5,
+475:                 )
+476:                 if completed.returncode == 0:
+477:                     line = completed.stdout.strip().split('\n')[0]
+478:                     total_str, free_str = [part.strip() for part in line.split(',')]
+479:                     vram_total = float(total_str) / 1024
+480:                     vram_free = float(free_str) / 1024
+481:                     result['vram_total_gb'] = round(vram_total, 2)
+482:                     result['vram_free_gb'] = round(vram_free, 2)
+483:                     gpu_checked = True
+484:                     if vram_free < 1.5:
+485:                         result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+486:                         return result
+487:                 else:
+488:                     logger.warning(
+489:                         "nvidia-smi GPU check failed (code %s): %s",
+490:                         completed.returncode,
+491:                         completed.stderr.strip(),
+492:                     )
+493:             except FileNotFoundError:
+494:                 logger.warning("nvidia-smi introuvable pour la vérification GPU")
+495:             except subprocess.TimeoutExpired:
+496:                 logger.warning("nvidia-smi GPU check timed out")
+497:             except Exception as e:
+498:                 logger.warning(f"nvidia-smi GPU check failed: {e}")
+499: 
+500:         if not gpu_checked:
+501:             result['reason'] = 'Impossible de déterminer la disponibilité GPU (pynvml/nvidia-smi indisponibles)'
+502:             return result
+503:         
+504:         # Check ONNXRuntime CUDA provider (requis pour InsightFace)
+505:         try:
+506:             import onnxruntime as ort
+507:             if 'CUDAExecutionProvider' in ort.get_available_providers():
+508:                 result['onnx_cuda'] = True
+509:         except ImportError:
+510:             pass
+511:         except Exception as e:
+512:             logger.warning(f"ONNXRuntime check failed: {e}")
+513: 
+514:         # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
+515:         if not result.get('onnx_cuda'):
+516:             ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
+517:             if ort_gpu_python:
+518:                 try:
+519:                     ort_check_code = (
+520:                         "import sys\n"
+521:                         "import onnxruntime as ort\n"
+522:                         "providers = ort.get_available_providers()\n"
+523:                         "sys.stdout.write('1' if 'CUDAExecutionProvider' in providers else '0')"
+524:                     )
+525:                     completed = subprocess.run(
+526:                         [ort_gpu_python, "-c", ort_check_code],
+527:                         capture_output=True,
+528:                         text=True,
+529:                         timeout=15,
+530:                     )
+531:                     if completed.returncode == 0:
+532:                         result['onnx_cuda'] = completed.stdout.strip() == "1"
+533:                     else:
+534:                         logger.warning(
+535:                             "ONNXRuntime GPU check failed (external env returned code %s): %s",
+536:                             completed.returncode,
+537:                             completed.stderr.strip(),
+538:                         )
+539:                 except FileNotFoundError:
+540:                     logger.warning(
+541:                         "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
+542:                         ort_gpu_python,
+543:                     )
+544:                 except subprocess.TimeoutExpired:
+545:                     logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
+546:                 except Exception as exc:
+547:                     logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
+548:         
+549:         # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
+550:         if result['onnx_cuda']:
+551:             result['available'] = True
+552:         else:
+553:             result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
+554:         
+555:         return result
+556:     
+557:     @staticmethod
+558:     def is_step5_gpu_enabled() -> bool:
+559:         """
+560:         Vérifier si le mode GPU STEP5 est activé via configuration.
+561:         
+562:         Returns:
+563:             bool: True si STEP5_ENABLE_GPU=1
+564:         """
+565:         return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
+566:     
+567:     @staticmethod
+568:     def get_step5_gpu_engines() -> List[str]:
+569:         """
+570:         Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
+571:         
+572:         Returns:
+573:             List[str]: ['insightface'] (valeurs non supportées ignorées)
+574:         """
+575:         engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
+576:         engines = _parse_csv_list(engines_str)
+577: 
+578:         normalized = [e.strip().lower() for e in engines if e.strip()]
+579:         allowed = {"insightface", "all"}
+580:         return [e for e in normalized if e in allowed]
+581:     
+582:     @staticmethod
+583:     def get_step5_gpu_max_vram_mb() -> int:
+584:         """
+585:         Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
+586:         
+587:         Returns:
+588:             int: Limite en Mo (défaut: 2048)
+589:         """
+590:         return _parse_optional_positive_int(
+591:             os.environ.get('STEP5_GPU_MAX_VRAM_MB')
+592:         ) or 2048
+593: 
+594: 
+595: # Global configuration instance
+596: config = Config()
+```
+
+## File: static/css/components/logs.css
+```css
+  1: .logs-overlay-container {
+  2:     z-index: 1100;
+  3:     background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
+  4:     padding: clamp(16px, 3vw, 36px);
+  5:     opacity: 0;
+  6:     visibility: hidden;
+  7:     transform: translateY(20px) scale(0.96);
+  8:     transition:
+  9:         opacity var(--motion-duration-slow) var(--motion-ease-out-expo),
+ 10:         visibility var(--motion-duration-slow) var(--motion-ease-out-expo),
+ 11:         transform var(--motion-duration-slow) var(--motion-ease-out-expo);
+ 12:     backdrop-filter: blur(8px);
+ 13: }
+ 14: 
+ 15: .logs-content-wrapper {
+ 16:     width: min(80vw, 1100px);
+ 17:     height: min(80vh, 780px);
+ 18:     display: flex;
+ 19:     flex-direction: column;
+ 20:     gap: 18px;
+ 21:     background: var(--bg-card);
+ 22:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+ 23:     border-radius: 28px;
+ 24:     padding: 20px 22px 24px;
+ 25:     box-shadow:
+ 26:         0 28px 60px rgba(0, 0, 0, 0.45),
+ 27:         0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
+ 28:     overflow: hidden;
+ 29: }
+ 30: 
+ 31: .logs-overlay-container[data-visible="true"] {
+ 32:     opacity: 1;
+ 33:     visibility: visible;
+ 34:     transform: translateY(0) scale(1);
+ 35: }
+ 36: 
+ 37: .logs-overlay-container[data-visible="true"] .logs-content-wrapper {
+ 38:     animation: logPanelEntrance 0.6s var(--motion-ease-out-expo) 0.1s both;
+ 39: }
+ 40: 
+ 41: @keyframes logPanelEntrance {
+ 42:     0% {
+ 43:         opacity: 0;
+ 44:         transform: translateY(16px) scale(0.98);
+ 45:         filter: blur(2px);
+ 46:     }
+ 47:     50% {
+ 48:         opacity: 0.8;
+ 49:         transform: translateY(-2px) scale(1.01);
+ 50:         filter: blur(0px);
+ 51:     }
+ 52:     100% {
+ 53:         opacity: 1;
+ 54:         transform: translateY(0) scale(1);
+ 55:         filter: blur(0px);
+ 56:     }
+ 57: }
+ 58: 
+ 59: .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
+ 60:     animation: logPanelExit 0.4s var(--motion-ease-in-expo) both;
+ 61: }
+ 62: 
+ 63: @keyframes logPanelExit {
+ 64:     0% {
+ 65:         opacity: 1;
+ 66:         transform: translateY(0) scale(1);
+ 67:         filter: blur(0px);
+ 68:     }
+ 69:     100% {
+ 70:         opacity: 0;
+ 71:         transform: translateY(20px) scale(0.96);
+ 72:         filter: blur(1px);
+ 73:     }
+ 74: }
+ 75: 
+ 76: @media (prefers-reduced-motion: reduce) {
+ 77:     .logs-overlay-container {
+ 78:         transition: opacity 0.2s ease, visibility 0.2s ease;
+ 79:         transform: none;
+ 80:     }
+ 81:     
+ 82:     .logs-overlay-container[data-visible="true"] .logs-content-wrapper,
+ 83:     .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
+ 84:         animation: none;
+ 85:         opacity: 1;
+ 86:         transform: none;
+ 87:         filter: none;
+ 88:     }
+ 89: }
+ 90: 
+ 91: @media (max-width: 900px) {
+ 92:     .logs-content-wrapper {
+ 93:         width: 95vw;
+ 94:         height: 90vh;
+ 95:         border-radius: 20px;
+ 96:         padding: 18px;
+ 97:     }
+ 98: }
+ 99: 
+100: .log-panel-header {
+101:     display: flex;
+102:     flex-direction: column;
+103:     align-items: stretch;
+104:     gap: 10px;
+105:     padding-bottom: 10px;
+106:     margin-bottom: 15px;
+107:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+108:     color: var(--accent-primary);
+109:     font-size: 1.3em;
+110:     font-weight: 500;
+111:     flex-shrink: 0;
+112:     transition: color var(--motion-duration-medium) var(--motion-ease-standard);
+113: }
+114: 
+115: .log-panel-header-main {
+116:     display: flex;
+117:     justify-content: space-between;
+118:     align-items: center;
+119:     gap: 12px;
+120: }
+121: 
+122: .log-panel-subheader {
+123:     display: flex;
+124:     flex-wrap: wrap;
+125:     align-items: baseline;
+126:     gap: 10px;
+127:     font-size: 0.85em;
+128:     color: var(--text-secondary);
+129: }
+130: 
+131: #log-panel-context-step {
+132:     color: var(--text-primary);
+133:     font-weight: 500;
+134: }
+135: 
+136: .log-panel-specific-buttons {
+137:     display: flex;
+138:     flex-wrap: wrap;
+139:     gap: 10px;
+140: }
+141: 
+142: .log-panel-specific-buttons .specific-log-button {
+143:     display: inline-flex;
+144:     align-items: center;
+145:     justify-content: center;
+146:     gap: 8px;
+147:     border-radius: 999px;
+148:     padding: 10px 18px;
+149:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
+150:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+151:     color: var(--text-secondary);
+152:     cursor: pointer;
+153:     transition:
+154:         color var(--motion-duration-fast) var(--motion-ease-standard),
+155:         background var(--motion-duration-fast) var(--motion-ease-standard),
+156:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
+157:         transform var(--motion-duration-fast) var(--motion-ease-standard);
+158: }
+159: 
+160: .log-panel-specific-buttons .specific-log-button:hover {
+161:     color: var(--text-primary);
+162:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
+163:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
+164: }
+165: 
+166: .log-panel-specific-buttons .specific-log-button:active {
+167:     transform: scale(0.98);
+168: }
+169: 
+170: #close-log-panel {
+171:     display: inline-flex;
+172:     align-items: center;
+173:     justify-content: center;
+174:     width: 44px;
+175:     height: 44px;
+176:     background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
+177:     border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
+178:     border-radius: 999px;
+179:     color: var(--text-bright);
+180:     font-size: 1.45em;
+181:     cursor: pointer;
+182:     box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
+183:     transition:
+184:         color var(--motion-duration-fast) var(--motion-ease-standard),
+185:         background var(--motion-duration-fast) var(--motion-ease-standard),
+186:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
+187:         transform var(--motion-duration-fast) var(--motion-ease-standard),
+188:         box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+189: }
+190: 
+191: #close-log-panel:hover {
+192:     color: var(--text-primary);
+193:     background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
+194:     border-color: rgb(var(--accent-primary-rgb) / 0.7);
+195:     box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+196: }
+197: 
+198: #close-log-panel:focus-visible {
+199:     outline: none;
+200:     box-shadow:
+201:         0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
+202:         0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+203: }
+204: 
+205: #close-log-panel:active {
+206:     transform: scale(0.96);
+207: }
+208: 
+209: .log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
+210: .log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
+211: 
+212: .log-output,
+213: .specific-log-output {
+214:     background-color: var(--log-bg);
+215:     color: var(--text-bright);
+216:     padding: 15px;
+217:     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+218:     font-size: 1em;
+219:     line-height: 1.45;
+220:     max-height: 300px;
+221:     overflow-y: auto;
+222:     white-space: pre-wrap;
+223:     word-break: break-all;
+224:     border-radius: 0 0 8px 8px;
+225:     flex-grow: 1;
+226: }
+227: 
+228: /* Enhanced Log Styling - Different log types */
+229: .log-line {
+230:     display: block;
+231:     margin: 2px 0;
+232:     padding: 2px 6px;
+233:     border-radius: 3px;
+234:     position: relative;
+235: }
+236: 
+237: .log-line.log-success {
+238:     background-color: rgb(var(--status-success-rgb) / 0.12);
+239:     border-left: 3px solid var(--status-success);
+240:     color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
+241: }
+242: 
+243: .log-line.log-warning {
+244:     background-color: rgb(var(--status-warning-rgb) / 0.12);
+245:     border-left: 3px solid var(--status-warning);
+246:     color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
+247: }
+248: 
+249: .log-line.log-error {
+250:     background-color: rgb(var(--status-error-rgb) / 0.12);
+251:     border-left: 3px solid var(--status-error);
+252:     color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
+253:     font-weight: 500;
+254: }
+255: 
+256: .log-line.log-info {
+257:     background-color: rgb(var(--status-running-rgb) / 0.12);
+258:     border-left: 3px solid var(--status-running);
+259:     color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
+260: }
+261: 
+262: .log-line.log-debug {
+263:     background-color: rgba(158, 158, 158, 0.1);
+264:     border-left: 3px solid #9e9e9e;
+265:     color: #616161;
+266:     font-size: 0.85em;
+267: }
+268: 
+269: .log-line.log-command {
+270:     background-color: rgba(156, 39, 176, 0.1);
+271:     border-left: 3px solid #9c27b0;
+272:     color: #7b1fa2;
+273:     font-weight: 500;
+274: }
+275: 
+276: .log-line.log-progress {
+277:     background-color: rgb(var(--accent-primary-rgb) / 0.10);
+278:     border-left: 3px solid var(--accent-primary);
+279:     color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+280: }
+281: 
+282: /* Log icons for better visual distinction */
+283: .log-line::before {
+284:     content: '';
+285:     display: inline-block;
+286:     width: 12px;
+287:     height: 12px;
+288:     margin-right: 8px;
+289:     border-radius: 50%;
+290:     vertical-align: middle;
+291: }
+292: 
+293: .log-line.log-success::before {
+294:     background-color: var(--status-success);
+295:     content: '✓';
+296:     color: white;
+297:     font-size: 8px;
+298:     text-align: center;
+299:     line-height: 12px;
+300:     font-weight: bold;
+301: }
+302: 
+303: .log-line.log-warning::before {
+304:     background-color: var(--status-warning);
+305:     content: '⚠';
+306:     color: white;
+307:     font-size: 8px;
+308:     text-align: center;
+309:     line-height: 12px;
+310: }
+311: 
+312: .log-line.log-error::before {
+313:     background-color: var(--status-error);
+314:     content: '✕';
+315:     color: white;
+316:     font-size: 8px;
+317:     text-align: center;
+318:     line-height: 12px;
+319:     font-weight: bold;
+320: }
+321: 
+322: .log-line.log-info::before {
+323:     background-color: var(--status-running);
+324:     content: 'ℹ';
+325:     color: white;
+326:     font-size: 8px;
+327:     text-align: center;
+328:     line-height: 12px;
+329: }
+330: 
+331: .log-line.log-debug::before {
+332:     background-color: #9e9e9e;
+333:     content: '•';
+334:     color: white;
+335:     font-size: 10px;
+336:     text-align: center;
+337:     line-height: 12px;
+338: }
+339: 
+340: .log-line.log-command::before {
+341:     background-color: #9c27b0;
+342:     content: '$';
+343:     color: white;
+344:     font-size: 8px;
+345:     text-align: center;
+346:     line-height: 12px;
+347:     font-weight: bold;
+348: }
+349: 
+350: .log-line.log-progress::before {
+351:     background-color: var(--accent-primary);
+352:     content: '⟳';
+353:     color: white;
+354:     font-size: 8px;
+355:     text-align: center;
+356:     line-height: 12px;
+357: }
+358: 
+359: /* Dark mode adjustments for log styling */
+360: @media (prefers-color-scheme: dark) {
+361:     .log-line.log-success {
+362:         background-color: rgb(var(--status-success-rgb) / 0.15);
+363:         color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
+364:     }
+365: 
+366:     .log-line.log-warning {
+367:         background-color: rgb(var(--status-warning-rgb) / 0.15);
+368:         color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
+369:     }
+370: 
+371:     .log-line.log-error {
+372:         background-color: rgb(var(--status-error-rgb) / 0.15);
+373:         color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
+374:     }
+375: 
+376:     .log-line.log-info {
+377:         background-color: rgb(var(--status-running-rgb) / 0.15);
+378:         color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
+379:     }
+380: 
+381:     .log-line.log-debug {
+382:         background-color: rgba(158, 158, 158, 0.15);
+383:         color: #bdbdbd;
+384:     }
+385: 
+386:     .log-line.log-command {
+387:         background-color: rgba(156, 39, 176, 0.15);
+388:         color: #ba68c8;
+389:     }
+390: 
+391:     .log-line.log-progress {
+392:         background-color: rgb(var(--accent-primary-rgb) / 0.15);
+393:         color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+394:     }
+395: }
+396: 
+397: /* Hover effects for better interactivity */
+398: .log-line:hover {
+399:     background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
+400:     transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+401: }
+402: 
+403: /* Improved spacing and readability */
+404: .log-output .log-line:first-child {
+405:     margin-top: 0;
+406: }
+407: 
+408: .log-output .log-line:last-child {
+409:     margin-bottom: 0;
+410: }
+411: .log-output:empty:before {
+412:     content: "En attente de logs...";
+413:     color: var(--text-secondary);
+414:     font-style: italic;
+415: }
+416: .specific-log-output:empty:before {
+417:     content: "Aucun log spécifique chargé.";
+418:     color: var(--text-secondary);
+419:     font-style: italic;
+420: }
+421: 
+422: .specific-log-controls-wrapper { margin-top: 15px; }
+423: .specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
+424: 
+425: .specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
+426: 
+427: .log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
+428: .log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
+429: .log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
+430: .log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
 ```
 
 ## File: static/css/layout.css

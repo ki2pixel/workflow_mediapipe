@@ -18,7 +18,7 @@ description: Maintain and execute the backend/frontend test suites with environm
 4. Lancer le script adapté :
    - `bash scripts/run_main_tests.sh` pour la suite principale backend.
    - `bash scripts/run_step3_tests.sh` depuis `transnet_env` si dépendances installées.
-   - `bash scripts/run_step5_tests.sh` depuis `tracking_env`.
+   - `bash scripts/run_step5_tests.sh` depuis `tracking_env_slim`.
    - `npm run test:frontend` pour la suite UI.
 5. Consulter les rapports (`.pytest_cache`, `logs/tests/` si définis).
 
@@ -31,7 +31,7 @@ description: Maintain and execute the backend/frontend test suites with environm
 
 ## Diagnostic rapide
 - Échecs massifs PyTest → vérifier versions `numpy` vs `tensorflow`. Recontraindre via `pip install -r requirements-dev.txt`.
-- Échec Step5 tests faute d’environnement → relire `README` Step5, s’assurer que `tracking_env` dispose d’ONNX Runtime.
+- Échec Step5 tests faute d’environnement → relire `README` Step5, s’assurer que `tracking_env_slim` dispose d’MediaPipe et packages allégés (`requirements-tracking-env-lite.txt`).
 - Tests frontend lents → vider `node_modules/.cache`, relancer `npm install` si dépendances corrompues.
 
 ## Références

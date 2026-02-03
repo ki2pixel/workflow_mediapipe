@@ -151,6 +151,37 @@ logger.debug(f"[CSV] Normalized URL: {original} -> {normalized}")
 
 ---
 
+## Persistance & Historique
+
+### Migration SQLite (Janvier 2026)
+- **Repository** : `download_history_repository.py` gère la persistance SQLite multi-processus
+- **Atomicité** : Verrouillage natif SQLite garantit l'intégrité en mode workers
+- **Migration** : Script `migrate_download_history_to_sqlite.py` pour conversion JSON→SQLite
+- **Configuration** : `DOWNLOAD_HISTORY_DB_PATH` configurable, automatiquement sous `BASE_PATH_SCRIPTS`
+
+### Flux Dropbox Proxy / R2
+Le service gère les URLs Dropbox proxy (workers.dev) comme URLs directes :
+
+```python
+# Détection proxy Dropbox
+def _is_dropbox_proxy_url(url: str) -> bool:
+    return "/dropbox/" in url.lower() and ("workers.dev" in url.lower() or "worker" in url.lower())
+
+# Tagging automatique dans execute_csv_download_worker()
+download_info = {
+    'url': dropbox_url,
+    'url_type': 'dropbox',  # Direct ou proxy
+    'original_url': dropbox_url
+}
+```
+
+### DRY_RUN Mode
+- `DRY_RUN_DOWNLOADS=true` : Ajoute URLs à l'historique sans lancer de téléchargement
+- Maintient la séquence réelle pour tests et monitoring
+- Compatible avec tous les types d'URLs (Dropbox, proxy, externes)
+
+---
+
 ## Actions Recommandées
 
 ### Refactoring Priorité Haute
@@ -183,5 +214,6 @@ logger.debug(f"[CSV] Normalized URL: {original} -> {normalized}")
 
 - [Architecture Complète](../core/ARCHITECTURE_COMPLETE_FR.md) : Vue d'ensemble système
 - [Analyse Complexité](../core/COMPLEXITY_ANALYSIS.md) : Métriques radon détaillées
-- [Download History Repository](../features/DOWNLOAD_HISTORY_REPOSITORY.md) : Persistance SQLite
-- [Webhook Service](../features/WEBHOOK_SERVICE.md) : Source webhook JSON
+- [Download History Repository](../services/download_history_repository.py) : Persistance SQLite
+- [CSV Downloads Management](../technical/CSV_DOWNLOADS_MANAGEMENT.md) : Flowcharts et flux Dropbox proxy
+- [Webhook Service](../services/webhook_service.py) : Source webhook JSON

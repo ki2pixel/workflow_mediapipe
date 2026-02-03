@@ -17,7 +17,7 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 | **STEP 2** (Convert) | `step2/` | `env/` | `ffmpeg` (via subprocess) |
 | **STEP 3** (TransNet) | `step3/` | `transnet_env/` | `WorkflowService` |
 | **STEP 4** (Audio) | `step4/` | `audio_env/` | `LemonfoxAudioService` |
-| **STEP 5** (Tracking) | `step5/` | `tracking_env/` | `ObjectDetectorRegistry` |
+| **STEP 5** (Tracking) | `step5/` | `tracking_env_slim/` (CPU) / `insightface_env/` (GPU) | `InsightFaceEngine (GPU-only) + factory` |
 | **STEP 6** (Reducer) | `step6/` | `env/` | N/A |
 | **STEP 7** (Finalize) | `step7/` | `env/` | `ResultsArchiver` |
 
@@ -25,7 +25,8 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 - Base : `env/bin/python`
 - TransNet : `transnet_env/bin/python`
 - Audio : `audio_env/bin/python`
-- Tracking : `tracking_env/bin/python`
+- Tracking : `tracking_env_slim/bin/python` (MediaPipe CPU, allégé)
+- InsightFace : `insightface_env/bin/python` (GPU-only)
 
 ## 2. Commandes d'Exécution Manuelle (Standard v4.1)
 
@@ -54,22 +55,22 @@ Le standard v4.1 privilégie Lemonfox avec fallback Pyannote. Le script détecte
 audio_env/bin/python workflow_scripts/step4/run_audio_analysis_lemonfox.py --log_dir logs/step4
 ```
 
-### Step 5 : Tracking (Standard: CPU Multiprocessing, GPU optionnel InsightFace)
-**Standard CPU** : Mode CPU par défaut avec multiprocessing (15 workers) pour MediaPipe/YuNet/OpenSeeFace.
-**GPU InsightFace** : Mode GPU requis exclusivement pour InsightFace (`STEP5_ENABLE_GPU=1`, `STEP5_GPU_ENGINES=insightface`).
+### Step 5 : Tracking (Standard: CPU MediaPipe via tracking_env_slim, GPU InsightFace-only)
+**Standard CPU** : Mode MediaPipe par défaut via `tracking_env_slim` avec multiprocessing (15 workers) et fallback object detector optionnel.
+**GPU InsightFace** : Mode GPU exclusivement pour InsightFace (`STEP5_ENABLE_GPU=1`, `STEP5_TRACKING_ENGINE=insightface`) via `insightface_env`.
 **Process** : Warmup `cap.read()`, chunking adaptatif interne, JSON dense (`tracked_objects: []` si vide).
 
 ```bash
-# Mode CPU standard (MediaPipe/YuNet/OpenSeeFace)
+# Mode CPU standard (MediaPipe) - via tracking_env_slim
 echo '["/chemin/absolu/vers/video.mp4"]' > temp_tracking.json
-TRACKING_DISABLE_GPU=1 tracking_env/bin/python workflow_scripts/step5/run_tracking_manager.py \
+TRACKING_DISABLE_GPU=1 tracking_env_slim/bin/python workflow_scripts/step5/run_tracking_manager.py \
   --videos_json_path temp_tracking.json \
   --cpu_internal_workers 15 \
   --disable_gpu
 
 # Mode GPU InsightFace (uniquement si moteur InsightFace sélectionné)
 echo '["/chemin/absolu/vers/video.mp4"]' > temp_tracking.json
-STEP5_ENABLE_GPU=1 STEP5_GPU_ENGINES=insightface tracking_env/bin/python workflow_scripts/step5/run_tracking_manager.py \
+STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python workflow_scripts/step5/run_tracking_manager.py \
   --videos_json_path temp_tracking.json \
   --tracking_engine insightface
 ```
@@ -106,7 +107,7 @@ Pour diagnostiquer un état incohérent :
      - Lire/écrire un fichier : utiliser les helpers de `FilesystemService` pour valider les permissions et verrous.
      - **Jamais** de manipulation directe du disque sans passer par ce service.
 2. **Historique** : Si problème de téléchargement, vérifier `download_history.sqlite3` (pas le JSON déprécié).
-3. **Tracking** : Si le tracking plante, vérifier que `config.settings.py` charge bien les modèles depuis le `ObjectDetectorRegistry` et non des chemins en dur.
+3. **Tracking** : Si le tracking plante, vérifier que `config.settings.py` charge bien les modèles depuis le `InsightFaceEngine` (factory `create_face_engine()`) et non des chemins en dur. Confirmer que `STEP5_TRACKING_ENGINE` est vide (MediaPipe via `tracking_env_slim`) ou `insightface` (GPU via `insightface_env`).
 4. **Scripts** : Les subprocess doivent utiliser `utils.resource_manager` pour la gestion des verrous et ressources.
 5. **Tests** : Environnement de test `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour CI.
 

@@ -232,7 +232,7 @@ class WorkflowCommandsConfig:
         return {
             "display_name": "5. Analyse du tracking",
             "cmd": [
-                str(config.get_venv_python("tracking_env")),
+                str(config.get_venv_python("tracking_env_slim")),
                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
             ],
             "cwd": str(self.base_path / "projets_extraits"),

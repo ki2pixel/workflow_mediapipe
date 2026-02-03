@@ -1,38 +1,44 @@
 # STEP5 Engines — Diagnostics & Switchovers
 
-## 1. Matrice moteurs
+## 1. Matrice moteurs (v4.2 simplifiée)
 | Moteur | Env var clé | GPU support | Logs à vérifier | Notes |
 | --- | --- | --- | --- | --- |
-| `mediapipe` | `STEP5_TRACKING_ENGINE=mediapipe` | CPU par défaut (GPU expérimental via `STEP5_GPU_ENGINES=mediapipe`) | `logs/step5/manager_*`, `[PROFILING] MediaPipe` | Import lazy via `importlib`; vérifier `STEP5_MEDIAPIPE_MAX_WIDTH` |
-| `opencv_yunet` | `STEP5_TRACKING_ENGINE=opencv_yunet` | CPU | `logs/step5/worker_*YUNET*` | `STEP5_YUNET_MAX_WIDTH` pour downscale + rescale bbox |
-| `opencv_yunet_pyfeat` | `STEP5_TRACKING_ENGINE=opencv_yunet_pyfeat` | CPU | `logs/step5/worker_*PYFEAT*` | Nécessite FaceMesh ONNX + py-feat; `STEP5_EXPORT_VERBOSE_FIELDS=true` pour landmarks |
-| `openseeface` | `STEP5_TRACKING_ENGINE=openseeface` | CPU | `logs/step5/worker_*OPENSEEFACE*` | Vérifier `STEP5_OPENSEEFACE_MAX_WIDTH`, throttle |
-| `eos` | `STEP5_TRACKING_ENGINE=eos` | CPU (GPU via object detector) | `logs/step5/worker_*EOS*` | Requiert `eos_env`; assets `workflow_scripts/step5/models/engines/eos/share` |
-| `insightface` | `STEP5_TRACKING_ENGINE=insightface` + `STEP5_ENABLE_GPU=1` | GPU obligatoire | `logs/step5/worker_*INSIGHTFACE*` | Vérifier modèles `~/.insightface`, FileExistsError → quarantine |
+| `mediapipe` | `STEP5_TRACKING_ENGINE=""` (défaut) | CPU via `tracking_env_slim` | `logs/step5/manager_*`, `[PROFILING] MediaPipe` | Import lazy via `importlib`; vérifier `STEP5_MEDIAPIPE_MAX_WIDTH` |
+| `insightface` | `STEP5_TRACKING_ENGINE=insightface` + `STEP5_ENABLE_GPU=1` | GPU obligatoire via `insightface_env` | `logs/step5/worker_*INSIGHTFACE*` | Vérifier modèles `~/.insightface`, FileExistsError → quarantine |
 
 ## 2. Script de validation providers
 ```bash
-tracking_env/bin/python - <<'PY'
+# Pour InsightFace (GPU)
+insightface_env/bin/python - <<'PY'
 import onnxruntime as ort
 print('Providers:', ort.get_available_providers())
 PY
 ```
 - Attendu : `['CUDAExecutionProvider', 'CPUExecutionProvider']` lorsque GPU actif.
 
+```bash
+# Pour MediaPipe (CPU) - tracking_env_slim
+tracking_env_slim/bin/python - <<'PY'
+import mediapipe as mp
+print('MediaPipe version:', mp.__version__)
+PY
+```
+
 ## 3. Switch CPU ↔ GPU (InsightFace)
 ```bash
 # Basculer en GPU InsightFace
 export STEP5_TRACKING_ENGINE=insightface
 export STEP5_ENABLE_GPU=1
-export STEP5_GPU_ENGINES=insightface
-unset TRACKING_DISABLE_GPU
+# Utiliser insightface_env/bin/python pour l'exécution
 
-# Revenir CPU MediaPipe
-export STEP5_TRACKING_ENGINE=mediapipe
+# Revenir CPU MediaPipe (par défaut)
+export STEP5_TRACKING_ENGINE=""
 export STEP5_ENABLE_GPU=0
 export TRACKING_DISABLE_GPU=1
+# Utiliser tracking_env_slim/bin/python pour l'exécution
 ```
 - Toujours supprimer `temp_tracking.json` après exécution (`rm -f temp_tracking.json`).
+- Les anciens moteurs (opencv_*, openseeface, eos) ont été supprimés en Phase 2 (décision 2026-02-03).
 
 ## 4. Checks JSON densité
 ```bash
@@ -52,3 +58,4 @@ PY
 ## 5. Profiling hooks
 - Activer `STEP5_ENABLE_PROFILING=1` puis inspecter `logs/step5/worker_*` pour `[PROFILING] frame` toutes les 20 frames.
 - Ajuster `STEP5_BLENDSHAPES_THROTTLE_N` pour réduire la pression CPU lors des runs longue durée.
+- Pour `tracking_env_slim`, utiliser `requirements-tracking-env-lite.txt` (packages allégés, pas de GPU).

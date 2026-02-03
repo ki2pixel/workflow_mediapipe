@@ -272,8 +272,8 @@ LEMONFOX_SPEECH_MIN_ON_SEC=0.0          # Durée minimum des îlots de parole (s
 python3 -m venv "${VENV_BASE_DIR:-.}/env"
 python3 -m venv "${VENV_BASE_DIR:-.}/transnet_env"
 python3 -m venv "${VENV_BASE_DIR:-.}/audio_env"
-python3 -m venv "${VENV_BASE_DIR:-.}/tracking_env"
-python3 -m venv "${VENV_BASE_DIR:-.}/eos_env"
+python3 -m venv "${VENV_BASE_DIR:-.}/tracking_env_slim"
+# InsightFace reste isolé dans son propre environnement (GPU-only)
 
 # Activation de l'environnement principal
 source "${VENV_BASE_DIR:-.}/env/bin/activate"   # Linux/Mac
@@ -291,12 +291,8 @@ source "${VENV_BASE_DIR:-.}/audio_env/bin/activate"
 pip install pyannote.audio torch torchaudio
 deactivate
 
-source "${VENV_BASE_DIR:-.}/tracking_env/bin/activate"
-pip install mediapipe opencv-contrib-python numpy   # opencv-contrib requis pour FaceDetectorYN (YuNet)
-deactivate
-
-source "${VENV_BASE_DIR:-.}/eos_env/bin/activate"
-pip install eos-py mediapipe opencv-contrib-python numpy scipy
+source "${VENV_BASE_DIR:-.}/tracking_env_slim/bin/activate"
+pip install -r requirements-tracking-env-lite.txt  # MediaPipe CPU + orchestration STEP5
 deactivate
 ```
 
@@ -310,7 +306,7 @@ source env/bin/activate
 ./start_workflow.sh
 ```
 
-> ℹ️ `start_workflow.sh` détecte automatiquement `VENV_BASE_DIR` (ordre : valeur exportée > `.env` > dossier projet), exporte `PYTHON_VENV_EXE_ENV` pour Flask et garantit que `config.get_venv_python()` pointe vers les bons environnements (suivi vertical, `tracking_env`, `eos_env`, etc.). Aucun `env/bin/python` ne doit être codé en dur.
+> ℹ️ `start_workflow.sh` détecte automatiquement `VENV_BASE_DIR` (ordre : valeur exportée > `.env` > dossier projet), exporte `PYTHON_VENV_EXE_ENV` pour Flask et garantit que `config.get_venv_python()` pointe vers les bons environnements (suivi vertical, `tracking_env_slim`, etc.). Aucun `env/bin/python` ne doit être codé en dur.
 > Lorsque `STEP5_ENABLE_GPU=1`, `workflow_scripts/step5/run_tracking_manager.py` valide l’état du GPU via `Config.check_gpu_availability()`, charge automatiquement l’interpréteur ONNXRuntime défini par `STEP5_INSIGHTFACE_ENV_PYTHON` (si présent) et injecte les chemins CUDA nécessaires dans les workers. En cas d’échec (VRAM insuffisante, ONNXRuntime CUDA indisponible…), un fallback CPU est appliqué si `STEP5_GPU_FALLBACK_AUTO=1`.
 
 #### Comprendre `start_workflow.sh` vs `app_new.py`

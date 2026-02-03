@@ -5,6 +5,12 @@ globs:
 ---
 
 ---
+trigger: always_on
+description: 
+globs: 
+---
+
+---
 description: Workflow MediaPipe v4.x mandatory coding standards for all files
 alwaysApply: true
 ---
@@ -28,7 +34,11 @@ alwaysApply: true
 - **Backend** : Flask services Python 3.10 (venv `/mnt/venv_ext4/env`), logique métier confinée à `services/`.
 - **Frontend** : JS natif (`static/`, `templates/`) avec `DOMBatcher` + `AppState`; aucun framework SPA.
 - **Config** : `.env` → `config/settings.py` → `WorkflowCommandsConfig`, jamais de secrets en dur.
-- **Environnements spécialisés** : `env/`, `transnet_env/`, `audio_env/`, `tracking_env/` pour cloisonner les dépendances.
+- **Environnements spécialisés** :
+  - `transnet_env/` : Découpage scènes (PyTorch/TensorFlow).
+  - `audio_env/` : Analyse audio (Whisper/Lemonfox).
+  - `tracking_env_slim/` : Tracking MediaPipe (CPU-optimized, sans GPU torch).
+  - `insightface_env/` : Tracking InsightFace (GPU-only, ONNX Runtime).
 
 ## Project Structure
 - `services/` : classes/fonctions pures (aucun accès Flask) ex: `FilesystemService` pour I/O sécurisée.
@@ -102,15 +112,15 @@ domBatcher.scheduleUpdate(() => {
 - Extraction audio via `ffmpeg` preset TV, analyse `Lemonfox` (avec smoothing) + fallback Pyannote.
 - Profil imposé `AUDIO_PROFILE=gpu_fp32` (AMP désactivé) pour éviter divergences GPU/CPU.
 - Import dynamique `services/lemonfox_audio_service.py` via `importlib` pour isoler Flask.
-- Variable `AUDIO_PARTIAL_SUCCESS_OK=1` permise pour succès partiels.
 
-### STEP5 Tracking (tracking_env)
-- Mode CPU par défaut (`TRACKING_DISABLE_GPU=1`). GPU uniquement pour InsightFace avec `STEP5_ENABLE_GPU=1` + `STEP5_GPU_ENGINES=insightface`.
-- Multiprocessing obligatoire : workers configurés via `TRACKING_CPU_WORKERS`, chargement `.env` côté worker.
-- Règles d’export : JSON dense frame-by-frame, `tracked_objects` vide si aucune détection.
-- Optimisations obligatoires : warmup `cap.read()`, chunking adaptatif interne, registry de modèles (pas de chemins en dur), padding landmarks (468→478) avant blendshapes py-feat, rescale des coordonnées après downscale.
-- Logging profiling toutes les 20 frames pour YuNet/FaceMesh/EOS, `cv2.setNumThreads(1)` côté YuNet.
-- GPU support : lazy import MediaPipe, injection `LD_LIBRARY_PATH`, logs des providers ONNX.
+### STEP5 Tracking (tracking_env_slim / insightface_env)
+- **Architecture Simplifiée** (Decision 2026-02-03) :
+  1. **MediaPipe** (Défaut, CPU) : Utilise `tracking_env_slim`. Multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
+  2. **InsightFace** (Optionnel, GPU) : Utilise `insightface_env`. Activé uniquement si `STEP5_ENABLE_GPU=1`.
+- **Interdit** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar sont supprimés.
+- **Règles d’export** : JSON dense frame-by-frame, `tracked_objects` vide si aucune détection.
+- **Optimisations** : Warmup `cap.read()`, chunking adaptatif interne.
+- **GPU** : Réservé strictement à InsightFace (ONNX Runtime). MediaPipe tourne toujours sur CPU.
 
 ## Quality & Testing
 - **Tests unitaires** : `tests/unit/` pour services isolés. Utiliser fixtures `patched_workflow_state()` et `patched_commands_config()`.
@@ -127,26 +137,11 @@ domBatcher.scheduleUpdate(() => {
 - Historique : migrations via script dédié (`scripts/migrate_download_history_to_sqlite.py`).
 
 ### Politique d’utilisation des Skills
-1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre. Elle définit l’architecture MediaPipe (services/state, venv spécialisés). Si elle couvre la tâche demandée, aucune skill globale ne doit être utilisée.
-2. **Debugging systématique** : Pour toute tâche de debugging (bug, crash, performance, erreur), charger immédiatement `.windsurf/skills/debugging-strategies/SKILL.md` après `workflow-operator` afin d’appliquer la méthodologie locale (reproduction, collecte, hypothèse, test).
-3. **Catalogue local étendu** : Après `workflow-operator`, utiliser en priorité les skills workspace suivantes selon la tâche :
-   - **pipeline-diagnostics** : vérifications `.env`, venvs, drivers, SQLite avant exécutions STEP1→STEP7.
-   - **step5-gpu-ops** : sélection moteur STEP5, tuning CPU/GPU, profiling, diagnostics JSON.
-   - **step4-audio-orchestrator** : opérations Lemonfox/Pyannote, profils CUDA, gestion OOM.
-   - **csv-monitoring-sme** : supervision `CSVService`, historique SQLite, politique Dropbox-only.
-   - **frontend-timeline-designer** : structure Timeline connectée, AppState, auto-scroll, Step Details.
-   - **logs-overlay-conductor** : overlay logs Phases 2‑4, auto-open toggle, focus trap.
-   - **workflow-docs-updater-plus** : synchronisation docs `docs/workflow/*` + Memory Bank.
-   - **tests-suite-guardian** : exécution/maintenance des suites backend/frontend (pytest, npm, scripts STEP3/STEP5).
-4. **Fallback contrôlé sur les skills globales** (`/home/kidpixel/.codeium/skills/`) :
-   - **Backends Python** : `python-backend-architect`, `python-coding-standards`, `python-cleanup`, `python-db-migrations` — seulement après avoir appliqué les skills locales pertinentes et pour des décisions intra-fichier (typage strict, migrations, nettoyage ciblé).
-   - **Frontends & UI** : `frontend-design`, `modern-vanilla-web`, `css-layout-development`, `ui-component-builder`, `interaction-design-patterns`, `html-tools` — utilisables lorsque l’UI dépasse le périmètre couvert par `frontend-timeline-designer` ou `logs-overlay-conductor`, tout en respectant les patterns locaux.
-   - **Docs & Process** : `code-doc`, `creating-windsurf-rules`, `architecture-tools`, `canvas-design`, `algorithmic-art`, `pdf-toolbox`, `media-ai-pipeline`, `devops-sre-security`, `engineering-features-for-machine-learning`, `postgres-expert`, `slack-gif-creator` — uniquement si aucune skill locale ne couvre la portée et après validation que le besoin sort du pipeline MediaPipe.
-5. **Exclusions** : Bannir l’usage d’une skill globale lorsqu’elle proposerait un scaffolding, une convention dossier ou une stack incompatible avec ce document. Documenter le refus dans `decisionLog.md` si la pression vient d’une contrainte externe.
-6. **Hiérarchie de résolution** :
-   - `workflow-operator` → skills locales pertinentes → règles de ce document → documentation `docs/workflow/*`.
-   - Ensuite seulement, compléter avec la skill globale adaptée pour rester DRY.
-7. **Traçabilité** : Lorsqu’une skill globale est mobilisée, mentionner laquelle et expliquer pourquoi aucune skill locale n’était suffisante (PR ou compte-rendu), afin de garder l’audit lisible.
+1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre.
+2. **Debugging systématique** : Charger `.windsurf/skills/debugging-strategies/SKILL.md` pour bug/crash.
+3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer` selon la tâche.
+4. **Fallback contrôlé** : Skills globales uniquement si aucune skill locale ne couvre le besoin.
+5. **Hiérarchie** : `workflow-operator` > Skills locales > Règles ce doc > Docs > Skills globales.
 
 ## Common Tasks
 ### Ajouter un nouveau service backend
@@ -155,26 +150,23 @@ domBatcher.scheduleUpdate(() => {
 3. Ajouter tests unitaires isolés (fixtures `mock_workflow_state`).
 4. Documenter la responsabilité dans `docs/workflow/features/`.
 
-### Étendre STEP5 avec un moteur
-1. Déclarer la configuration dans `.env` + `config/settings.py`.
-2. Ajouter le moteur dans le registry `workflow_scripts/step5/face_engines.py` (pas de chemins absolus).
-3. Garantir compatibilité multiprocessing (charge `.env`, instrumentation profiling, rescale coords).
-4. Mettre à jour les docs (`docs/workflow/pipeline/STEP5_SUIVI_VIDEO.md`).
+### Configuration Moteurs STEP5
+- **MediaPipe** : Ajuster `TRACKING_CPU_WORKERS` dans `.env` selon cœurs disponibles.
+- **InsightFace** : Vérifier `STEP5_ENABLE_GPU=1` et la présence des modèles dans `~/.insightface/`. Ne jamais modifier le code pour hardcoder un chemin.
 
 ### Mettre à jour l’overlay logs frontend
 1. Modifier `static/css/components/logs.css` pour le style.
 2. Adapter `static/uiUpdater.js` pour alimenter header/timer.
 3. Synchroniser AppState (`logPanel.isOpen`) + Step Details pour éviter overlap.
-4. Ajouter/mettre à jour tests (`tests/frontend/test_timeline_logs_phase2.mjs`).
 
 ## Anti-Patterns
-- Placer du métier dans un blueprint Flask ou manipuler `WorkflowState` sans verrou (utiliser ses méthodes atomiques).
-- Accéder au DOM avec `document.getElementById` dès l’import (utiliser getters lazy dans `domElements`).
-- Utiliser `innerHTML` avec contenu dynamique non échappé (obligatoire d’utiliser `DOMUpdateUtils.escapeHtml`).
-- Démarrer des polls via `setInterval` dispersé (toujours passer par `PollingManager`).
-- Hardcoder des chemins (`/mnt/cache`) ou des commandes : lire `WorkflowCommandsConfig`.
-- Exporter des JSON STEP5 tronqués ou non densifiés.
+- Placer du métier dans un blueprint Flask ou manipuler `WorkflowState` sans verrou.
+- Accéder au DOM avec `document.getElementById` dès l’import (utiliser getters lazy).
+- Utiliser `innerHTML` sans `DOMUpdateUtils.escapeHtml`.
+- Démarrer des polls via `setInterval` dispersé (utiliser `PollingManager`).
+- Hardcoder des chemins (`/mnt/cache`) ou des commandes.
+- Tenter d'activer le GPU sur MediaPipe (non supporté dans cette stack).
 
 ## Notes finales
-- Maintenir ce document <12 000 caractères (actuellement ~6 k). Réviser après toute évolution majeure (nouveau moteur STEP5, changement AppState, refonte UI).
-- Pour toute question, consulter les audits récents (`docs/workflow/audits/`) avant d’ajouter une règle.
+- Maintenir ce document <12 000 caractères. Réviser après toute évolution majeure.
+- Pour toute question, consulter les audits récents (`docs/workflow/audits/`).

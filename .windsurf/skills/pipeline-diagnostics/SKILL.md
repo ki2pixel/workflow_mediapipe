@@ -7,8 +7,8 @@ description: Checklists and scripts to validate env vars, venv availability, and
 
 ## Quick Start
 1. Lire `.env` via `config/settings.py` (`python - <<'PY' ...`) pour afficher les variables critiques (`CACHE_ROOT_DIR`, `STEP5_*`, `DOWNLOAD_HISTORY_DB_PATH`).
-2. Valider l'existence des venv spécialisés (`env/`, `transnet_env/`, `audio_env/`, `tracking_env/`, `eos_env/`).
-3. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible.
+2. Valider l'existence des venv spécialisés (`env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
+3. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP5 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
 4. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur.
 
 ## Procédure Complète
@@ -16,12 +16,13 @@ description: Checklists and scripts to validate env vars, venv availability, and
    - Charger via `python3 config/settings.py --print` (si script dispo) ou `python - <<'PY'` pour inspecter `config.settings.config`.
    - Contrôler : chemins cache, flags `DRY_RUN_DOWNLOADS`, `STEP5_ENABLE_GPU`, `AUDIO_PROFILE`, URLs webhook.
 2. **Venv Readiness**
-   - `ls env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env/bin/python eos_env/bin/python`.
+   - `ls env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env_slim/bin/python insightface_env/bin/python`.
    - `python -V` dans chaque venv (ex: `env/bin/python -V`).
+   - Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
 3. **Hardware & Drivers**
    - `nvidia-smi` (GPU dispo, driver version ≥ 515).
    - `ffmpeg -hide_banner | head -n 1` pour STEP2.
-   - `tracking_env/bin/python - <<'PY'` pour importer `onnxruntime`, `mediapipe`, `opencv`.
+   - `insightface_env/bin/python - <<'PY'` pour importer `onnxruntime` et vérifier `get_available_providers()` (GPU).
 4. **Filesystem & Permissions**
    - Vérifier `CACHE_ROOT_DIR`, `ARCHIVES_DIR`, `logs/stepX` existent et sont accessibles (`FilesystemService` doit être utilisé côté code; ici on vérifie les répertoires).
 5. **SQLite Health**
@@ -29,7 +30,7 @@ description: Checklists and scripts to validate env vars, venv availability, and
 
 ## Résolution Rapide
 - Échec import `torch`/`pyannote` STEP4 → relancer install via `audio_env/bin/pip install -r requirements.txt`.
-- `tracking_env` manque `onnxruntime` → `tracking_env/bin/pip install onnxruntime-gpu==1.16.3` puis re-tester.
+- `tracking_env_slim` manque `mediapipe` → `tracking_env_slim/bin/pip install -r requirements-tracking-env-lite.txt` puis re-tester.
 - Variables `.env` incohérentes → éditer `.env`, recharger via `config/settings.py`.
 
 ## Références

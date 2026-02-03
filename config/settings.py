@@ -442,31 +442,63 @@ class Config:
             'onnx_cuda': False,
         }
         
-        # Check PyTorch CUDA (indicateur général)
+        # Check GPU availability via pynv (NVML) first, fallback to nvidia-smi
+        gpu_checked = False
         try:
-            import torch
-            if not torch.cuda.is_available():
-                result['reason'] = 'CUDA not available (PyTorch check)'
-                return result
-            
-            # Vérifier VRAM
-            vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Go
-            vram_free = (torch.cuda.mem_get_info()[0]) / (1024**3)  # Go
-            
+            import pynvml
+
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            vram_total = mem_info.total / (1024 ** 3)
+            vram_free = mem_info.free / (1024 ** 3)
             result['vram_total_gb'] = round(vram_total, 2)
             result['vram_free_gb'] = round(vram_free, 2)
-            result['cuda_version'] = torch.version.cuda
-            
-            # Vérifier VRAM minimale (2 Go libres recommandés)
+            result['cuda_version'] = os.environ.get('CUDA_VERSION') or ''
+            gpu_checked = True
+
             if vram_free < 1.5:
                 result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
                 return result
-        
         except ImportError:
-            result['reason'] = 'PyTorch not installed in tracking_env'
-            return result
+            logger.debug('pynvml not available; falling back to nvidia-smi for GPU detection')
         except Exception as e:
-            result['reason'] = f'PyTorch CUDA check failed: {e}'
+            logger.warning(f"pynvml check failed: {e}; falling back to nvidia-smi")
+
+        if not gpu_checked:
+            try:
+                completed = subprocess.run(
+                    ['nvidia-smi', '--query-gpu=memory.total,memory.free', '--format=csv,noheader,nounits'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if completed.returncode == 0:
+                    line = completed.stdout.strip().split('\n')[0]
+                    total_str, free_str = [part.strip() for part in line.split(',')]
+                    vram_total = float(total_str) / 1024
+                    vram_free = float(free_str) / 1024
+                    result['vram_total_gb'] = round(vram_total, 2)
+                    result['vram_free_gb'] = round(vram_free, 2)
+                    gpu_checked = True
+                    if vram_free < 1.5:
+                        result['reason'] = f'VRAM insuffisante ({vram_free:.1f} Go libres < 1.5 Go)'
+                        return result
+                else:
+                    logger.warning(
+                        "nvidia-smi GPU check failed (code %s): %s",
+                        completed.returncode,
+                        completed.stderr.strip(),
+                    )
+            except FileNotFoundError:
+                logger.warning("nvidia-smi introuvable pour la vérification GPU")
+            except subprocess.TimeoutExpired:
+                logger.warning("nvidia-smi GPU check timed out")
+            except Exception as e:
+                logger.warning(f"nvidia-smi GPU check failed: {e}")
+
+        if not gpu_checked:
+            result['reason'] = 'Impossible de déterminer la disponibilité GPU (pynvml/nvidia-smi indisponibles)'
             return result
         
         # Check ONNXRuntime CUDA provider (requis pour InsightFace)

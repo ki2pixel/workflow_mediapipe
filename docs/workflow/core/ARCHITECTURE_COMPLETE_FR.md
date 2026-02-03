@@ -206,51 +206,51 @@ graph TD
 
 #### Étape 5 : Suivi Vidéo (`run_tracking_manager.py`)
 - **Objectif** : Suivi et détection d'objets/visages
-- **Environnement** : `tracking_env/` (spécialisé MediaPipe)
+- **Environnements** : `tracking_env_slim/` (MediaPipe CPU par défaut) + `insightface_env/` (GPU-only isolé)
 - **Entrées** : Vidéos avec analyses scènes/audio
 - **Sorties** : Fichiers JSON avec données de tracking (`<stem>_tracking.json`)
-- **Technologies** : MediaPipe Tasks + OpenCV (I/O) + ONNXRuntime (InsightFace)
-- **Configuration CPU-only par défaut (v4.1)** :
-  - Variables d'environnement fixées dans `app_new.py` :
-    - `TRACKING_DISABLE_GPU=1` : Désactive GPU
-    - `TRACKING_CPU_WORKERS=15` : Nombre de workers CPU internes
-  - Paramètres CLI supportés par `run_tracking_manager.py` :
-    - `--disable_gpu` : Force désactivation GPU
-    - `--cpu_internal_workers N` : Override nombre de workers
-  - **Raison** : Meilleures performances globales et stabilité sur lots multi-vidéos
-- **Progression UI (corrections v4.1)** :
-  - **Backend (`app_new.py`)** :
-    - Initialisation correcte du compteur `files_completed` lors du parsing du total
-    - Contribution fractionnaire par fichier plafonnée à 0.99 pendant traitement
-    - Reset de `progress_current_fractional` après chaque succès (évite report entre fichiers)
-    - Parsing des lignes de succès : `[Gestionnaire] Succès pour <filename>`
-  - **Frontend (`static/uiUpdater.js`)** :
-    - Désactivation du fallback « pourcentage dans le texte » pour STEP5 (évite faux positifs)
-    - Garde-fous : cap à 99% si statut ∈ {running, starting, initiated}
-    - Pas d'affichage 100% tant que statut ≠ `completed`
-    - Gestion spéciale si `progress_current == progress_total` mais statut en cours
-- **Restrictions GPU (décision 27/12/2025)** :
-  - `STEP5_ENABLE_GPU=1` n'autorise plus que le moteur InsightFace à utiliser le GPU.
-  - Le mode MediaPipe (par défaut) est forcé en mode CPU même si le flag GPU est actif.
-  - Le gestionnaire crée au plus **un worker GPU séquentiel** (pas de parallélisation) et bascule automatiquement en CPU si `Config.check_gpu_availability()` échoue ou si `STEP5_GPU_FALLBACK_AUTO=1`.
-  - `process_video_worker_multiprocessing.py` applique un **lazy import MediaPipe** pour minimiser le coût d'import dans les workers.
+- **Technologies** : MediaPipe Tasks (CPU) + InsightFace (GPU optionnel) + OpenCV (I/O) + ONNXRuntime
+- **Architecture simplifiée (v4.2)** :
+  - **Moteur par défaut** : MediaPipe Face Landmarker dans `tracking_env_slim` (CPU, 15 workers multiprocessing)
+  - **Moteur GPU** : InsightFace isolé dans `insightface_env`, activé via `STEP5_TRACKING_ENGINE=insightface` + `STEP5_ENABLE_GPU=1`
+  - **WorkflowCommandsConfig** : Pointe automatiquement sur `tracking_env_slim` pour MediaPipe, bascule sur `insightface_env` pour GPU
+  - **Gestionnaire STEP5** : `_EnvConfig` centralise la lecture des variables `STEP5_*`, injecte `LD_LIBRARY_PATH` CUDA et rechargement `.env` dans les workers
+- **Configuration** :
+  - `STEP5_TRACKING_ENGINE` : vide (MediaPipe) ou `insightface` (GPU-only)
+  - `STEP5_ENABLE_GPU` : Activation GPU (défaut: 0)
+  - `STEP5_GPU_ENGINES` : Moteurs autorisés en GPU (uniquement `insightface`)
+  - `TRACKING_CPU_WORKERS` : Workers CPU pour MediaPipe (défaut: 15)
+  - `STEP5_ENABLE_PROFILING` : Logs détaillés toutes les 20 frames
+- **Restrictions GPU** :
+  - InsightFace GPU-only, exécution séquentielle (1 worker)
+  - MediaPipe reste forcé en CPU même si GPU activé
+  - Fallback automatique CPU si `Config.check_gpu_availability()` (pynvml → nvidia-smi) échoue
 - **Fonctionnalités** :
-  - Détection faciale avancée
-  - Tracking d'objets avec fallback
-  - Analyse de parole enrichie
-  - Mode CPU-only par défaut avec 15 workers internes
-  - Détection de parole avancée basée sur l'ouverture de la mâchoire
-  - **Registry object detection MediaPipe** : `workflow_scripts/step5/object_detector_registry.py` centralise les modèles fallback (`efficientdet_lite0/1/2`, `ssd_mobilenet_v3`, `yolo11n_onnx`, `nanodet_plus`). Les variables `STEP5_ENABLE_OBJECT_DETECTION`, `STEP5_OBJECT_DETECTOR_MODEL`, `STEP5_OBJECT_DETECTOR_MODEL_PATH` définissent le modèle actif. La résolution des chemins suit `override_path` > env > `workflow_scripts/step5/models/object_detectors/<backend>/...`. Voir `STEP5_SUIVI_VIDEO.md` pour la table mAP/hardware.
+  - Détection faciale avancée (478 landmarks, 52 blendshapes ARKit)
+  - Tracking d'objets avec registry EfficientDet/YOLO/NanoDet
+  - Export JSON dense frame-by-frame avec `tracked_objects`
+  - Optimisations : throttling blendshapes, downscaling + rescale coordonnées, streaming JSON
 
 #### Étape 6 : Réduction JSON (`json_reducer.py`)
-- **Objectif** : Optimisation des fichiers JSON pour After Effects
+- **Objectif** : Optimisation et enrichissement des fichiers JSON pour After Effects
 - **Environnement** : `env/` (environnement principal)
 - **Entrées** : Fichiers JSON de tracking et d'audio
-- **Sorties** : Mêmes fichiers JSON, mais avec une taille réduite
+- **Sorties** : Fichiers `*_tracking.json` (source primaire AE) + JSON réduits
 - **Fonctionnalités** :
-  - Suppression des données non essentielles (ex: landmarks, blendshapes)
-  - Modification des fichiers sur place pour économiser l'espace disque
-  - Traitement par lot basé sur un mot-clé
+  - Réduction de taille (suppression données non essentielles)
+  - Enrichissement métadonnées (confidence, fps, total_frames)
+  - **Nouveaux champs (v4.2)** :
+    - `tracking_analytics` : Histogramme confidence, stats par objet, distribution des scores
+    - `expression_summary` : Résumé léger des blendshapes (gated, configurable)
+    - `temporal_alignment` : Warnings désalignement audio/vidéo
+  - **Configuration** :
+    - `STEP6_INCLUDE_TRACKING_ANALYTICS=1` : Active analytics
+    - `STEP6_INCLUDE_EXPRESSION_SUMMARY=1` : Active expression summary
+    - `STEP6_EXPRESSION_KEYS` : Clés blendshapes à inclure
+  - **After Effects Integration** :
+    - Scripts AE priorisent `*_tracking.json` (sortie STEP6)
+    - Pondération par confidence disponible via `ENABLE_CONFIDENCE_WEIGHTING`
+    - Fallback streaming sur JSON STEP5 bruts pour éviter crashs mémoire
 
 #### Étape 7 : Finalisation (`finalize_and_copy.py`)
 - **Objectif** : Consolidation et archivage des résultats
