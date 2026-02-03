@@ -58,14 +58,8 @@ var G = {
 		logFileNamePrefix: "MediaSolutionLog_V11.2_FinalFix_",
 		videoExtensions: ["mp4", "mov", "avi", "mxf", "mpg", "mpeg", "wmv"],
 		imageExtensions: ["jpg", "jpeg", "png", "gif", "tif", "tiff", "psd", "bmp"],
-		zipDownloadsFolder: "G:/Téléchargements",
-		sevenZipPath: "C:/Program Files/7-Zip/7z.exe",
-		shouldDeleteZipAfterExtraction: true,
 		projectCreationBasePath: "F:/",
-		zipKeyword: "Camille",
-		shouldDeleteSourceZipAfterPrep: false,
 		step1_LogFolderPath: "F:/_MediaSolution_Step1_Logs/",
-		processedZipsListFile: "F:/_MediaSolution_Step1_Logs/processed_zips.txt",
 		configFileName: "Media-Solution.config.json",
 		batchDelayMs: 75,
 		purgeEveryNProjects: 1,
@@ -73,7 +67,20 @@ var G = {
 		targetCompWidth: 1080,
 		targetCompHeight: 1920,
 		defaultVideoScaleX: 180,
-		defaultVideoScaleY: 180
+		defaultVideoScaleY: 180,
+		enableAutoRecenteringInBatch: true,
+		enablePythonAnalyzer: true,
+		enablePythonCutsParser: true,
+		pythonCmd: "C:/Python313/python.exe",
+		step7AnalyzerScriptPath: "F:/Adobe/Adobe After Effects 2024/Support Files/Scripts/ScriptUI Panels/preprocess_ae_json.py",
+		pythonCutsScriptPath: "F:/Adobe/Adobe After Effects 2024/Support Files/Scripts/ScriptUI Panels/media_solution_bridge.py",
+		pythonTempFolder: Folder.temp.fsName,
+		pythonCutsSnapFactor: 1.1,
+		pythonSpreadThreshold: 200,
+		pythonEnableConfidenceWeighting: true,
+		pythonConfidenceWeight: 0.35,
+		pythonLabelHighSpread: 12,
+		pythonLabelStable: 3
 	},
 	STATE: {
 		projectsToProcess: [],
@@ -319,6 +326,266 @@ function closeLogFile() {
 	}
  }
 
+ function escapeSystemArg(arg) {
+	if (arg === null || arg === undefined) return "\"\"";
+	var s = arg.toString();
+	s = s.replace(/\"/g, "\\\"");
+	return "\"" + s + "\"";
+ }
+
+ function findBestTrackingJsonForBaseName(docsFolder, videoBaseName) {
+	if (!docsFolder || !(docsFolder instanceof Folder) || !docsFolder.exists) return null;
+	if (!videoBaseName) return null;
+	var candidates = [
+		videoBaseName + "_ae.json",
+		videoBaseName + "_tracking.json",
+		videoBaseName + ".json"
+	];
+	for (var i = 0; i < candidates.length; i++) {
+		var f = new File(docsFolder.fsName + "/" + candidates[i]);
+		if (f.exists) return f;
+	}
+	return null;
+ }
+
+ function deriveVideoBaseNameFromAepFile(projectFile) {
+	if (!projectFile || !(projectFile instanceof File)) return null;
+	var name = projectFile.name || "";
+	if (!name) return null;
+	var stem = name.replace(/\.aep$/i, "");
+	var suffix = G.CONFIG.compNameSuffix || "";
+	if (suffix) {
+		var escapedSuffix = suffix.replace(/([.*+?^${}()|[\]\\])/g, "\\$1");
+		var re = new RegExp(escapedSuffix + "(?:_[0-9]{8}_[0-9]{6})?$", "i");
+		stem = stem.replace(re, "");
+	}
+	return stem || null;
+ }
+
+ function buildPythonAnalyzerManifestForLayer(comp, layer, frameRate, videoJsonFile) {
+	var compMaxFrame = Math.round(comp.duration * frameRate);
+	var manifest = {
+		comp_max_frame: compMaxFrame,
+		json_path: videoJsonFile.fsName,
+		config: {
+			SPREAD_THRESHOLD: G.CONFIG.pythonSpreadThreshold,
+			ENABLE_CONFIDENCE_WEIGHTING: G.CONFIG.pythonEnableConfidenceWeighting,
+			CONFIDENCE_WEIGHT: G.CONFIG.pythonConfidenceWeight,
+			LABEL_HIGH_SPREAD: G.CONFIG.pythonLabelHighSpread,
+			LABEL_STABLE: G.CONFIG.pythonLabelStable
+		},
+		layers: {}
+	};
+	manifest.layers[layer.index.toString()] = {
+		name: layer.name,
+		json_path: videoJsonFile.fsName,
+		in_frame: Math.floor(layer.inPoint * frameRate),
+		out_frame: Math.ceil(layer.outPoint * frameRate),
+		video_scale: 1.0
+	};
+	return manifest;
+ }
+
+ function tryRunPythonAnalyzerForLayer(comp, layer, frameRate, videoJsonFile) {
+	if (!G.CONFIG.enablePythonAnalyzer) return null;
+	if (!G.CONFIG.pythonCmd || !G.CONFIG.step7AnalyzerScriptPath) return null;
+	if (!videoJsonFile || !videoJsonFile.exists) return null;
+	if (!system || typeof system.callSystem !== "function") return null;
+
+	var manifest = buildPythonAnalyzerManifestForLayer(comp, layer, frameRate, videoJsonFile);
+	var ts = getTimestamp();
+	var tempFolder = G.CONFIG.pythonTempFolder || Folder.temp.fsName;
+	var manifestFile = new File(tempFolder + "/ms_manifest_" + ts + ".json");
+	var resultFile = new File(tempFolder + "/ms_results_" + ts + ".json");
+
+	try {
+		if (!manifestFile.open("w")) return null;
+		manifestFile.encoding = "UTF-8";
+		manifestFile.write(safeJsonStringify(manifest));
+		manifestFile.close();
+	} catch (eWrite) {
+		try {
+			manifestFile.close();
+		} catch (eClose) {}
+		logMessage("WARN (PY): Could not write manifest: " + eWrite.toString());
+		return null;
+	}
+
+	var cmd =
+		escapeSystemArg(G.CONFIG.pythonCmd) +
+		" " +
+		escapeSystemArg(G.CONFIG.step7AnalyzerScriptPath) +
+		" --manifest_path " +
+		escapeSystemArg(manifestFile.fsName) +
+		" --output_path " +
+		escapeSystemArg(resultFile.fsName);
+
+	try {
+		var output = system.callSystem(cmd) || "";
+		if (output && output.length > 0) {
+			logMessage(" (PY) stdout: " + output);
+		}
+	} catch (eCall) {
+		logMessage("WARN (PY): system.callSystem failed: " + eCall.toString());
+		return null;
+	}
+
+	if (!resultFile.exists) {
+		logMessage("WARN (PY): Result file not found: " + resultFile.fsName);
+		return null;
+	}
+
+	var content = readTextFile(resultFile);
+	if (content === null) {
+		logMessage("WARN (PY): Could not read result file: " + resultFile.fsName);
+		return null;
+	}
+	var parsed = safeJsonParse(content);
+	if (!parsed || typeof parsed !== "object") {
+		logMessage("WARN (PY): Invalid result JSON.");
+		return null;
+	}
+	if (parsed.error) {
+		logMessage("WARN (PY): " + parsed.error);
+		return null;
+	}
+	return parsed;
+ }
+
+ function buildPythonCutsManifest(comp, frameRate, csvFile) {
+	var compDuration = (comp && typeof comp.duration === "number") ? comp.duration : null;
+	var manifest = {
+		mode: "cuts",
+		csv_path: csvFile.fsName,
+		frame_rate: frameRate,
+		comp_duration: compDuration,
+		config: {
+			SNAP_FACTOR: G.CONFIG.pythonCutsSnapFactor
+		}
+	};
+	return manifest;
+ }
+
+ function tryRunPythonCutsParserForCsv(comp, frameRate, csvFile) {
+	if (!G.CONFIG.enablePythonCutsParser) return null;
+	if (!G.CONFIG.pythonCmd || !G.CONFIG.pythonCutsScriptPath) return null;
+	if (!csvFile || !(csvFile instanceof File) || !csvFile.exists) return null;
+	if (!system || typeof system.callSystem !== "function") return null;
+
+	var manifest = buildPythonCutsManifest(comp, frameRate, csvFile);
+	var ts = getTimestamp();
+	var tempFolder = G.CONFIG.pythonTempFolder || Folder.temp.fsName;
+	var manifestFile = new File(tempFolder + "/ms_cuts_manifest_" + ts + ".json");
+	var resultFile = new File(tempFolder + "/ms_cuts_results_" + ts + ".json");
+
+	try {
+		if (!manifestFile.open("w")) return null;
+		manifestFile.encoding = "UTF-8";
+		manifestFile.write(safeJsonStringify(manifest));
+		manifestFile.close();
+	} catch (eWrite) {
+		try {
+			manifestFile.close();
+		} catch (eClose) {}
+		logMessage("WARN (PY-CUTS): Could not write manifest: " + eWrite.toString());
+		return null;
+	}
+
+	var cmd =
+		escapeSystemArg(G.CONFIG.pythonCmd) +
+		" " +
+		escapeSystemArg(G.CONFIG.pythonCutsScriptPath) +
+		" --manifest_path " +
+		escapeSystemArg(manifestFile.fsName) +
+		" --output_path " +
+		escapeSystemArg(resultFile.fsName);
+
+	try {
+		var output = system.callSystem(cmd) || "";
+		if (output && output.length > 0) {
+			logMessage(" (PY-CUTS) stdout: " + output);
+		}
+	} catch (eCall) {
+		logMessage("WARN (PY-CUTS): system.callSystem failed: " + eCall.toString());
+		return null;
+	}
+
+	if (!resultFile.exists) {
+		logMessage("WARN (PY-CUTS): Result file not found: " + resultFile.fsName);
+		return null;
+	}
+
+	var content = readTextFile(resultFile);
+	if (content === null) {
+		logMessage("WARN (PY-CUTS): Could not read result file: " + resultFile.fsName);
+		return null;
+	}
+
+	var parsed = safeJsonParse(content);
+	if (!parsed || typeof parsed !== "object") {
+		logMessage("WARN (PY-CUTS): Invalid result JSON.");
+		return null;
+	}
+	if (parsed.error) {
+		logMessage("WARN (PY-CUTS): " + parsed.error);
+		return null;
+	}
+	if (!parsed.segments || !(parsed.segments instanceof Array)) {
+		logMessage("WARN (PY-CUTS): Missing segments array in result.");
+		return null;
+	}
+
+	return parsed.segments;
+ }
+
+ function applyPythonRecenteringIfEnabled(comp, targetLayer, docsFolder, videoBaseName) {
+	if (!G.CONFIG.enableAutoRecenteringInBatch) return false;
+	var baseCandidates = [];
+	if (videoBaseName) baseCandidates.push(videoBaseName);
+	var derivedBaseName = deriveVideoBaseNameFromAepFile(G.STATE.currentlyOpenProjectFile);
+	if (derivedBaseName && derivedBaseName !== videoBaseName) baseCandidates.push(derivedBaseName);
+
+	var videoJsonFile = null;
+	for (var i = 0; i < baseCandidates.length; i++) {
+		videoJsonFile = findBestTrackingJsonForBaseName(docsFolder, baseCandidates[i]);
+		if (videoJsonFile) break;
+	}
+	if (!videoJsonFile) return false;
+	var frameRate = comp && comp.frameRate ? comp.frameRate : 25.0;
+	var resByLayer = tryRunPythonAnalyzerForLayer(comp, targetLayer, frameRate, videoJsonFile);
+	if (!resByLayer) return false;
+	var layerRes = resByLayer[targetLayer.index.toString()];
+	if (!layerRes) return false;
+	var centerX = parseFloat(layerRes.center_x);
+	if (isNaN(centerX)) return false;
+
+	try {
+		var compCenterX = comp.width / 2;
+		var anchorProp = targetLayer.property("Anchor Point");
+		var posProp = targetLayer.property("Position");
+		var anchorV = anchorProp.value;
+		var posV = posProp.value;
+		var anchorOut = [centerX, anchorV[1]];
+		if (anchorV && anchorV.length > 2) anchorOut.push(anchorV[2]);
+		var posOut = [compCenterX, posV[1]];
+		if (posV && posV.length > 2) posOut.push(posV[2]);
+		anchorProp.setValue(anchorOut);
+		posProp.setValue(posOut);
+		logMessage(
+			" (PY) Auto recenter applied: layer='" +
+				targetLayer.name +
+				"' center_x=" +
+				centerX +
+				" reason=" +
+				(layerRes.reason || "")
+		);
+		return true;
+	} catch (e) {
+		logMessage("WARN (PY): Could not apply recenter: " + e.toString());
+		return false;
+	}
+ }
+
  function escapeJsonString(str) {
 	return String(str)
 		.replace(/\\/g, "\\\\")
@@ -462,12 +729,6 @@ function closeLogFile() {
 			report.errors.push("Dossier 'docs' introuvable: " + docsFolder.fsName);
 		}
 
-		var sevenZip = new File(G.CONFIG.sevenZipPath);
-		if (!sevenZip.exists) report.warnings.push("7-Zip introuvable: " + G.CONFIG.sevenZipPath);
-
-		var zipSourceFolder = new Folder(G.CONFIG.zipDownloadsFolder);
-		if (!zipSourceFolder.exists) report.warnings.push("Dossier ZIP introuvable: " + G.CONFIG.zipDownloadsFolder);
-
 		var configFile = getConfigFile();
 		if (configFile && !configFile.exists) report.warnings.push("Aucun fichier de config externe. Vous pouvez en exporter un depuis l'UI.");
 
@@ -603,54 +864,60 @@ function applyCutsToSelectedLayer(targetLayer, csvFile) {
 		position: targetLayer.property("Position").value,
 		compFrameRate: initialComp.frameRate
 	};
-	var fileContent = "";
-	try {
-		csvFile.open("r");
-		fileContent = csvFile.read();
-		csvFile.close();
-	} catch (e) {
-		logMessage("ERROR (Segment) reading CSV: " + e.toString());
-		return 0;
-	}
-	var lines = fileContent.split(/\r\n|\r|\n/);
-	var parsedSegments = [];
 	var frameRate = layerCache.compFrameRate;
 	var frameDuration = 1 / frameRate;
-	var startLineIndex = 1;
-	if (lines.length > 0) {
-		var firstLine = String(lines[0]).trim();
-		if (firstLine !== "") {
-			var firstColumns = firstLine.split(',');
-			if (firstColumns.length >= 3 && isTimecodeLike(firstColumns[1]) && isTimecodeLike(firstColumns[2])) {
-				startLineIndex = 0;
+	var parsedSegments = [];
+	var pythonSegments = tryRunPythonCutsParserForCsv(initialComp, frameRate, csvFile);
+	if (pythonSegments && pythonSegments.length > 0) {
+		parsedSegments = pythonSegments;
+		logMessage(" (PY-CUTS) Using python cuts parser: segments=" + parsedSegments.length);
+	} else {
+		var fileContent = "";
+		try {
+			csvFile.open("r");
+			fileContent = csvFile.read();
+			csvFile.close();
+		} catch (e) {
+			logMessage("ERROR (Segment) reading CSV: " + e.toString());
+			return 0;
+		}
+		var lines = fileContent.split(/\r\n|\r|\n/);
+		var startLineIndex = 1;
+		if (lines.length > 0) {
+			var firstLine = String(lines[0]).trim();
+			if (firstLine !== "") {
+				var firstColumns = firstLine.split(',');
+				if (firstColumns.length >= 3 && isTimecodeLike(firstColumns[1]) && isTimecodeLike(firstColumns[2])) {
+					startLineIndex = 0;
+				}
 			}
 		}
-	}
-	for (var i = startLineIndex; i < lines.length; i++) {
-		var line = lines[i].trim();
-		if (line === "") continue;
-		var columns = line.split(',');
-		if (columns.length < 3) continue;
-		var startTime = -1;
-		var endTime = -1;
-		if (columns.length >= 5) {
-			var frameIn = parseInt(String(columns[3]).trim(), 10);
-			var frameOut = parseInt(String(columns[4]).trim(), 10);
-			if (!isNaN(frameIn) && !isNaN(frameOut) && frameIn >= 1 && frameOut >= frameIn) {
-				startTime = (frameIn - 1) / frameRate;
-				endTime = frameOut / frameRate;
+		for (var i = startLineIndex; i < lines.length; i++) {
+			var line = lines[i].trim();
+			if (line === "") continue;
+			var columns = line.split(',');
+			if (columns.length < 3) continue;
+			var startTime = -1;
+			var endTime = -1;
+			if (columns.length >= 5) {
+				var frameIn = parseInt(String(columns[3]).trim(), 10);
+				var frameOut = parseInt(String(columns[4]).trim(), 10);
+				if (!isNaN(frameIn) && !isNaN(frameOut) && frameIn >= 1 && frameOut >= frameIn) {
+					startTime = (frameIn - 1) / frameRate;
+					endTime = frameOut / frameRate;
+				}
 			}
-		}
-		if (startTime < 0 || endTime < 0) {
-			startTime = csvTimecodeToSeconds(columns[1].trim());
-			endTime = csvTimecodeToSeconds(columns[2].trim());
-		}
-		if (startTime >= 0 && endTime > startTime) {
-			parsedSegments.push({
-				num: columns[0].trim(),
-				startTime: startTime,
-				endTime: endTime
-			});
+			if (startTime < 0 || endTime < 0) {
+				startTime = csvTimecodeToSeconds(columns[1].trim());
+				endTime = csvTimecodeToSeconds(columns[2].trim());
+			}
+			if (startTime >= 0 && endTime > startTime) {
+				parsedSegments.push({
+					num: columns[0].trim(),
+					startTime: startTime,
+					endTime: endTime
+				});
+			}
 		}
 	}
 	if (parsedSegments.length === 0) {
@@ -739,77 +1006,18 @@ function cleanupProject(comp) {
 	}
 }
 
-function extractCsvFromZip(videoBaseName, csvFileNameToExtract, zipSourceFolder, targetDocsFolder) {
-	var zipFiles = zipSourceFolder.getFiles("*.zip");
-	if (!zipFiles || zipFiles.length === 0) return false;
-
-	function normalize(str) {
-		return removeDiacritics(str.toLowerCase()).replace(/[^a-z0-9]+/g, "");
-	}
-	var normalizedTarget = normalize(videoBaseName);
-	var foundZip = null;
-	for (var i = 0; i < zipFiles.length; i++) {
-		var zipBaseName = decodeURI(zipFiles[i].name).replace(/\.zip$/i, "");
-		if (normalize(zipBaseName) === normalizedTarget) {
-			foundZip = zipFiles[i];
-			break;
-		}
-	}
-	if (!foundZip) {
-		logMessage("WARN: No matching ZIP found for: " + videoBaseName);
-		return false;
-	}
-	var sevenZip = new File(G.CONFIG.sevenZipPath);
-	if (!sevenZip.exists) {
-		logMessage("ERROR: 7-Zip not found at: " + G.CONFIG.sevenZipPath);
-		return false;
-	}
-	try {
-		if (foundZip.fsName.indexOf('"') > -1) throw new Error('Invalid character " in zip path: ' + foundZip.fsName);
-		if (targetDocsFolder.fsName.indexOf('"') > -1) throw new Error('Invalid character " in target folder path: ' + targetDocsFolder.fsName);
-		if (String(csvFileNameToExtract).indexOf('"') > -1) throw new Error('Invalid character " in CSV file name: ' + csvFileNameToExtract);
-		var cmd = '"' + G.CONFIG.sevenZipPath + '" e -y -o"' + targetDocsFolder.fsName + '" "' + foundZip.fsName + '" "' + csvFileNameToExtract + '"';
-		system.callSystem(cmd);
-		var extractedCsv = new File(targetDocsFolder.fsName + "/" + csvFileNameToExtract);
-		if (extractedCsv.exists) {
-			logMessage("SUCCESS: CSV extracted: " + csvFileNameToExtract);
-			if (G.CONFIG.shouldDeleteZipAfterExtraction) {
-				try {
-					foundZip.remove();
-				} catch (e) {
-					logMessage("WARN: Could not delete ZIP after extraction: " + e.toString());
-				}
-			}
-			return true;
-		} else {
-			throw new Error("Extraction failed or CSV not found");
-		}
-	} catch (e) {
-		handleError("extractCsvFromZip", e);
-		return false;
-	}
-}
-
 function performStep2_1_Logic() {
-	logMessage("--- Logic Step 2.1: Preparing CSVs ---");
+	logMessage("--- Logic Step 2.1: Preparing CSVs (delegated to STEP1) ---");
 	var docsFolder = new Folder(G.STATE.selectedFolder.fsName + "/" + G.CONFIG.docsSubFolderName);
 	if (!docsFolder.exists) throw new Error("Project 'docs' folder not found.");
 
 	var videoFiles = getFilesByExtensions(docsFolder, G.CONFIG.videoExtensions);
-
 	if (videoFiles.length === 0) {
 		logMessage("WARN (Step2.1): No video files found in 'docs'.");
 		return true;
 	}
-	var extractedCount = 0;
-	var zipSourceFolder = new Folder(G.CONFIG.zipDownloadsFolder);
-	for (var j = 0; j < videoFiles.length; j++) {
-		var videoBaseName = decodeURI(videoFiles[j].name).substring(0, decodeURI(videoFiles[j].name).lastIndexOf('.'));
-		if (extractCsvFromZip(videoBaseName, videoBaseName + ".csv", zipSourceFolder, docsFolder)) {
-			extractedCount++;
-		}
-	}
-	logMessage("INFO (Step2.1): " + extractedCount + " CSVs extracted for " + videoFiles.length + " videos.");
+
+	logMessage("INFO (Step2.1): ZIP extraction skipped (handled upstream by STEP1). Found " + videoFiles.length + " video(s) ready.");
 	return true;
 }
 
@@ -993,6 +1201,7 @@ function performStep3_2_Logic(expectedCompName, targetLayerIndex) {
 		if (targetLayer.source) targetLayer.property("Anchor Point").setValue([targetLayer.source.width / 2, 0]);
 		targetLayer.property("Position").setValue([activeComp.width / 2, 0]);
 		var videoBaseName = activeComp.name.replace(G.CONFIG.compNameSuffix, "");
+		applyPythonRecenteringIfEnabled(activeComp, targetLayer, docsFolder, videoBaseName);
 		var csvFile = new File(docsFolder.fsName + "/" + videoBaseName + ".csv");
 		if (csvFile.exists) {
 			result.segmentsCreated = applyCutsToSelectedLayer(targetLayer, csvFile);
@@ -1233,6 +1442,19 @@ function buildWorkflowUI(thisObj) {
 	toolsPanel.margins = 10;
 	var recenterButton = toolsPanel.add("button", undefined, "Recentrage Intelligent");
 	recenterButton.helpTip = "Lance le script externe de recentrage sur la composition active.";
+	var autoRecenteringGroup = toolsPanel.add("group");
+	autoRecenteringGroup.orientation = "row";
+	autoRecenteringGroup.alignChildren = ["left", "center"];
+	var autoRecenteringCheckbox = autoRecenteringGroup.add("checkbox", undefined, "Auto-recentrage batch (Python)");
+	autoRecenteringCheckbox.value = !!G.CONFIG.enableAutoRecenteringInBatch;
+	autoRecenteringCheckbox.onClick = function() {
+		G.CONFIG.enableAutoRecenteringInBatch = !!autoRecenteringCheckbox.value;
+		var statusMsg = G.CONFIG.enableAutoRecenteringInBatch ? "Auto-recentrage batch activé" : "Auto-recentrage batch désactivé";
+		logMessage("[UI] " + statusMsg);
+		if (G.STATE.ui && typeof G.STATE.ui.updateStatus === "function") {
+			G.STATE.ui.updateStatus(statusMsg);
+		}
+	};
 	var exportConfigButton = toolsPanel.add("button", undefined, "Exporter la config (JSON)");
 
 	// Store UI elements in the global state for access from other functions.
