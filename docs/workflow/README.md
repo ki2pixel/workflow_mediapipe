@@ -49,18 +49,20 @@ La documentation a été réorganisée thématiquement pour une navigation intui
 - **[STEP2_CONVERSION.md](pipeline/STEP2_CONVERSION.md)** — Conversion vidéo
 - **[STEP3_DETECTION_SCENES.md](pipeline/STEP3_DETECTION_SCENES.md)** — Détection de scènes
 - **[STEP4_ANALYSE_AUDIO.md](pipeline/STEP4_ANALYSE_AUDIO.md)** — Analyse audio
-- **[STEP5_SUIVI_VIDEO.md](pipeline/STEP5_SUIVI_VIDEO.md)** — Suivi vidéo
+- **[STEP5_SUIVI_VIDEO.md](pipeline/STEP5_SUIVI_VIDEO.md)** — **MAJ** : Architecture tracking_env_slim + dette technique
 - **[STEP6_REDUCTION_JSON.md](pipeline/STEP6_REDUCTION_JSON.md)** — Réduction JSON
-- **[STEP7_PRETRAITEMENT_AE.md](pipeline/STEP7_PRETRAITEMENT_AE.md)** — Pré-traitement AE (JSON optimisé)
+- **[STEP7_PRETRAITEMENT_AE.md](pipeline/STEP7_PRETRAITEMENT_AE.md)** — **MAJ** : Pipeline 8 étapes + mode analyzer + Media-Solution
 - **[STEP8_FINALISATION.md](pipeline/STEP8_FINALISATION.md)** — Finalisation
 
 ### 🛠️ Technical Documentation
+- **[API_ROUTES.md](technical/API_ROUTES.md)** — **NOUVEAU** : Contrats API, sécurité et instrumentation
 - **[API_INSTRUMENTATION.md](technical/API_INSTRUMENTATION.md)** — Instrumentation API
 - **[WEBHOOK_INTEGRATION.md](technical/WEBHOOK_INTEGRATION.md)** — Integration Webhook
 - **[CSV_DOWNLOADS_MANAGEMENT.md](technical/CSV_DOWNLOADS_MANAGEMENT.md)** — Gestion téléchargements
 - **[SYSTEM_MONITORING_ENHANCEMENTS.md](technical/SYSTEM_MONITORING_ENHANCEMENTS.md)** — Monitoring système
 - **[TESTING_STRATEGY.md](technical/TESTING_STRATEGY.md)** — Stratégie de tests
 - **[SECURITY.md](technical/SECURITY.md)** — Sécurité
+- **[TRACKING_OPTIMIZATIONS.md](technical/TRACKING_OPTIMIZATIONS.md)** — Optimisations tracking utils
 
 ### 🚀 Features & Functionality
 - **Smart Upload** — *feature retirée le 18 janvier 2026, voir `memory-bank/decisionLog.md` et `legacy/SMART_UPLOAD_FEATURE.md` pour l’historique complet*
@@ -72,6 +74,7 @@ La documentation a été réorganisée thématiquement pour une navigation intui
 
 ### 📋 Practical Guides
 - **[FRONTEND_GUIDE_RACCourcis_A11Y_LOADERS.md](guides/FRONTEND_GUIDE_RACCourcis_A11Y_LOADERS.md)** — Guide frontend A11y
+- **[SPEAKING_AND_TRACKING.md](utils/SPEAKING_AND_TRACKING.md)** — **NOUVEAU** : Speaking detection & tracking utils
 
 ### 🗂️ Administration & Maintenance
 - **[UPDATE_DOCUMENTATION_SUMMARY.md](admin/UPDATE_DOCUMENTATION_SUMMARY.md)** — Historique mises à jour

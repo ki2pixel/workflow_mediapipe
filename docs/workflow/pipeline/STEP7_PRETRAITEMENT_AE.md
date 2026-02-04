@@ -271,14 +271,153 @@ def test_ae_json_schema():
 
 ---
 
-## Évolution Future
+## Intégration Pipeline 8 Étapes
 
-### v4.3 (Planifié)
+### Flux Complet (v4.2+)
+```mermaid
+graph LR
+    A[STEP6 Reduction] --> B[STEP7 Pré-traitement AE]
+    B --> C[STEP8 Finalisation]
+    
+    subgraph "STEP6 → STEP7"
+        D[*_tracking.json] --> E[preprocess_ae_json.py]
+        F[*_audio.json] --> E
+        E --> G[*_ae.json]
+    end
+    
+    subgraph "STEP7 → AE"
+        G --> H[Analyse-Écart-X.jsx]
+        H --> I[Media-Solution.jsx]
+    end
+```
+
+### Rôle dans Pipeline 8 Étapes
+- **Position** : 7ème étape (pré-traitement AE)
+- **Prérequis** : STEP6 réduction JSON (`*_tracking.json`, `*_audio.json`)
+- **Sortie** : `*_ae.json` optimisé pour After Effects
+- **Étape suivante** : STEP8 finalisation (copie archives)
+
+### Priorité des Fichiers (Scripts AE)
+Les scripts After Effects suivent cette hiérarchie :
+1. `*_ae.json` (pré-traité STEP7) - **priorité maximale**
+2. `*_tracking.json` (réduit STEP6) - fallback
+3. `*.json` (legacy STEP5) - streaming dernier recours
+
+---
+
+## Mode Analyzer (Sandwich + Media-Solution)
+
+L'Étape 7 expose un mode "analyzer" pour déléguer les calculs lourds à Python via `system.callSystem()` depuis After Effects.
+
+### Mode Sandwich (STEP7 → AE)
+- **Entrée** : manifest JSON (calques + in/out frames + json_path)
+- **Sortie** : JSON résultat indexé par layer_id
+- **Utilité** : Éviter la boucle coûteuse "calques × frames" en ExtendScript
+
+### Intégration Media-Solution
+Media-Solution utilise également le mode analyzer pour deux opérations :
+
+#### 1. Auto-recentrage Python en Batch
+```javascript
+// Dans Media-Solution-v11.2-production.jsx
+var manifest = {
+    "layers": [{"id": "1", "name": "Face_0", "in_frame": 100, "out_frame": 200}],
+    "json_path": "docs/video_ae.json",  // Priorité *_ae.json
+    "video_fps": 25.0
+};
+
+var result = system.callSystem(
+    'env/bin/python workflow_scripts/step7/preprocess_ae_json.py ' +
+    '--manifest_path ' + tempManifest + ' ' +
+    '--output_path ' + tempResult
+);
+
+// Application automatique Anchor Point + Position
+applyRecentrage(result);
+```
+
+#### 2. Cuts CSV via Python
+```javascript
+// Feature flag : enablePythonCutsParser
+if (enablePythonCutsParser) {
+    var cutsManifest = createCutsManifest();
+    var cutsResult = system.callSystem(
+        'env/bin/python media_solution_bridge.py --mode cuts ' +
+        '--manifest_path ' + cutsManifest + ' ' +
+        '--output_path ' + cutsResults
+    );
+    applyCuts(cutsResult);
+}
+```
+
+### Manifest Exemple
+```json
+{
+  "layers": [
+    {"id": "1", "name": "Face_0", "in_frame": 100, "out_frame": 200},
+    {"id": "2", "name": "Face_1", "in_frame": 150, "out_frame": 250}
+  ],
+  "json_path": "docs/video_tracking.json",
+  "video_fps": 25.0
+}
+```
+
+### Résultat Analyzer
+```json
+{
+  "1": {
+    "center_x": 150.5,
+    "center_y": 180.2,
+    "label_color": "#FF6B6B",
+    "avg_confidence": 0.87
+  },
+  "2": {
+    "center_x": 320.1,
+    "center_y": 240.8,
+    "label_color": "#4ECDC4",
+    "avg_confidence": 0.91
+  }
+}
+```
+
+### Logs Python dans AE
+Les logs Python apparaissent avec préfixe `[PY]` dans la console AE :
+```
+[PY] Analyzer mode: processing 2 layers
+[PY] Layer 1: center_x=150.5, center_y=180.2
+[PY] Completed analyzer in 0.045s
+```
+
+---
+
+## Notes After Effects
+
+### Scripts Supportés
+1. **`Analyse-Écart-X-depuis-JSON-et-Label-Vidéo36_good.jsx`**
+   - Priorité : `*_ae.json` → `*_tracking.json` → legacy
+   - Support mode analyzer via `system.callSystem()`
+   - Optimisations : filtrage plage frames, eval() vs JSON.parse
+
+2. **`Media-Solution-v11.2-production.jsx`**
+   - Auto-recentrage Python en batch
+   - Cuts CSV via Python bridge
+   - Feature flags : `enablePythonCutsParser`, `pythonCutsScriptPath`
+
+### Performance
+- **Avec `*_ae.json`** : Chargement instantané (accès direct `dataByFrame[frame]`)
+- **Sans `*_ae.json`** : Parsing streaming coûteux (fallback STEP5/STEP6)
+- **Gain observé** : 30-50% plus rapide avec eval() + filtrage plage
+
+---
+
+## Évolution Future (v4.3+)
+
+### Planifié
 - **Cache intelligent** : Invalidation basée sur timestamps source
 - **Compression** : gzip pour `*_ae.json` >50MB
 - **Multi-track** : Support vidéos multi-pistes
 
 ### Améliorations Possibles
-- **Streaming analyzer** : Pour manifests très grands
+- **Streaming analyzer** : Pour manifests très grands (>1000 calques)
 - **Expressions AE** : Génération automatique d'expressions complexes
 - **Validation croisée** : Vérification cohérence tracking/audio

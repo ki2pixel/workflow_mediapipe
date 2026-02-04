@@ -398,3 +398,112 @@ workflow_scripts/step5/object_detector_registry.py
   - router l’exécution vers `tracking_env_slim` (MediaPipe CPU) ou `insightface_env` (InsightFace GPU) avec vérification d’existence et messages d’erreur explicites.
 - Les workers multiprocessing rechargent toujours `.env` pour récupérer ces variables à chaque fork, garantissant que les réglages (`STEP5_BLENDSHAPES_THROTTLE_N`, profil d’export, profiling) restent synchronisés même en mode chunké.
 - **Check GPU sans PyTorch** : `config.Config.check_gpu_availability()` utilise désormais `pynvml` puis `nvidia-smi` pour valider VRAM disponible, avant de vérifier les providers ONNX Runtime. Ce changement permet de garder `tracking_env_slim` sans PyTorch tout en conservant un diagnostic GPU fiable.
+
+---
+
+## Architecture Actuelle et Dette Technique (2026-02-03+)
+
+> **Décision 2026-02-03** : Simplification complète de l'architecture STEP5 autour de 2 modes supportés uniquement. Les moteurs OpenCV/YuNet/EOS ont été supprimés du codebase pour réduire la complexité et améliorer la maintenabilité.
+
+### Modes Supportés
+1. **MediaPipe (CPU - Défaut)** 
+   - Environnement : `tracking_env_slim/` (requirements-tracking-env-lite.txt)
+   - Workers : 15 workers multiprocessing par défaut
+   - GPU : Jamais activé (même si `STEP5_ENABLE_GPU=1`)
+
+2. **InsightFace (GPU - Optionnel)**
+   - Environnement : `insightface_env/` (ONNX Runtime GPU)
+   - Workers : 1 worker séquentiel GPU
+   - GPU : Réservé exclusivement à InsightFace
+
+### Environnements Spécialisés
+```bash
+# CPU-only (défaut)
+tracking_env_slim/     # MediaPipe CPU, OpenCV, multiprocessing
+  └── requirements-tracking-env-lite.txt
+
+# GPU-only (optionnel)  
+insightface_env/       # InsightFace ONNX, CUDA, GPU memory
+  └── requirements-insightface_env.txt
+```
+
+### Restrictions GPU (décision 2025-12-27)
+⚠️ **IMPORTANT** : Le support GPU est **réservé exclusivement à InsightFace**
+- **MediaPipe Face Landmarker** : CPU-only (15 workers)
+- Le gestionnaire force `args.disable_gpu=True` pour tous les moteurs non-InsightFace
+- **Contraintes GPU** :
+  - 1 worker GPU séquentiel uniquement
+  - NVIDIA CUDA ≥ 12.0 avec ≥ 2 Go VRAM libres (4 Go recommandés)
+  - CPU-only recommandé pour batchs massifs (10+ vidéos)
+
+### Legacy Supprimé
+Les moteurs suivants ne sont plus supportés :
+- ❌ OpenCV Haar (supprimé)
+- ❌ OpenCV YuNet (supprimé) 
+- ❌ OpenCV YuNet + PyFeat (supprimé)
+- ❌ EOS 3DMM (supprimé)
+- ❌ OpenSeeFace (supprimé)
+
+---
+
+## Dette Technique (Radon F/E)
+
+### Workers Multiprocessing (Score F)
+- **`process_video_worker.py`** : Score F - 399 lignes main, orchestration worker
+  - **Problème** : Fonction `main()` monolithique gérant chunking, détection, export
+  - **Recommandation** : Extraire `FrameChunkRunner` et `DetectionOrchestrator`
+- **`process_frame_chunk()`** : Score F - 315 lignes, traitement chunks parallèles
+  - **Problème** : Gestion IPC complexe avec synchronisation manuelle
+  - **Recommandation** : Créer `ChunkProcessor` avec callbacks
+
+### Gestion Manager (Score E)
+- **`run_tracking_manager.py`** : Score E - 467 lignes main, orchestration globale
+  - **Problème** : Discovery CUDA, configuration engines, lancement subprocess mélangés
+  - **Recommandation** : Séparer `CudaDiscovery`, `EngineConfig`, `SubprocessLauncher`
+- **`launch_worker_process()`** : Score D - 309 lignes, lancement subprocess
+  - **Problème** : Construction environnement subprocess complexe
+  - **Recommandation** : Extraire `SubprocessEnvironmentBuilder`
+
+### Moteurs (Score E)
+- **`InsightFaceEngine.detect()`** : Score E - 284 lignes, GPU/CPU + fallback
+  - **Problème** : Méthode longue avec gestion GPU/CPU intégrée
+  - **Recommandation** : Séparer `GpuDetector` et `CpuFallbackDetector`
+
+---
+
+## Actions de Réduction Dette
+
+### Priorité Haute (Radon F)
+1. **Extraire `FrameChunkRunner`** de `process_video_worker.main()` :
+   ```python
+   class FrameChunkRunner:
+       def __init__(self, config: ChunkConfig):
+           self.config = config
+       
+       def process_video(self, video_path: str) -> Dict:
+           # Orchestration chunks simplifiée
+   ```
+
+2. **Créer `ChunkProcessor`** pour remplacer `process_frame_chunk()` :
+   ```python
+   class ChunkProcessor:
+       def process_chunk(self, chunk_data: ChunkData) -> List[FrameResult]:
+           # Traitement chunk isolé avec callbacks
+   ```
+
+3. **Séparer `CudaDiscovery`** :
+   ```python
+   class CudaDiscovery:
+       @staticmethod
+       def discover_paths() -> List[str]:
+           # Discovery isolée
+   
+       @staticmethod
+       def validate_gpu() -> bool:
+           # Validation GPU séparée
+   ```
+
+### Priorité Moyenne (Radon E)
+- Refactor `InsightFaceEngine` en `GpuDetector` + `CpuFallbackDetector`
+- Extraire `SubprocessEnvironmentBuilder` de `launch_worker_process()`
+- Simplifier `run_tracking_manager.main()` avec des helpers spécialisés

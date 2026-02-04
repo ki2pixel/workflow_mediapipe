@@ -170,1244 +170,6 @@ app_new.py
 
 # Files
 
-## File: workflow_scripts/step7/preprocess_ae_json.py
-```python
-  1: #!/usr/bin/env python3
-  2: # -*- coding: utf-8 -*-
-  3: 
-  4: import argparse
-  5: import json
-  6: import logging
-  7: import os
-  8: import sys
-  9: from datetime import datetime
- 10: from pathlib import Path
- 11: from typing import Any, Dict, List, Optional, Tuple
- 12: 
- 13: 
- 14: logger = logging.getLogger(__name__)
- 15: logger.setLevel(logging.INFO)
- 16: 
- 17: VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm")
- 18: AUDIO_SUFFIX = "_audio.json"
- 19: TRACKING_SUFFIX = "_tracking.json"
- 20: AE_PREPROCESSED_SUFFIX = "_ae.json"
- 21: 
- 22: 
- 23: DEFAULT_ANALYZER_CONFIG: Dict[str, Any] = {
- 24:     "SPREAD_THRESHOLD": 200,
- 25:     "ENABLE_CONFIDENCE_WEIGHTING": True,
- 26:     "CONFIDENCE_WEIGHT": 0.35,
- 27:     "LABEL_HIGH_SPREAD": 12,
- 28:     "LABEL_STABLE": 3,
- 29: }
- 30: 
- 31: 
- 32: def setup_logging(log_dir: str) -> str:
- 33:     os.makedirs(log_dir, exist_ok=True)
- 34:     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
- 35:     log_path = os.path.join(log_dir, f"preprocess_ae_{timestamp}.log")
- 36: 
- 37:     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
- 38: 
- 39:     fh = logging.FileHandler(log_path, encoding="utf-8")
- 40:     fh.setLevel(logging.INFO)
- 41:     fh.setFormatter(formatter)
- 42: 
- 43:     ch = logging.StreamHandler(sys.stdout)
- 44:     ch.setLevel(logging.INFO)
- 45:     ch.setFormatter(formatter)
- 46: 
- 47:     logger.handlers.clear()
- 48:     logger.addHandler(fh)
- 49:     logger.addHandler(ch)
- 50:     logger.propagate = False
- 51: 
- 52:     logger.info("Log file initialized: %s", log_path)
- 53:     return log_path
- 54: 
- 55: 
- 56: def _load_json(path: Path) -> Optional[Dict[str, Any]]:
- 57:     try:
- 58:         with open(path, "r", encoding="utf-8") as f:
- 59:             data = json.load(f)
- 60:         return data if isinstance(data, dict) else None
- 61:     except Exception as e:
- 62:         logger.warning("Impossible de lire JSON '%s': %s", path, e)
- 63:         return None
- 64: 
- 65: 
- 66: def _write_json_atomically(path: Path, payload: Dict[str, Any]) -> None:
- 67:     tmp_path = path.with_suffix(path.suffix + ".tmp")
- 68:     with open(tmp_path, "w", encoding="utf-8") as f:
- 69:         json.dump(payload, f, indent=2, ensure_ascii=False)
- 70:     os.replace(tmp_path, path)
- 71: 
- 72: 
- 73: def _clamp01(value: Any) -> float:
- 74:     try:
- 75:         f = float(value)
- 76:     except Exception:
- 77:         return 0.0
- 78:     if f < 0.0:
- 79:         return 0.0
- 80:     if f > 1.0:
- 81:         return 1.0
- 82:     return f
- 83: 
- 84: 
- 85: def _normalize_str_list(value: Any) -> List[str]:
- 86:     if value is None:
- 87:         return []
- 88:     if isinstance(value, list):
- 89:         out: List[str] = []
- 90:         for v in value:
- 91:             if isinstance(v, str) and v:
- 92:                 out.append(v)
- 93:         return out
- 94:     if isinstance(value, str) and value:
- 95:         if "," in value:
- 96:             parts = [p.strip() for p in value.split(",")]
- 97:             return [p for p in parts if p]
- 98:         return [value]
- 99:     return []
-100: 
-101: 
-102: def _calculate_stats(values: List[float]) -> Dict[str, float]:
-103:     if not values:
-104:         return {"min": 0.0, "max": 0.0, "spread": 0.0, "average": 0.0}
-105:     min_v = values[0]
-106:     max_v = values[0]
-107:     s = 0.0
-108:     for v in values:
-109:         s += v
-110:         if v < min_v:
-111:             min_v = v
-112:         if v > max_v:
-113:             max_v = v
-114:     avg = s / float(len(values))
-115:     return {"min": float(min_v), "max": float(max_v), "spread": float(max_v - min_v), "average": float(avg)}
-116: 
-117: 
-118: def _compute_presence_score(presence: int, avg_confidence: float, config: Dict[str, Any]) -> float:
-119:     if not config.get("ENABLE_CONFIDENCE_WEIGHTING", True):
-120:         return float(presence)
-121:     weight = config.get("CONFIDENCE_WEIGHT", 0.0)
-122:     try:
-123:         w = float(weight)
-124:     except Exception:
-125:         w = 0.0
-126:     if w < 0.0:
-127:         w = 0.0
-128:     return float(presence) * (1.0 + (_clamp01(avg_confidence) * w))
-129: 
-130: 
-131: def _find_audio_json_for_video_json(video_json_path: Path) -> Optional[Path]:
-132:     if not video_json_path.exists():
-133:         return None
-134:     base_name = video_json_path.name
-135:     stem = base_name
-136:     if stem.lower().endswith("_ae.json"):
-137:         stem = stem[: -len("_ae.json")]
-138:     elif stem.lower().endswith("_tracking.json"):
-139:         stem = stem[: -len("_tracking.json")]
-140:     elif stem.lower().endswith(".json"):
-141:         stem = stem[: -len(".json")]
-142: 
-143:     audio_path = video_json_path.parent / f"{stem}{AUDIO_SUFFIX}"
-144:     return audio_path if audio_path.exists() else None
-145: 
-146: 
-147: def _load_ae_or_tracking_index(video_json_path: Path) -> Optional[Dict[str, Any]]:
-148:     root = _load_json(video_json_path)
-149:     if not root:
-150:         return None
-151: 
-152:     if isinstance(root.get("dataByFrame"), dict):
-153:         return root
-154: 
-155:     frames = _extract_frames_analysis(root)
-156:     if not frames:
-157:         return None
-158: 
-159:     data_by_frame, max_frame = _index_reduced_tracking_frames(frames)
-160:     out: Dict[str, Any] = {
-161:         "dataByFrame": {str(k): v for k, v in data_by_frame.items()},
-162:         "maxFrame": max_frame,
-163:     }
-164:     if isinstance(root.get("tracking_analytics"), dict):
-165:         out["tracking_analytics"] = root.get("tracking_analytics")
-166:     if isinstance(root.get("expression_summary"), dict):
-167:         out["expression_summary"] = root.get("expression_summary")
-168:     if isinstance(root.get("temporal_alignment"), dict):
-169:         out["temporal_alignment"] = root.get("temporal_alignment")
-170:     if root.get("fps") is not None:
-171:         out["fps"] = root.get("fps")
-172:     if root.get("total_frames") is not None:
-173:         out["total_frames"] = root.get("total_frames")
-174:     return out
-175: 
-176: 
-177: def _parse_int(value: Any) -> Optional[int]:
-178:     try:
-179:         return int(value)
-180:     except Exception:
-181:         return None
-182: 
-183: 
-184: def _compute_video_frame_scale(video_max_frame: int, reference_max_frame: int) -> float:
-185:     if video_max_frame <= 0 or reference_max_frame <= 0:
-186:         return 1.0
-187:     diff_ratio = abs(float(video_max_frame - reference_max_frame)) / float(reference_max_frame)
-188:     if diff_ratio > 0.05:
-189:         return float(video_max_frame) / float(reference_max_frame)
-190:     return 1.0
-191: 
-192: 
-193: def _to_int_keyed_map(raw_map: Any) -> Dict[int, Any]:
-194:     if not isinstance(raw_map, dict):
-195:         return {}
-196:     out: Dict[int, Any] = {}
-197:     for k, v in raw_map.items():
-198:         ki = _parse_int(k)
-199:         if ki is None:
-200:             continue
-201:         out[ki] = v
-202:     return out
-203: 
-204: 
-205: def _analyze_layer(
-206:     layer_info: Dict[str, Any],
-207:     data_by_frame: Dict[int, List[Dict[str, Any]]],
-208:     audio_by_frame: Dict[int, Dict[str, Any]],
-209:     config: Dict[str, Any],
-210:     video_frame_scale: float,
-211:     video_max_frame: int,
-212: ) -> Optional[Dict[str, Any]]:
-213:     min_frame = _parse_int(layer_info.get("in_frame"))
-214:     max_frame = _parse_int(layer_info.get("out_frame"))
-215:     if min_frame is None or max_frame is None:
-216:         return None
-217: 
-218:     objects_in_layer: Dict[str, Dict[str, Any]] = {}
-219: 
-220:     layer_scale_raw = layer_info.get("video_scale", 1.0)
-221:     try:
-222:         layer_scale = float(layer_scale_raw)
-223:     except Exception:
-224:         layer_scale = 1.0
-225:     if layer_scale <= 0.0:
-226:         layer_scale = 1.0
-227: 
-228:     effective_frame_scale = video_frame_scale * layer_scale
-229: 
-230:     for frame in range(min_frame, max_frame + 1):
-231:         video_frame = frame
-232:         if effective_frame_scale != 1.0:
-233:             mapped = int(round(float(frame) * effective_frame_scale))
-234:             if mapped < 1:
-235:                 mapped = 1
-236:             if video_max_frame > 0 and mapped > video_max_frame:
-237:                 mapped = video_max_frame
-238:             video_frame = mapped
-239: 
-240:         frame_objs = data_by_frame.get(video_frame)
-241:         audio_info = audio_by_frame.get(frame)
-242: 
-243:         if not isinstance(frame_objs, list):
-244:             continue
-245: 
-246:         for obj in frame_objs:
-247:             if not isinstance(obj, dict):
-248:                 continue
-249:             obj_id = obj.get("id")
-250:             if not isinstance(obj_id, str) or not obj_id:
-251:                 continue
-252: 
-253:             source = obj.get("source")
-254:             label = obj.get("label")
-255: 
-256:             cx = obj.get("centroid_x")
-257:             try:
-258:                 cx_f = float(cx)
-259:             except Exception:
-260:                 continue
-261: 
-262:             bbox_surface = 0.0
-263:             try:
-264:                 bbox_surface = float(obj.get("bbox_surface") or 0.0)
-265:             except Exception:
-266:                 bbox_surface = 0.0
-267:             if bbox_surface < 0.0:
-268:                 bbox_surface = 0.0
-269: 
-270:             conf_f = _clamp01(obj.get("confidence"))
-271:             speakers = _normalize_str_list(obj.get("video_speakers"))
-272: 
-273:             if obj_id not in objects_in_layer:
-274:                 objects_in_layer[obj_id] = {
-275:                     "id": obj_id,
-276:                     "source": source,
-277:                     "label": label,
-278:                     "x_values": [],
-279:                     "bbox_surfaces": [],
-280:                     "confidence_values": [],
-281:                     "audio_confirm_count": 0,
-282:                     "total_bbox_surface": 0.0,
-283:                     "total_confidence": 0.0,
-284:                     "avg_bbox_surface": 0.0,
-285:                     "avg_confidence": 0.0,
-286:                     "video_speakers": speakers,
-287:                 }
-288: 
-289:             d = objects_in_layer[obj_id]
-290:             d["x_values"].append(cx_f)
-291:             d["bbox_surfaces"].append(bbox_surface)
-292:             d["confidence_values"].append(conf_f)
-293:             d["total_bbox_surface"] += bbox_surface
-294:             d["total_confidence"] += conf_f
-295: 
-296:             is_eligible_for_audio = (source == "face_landmarker") or (
-297:                 source == "object_detector" and label == "person"
-298:             )
-299:             if is_eligible_for_audio and audio_info and audio_info.get("is_speech_present") and speakers:
-300:                 active_labels = _normalize_str_list(audio_info.get("active_speaker_labels"))
-301:                 if active_labels and (set(active_labels) & set(speakers)):
-302:                     d["audio_confirm_count"] += 1
-303: 
-304:     if not objects_in_layer:
-305:         return None
-306: 
-307:     best_audio_face: Optional[Dict[str, Any]] = None
-308:     best_audio_person: Optional[Dict[str, Any]] = None
-309:     best_face: Optional[Dict[str, Any]] = None
-310:     best_person: Optional[Dict[str, Any]] = None
-311:     best_fallback: Optional[Dict[str, Any]] = None
-312: 
-313:     max_audio_face_confirm = 0
-314:     max_audio_person_confirm = 0
-315:     max_face_presence = -1.0
-316:     max_person_presence = -1.0
-317:     max_fallback_presence = -1.0
-318:     max_audio_face_bbox = 0.0
-319:     max_face_bbox = 0.0
-320: 
-321:     for oid, obj in objects_in_layer.items():
-322:         x_vals: List[float] = obj.get("x_values") or []
-323:         presence = len(x_vals)
-324:         if presence <= 0:
-325:             continue
-326: 
-327:         bbox_count = len(obj.get("bbox_surfaces") or [])
-328:         conf_count = len(obj.get("confidence_values") or [])
-329:         obj["avg_bbox_surface"] = (obj["total_bbox_surface"] / float(bbox_count)) if bbox_count > 0 else 0.0
-330:         obj["avg_confidence"] = (obj["total_confidence"] / float(conf_count)) if conf_count > 0 else 0.0
-331: 
-332:         presence_score = _compute_presence_score(presence, float(obj["avg_confidence"]), config)
-333: 
-334:         source = obj.get("source")
-335:         label = obj.get("label")
-336:         audio_confirm = int(obj.get("audio_confirm_count") or 0)
-337: 
-338:         if source == "face_landmarker":
-339:             if audio_confirm > 0:
-340:                 current_best_score = (
-341:                     _compute_presence_score(
-342:                         len(best_audio_face.get("x_values") or []),
-343:                         float(best_audio_face.get("avg_confidence") or 0.0),
-344:                         config,
-345:                     )
-346:                     if best_audio_face
-347:                     else -1.0
-348:                 )
-349:                 if (
-350:                     audio_confirm > max_audio_face_confirm
-351:                     or (audio_confirm == max_audio_face_confirm and presence_score > current_best_score)
-352:                     or (
-353:                         audio_confirm == max_audio_face_confirm
-354:                         and presence_score == current_best_score
-355:                         and float(obj["avg_bbox_surface"]) > max_audio_face_bbox
-356:                     )
-357:                 ):
-358:                     best_audio_face = obj
-359:                     max_audio_face_confirm = audio_confirm
-360:                     max_audio_face_bbox = float(obj["avg_bbox_surface"])
-361: 
-362:             if presence_score > max_face_presence or (
-363:                 presence_score == max_face_presence and float(obj["avg_bbox_surface"]) > max_face_bbox
-364:             ):
-365:                 best_face = obj
-366:                 max_face_presence = presence_score
-367:                 max_face_bbox = float(obj["avg_bbox_surface"])
-368: 
-369:         elif source == "object_detector" and label == "person":
-370:             if audio_confirm > 0:
-371:                 current_best_score = (
-372:                     _compute_presence_score(
-373:                         len(best_audio_person.get("x_values") or []),
-374:                         float(best_audio_person.get("avg_confidence") or 0.0),
-375:                         config,
-376:                     )
-377:                     if best_audio_person
-378:                     else -1.0
-379:                 )
-380:                 if (
-381:                     audio_confirm > max_audio_person_confirm
-382:                     or (audio_confirm == max_audio_person_confirm and presence_score > current_best_score)
-383:                 ):
-384:                     best_audio_person = obj
-385:                     max_audio_person_confirm = audio_confirm
-386: 
-387:             if presence_score > max_person_presence:
-388:                 best_person = obj
-389:                 max_person_presence = presence_score
-390: 
-391:         if presence_score > max_fallback_presence:
-392:             best_fallback = obj
-393:             max_fallback_presence = presence_score
-394: 
-395:     target = best_audio_face or best_audio_person or best_face or best_person or best_fallback
-396:     if not target:
-397:         return None
-398: 
-399:     stats = _calculate_stats(target.get("x_values") or [])
-400:     spread_threshold = config.get("SPREAD_THRESHOLD", DEFAULT_ANALYZER_CONFIG["SPREAD_THRESHOLD"])
-401:     try:
-402:         spread_threshold_f = float(spread_threshold)
-403:     except Exception:
-404:         spread_threshold_f = float(DEFAULT_ANALYZER_CONFIG["SPREAD_THRESHOLD"])
-405: 
-406:     label_high = int(config.get("LABEL_HIGH_SPREAD", DEFAULT_ANALYZER_CONFIG["LABEL_HIGH_SPREAD"]))
-407:     label_stable = int(config.get("LABEL_STABLE", DEFAULT_ANALYZER_CONFIG["LABEL_STABLE"]))
-408: 
-409:     label_to_apply = label_stable
-410:     if stats["spread"] > spread_threshold_f and target.get("source") == "face_landmarker":
-411:         label_to_apply = label_high
-412: 
-413:     reason = "fallback"
-414:     if best_audio_face and target is best_audio_face:
-415:         reason = "audio_confirm_face"
-416:     elif best_audio_person and target is best_audio_person:
-417:         reason = "audio_confirm_person"
-418:     elif best_face and target is best_face:
-419:         reason = "face_presence"
-420:     elif best_person and target is best_person:
-421:         reason = "person_presence"
-422: 
-423:     return {
-424:         "center_x": stats["average"],
-425:         "spread": stats["spread"],
-426:         "label_color": label_to_apply,
-427:         "selected_id": target.get("id"),
-428:         "reason": reason,
-429:     }
-430: 
-431: 
-432: def analyze_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
-433:     raw_layers = manifest.get("layers")
-434:     if not isinstance(raw_layers, dict):
-435:         raise ValueError("manifest.layers doit être un objet")
-436: 
-437:     cfg = dict(DEFAULT_ANALYZER_CONFIG)
-438:     raw_cfg = manifest.get("config")
-439:     if isinstance(raw_cfg, dict):
-440:         cfg.update(raw_cfg)
-441: 
-442:     comp_max_frame = _parse_int(manifest.get("comp_max_frame")) or 0
-443: 
-444:     loaded_cache: Dict[str, Dict[str, Any]] = {}
-445:     results: Dict[str, Any] = {}
-446: 
-447:     for layer_id, layer_info_raw in raw_layers.items():
-448:         if not isinstance(layer_id, str):
-449:             layer_id = str(layer_id)
-450:         if not isinstance(layer_info_raw, dict):
-451:             continue
-452: 
-453:         json_path_raw = layer_info_raw.get("json_path") or manifest.get("json_path")
-454:         if not isinstance(json_path_raw, str) or not json_path_raw:
-455:             continue
-456:         video_json_path = Path(json_path_raw)
-457: 
-458:         cache_key = str(video_json_path)
-459:         if cache_key not in loaded_cache:
-460:             idx = _load_ae_or_tracking_index(video_json_path)
-461:             if not idx:
-462:                 loaded_cache[cache_key] = {"dataByFrame": {}, "maxFrame": 0, "audioByFrame": {}, "audioMaxFrame": None}
-463:             else:
-464:                 if isinstance(idx.get("audioByFrame"), dict):
-465:                     loaded_cache[cache_key] = idx
-466:                 else:
-467:                     audio_path = _find_audio_json_for_video_json(video_json_path)
-468:                     audio_root = _load_json(audio_path) if audio_path else None
-469:                     audio_by_frame, audio_max_frame = _index_audio_by_frame(audio_root) if audio_root else ({}, None)
-470:                     idx["audioByFrame"] = {str(k): v for k, v in audio_by_frame.items()}
-471:                     idx["audioMaxFrame"] = audio_max_frame
-472:                     loaded_cache[cache_key] = idx
-473: 
-474:         idx = loaded_cache[cache_key]
-475:         data_by_frame = _to_int_keyed_map(idx.get("dataByFrame"))
-476:         audio_by_frame = _to_int_keyed_map(idx.get("audioByFrame"))
-477: 
-478:         video_max_frame = _parse_int(idx.get("maxFrame")) or 0
-479:         audio_max_frame = _parse_int(idx.get("audioMaxFrame"))
-480:         reference_max_frame = audio_max_frame if audio_max_frame is not None else comp_max_frame
-481:         video_frame_scale = _compute_video_frame_scale(video_max_frame, reference_max_frame) if reference_max_frame > 0 else 1.0
-482: 
-483:         res = _analyze_layer(
-484:             layer_info_raw,
-485:             data_by_frame,
-486:             audio_by_frame,
-487:             cfg,
-488:             video_frame_scale,
-489:             video_max_frame,
-490:         )
-491:         if res is not None:
-492:             results[layer_id] = res
-493: 
-494:     return results
-495: 
-496: 
-497: def _extract_frames_analysis(tracking: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
-498:     frames = tracking.get("frames_analysis")
-499:     if isinstance(frames, list):
-500:         return frames
-501: 
-502:     frames = tracking.get("frames")
-503:     if isinstance(frames, list):
-504:         return frames
-505: 
-506:     return None
-507: 
-508: 
-509: def _index_reduced_tracking_frames(frames: List[Dict[str, Any]]) -> Tuple[Dict[int, List[Dict[str, Any]]], int]:
-510:     data_by_frame: Dict[int, List[Dict[str, Any]]] = {}
-511:     max_frame_seen = 0
-512: 
-513:     for frame_obj in frames:
-514:         if not isinstance(frame_obj, dict):
-515:             continue
-516:         frame_num = frame_obj.get("frame")
-517:         try:
-518:             frame_i = int(frame_num)
-519:         except Exception:
-520:             continue
-521: 
-522:         max_frame_seen = max(max_frame_seen, frame_i)
-523: 
-524:         tracked = frame_obj.get("tracked_objects")
-525:         if not isinstance(tracked, list):
-526:             continue
-527: 
-528:         out_tracked: List[Dict[str, Any]] = []
-529:         for obj in tracked:
-530:             if not isinstance(obj, dict):
-531:                 continue
-532:             source = obj.get("source")
-533:             label = obj.get("label")
-534:             is_relevant = (source == "face_landmarker") or (source == "object_detector" and label == "person")
-535:             if not is_relevant:
-536:                 continue
-537: 
-538:             obj_id = obj.get("id")
-539:             if not isinstance(obj_id, str) or not obj_id:
-540:                 continue
-541: 
-542:             cx = obj.get("centroid_x")
-543:             try:
-544:                 cx_f = float(cx)
-545:             except Exception:
-546:                 continue
-547: 
-548:             bbox_w = obj.get("bbox_width")
-549:             bbox_h = obj.get("bbox_height")
-550:             try:
-551:                 bbox_w_f = float(bbox_w) if bbox_w is not None else 0.0
-552:             except Exception:
-553:                 bbox_w_f = 0.0
-554:             try:
-555:                 bbox_h_f = float(bbox_h) if bbox_h is not None else 0.0
-556:             except Exception:
-557:                 bbox_h_f = 0.0
-558: 
-559:             bbox_surface = max(0.0, bbox_w_f) * max(0.0, bbox_h_f)
-560: 
-561:             conf = obj.get("confidence")
-562:             try:
-563:                 conf_f = float(conf) if conf is not None else 0.0
-564:             except Exception:
-565:                 conf_f = 0.0
-566:             if conf_f < 0.0:
-567:                 conf_f = 0.0
-568:             if conf_f > 1.0:
-569:                 conf_f = 1.0
-570: 
-571:             speakers = obj.get("active_speakers")
-572:             if not isinstance(speakers, list):
-573:                 speakers = []
-574:             speakers_out: List[str] = []
-575:             for s in speakers:
-576:                 if isinstance(s, str) and s:
-577:                     speakers_out.append(s)
-578: 
-579:             out_tracked.append(
-580:                 {
-581:                     "id": obj_id,
-582:                     "centroid_x": cx_f,
-583:                     "source": source,
-584:                     "label": label,
-585:                     "video_speakers": speakers_out,
-586:                     "bbox_width": bbox_w_f,
-587:                     "bbox_height": bbox_h_f,
-588:                     "bbox_surface": bbox_surface,
-589:                     "confidence": conf_f,
-590:                 }
-591:             )
-592: 
-593:         if out_tracked:
-594:             data_by_frame[frame_i] = out_tracked
-595: 
-596:     return data_by_frame, max_frame_seen
-597: 
-598: 
-599: def _index_audio_by_frame(audio: Dict[str, Any]) -> Tuple[Dict[int, Dict[str, Any]], Optional[int]]:
-600:     frames = audio.get("frames_analysis")
-601:     if not isinstance(frames, list):
-602:         return {}, None
-603: 
-604:     by_frame: Dict[int, Dict[str, Any]] = {}
-605:     max_frame = None
-606: 
-607:     for frame_obj in frames:
-608:         if not isinstance(frame_obj, dict):
-609:             continue
-610:         frame_num = frame_obj.get("frame")
-611:         try:
-612:             frame_i = int(frame_num)
-613:         except Exception:
-614:             continue
-615: 
-616:         audio_info = frame_obj.get("audio_info")
-617:         if not isinstance(audio_info, dict):
-618:             continue
-619: 
-620:         by_frame[frame_i] = audio_info
-621:         if max_frame is None or frame_i > max_frame:
-622:             max_frame = frame_i
-623: 
-624:     return by_frame, max_frame
-625: 
-626: 
-627: def build_ae_payload(tracking: Dict[str, Any], audio: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-628:     frames = _extract_frames_analysis(tracking)
-629:     if not frames:
-630:         return None
-631: 
-632:     data_by_frame, max_frame = _index_reduced_tracking_frames(frames)
-633:     audio_by_frame, audio_max_frame = _index_audio_by_frame(audio) if audio else ({}, None)
-634: 
-635:     fps = tracking.get("fps")
-636:     total_frames = tracking.get("total_frames")
-637: 
-638:     out: Dict[str, Any] = {
-639:         "schema": "ae_preprocessed",
-640:         "schema_version": 1,
-641:         "dataByFrame": {str(k): v for k, v in data_by_frame.items()},
-642:         "maxFrame": max_frame,
-643:         "audioByFrame": {str(k): v for k, v in audio_by_frame.items()},
-644:         "audioMaxFrame": audio_max_frame,
-645:     }
-646: 
-647:     if fps is not None:
-648:         out["fps"] = fps
-649:     if total_frames is not None:
-650:         out["total_frames"] = total_frames
-651: 
-652:     if isinstance(tracking.get("tracking_analytics"), dict):
-653:         out["tracking_analytics"] = tracking.get("tracking_analytics")
-654:     if isinstance(tracking.get("expression_summary"), dict):
-655:         out["expression_summary"] = tracking.get("expression_summary")
-656:     if isinstance(tracking.get("temporal_alignment"), dict):
-657:         out["temporal_alignment"] = tracking.get("temporal_alignment")
-658: 
-659:     if audio and isinstance(audio.get("speaker_embeddings"), dict):
-660:         out["speaker_embeddings"] = audio.get("speaker_embeddings")
-661: 
-662:     return out
-663: 
-664: 
-665: def _find_docs_dirs(work_dir: Path, keyword: str) -> List[Path]:
-666:     if not work_dir.is_dir():
-667:         return []
-668: 
-669:     docs_dirs: List[Path] = []
-670:     for project_dir in work_dir.iterdir():
-671:         if not project_dir.is_dir():
-672:             continue
-673:         if keyword and keyword not in project_dir.name:
-674:             continue
-675:         docs_dir = project_dir / "docs"
-676:         if docs_dir.is_dir():
-677:             docs_dirs.append(docs_dir)
-678:     return docs_dirs
-679: 
-680: 
-681: def _iter_videos_in_docs(docs_dir: Path) -> List[Path]:
-682:     videos: List[Path] = []
-683:     for p in docs_dir.iterdir():
-684:         if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
-685:             videos.append(p)
-686:     return videos
-687: 
-688: 
-689: def _resolve_tracking_paths(docs_dir: Path, stem: str) -> Tuple[Optional[Path], Optional[Path]]:
-690:     reduced = docs_dir / f"{stem}{TRACKING_SUFFIX}"
-691:     legacy = docs_dir / f"{stem}.json"
-692: 
-693:     if reduced.exists():
-694:         return reduced, legacy if legacy.exists() else None
-695:     if legacy.exists():
-696:         return legacy, None
-697:     return None, None
-698: 
-699: 
-700: def preprocess_docs_dir(docs_dir: Path) -> int:
-701:     written = 0
-702:     videos = _iter_videos_in_docs(docs_dir)
-703: 
-704:     for idx, video_path in enumerate(videos, start=1):
-705:         stem = video_path.stem
-706:         tracking_in, _legacy = _resolve_tracking_paths(docs_dir, stem)
-707:         if tracking_in is None:
-708:             logger.info("Tracking introuvable pour '%s'", video_path.name)
-709:             continue
-710: 
-711:         tracking = _load_json(tracking_in)
-712:         if not tracking:
-713:             continue
-714: 
-715:         audio_path = docs_dir / f"{stem}{AUDIO_SUFFIX}"
-716:         audio = _load_json(audio_path) if audio_path.exists() else None
-717: 
-718:         payload = build_ae_payload(tracking, audio)
-719:         if payload is None:
-720:             continue
-721: 
-722:         out_path = docs_dir / f"{stem}{AE_PREPROCESSED_SUFFIX}"
-723:         _write_json_atomically(out_path, payload)
-724:         written += 1
-725: 
-726:         print(
-727:             f"INTERNAL_PROGRESS: {idx}/{len(videos)} items ({int(round((idx / float(len(videos))) * 100))}%) - {video_path.name}"
-728:         )
-729: 
-730:     return written
-731: 
-732: 
-733: def main() -> None:
-734:     parser = argparse.ArgumentParser(description="Étape 7 - Pré-traitement AE (JSON AE-ready)")
-735:     parser.add_argument("--manifest_path", type=str, default=None, help="Mode analyse AE: manifest JSON")
-736:     parser.add_argument("--output_path", type=str, default=None, help="Mode analyse AE: output JSON")
-737:     parser.add_argument(
-738:         "--base_dir",
-739:         type=str,
-740:         default=os.environ.get("BASE_PATH_SCRIPTS", ""),
-741:         help="Chemin base du projet (contenant projets_extraits)",
-742:     )
-743:     parser.add_argument("--work_dir", type=str, default=None, help="Chemin explicite vers projets_extraits")
-744:     parser.add_argument(
-745:         "--keyword",
-746:         type=str,
-747:         default=os.environ.get("FOLDER_KEYWORD", "Camille"),
-748:         help="Mot-clé pour filtrer les dossiers projet",
-749:     )
-750:     parser.add_argument(
-751:         "--log_dir",
-752:         type=str,
-753:         default=str(os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs", "step7")),
-754:         help="Répertoire pour les logs (par défaut logs/step7)",
-755:     )
-756: 
-757:     args = parser.parse_args()
-758: 
-759:     if args.manifest_path:
-760:         if not args.output_path:
-761:             raise SystemExit("--output_path requis lorsque --manifest_path est fourni")
-762:         manifest_path = Path(args.manifest_path)
-763:         out_path = Path(args.output_path)
-764: 
-765:         try:
-766:             with open(manifest_path, "r", encoding="utf-8") as f:
-767:                 manifest = json.load(f)
-768:             if not isinstance(manifest, dict):
-769:                 raise ValueError("Manifest invalide (doit être un objet JSON)")
-770: 
-771:             results = analyze_manifest(manifest)
-772:             _write_json_atomically(out_path, results)
-773:         except Exception as e:
-774:             _write_json_atomically(out_path, {"error": str(e)})
-775:         return
-776: 
-777:     if args.work_dir:
-778:         work_dir = Path(args.work_dir)
-779:     else:
-780:         base_dir = Path(args.base_dir) if args.base_dir else Path(os.getcwd())
-781:         work_dir = base_dir / "projets_extraits"
-782: 
-783:     setup_logging(args.log_dir)
-784: 
-785:     docs_dirs = _find_docs_dirs(work_dir, keyword=args.keyword)
-786:     print(f"TOTAL_AE_PREPROCESS: {len(docs_dirs)}")
-787: 
-788:     for p_idx, docs_dir in enumerate(docs_dirs, start=1):
-789:         logger.info("PREPROCESS_AE: %s/%s: %s", p_idx, len(docs_dirs), docs_dir)
-790:         print(f"PREPROCESS_AE: {p_idx}/{len(docs_dirs)}: {docs_dir.name}")
-791:         preprocess_docs_dir(docs_dir)
-792:         print(f"Succès: pré-traitement AE terminé pour {docs_dir.parent.name}")
-793: 
-794:     logger.info("--- Pré-traitement AE terminé ! ---")
-795: 
-796: 
-797: if __name__ == "__main__":
-798:     main()
-```
-
-## File: workflow_scripts/step8/finalize_and_copy.py
-```python
-  1: #!/usr/bin/env python3
-  2: # -*- coding: utf-8 -*-
-  3: 
-  4: """
-  5: Script de finalisation et copie des projets vers la destination finale.
-  6: Étape 8 (Ubuntu)
-  7: \- Archive d'abord les artefacts d'analyse (scènes/tracking/audio) avant suppression
-  8: \- Copie ensuite le dossier du projet vers la destination finale
-  9: """
- 10: 
- 11: import os
- 12: import errno
- 13: import sys
- 14: import json
- 15: import shutil
- 16: import logging
- 17: import subprocess
- 18: import tempfile
- 19: from pathlib import Path
- 20: from datetime import datetime
- 21: 
- 22: ROOT_DIR = Path(__file__).resolve().parents[2]
- 23: if str(ROOT_DIR) not in sys.path:
- 24:     sys.path.insert(0, str(ROOT_DIR))
- 25: 
- 26: from config.settings import config
- 27: from services.results_archiver import ResultsArchiver, SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX, VIDEO_METADATA_NAME
- 28: 
- 29: # --- Configuration ---
- 30: WORK_DIR = Path(os.getcwd())
- 31: OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/mnt/cache"))
- 32: FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
- 33: BASE_DIR = ROOT_DIR
- 34: LOG_DIR = BASE_DIR / "logs" / "step8"
- 35: 
- 36: # --- Configuration du Logger ---
- 37: LOG_DIR.mkdir(parents=True, exist_ok=True)
- 38: log_file = LOG_DIR / f"finalize_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
- 39: 
- 40: logging.basicConfig(
- 41:     level=logging.INFO,
- 42:     format='%(asctime)s - %(levelname)s - %(message)s',
- 43:     handlers=[
- 44:         logging.FileHandler(log_file, encoding='utf-8'),
- 45:         logging.StreamHandler(sys.stdout)
- 46:     ]
- 47: )
- 48: 
- 49: 
- 50: def find_projects_to_finalize():
- 51:     """Trouve tous les projets dans WORK_DIR qui sont prêts à être finalisés."""
- 52:     projects = []
- 53:     logging.info(f"Recherche de projets à finaliser dans: {WORK_DIR}")
- 54: 
- 55:     for project_dir in WORK_DIR.iterdir():
- 56:         if not project_dir.is_dir() or project_dir.name.startswith("_temp_"):
- 57:             continue
- 58: 
- 59:         is_ready = False
- 60:         found_reason = ""
- 61:         for video_file in project_dir.rglob("*.mp4"):
- 62:             stem = video_file.stem
- 63:             scenes_csv = next(project_dir.rglob(f"{stem}{SCENES_SUFFIX}"), None)
- 64:             tracking_json = next(project_dir.rglob(f"{stem}{TRACKING_SUFFIX}"), None)
- 65:             audio_json = next(project_dir.rglob(f"{stem}{AUDIO_SUFFIX}"), None)
- 66:             if FINALIZE_MODE == "strict":
- 67:                 if scenes_csv and scenes_csv.exists() and tracking_json and tracking_json.exists():
- 68:                     found_reason = f"artefacts scènes+tracking pour '{video_file.name}'"
- 69:                     is_ready = True
- 70:                     break
- 71:             elif FINALIZE_MODE == "videos":
- 72:                 found_reason = f"vidéo présente '{video_file.name}'"
- 73:                 is_ready = True
- 74:                 break
- 75:             else:
- 76:                 if (scenes_csv and scenes_csv.exists()) or (tracking_json and tracking_json.exists()) or (audio_json and audio_json.exists()):
- 77:                     found_reason = f"au moins un artefact pour '{video_file.name}'"
- 78:                     is_ready = True
- 79:                     break
- 80: 
- 81:         if is_ready:
- 82:             logging.info(f"Projet '{project_dir.name}' est prêt ({found_reason}). Mode: {FINALIZE_MODE}")
- 83:             projects.append(project_dir)
- 84:         else:
- 85:             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
- 86: 
- 87:     return projects
- 88: 
- 89: 
- 90: def _is_dir_writable(path: Path) -> bool:
- 91:     """Teste la capacité d'écriture/suppression dans un répertoire cible.
- 92: 
- 93:     Plus fiable que os.access() sur des montages FUSE/NTFS.
- 94:     """
- 95:     try:
- 96:         path.mkdir(parents=True, exist_ok=True)
- 97:         with tempfile.NamedTemporaryFile(dir=str(path), delete=True) as tmp:
- 98:             tmp.write(b"writable-check")
- 99:             tmp.flush()
-100:         return True
-101:     except Exception:
-102:         return False
-103: 
-104: 
-105: def _select_output_dir(preferred: Path, base_dir: Path) -> Path:
-106:     """Sélectionne une destination inscriptible, avec repli si nécessaire.
-107: 
-108:     - Utilise `preferred` si inscriptible.
-109:     - Sinon, utilise `FALLBACK_OUTPUT_DIR` si défini et inscriptible.
-110:     - Sinon, utilise `base_dir / "_finalized_output"`.
-111:     """
-112:     if _is_dir_writable(preferred):
-113:         logging.info(f"Destination vérifiée: '{preferred}' est inscriptible")
-114:         return preferred
-115: 
-116:     logging.warning(
-117:         f"La destination préférée '{preferred}' n'est pas inscriptible (montage RO ? permissions ?). "
-118:         "Activation d'une destination de repli."
-119:     )
-120: 
-121:     env_fallback = os.environ.get("FALLBACK_OUTPUT_DIR")
-122:     if env_fallback:
-123:         fb = Path(env_fallback)
-124:         if _is_dir_writable(fb):
-125:             logging.warning(f"Bascule vers FALLBACK_OUTPUT_DIR: '{fb}'")
-126:             return fb
-127:         else:
-128:             logging.warning(f"FALLBACK_OUTPUT_DIR défini mais non inscriptible: '{fb}'")
-129: 
-130:     local_fb = base_dir / "_finalized_output"
-131:     local_fb.mkdir(parents=True, exist_ok=True)
-132:     logging.warning(f"Bascule vers le répertoire de repli local: '{local_fb}'")
-133:     return local_fb
-134: 
-135: 
-136: def _safe_rmtree(path: Path) -> None:
-137:     """Supprime un dossier en consignant proprement les erreurs de permissions."""
-138: 
-139:     def _onerror(func, p, exc_info):
-140:         logging.error(f"Suppression échouée sur '{p}': {exc_info[1]}")
-141: 
-142:     shutil.rmtree(path, onerror=_onerror)
-143: 
-144: 
-145: def _destination_supports_chmod(dest_dir: Path) -> bool:
-146:     """Détecte si le FS destination supporte chmod (NTFS typiquement renvoie EPERM).
-147: 
-148:     Si on ne peut pas créer de fichier, la question du chmod est secondaire; laisser True.
-149:     """
-150:     try:
-151:         dest_dir.mkdir(parents=True, exist_ok=True)
-152:         with tempfile.NamedTemporaryFile(dir=str(dest_dir), delete=True) as tmp:
-153:             try:
-154:                 os.chmod(tmp.name, 0o664)
-155:             except PermissionError:
-156:                 return False
-157:             except OSError as e:
-158:                 err = getattr(e, 'errno', None)
-159:                 if err in (errno.EPERM, errno.EACCES, getattr(errno, 'EOPNOTSUPP', None)):
-160:                     return False
-161:                 raise
-162:     except Exception:
-163:         return True
-164: 
-165: 
-166: def _copy_project_tree(src: Path, dst: Path) -> None:
-167:     """Copie le projet sans préserver les permissions sur FS type NTFS.
-168: 
-169:     Stratégie:
-170:     - Si chmod supporté: utiliser shutil.copytree (comportement standard).
-171:     - Sinon: tenter rsync --no-perms/owner/group; à défaut cp --no-preserve; à défaut copie Python manuelle.
-172:     """
-173:     dst.parent.mkdir(parents=True, exist_ok=True)
-174:     supports_chmod = _destination_supports_chmod(dst)
-175:     if supports_chmod:
-176:         shutil.copytree(src, dst, dirs_exist_ok=True)
-177:         return
-178: 
-179:     logging.info("Destination ne supporte pas chmod — copie sans préservation des permissions.")
-180:     # 1) rsync si disponible
-181:     try:
-182:         subprocess.run(
-183:             [
-184:                 "rsync",
-185:                 "-a",
-186:                 "--no-perms",
-187:                 "--no-owner",
-188:                 "--no-group",
-189:                 "--no-times",
-190:                 f"{str(src)}/",
-191:                 f"{str(dst)}/",
-192:             ],
-193:             check=True,
-194:         )
-195:         return
-196:     except FileNotFoundError:
-197:         logging.info("rsync non disponible, tentative via cp --no-preserve")
-198:     except subprocess.CalledProcessError as e:
-199:         logging.warning(f"rsync a échoué: {e}")
-200: 
-201:     # 2) cp --no-preserve si disponible (fusionner le contenu dans dst)
-202:     try:
-203:         dst.mkdir(parents=True, exist_ok=True)
-204:         subprocess.run(
-205:             [
-206:                 "bash",
-207:                 "-lc",
-208:                 f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'",
-209:             ],
-210:             check=True,
-211:         )
-212:         return
-213:     except subprocess.CalledProcessError as e:
-214:         logging.warning(f"cp --no-preserve a échoué: {e}")
-215: 
-216:     # 3) Fallback Python: os.walk et shutil.copyfile sans copystat
-217:     for root, dirs, files in os.walk(src):
-218:         rel = os.path.relpath(root, src)
-219:         target_dir = dst / rel if rel != "." else dst
-220:         target_dir.mkdir(parents=True, exist_ok=True)
-221:         for d in dirs:
-222:             (target_dir / d).mkdir(parents=True, exist_ok=True)
-223:         for f in files:
-224:             s = Path(root) / f
-225:             t = target_dir / f
-226:             shutil.copyfile(s, t)
-227: 
-228: 
-229: def _compute_alternative_output_dir(existing_dst: Path) -> Path:
-230:     """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé."""
-231:     base = existing_dst.parent
-232:     name = existing_dst.name
-233:     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-234:     candidate = base / f"{name}__finalized_{ts}"
-235:     i = 1
-236:     while candidate.exists():
-237:         candidate = base / f"{name}__finalized_{ts}_{i}"
-238:         i += 1
-239:     return candidate
-240: 
-241: 
-242: def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
-243:     docs_dir = dst_project_dir / "docs"
-244:     docs_dir.mkdir(parents=True, exist_ok=True)
-245: 
-246:     media_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".png", ".jpg", ".jpeg"}
-247:     analysis_suffixes = {SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX}
-248: 
-249:     video_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
-250:     video_stems: set[str] = set()
-251:     try:
-252:         for p in dst_project_dir.iterdir():
-253:             if p.is_file() and p.suffix.lower() in video_exts:
-254:                 video_stems.add(p.stem)
-255:         if docs_dir.exists():
-256:             for p in docs_dir.rglob("*"):
-257:                 if p.is_file() and p.suffix.lower() in video_exts:
-258:                     video_stems.add(p.stem)
-259:     except Exception:
-260:         pass
-261: 
-262:     for entry in dst_project_dir.iterdir():
-263:         if entry.name == "docs":
-264:             continue
-265:         if entry.is_file():
-266:             ext = entry.suffix.lower()
-267:             stem = entry.stem
-268:             move = False
-269:             if ext in media_exts:
-270:                 move = True
-271:             else:
-272:                 for suf in analysis_suffixes:
-273:                     if entry.name.endswith(suf) or entry.name == f"{stem}.csv":
-274:                         move = True
-275:                         break
-276:                 if not move and ext == ".json" and stem in video_stems:
-277:                     move = True
-278:             if move:
-279:                 target = docs_dir / entry.name
-280:                 try:
-281:                     if target.exists():
-282:                         target.unlink()
-283:                     shutil.move(str(entry), str(target))
-284:                 except Exception as e:
-285:                     logging.warning(f"Impossible de déplacer '{entry}' vers '{target}': {e}")
-286: 
-287: 
-288: def restore_archived_analysis(project_name: str, output_project_dir: Path) -> None:
-289:     try:
-290:         docs_dir = output_project_dir / "docs"
-291:         docs_dir.mkdir(parents=True, exist_ok=True)
-292: 
-293:         video_exts = (".mp4", ".mov", ".avi", ".mkv", ".webm")
-294:         videos = []
-295:         if docs_dir.exists():
-296:             videos.extend([p for p in docs_dir.rglob("*") if p.is_file() and p.suffix.lower() in video_exts])
-297:         videos.extend([p for p in output_project_dir.iterdir() if p.is_file() and p.suffix.lower() in video_exts])
-298: 
-299:         for v in videos:
-300:             target_dir = docs_dir if v.parent != docs_dir else v.parent
-301:             stem = v.stem
-302: 
-303:             scenes_path = ResultsArchiver.find_analysis_file(project_name, v, SCENES_SUFFIX)
-304:             if scenes_path:
-305:                 dst = target_dir / f"{stem}{SCENES_SUFFIX}"
-306:                 try:
-307:                     shutil.copy2(scenes_path, dst)
-308:                 except Exception as e:
-309:                     logging.warning(f"Restauration scenes échouée {scenes_path} -> {dst}: {e}")
-310: 
-311:             audio_path = ResultsArchiver.find_analysis_file(project_name, v, AUDIO_SUFFIX)
-312:             if audio_path:
-313:                 dst = target_dir / f"{stem}{AUDIO_SUFFIX}"
-314:                 try:
-315:                     shutil.copy2(audio_path, dst)
-316:                 except Exception as e:
-317:                     logging.warning(f"Restauration audio échouée {audio_path} -> {dst}: {e}")
-318: 
-319:             tracking_path = ResultsArchiver.find_analysis_file(project_name, v, TRACKING_SUFFIX)
-320:             if tracking_path:
-321:                 dst = target_dir / f"{stem}{TRACKING_SUFFIX}"
-322:                 try:
-323:                     shutil.copy2(tracking_path, dst)
-324:                 except Exception as e:
-325:                     logging.warning(f"Restauration tracking échouée {tracking_path} -> {dst}: {e}")
-326:     except Exception as e:
-327:         logging.warning(f"Restauration des analyses archivées échouée (projet={project_name}): {e}")
-328: 
-329: 
-330: def finalize_project(project_dir):
-331:     try:
-332:         project_name = project_dir.name
-333:         logging.info(f"Finalisation du projet: {project_name}")
-334:         print(f"Finalisation en cours pour '{project_name}'...")
-335: 
-336:         # 1) Archiver d'abord tous les artefacts d'analyse disponibles
-337:         try:
-338:             arch_summary = ResultsArchiver.archive_project_analysis(project_name)
-339:             if arch_summary and not arch_summary.get("error"):
-340:                 logging.info(
-341:                     "Archivage des analyses terminé: %s",
-342:                     json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False),
-343:                 )
-344:             else:
-345:                 logging.warning(f"Archivage des analyses non effectué ou en erreur: {arch_summary}")
-346:         except Exception as e:
-347:             logging.warning(f"Erreur lors de l'archivage des analyses du projet '{project_name}': {e}")
-348: 
-349:         output_project_dir = OUTPUT_DIR / project_name
-350: 
-351:         if output_project_dir.exists():
-352:             logging.warning(
-353:                 f"Le dossier de destination '{output_project_dir}' existe déjà. Tentative de suppression avant copie."
-354:             )
-355:             _safe_rmtree(output_project_dir)
-356:             if output_project_dir.exists():
-357:                 alt_dir = _compute_alternative_output_dir(output_project_dir)
-358:                 logging.warning(f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'")
-359:                 output_project_dir = alt_dir
-360: 
-361:         try:
-362:             _copy_project_tree(project_dir, output_project_dir)
-363:         except Exception as e:
-364:             logging.error("Erreur lors de la copie du projet: %s", e, exc_info=True)
-365:             raise
-366:         logging.info(f"Projet '{project_name}' copié avec succès vers '{output_project_dir}'")
-367: 
-368:         _normalize_project_docs_structure(output_project_dir)
-369: 
-370:         if os.environ.get("RESTORE_ARCHIVES_TO_OUTPUT", "0") in ("1", "true", "True"):
-371:             try:
-372:                 restore_archived_analysis(project_name, output_project_dir)
-373:             except Exception as e:
-374:                 logging.warning(f"Restauration des analyses archivées échouée: {e}")
-375: 
-376:         # --- Suppression du dossier source (après archivage) ---
-377:         try:
-378:             project_dir.resolve().relative_to(config.ARCHIVES_DIR.resolve())
-379:             logging.error(f"Refus de suppression: '{project_dir}' est sous ARCHIVES_DIR")
-380:             return False
-381:         except Exception:
-382:             pass
-383:         _safe_rmtree(project_dir)
-384:         logging.info(f"Dossier source '{project_dir}' supprimé avec succès.")
-385: 
-386:         logging.info(f"Finalisation terminée pour '{project_name}'")
-387:         print(f"Finalisation terminée pour '{project_name}'")
-388:         return True
-389: 
-390:     except Exception as e:
-391:         logging.error(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}", exc_info=True)
-392:         return False
-393: 
-394: 
-395: def main():
-396:     logging.info("--- Démarrage du script de Finalisation et Nettoyage ---")
-397: 
-398:     global OUTPUT_DIR
-399:     try:
-400:         OUTPUT_DIR = _select_output_dir(OUTPUT_DIR, BASE_DIR)
-401:         logging.info(f"Le répertoire de destination est: {OUTPUT_DIR.resolve()}")
-402:     except Exception as e:
-403:         logging.critical(f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}")
-404:         sys.exit(1)
-405: 
-406:     projects = find_projects_to_finalize()
-407:     total_projects = len(projects)
-408:     logging.info(f"{total_projects} projet(s) à finaliser")
-409:     print(f"{total_projects} projet(s) à finaliser")
-410: 
-411:     if total_projects == 0:
-412:         logging.info("Aucun projet à finaliser. Fin du script.")
-413:         return
-414: 
-415:     successful_count = 0
-416:     for project in projects:
-417:         if finalize_project(project):
-418:             successful_count += 1
-419: 
-420:     logging.info("--- Finalisation terminée ---")
-421:     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")
-422: 
-423:     if successful_count < total_projects:
-424:         sys.exit(1)
-425: 
-426: 
-427: if __name__ == "__main__":
-428:     try:
-429:         main()
-430:     except Exception as e:
-431:         logging.critical(f"Erreur critique non gérée dans le script de finalisation: {e}", exc_info=True)
-432:         sys.exit(1)
-```
-
 ## File: config/__init__.py
 ```python
 1: """Config package marker for pytest/package imports."""
@@ -12389,23 +11151,6 @@ app_new.py
 359: export default performanceOptimizer;
 ```
 
-## File: static/constants.js
-```javascript
- 1: export const POLLING_INTERVAL = 2000; // Increased from 500ms to 2000ms to reduce logging
- 2: 
- 3: // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
- 4: export const defaultSequenceableStepsKeys = [
- 5:     "STEP1",
- 6:     "STEP2",
- 7:     "STEP3",
- 8:     "STEP4",
- 9:     "STEP5",
-10:     "STEP6",
-11:     "STEP7",
-12:     "STEP8"
-13: ];
-```
-
 ## File: static/csvDownloadMonitor.js
 ```javascript
   1: /**
@@ -19380,14 +18125,816 @@ app_new.py
 288:             return False
 ```
 
-## File: workflow_scripts/step7/finalize_and_copy.py
+## File: workflow_scripts/step7/preprocess_ae_json.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: 
+  4: import argparse
+  5: import json
+  6: import logging
+  7: import os
+  8: import sys
+  9: from datetime import datetime
+ 10: from pathlib import Path
+ 11: from typing import Any, Dict, List, Optional, Tuple
+ 12: 
+ 13: 
+ 14: logger = logging.getLogger(__name__)
+ 15: logger.setLevel(logging.INFO)
+ 16: 
+ 17: VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm")
+ 18: AUDIO_SUFFIX = "_audio.json"
+ 19: TRACKING_SUFFIX = "_tracking.json"
+ 20: AE_PREPROCESSED_SUFFIX = "_ae.json"
+ 21: 
+ 22: 
+ 23: DEFAULT_ANALYZER_CONFIG: Dict[str, Any] = {
+ 24:     "SPREAD_THRESHOLD": 200,
+ 25:     "ENABLE_CONFIDENCE_WEIGHTING": True,
+ 26:     "CONFIDENCE_WEIGHT": 0.35,
+ 27:     "LABEL_HIGH_SPREAD": 12,
+ 28:     "LABEL_STABLE": 3,
+ 29: }
+ 30: 
+ 31: 
+ 32: def setup_logging(log_dir: str) -> str:
+ 33:     os.makedirs(log_dir, exist_ok=True)
+ 34:     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+ 35:     log_path = os.path.join(log_dir, f"preprocess_ae_{timestamp}.log")
+ 36: 
+ 37:     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+ 38: 
+ 39:     fh = logging.FileHandler(log_path, encoding="utf-8")
+ 40:     fh.setLevel(logging.INFO)
+ 41:     fh.setFormatter(formatter)
+ 42: 
+ 43:     ch = logging.StreamHandler(sys.stdout)
+ 44:     ch.setLevel(logging.INFO)
+ 45:     ch.setFormatter(formatter)
+ 46: 
+ 47:     logger.handlers.clear()
+ 48:     logger.addHandler(fh)
+ 49:     logger.addHandler(ch)
+ 50:     logger.propagate = False
+ 51: 
+ 52:     logger.info("Log file initialized: %s", log_path)
+ 53:     return log_path
+ 54: 
+ 55: 
+ 56: def _load_json(path: Path) -> Optional[Dict[str, Any]]:
+ 57:     try:
+ 58:         with open(path, "r", encoding="utf-8") as f:
+ 59:             data = json.load(f)
+ 60:         return data if isinstance(data, dict) else None
+ 61:     except Exception as e:
+ 62:         logger.warning("Impossible de lire JSON '%s': %s", path, e)
+ 63:         return None
+ 64: 
+ 65: 
+ 66: def _write_json_atomically(path: Path, payload: Dict[str, Any]) -> None:
+ 67:     tmp_path = path.with_suffix(path.suffix + ".tmp")
+ 68:     with open(tmp_path, "w", encoding="utf-8") as f:
+ 69:         json.dump(payload, f, indent=2, ensure_ascii=False)
+ 70:     os.replace(tmp_path, path)
+ 71: 
+ 72: 
+ 73: def _clamp01(value: Any) -> float:
+ 74:     try:
+ 75:         f = float(value)
+ 76:     except Exception:
+ 77:         return 0.0
+ 78:     if f < 0.0:
+ 79:         return 0.0
+ 80:     if f > 1.0:
+ 81:         return 1.0
+ 82:     return f
+ 83: 
+ 84: 
+ 85: def _normalize_str_list(value: Any) -> List[str]:
+ 86:     if value is None:
+ 87:         return []
+ 88:     if isinstance(value, list):
+ 89:         out: List[str] = []
+ 90:         for v in value:
+ 91:             if isinstance(v, str) and v:
+ 92:                 out.append(v)
+ 93:         return out
+ 94:     if isinstance(value, str) and value:
+ 95:         if "," in value:
+ 96:             parts = [p.strip() for p in value.split(",")]
+ 97:             return [p for p in parts if p]
+ 98:         return [value]
+ 99:     return []
+100: 
+101: 
+102: def _calculate_stats(values: List[float]) -> Dict[str, float]:
+103:     if not values:
+104:         return {"min": 0.0, "max": 0.0, "spread": 0.0, "average": 0.0}
+105:     min_v = values[0]
+106:     max_v = values[0]
+107:     s = 0.0
+108:     for v in values:
+109:         s += v
+110:         if v < min_v:
+111:             min_v = v
+112:         if v > max_v:
+113:             max_v = v
+114:     avg = s / float(len(values))
+115:     return {"min": float(min_v), "max": float(max_v), "spread": float(max_v - min_v), "average": float(avg)}
+116: 
+117: 
+118: def _compute_presence_score(presence: int, avg_confidence: float, config: Dict[str, Any]) -> float:
+119:     if not config.get("ENABLE_CONFIDENCE_WEIGHTING", True):
+120:         return float(presence)
+121:     weight = config.get("CONFIDENCE_WEIGHT", 0.0)
+122:     try:
+123:         w = float(weight)
+124:     except Exception:
+125:         w = 0.0
+126:     if w < 0.0:
+127:         w = 0.0
+128:     return float(presence) * (1.0 + (_clamp01(avg_confidence) * w))
+129: 
+130: 
+131: def _find_audio_json_for_video_json(video_json_path: Path) -> Optional[Path]:
+132:     if not video_json_path.exists():
+133:         return None
+134:     base_name = video_json_path.name
+135:     stem = base_name
+136:     if stem.lower().endswith("_ae.json"):
+137:         stem = stem[: -len("_ae.json")]
+138:     elif stem.lower().endswith("_tracking.json"):
+139:         stem = stem[: -len("_tracking.json")]
+140:     elif stem.lower().endswith(".json"):
+141:         stem = stem[: -len(".json")]
+142: 
+143:     audio_path = video_json_path.parent / f"{stem}{AUDIO_SUFFIX}"
+144:     return audio_path if audio_path.exists() else None
+145: 
+146: 
+147: def _load_ae_or_tracking_index(video_json_path: Path) -> Optional[Dict[str, Any]]:
+148:     root = _load_json(video_json_path)
+149:     if not root:
+150:         return None
+151: 
+152:     if isinstance(root.get("dataByFrame"), dict):
+153:         return root
+154: 
+155:     frames = _extract_frames_analysis(root)
+156:     if not frames:
+157:         return None
+158: 
+159:     data_by_frame, max_frame = _index_reduced_tracking_frames(frames)
+160:     out: Dict[str, Any] = {
+161:         "dataByFrame": {str(k): v for k, v in data_by_frame.items()},
+162:         "maxFrame": max_frame,
+163:     }
+164:     if isinstance(root.get("tracking_analytics"), dict):
+165:         out["tracking_analytics"] = root.get("tracking_analytics")
+166:     if isinstance(root.get("expression_summary"), dict):
+167:         out["expression_summary"] = root.get("expression_summary")
+168:     if isinstance(root.get("temporal_alignment"), dict):
+169:         out["temporal_alignment"] = root.get("temporal_alignment")
+170:     if root.get("fps") is not None:
+171:         out["fps"] = root.get("fps")
+172:     if root.get("total_frames") is not None:
+173:         out["total_frames"] = root.get("total_frames")
+174:     return out
+175: 
+176: 
+177: def _parse_int(value: Any) -> Optional[int]:
+178:     try:
+179:         return int(value)
+180:     except Exception:
+181:         return None
+182: 
+183: 
+184: def _compute_video_frame_scale(video_max_frame: int, reference_max_frame: int) -> float:
+185:     if video_max_frame <= 0 or reference_max_frame <= 0:
+186:         return 1.0
+187:     diff_ratio = abs(float(video_max_frame - reference_max_frame)) / float(reference_max_frame)
+188:     if diff_ratio > 0.05:
+189:         return float(video_max_frame) / float(reference_max_frame)
+190:     return 1.0
+191: 
+192: 
+193: def _to_int_keyed_map(raw_map: Any) -> Dict[int, Any]:
+194:     if not isinstance(raw_map, dict):
+195:         return {}
+196:     out: Dict[int, Any] = {}
+197:     for k, v in raw_map.items():
+198:         ki = _parse_int(k)
+199:         if ki is None:
+200:             continue
+201:         out[ki] = v
+202:     return out
+203: 
+204: 
+205: def _analyze_layer(
+206:     layer_info: Dict[str, Any],
+207:     data_by_frame: Dict[int, List[Dict[str, Any]]],
+208:     audio_by_frame: Dict[int, Dict[str, Any]],
+209:     config: Dict[str, Any],
+210:     video_frame_scale: float,
+211:     video_max_frame: int,
+212: ) -> Optional[Dict[str, Any]]:
+213:     min_frame = _parse_int(layer_info.get("in_frame"))
+214:     max_frame = _parse_int(layer_info.get("out_frame"))
+215:     if min_frame is None or max_frame is None:
+216:         return None
+217: 
+218:     objects_in_layer: Dict[str, Dict[str, Any]] = {}
+219: 
+220:     layer_scale_raw = layer_info.get("video_scale", 1.0)
+221:     try:
+222:         layer_scale = float(layer_scale_raw)
+223:     except Exception:
+224:         layer_scale = 1.0
+225:     if layer_scale <= 0.0:
+226:         layer_scale = 1.0
+227: 
+228:     effective_frame_scale = video_frame_scale * layer_scale
+229: 
+230:     for frame in range(min_frame, max_frame + 1):
+231:         video_frame = frame
+232:         if effective_frame_scale != 1.0:
+233:             mapped = int(round(float(frame) * effective_frame_scale))
+234:             if mapped < 1:
+235:                 mapped = 1
+236:             if video_max_frame > 0 and mapped > video_max_frame:
+237:                 mapped = video_max_frame
+238:             video_frame = mapped
+239: 
+240:         frame_objs = data_by_frame.get(video_frame)
+241:         audio_info = audio_by_frame.get(frame)
+242: 
+243:         if not isinstance(frame_objs, list):
+244:             continue
+245: 
+246:         for obj in frame_objs:
+247:             if not isinstance(obj, dict):
+248:                 continue
+249:             obj_id = obj.get("id")
+250:             if not isinstance(obj_id, str) or not obj_id:
+251:                 continue
+252: 
+253:             source = obj.get("source")
+254:             label = obj.get("label")
+255: 
+256:             cx = obj.get("centroid_x")
+257:             try:
+258:                 cx_f = float(cx)
+259:             except Exception:
+260:                 continue
+261: 
+262:             bbox_surface = 0.0
+263:             try:
+264:                 bbox_surface = float(obj.get("bbox_surface") or 0.0)
+265:             except Exception:
+266:                 bbox_surface = 0.0
+267:             if bbox_surface < 0.0:
+268:                 bbox_surface = 0.0
+269: 
+270:             conf_f = _clamp01(obj.get("confidence"))
+271:             speakers = _normalize_str_list(obj.get("video_speakers"))
+272: 
+273:             if obj_id not in objects_in_layer:
+274:                 objects_in_layer[obj_id] = {
+275:                     "id": obj_id,
+276:                     "source": source,
+277:                     "label": label,
+278:                     "x_values": [],
+279:                     "bbox_surfaces": [],
+280:                     "confidence_values": [],
+281:                     "audio_confirm_count": 0,
+282:                     "total_bbox_surface": 0.0,
+283:                     "total_confidence": 0.0,
+284:                     "avg_bbox_surface": 0.0,
+285:                     "avg_confidence": 0.0,
+286:                     "video_speakers": speakers,
+287:                 }
+288: 
+289:             d = objects_in_layer[obj_id]
+290:             d["x_values"].append(cx_f)
+291:             d["bbox_surfaces"].append(bbox_surface)
+292:             d["confidence_values"].append(conf_f)
+293:             d["total_bbox_surface"] += bbox_surface
+294:             d["total_confidence"] += conf_f
+295: 
+296:             is_eligible_for_audio = (source == "face_landmarker") or (
+297:                 source == "object_detector" and label == "person"
+298:             )
+299:             if is_eligible_for_audio and audio_info and audio_info.get("is_speech_present") and speakers:
+300:                 active_labels = _normalize_str_list(audio_info.get("active_speaker_labels"))
+301:                 if active_labels and (set(active_labels) & set(speakers)):
+302:                     d["audio_confirm_count"] += 1
+303: 
+304:     if not objects_in_layer:
+305:         return None
+306: 
+307:     best_audio_face: Optional[Dict[str, Any]] = None
+308:     best_audio_person: Optional[Dict[str, Any]] = None
+309:     best_face: Optional[Dict[str, Any]] = None
+310:     best_person: Optional[Dict[str, Any]] = None
+311:     best_fallback: Optional[Dict[str, Any]] = None
+312: 
+313:     max_audio_face_confirm = 0
+314:     max_audio_person_confirm = 0
+315:     max_face_presence = -1.0
+316:     max_person_presence = -1.0
+317:     max_fallback_presence = -1.0
+318:     max_audio_face_bbox = 0.0
+319:     max_face_bbox = 0.0
+320: 
+321:     for oid, obj in objects_in_layer.items():
+322:         x_vals: List[float] = obj.get("x_values") or []
+323:         presence = len(x_vals)
+324:         if presence <= 0:
+325:             continue
+326: 
+327:         bbox_count = len(obj.get("bbox_surfaces") or [])
+328:         conf_count = len(obj.get("confidence_values") or [])
+329:         obj["avg_bbox_surface"] = (obj["total_bbox_surface"] / float(bbox_count)) if bbox_count > 0 else 0.0
+330:         obj["avg_confidence"] = (obj["total_confidence"] / float(conf_count)) if conf_count > 0 else 0.0
+331: 
+332:         presence_score = _compute_presence_score(presence, float(obj["avg_confidence"]), config)
+333: 
+334:         source = obj.get("source")
+335:         label = obj.get("label")
+336:         audio_confirm = int(obj.get("audio_confirm_count") or 0)
+337: 
+338:         if source == "face_landmarker":
+339:             if audio_confirm > 0:
+340:                 current_best_score = (
+341:                     _compute_presence_score(
+342:                         len(best_audio_face.get("x_values") or []),
+343:                         float(best_audio_face.get("avg_confidence") or 0.0),
+344:                         config,
+345:                     )
+346:                     if best_audio_face
+347:                     else -1.0
+348:                 )
+349:                 if (
+350:                     audio_confirm > max_audio_face_confirm
+351:                     or (audio_confirm == max_audio_face_confirm and presence_score > current_best_score)
+352:                     or (
+353:                         audio_confirm == max_audio_face_confirm
+354:                         and presence_score == current_best_score
+355:                         and float(obj["avg_bbox_surface"]) > max_audio_face_bbox
+356:                     )
+357:                 ):
+358:                     best_audio_face = obj
+359:                     max_audio_face_confirm = audio_confirm
+360:                     max_audio_face_bbox = float(obj["avg_bbox_surface"])
+361: 
+362:             if presence_score > max_face_presence or (
+363:                 presence_score == max_face_presence and float(obj["avg_bbox_surface"]) > max_face_bbox
+364:             ):
+365:                 best_face = obj
+366:                 max_face_presence = presence_score
+367:                 max_face_bbox = float(obj["avg_bbox_surface"])
+368: 
+369:         elif source == "object_detector" and label == "person":
+370:             if audio_confirm > 0:
+371:                 current_best_score = (
+372:                     _compute_presence_score(
+373:                         len(best_audio_person.get("x_values") or []),
+374:                         float(best_audio_person.get("avg_confidence") or 0.0),
+375:                         config,
+376:                     )
+377:                     if best_audio_person
+378:                     else -1.0
+379:                 )
+380:                 if (
+381:                     audio_confirm > max_audio_person_confirm
+382:                     or (audio_confirm == max_audio_person_confirm and presence_score > current_best_score)
+383:                 ):
+384:                     best_audio_person = obj
+385:                     max_audio_person_confirm = audio_confirm
+386: 
+387:             if presence_score > max_person_presence:
+388:                 best_person = obj
+389:                 max_person_presence = presence_score
+390: 
+391:         if presence_score > max_fallback_presence:
+392:             best_fallback = obj
+393:             max_fallback_presence = presence_score
+394: 
+395:     target = best_audio_face or best_audio_person or best_face or best_person or best_fallback
+396:     if not target:
+397:         return None
+398: 
+399:     stats = _calculate_stats(target.get("x_values") or [])
+400:     spread_threshold = config.get("SPREAD_THRESHOLD", DEFAULT_ANALYZER_CONFIG["SPREAD_THRESHOLD"])
+401:     try:
+402:         spread_threshold_f = float(spread_threshold)
+403:     except Exception:
+404:         spread_threshold_f = float(DEFAULT_ANALYZER_CONFIG["SPREAD_THRESHOLD"])
+405: 
+406:     label_high = int(config.get("LABEL_HIGH_SPREAD", DEFAULT_ANALYZER_CONFIG["LABEL_HIGH_SPREAD"]))
+407:     label_stable = int(config.get("LABEL_STABLE", DEFAULT_ANALYZER_CONFIG["LABEL_STABLE"]))
+408: 
+409:     label_to_apply = label_stable
+410:     if stats["spread"] > spread_threshold_f and target.get("source") == "face_landmarker":
+411:         label_to_apply = label_high
+412: 
+413:     reason = "fallback"
+414:     if best_audio_face and target is best_audio_face:
+415:         reason = "audio_confirm_face"
+416:     elif best_audio_person and target is best_audio_person:
+417:         reason = "audio_confirm_person"
+418:     elif best_face and target is best_face:
+419:         reason = "face_presence"
+420:     elif best_person and target is best_person:
+421:         reason = "person_presence"
+422: 
+423:     return {
+424:         "center_x": stats["average"],
+425:         "spread": stats["spread"],
+426:         "label_color": label_to_apply,
+427:         "selected_id": target.get("id"),
+428:         "reason": reason,
+429:     }
+430: 
+431: 
+432: def analyze_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
+433:     raw_layers = manifest.get("layers")
+434:     if not isinstance(raw_layers, dict):
+435:         raise ValueError("manifest.layers doit être un objet")
+436: 
+437:     cfg = dict(DEFAULT_ANALYZER_CONFIG)
+438:     raw_cfg = manifest.get("config")
+439:     if isinstance(raw_cfg, dict):
+440:         cfg.update(raw_cfg)
+441: 
+442:     comp_max_frame = _parse_int(manifest.get("comp_max_frame")) or 0
+443: 
+444:     loaded_cache: Dict[str, Dict[str, Any]] = {}
+445:     results: Dict[str, Any] = {}
+446: 
+447:     for layer_id, layer_info_raw in raw_layers.items():
+448:         if not isinstance(layer_id, str):
+449:             layer_id = str(layer_id)
+450:         if not isinstance(layer_info_raw, dict):
+451:             continue
+452: 
+453:         json_path_raw = layer_info_raw.get("json_path") or manifest.get("json_path")
+454:         if not isinstance(json_path_raw, str) or not json_path_raw:
+455:             continue
+456:         video_json_path = Path(json_path_raw)
+457: 
+458:         cache_key = str(video_json_path)
+459:         if cache_key not in loaded_cache:
+460:             idx = _load_ae_or_tracking_index(video_json_path)
+461:             if not idx:
+462:                 loaded_cache[cache_key] = {"dataByFrame": {}, "maxFrame": 0, "audioByFrame": {}, "audioMaxFrame": None}
+463:             else:
+464:                 if isinstance(idx.get("audioByFrame"), dict):
+465:                     loaded_cache[cache_key] = idx
+466:                 else:
+467:                     audio_path = _find_audio_json_for_video_json(video_json_path)
+468:                     audio_root = _load_json(audio_path) if audio_path else None
+469:                     audio_by_frame, audio_max_frame = _index_audio_by_frame(audio_root) if audio_root else ({}, None)
+470:                     idx["audioByFrame"] = {str(k): v for k, v in audio_by_frame.items()}
+471:                     idx["audioMaxFrame"] = audio_max_frame
+472:                     loaded_cache[cache_key] = idx
+473: 
+474:         idx = loaded_cache[cache_key]
+475:         data_by_frame = _to_int_keyed_map(idx.get("dataByFrame"))
+476:         audio_by_frame = _to_int_keyed_map(idx.get("audioByFrame"))
+477: 
+478:         video_max_frame = _parse_int(idx.get("maxFrame")) or 0
+479:         audio_max_frame = _parse_int(idx.get("audioMaxFrame"))
+480:         reference_max_frame = audio_max_frame if audio_max_frame is not None else comp_max_frame
+481:         video_frame_scale = _compute_video_frame_scale(video_max_frame, reference_max_frame) if reference_max_frame > 0 else 1.0
+482: 
+483:         res = _analyze_layer(
+484:             layer_info_raw,
+485:             data_by_frame,
+486:             audio_by_frame,
+487:             cfg,
+488:             video_frame_scale,
+489:             video_max_frame,
+490:         )
+491:         if res is not None:
+492:             results[layer_id] = res
+493: 
+494:     return results
+495: 
+496: 
+497: def _extract_frames_analysis(tracking: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+498:     frames = tracking.get("frames_analysis")
+499:     if isinstance(frames, list):
+500:         return frames
+501: 
+502:     frames = tracking.get("frames")
+503:     if isinstance(frames, list):
+504:         return frames
+505: 
+506:     return None
+507: 
+508: 
+509: def _index_reduced_tracking_frames(frames: List[Dict[str, Any]]) -> Tuple[Dict[int, List[Dict[str, Any]]], int]:
+510:     data_by_frame: Dict[int, List[Dict[str, Any]]] = {}
+511:     max_frame_seen = 0
+512: 
+513:     for frame_obj in frames:
+514:         if not isinstance(frame_obj, dict):
+515:             continue
+516:         frame_num = frame_obj.get("frame")
+517:         try:
+518:             frame_i = int(frame_num)
+519:         except Exception:
+520:             continue
+521: 
+522:         max_frame_seen = max(max_frame_seen, frame_i)
+523: 
+524:         tracked = frame_obj.get("tracked_objects")
+525:         if not isinstance(tracked, list):
+526:             continue
+527: 
+528:         out_tracked: List[Dict[str, Any]] = []
+529:         for obj in tracked:
+530:             if not isinstance(obj, dict):
+531:                 continue
+532:             source = obj.get("source")
+533:             label = obj.get("label")
+534:             is_relevant = (source == "face_landmarker") or (source == "object_detector" and label == "person")
+535:             if not is_relevant:
+536:                 continue
+537: 
+538:             obj_id = obj.get("id")
+539:             if not isinstance(obj_id, str) or not obj_id:
+540:                 continue
+541: 
+542:             cx = obj.get("centroid_x")
+543:             try:
+544:                 cx_f = float(cx)
+545:             except Exception:
+546:                 continue
+547: 
+548:             bbox_w = obj.get("bbox_width")
+549:             bbox_h = obj.get("bbox_height")
+550:             try:
+551:                 bbox_w_f = float(bbox_w) if bbox_w is not None else 0.0
+552:             except Exception:
+553:                 bbox_w_f = 0.0
+554:             try:
+555:                 bbox_h_f = float(bbox_h) if bbox_h is not None else 0.0
+556:             except Exception:
+557:                 bbox_h_f = 0.0
+558: 
+559:             bbox_surface = max(0.0, bbox_w_f) * max(0.0, bbox_h_f)
+560: 
+561:             conf = obj.get("confidence")
+562:             try:
+563:                 conf_f = float(conf) if conf is not None else 0.0
+564:             except Exception:
+565:                 conf_f = 0.0
+566:             if conf_f < 0.0:
+567:                 conf_f = 0.0
+568:             if conf_f > 1.0:
+569:                 conf_f = 1.0
+570: 
+571:             speakers = obj.get("active_speakers")
+572:             if not isinstance(speakers, list):
+573:                 speakers = []
+574:             speakers_out: List[str] = []
+575:             for s in speakers:
+576:                 if isinstance(s, str) and s:
+577:                     speakers_out.append(s)
+578: 
+579:             out_tracked.append(
+580:                 {
+581:                     "id": obj_id,
+582:                     "centroid_x": cx_f,
+583:                     "source": source,
+584:                     "label": label,
+585:                     "video_speakers": speakers_out,
+586:                     "bbox_width": bbox_w_f,
+587:                     "bbox_height": bbox_h_f,
+588:                     "bbox_surface": bbox_surface,
+589:                     "confidence": conf_f,
+590:                 }
+591:             )
+592: 
+593:         if out_tracked:
+594:             data_by_frame[frame_i] = out_tracked
+595: 
+596:     return data_by_frame, max_frame_seen
+597: 
+598: 
+599: def _index_audio_by_frame(audio: Dict[str, Any]) -> Tuple[Dict[int, Dict[str, Any]], Optional[int]]:
+600:     frames = audio.get("frames_analysis")
+601:     if not isinstance(frames, list):
+602:         return {}, None
+603: 
+604:     by_frame: Dict[int, Dict[str, Any]] = {}
+605:     max_frame = None
+606: 
+607:     for frame_obj in frames:
+608:         if not isinstance(frame_obj, dict):
+609:             continue
+610:         frame_num = frame_obj.get("frame")
+611:         try:
+612:             frame_i = int(frame_num)
+613:         except Exception:
+614:             continue
+615: 
+616:         audio_info = frame_obj.get("audio_info")
+617:         if not isinstance(audio_info, dict):
+618:             continue
+619: 
+620:         by_frame[frame_i] = audio_info
+621:         if max_frame is None or frame_i > max_frame:
+622:             max_frame = frame_i
+623: 
+624:     return by_frame, max_frame
+625: 
+626: 
+627: def build_ae_payload(tracking: Dict[str, Any], audio: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+628:     frames = _extract_frames_analysis(tracking)
+629:     if not frames:
+630:         return None
+631: 
+632:     data_by_frame, max_frame = _index_reduced_tracking_frames(frames)
+633:     audio_by_frame, audio_max_frame = _index_audio_by_frame(audio) if audio else ({}, None)
+634: 
+635:     fps = tracking.get("fps")
+636:     total_frames = tracking.get("total_frames")
+637: 
+638:     out: Dict[str, Any] = {
+639:         "schema": "ae_preprocessed",
+640:         "schema_version": 1,
+641:         "dataByFrame": {str(k): v for k, v in data_by_frame.items()},
+642:         "maxFrame": max_frame,
+643:         "audioByFrame": {str(k): v for k, v in audio_by_frame.items()},
+644:         "audioMaxFrame": audio_max_frame,
+645:     }
+646: 
+647:     if fps is not None:
+648:         out["fps"] = fps
+649:     if total_frames is not None:
+650:         out["total_frames"] = total_frames
+651: 
+652:     if isinstance(tracking.get("tracking_analytics"), dict):
+653:         out["tracking_analytics"] = tracking.get("tracking_analytics")
+654:     if isinstance(tracking.get("expression_summary"), dict):
+655:         out["expression_summary"] = tracking.get("expression_summary")
+656:     if isinstance(tracking.get("temporal_alignment"), dict):
+657:         out["temporal_alignment"] = tracking.get("temporal_alignment")
+658: 
+659:     if audio and isinstance(audio.get("speaker_embeddings"), dict):
+660:         out["speaker_embeddings"] = audio.get("speaker_embeddings")
+661: 
+662:     return out
+663: 
+664: 
+665: def _find_docs_dirs(work_dir: Path, keyword: str) -> List[Path]:
+666:     if not work_dir.is_dir():
+667:         return []
+668: 
+669:     docs_dirs: List[Path] = []
+670:     for project_dir in work_dir.iterdir():
+671:         if not project_dir.is_dir():
+672:             continue
+673:         if keyword and keyword not in project_dir.name:
+674:             continue
+675:         docs_dir = project_dir / "docs"
+676:         if docs_dir.is_dir():
+677:             docs_dirs.append(docs_dir)
+678:     return docs_dirs
+679: 
+680: 
+681: def _iter_videos_in_docs(docs_dir: Path) -> List[Path]:
+682:     videos: List[Path] = []
+683:     for p in docs_dir.iterdir():
+684:         if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
+685:             videos.append(p)
+686:     return videos
+687: 
+688: 
+689: def _resolve_tracking_paths(docs_dir: Path, stem: str) -> Tuple[Optional[Path], Optional[Path]]:
+690:     reduced = docs_dir / f"{stem}{TRACKING_SUFFIX}"
+691:     legacy = docs_dir / f"{stem}.json"
+692: 
+693:     if reduced.exists():
+694:         return reduced, legacy if legacy.exists() else None
+695:     if legacy.exists():
+696:         return legacy, None
+697:     return None, None
+698: 
+699: 
+700: def preprocess_docs_dir(docs_dir: Path) -> int:
+701:     written = 0
+702:     videos = _iter_videos_in_docs(docs_dir)
+703: 
+704:     for idx, video_path in enumerate(videos, start=1):
+705:         stem = video_path.stem
+706:         tracking_in, _legacy = _resolve_tracking_paths(docs_dir, stem)
+707:         if tracking_in is None:
+708:             logger.info("Tracking introuvable pour '%s'", video_path.name)
+709:             continue
+710: 
+711:         tracking = _load_json(tracking_in)
+712:         if not tracking:
+713:             continue
+714: 
+715:         audio_path = docs_dir / f"{stem}{AUDIO_SUFFIX}"
+716:         audio = _load_json(audio_path) if audio_path.exists() else None
+717: 
+718:         payload = build_ae_payload(tracking, audio)
+719:         if payload is None:
+720:             continue
+721: 
+722:         out_path = docs_dir / f"{stem}{AE_PREPROCESSED_SUFFIX}"
+723:         _write_json_atomically(out_path, payload)
+724:         written += 1
+725: 
+726:         print(
+727:             f"INTERNAL_PROGRESS: {idx}/{len(videos)} items ({int(round((idx / float(len(videos))) * 100))}%) - {video_path.name}"
+728:         )
+729: 
+730:     return written
+731: 
+732: 
+733: def main() -> None:
+734:     parser = argparse.ArgumentParser(description="Étape 7 - Pré-traitement AE (JSON AE-ready)")
+735:     parser.add_argument("--manifest_path", type=str, default=None, help="Mode analyse AE: manifest JSON")
+736:     parser.add_argument("--output_path", type=str, default=None, help="Mode analyse AE: output JSON")
+737:     parser.add_argument(
+738:         "--base_dir",
+739:         type=str,
+740:         default=os.environ.get("BASE_PATH_SCRIPTS", ""),
+741:         help="Chemin base du projet (contenant projets_extraits)",
+742:     )
+743:     parser.add_argument("--work_dir", type=str, default=None, help="Chemin explicite vers projets_extraits")
+744:     parser.add_argument(
+745:         "--keyword",
+746:         type=str,
+747:         default=os.environ.get("FOLDER_KEYWORD", "Camille"),
+748:         help="Mot-clé pour filtrer les dossiers projet",
+749:     )
+750:     parser.add_argument(
+751:         "--log_dir",
+752:         type=str,
+753:         default=str(os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs", "step7")),
+754:         help="Répertoire pour les logs (par défaut logs/step7)",
+755:     )
+756: 
+757:     args = parser.parse_args()
+758: 
+759:     if args.manifest_path:
+760:         if not args.output_path:
+761:             raise SystemExit("--output_path requis lorsque --manifest_path est fourni")
+762:         manifest_path = Path(args.manifest_path)
+763:         out_path = Path(args.output_path)
+764: 
+765:         try:
+766:             with open(manifest_path, "r", encoding="utf-8") as f:
+767:                 manifest = json.load(f)
+768:             if not isinstance(manifest, dict):
+769:                 raise ValueError("Manifest invalide (doit être un objet JSON)")
+770: 
+771:             results = analyze_manifest(manifest)
+772:             _write_json_atomically(out_path, results)
+773:         except Exception as e:
+774:             _write_json_atomically(out_path, {"error": str(e)})
+775:         return
+776: 
+777:     if args.work_dir:
+778:         work_dir = Path(args.work_dir)
+779:     else:
+780:         base_dir = Path(args.base_dir) if args.base_dir else Path(os.getcwd())
+781:         work_dir = base_dir / "projets_extraits"
+782: 
+783:     setup_logging(args.log_dir)
+784: 
+785:     docs_dirs = _find_docs_dirs(work_dir, keyword=args.keyword)
+786:     print(f"TOTAL_AE_PREPROCESS: {len(docs_dirs)}")
+787: 
+788:     for p_idx, docs_dir in enumerate(docs_dirs, start=1):
+789:         logger.info("PREPROCESS_AE: %s/%s: %s", p_idx, len(docs_dirs), docs_dir)
+790:         print(f"PREPROCESS_AE: {p_idx}/{len(docs_dirs)}: {docs_dir.name}")
+791:         preprocess_docs_dir(docs_dir)
+792:         print(f"Succès: pré-traitement AE terminé pour {docs_dir.parent.name}")
+793: 
+794:     logger.info("--- Pré-traitement AE terminé ! ---")
+795: 
+796: 
+797: if __name__ == "__main__":
+798:     main()
+```
+
+## File: workflow_scripts/step8/finalize_and_copy.py
 ```python
   1: #!/usr/bin/env python3
   2: # -*- coding: utf-8 -*-
   3: 
   4: """
   5: Script de finalisation et copie des projets vers la destination finale.
-  6: Étape 7 (Ubuntu)
+  6: Étape 8 (Ubuntu)
   7: \- Archive d'abord les artefacts d'analyse (scènes/tracking/audio) avant suppression
   8: \- Copie ensuite le dossier du projet vers la destination finale
   9: """
@@ -19412,123 +18959,123 @@ app_new.py
  28: 
  29: # --- Configuration ---
  30: WORK_DIR = Path(os.getcwd())
- 31: # --- MODIFICATION: Changer la destination ---
- 32: OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/mnt/cache"))
- 33: # --- FIN DE LA MODIFICATION ---
- 34: FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
- 35: BASE_DIR = ROOT_DIR
- 36: LOG_DIR = BASE_DIR / "logs" / "step8"
- 37: 
- 38: # --- Configuration du Logger ---
- 39: LOG_DIR.mkdir(parents=True, exist_ok=True)
- 40: log_file = LOG_DIR / f"finalize_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
- 41: 
- 42: logging.basicConfig(
- 43:     level=logging.INFO,
- 44:     format='%(asctime)s - %(levelname)s - %(message)s',
- 45:     handlers=[
- 46:         logging.FileHandler(log_file, encoding='utf-8'),
- 47:         logging.StreamHandler(sys.stdout)
- 48:     ]
- 49: )
- 50: 
- 51: 
- 52: def find_projects_to_finalize():
- 53:     """Trouve tous les projets dans WORK_DIR qui sont prêts à être finalisés."""
- 54:     projects = []
- 55:     logging.info(f"Recherche de projets à finaliser dans: {WORK_DIR}")
- 56: 
- 57:     for project_dir in WORK_DIR.iterdir():
- 58:         if not project_dir.is_dir() or project_dir.name.startswith("_temp_"):
- 59:             continue
- 60: 
- 61:         is_ready = False
- 62:         found_reason = ""
- 63:         for video_file in project_dir.rglob("*.mp4"):
- 64:             stem = video_file.stem
- 65:             scenes_csv = next(project_dir.rglob(f"{stem}{SCENES_SUFFIX}"), None)
- 66:             tracking_json = next(project_dir.rglob(f"{stem}{TRACKING_SUFFIX}"), None)
- 67:             audio_json = next(project_dir.rglob(f"{stem}{AUDIO_SUFFIX}"), None)
- 68:             if FINALIZE_MODE == "strict":
- 69:                 if scenes_csv and scenes_csv.exists() and tracking_json and tracking_json.exists():
- 70:                     found_reason = f"artefacts scènes+tracking pour '{video_file.name}'"
- 71:                     is_ready = True
- 72:                     break
- 73:             elif FINALIZE_MODE == "videos":
- 74:                 found_reason = f"vidéo présente '{video_file.name}'"
- 75:                 is_ready = True
- 76:                 break
- 77:             else:
- 78:                 if (scenes_csv and scenes_csv.exists()) or (tracking_json and tracking_json.exists()) or (audio_json and audio_json.exists()):
- 79:                     found_reason = f"au moins un artefact pour '{video_file.name}'"
- 80:                     is_ready = True
- 81:                     break
- 82: 
- 83:         if is_ready:
- 84:             logging.info(f"Projet '{project_dir.name}' est prêt ({found_reason}). Mode: {FINALIZE_MODE}")
- 85:             projects.append(project_dir)
- 86:         else:
- 87:             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
+ 31: OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/mnt/cache"))
+ 32: FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
+ 33: BASE_DIR = ROOT_DIR
+ 34: LOG_DIR = BASE_DIR / "logs" / "step8"
+ 35: 
+ 36: # --- Configuration du Logger ---
+ 37: LOG_DIR.mkdir(parents=True, exist_ok=True)
+ 38: log_file = LOG_DIR / f"finalize_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+ 39: 
+ 40: logging.basicConfig(
+ 41:     level=logging.INFO,
+ 42:     format='%(asctime)s - %(levelname)s - %(message)s',
+ 43:     handlers=[
+ 44:         logging.FileHandler(log_file, encoding='utf-8'),
+ 45:         logging.StreamHandler(sys.stdout)
+ 46:     ]
+ 47: )
+ 48: 
+ 49: 
+ 50: def find_projects_to_finalize():
+ 51:     """Trouve tous les projets dans WORK_DIR qui sont prêts à être finalisés."""
+ 52:     projects = []
+ 53:     logging.info(f"Recherche de projets à finaliser dans: {WORK_DIR}")
+ 54: 
+ 55:     for project_dir in WORK_DIR.iterdir():
+ 56:         if not project_dir.is_dir() or project_dir.name.startswith("_temp_"):
+ 57:             continue
+ 58: 
+ 59:         is_ready = False
+ 60:         found_reason = ""
+ 61:         for video_file in project_dir.rglob("*.mp4"):
+ 62:             stem = video_file.stem
+ 63:             scenes_csv = next(project_dir.rglob(f"{stem}{SCENES_SUFFIX}"), None)
+ 64:             tracking_json = next(project_dir.rglob(f"{stem}{TRACKING_SUFFIX}"), None)
+ 65:             audio_json = next(project_dir.rglob(f"{stem}{AUDIO_SUFFIX}"), None)
+ 66:             if FINALIZE_MODE == "strict":
+ 67:                 if scenes_csv and scenes_csv.exists() and tracking_json and tracking_json.exists():
+ 68:                     found_reason = f"artefacts scènes+tracking pour '{video_file.name}'"
+ 69:                     is_ready = True
+ 70:                     break
+ 71:             elif FINALIZE_MODE == "videos":
+ 72:                 found_reason = f"vidéo présente '{video_file.name}'"
+ 73:                 is_ready = True
+ 74:                 break
+ 75:             else:
+ 76:                 if (scenes_csv and scenes_csv.exists()) or (tracking_json and tracking_json.exists()) or (audio_json and audio_json.exists()):
+ 77:                     found_reason = f"au moins un artefact pour '{video_file.name}'"
+ 78:                     is_ready = True
+ 79:                     break
+ 80: 
+ 81:         if is_ready:
+ 82:             logging.info(f"Projet '{project_dir.name}' est prêt ({found_reason}). Mode: {FINALIZE_MODE}")
+ 83:             projects.append(project_dir)
+ 84:         else:
+ 85:             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
+ 86: 
+ 87:     return projects
  88: 
- 89:     return projects
- 90: 
- 91: 
- 92: def _is_dir_writable(path: Path) -> bool:
- 93:     """Teste la capacité d'écriture/suppression dans un répertoire cible.
- 94: 
- 95:     Plus fiable que os.access() sur des montages FUSE/NTFS.
- 96:     """
- 97:     try:
- 98:         path.mkdir(parents=True, exist_ok=True)
- 99:         with tempfile.NamedTemporaryFile(dir=str(path), delete=True) as tmp:
-100:             tmp.write(b"writable-check")
-101:             tmp.flush()
-102:         return True
-103:     except Exception:
-104:         return False
-105: 
-106: 
-107: def _select_output_dir(preferred: Path, base_dir: Path) -> Path:
-108:     """Sélectionne une destination inscriptible, avec repli si nécessaire.
-109: 
-110:     - Utilise `preferred` si inscriptible.
-111:     - Sinon, utilise `FALLBACK_OUTPUT_DIR` si défini et inscriptible.
-112:     - Sinon, utilise `base_dir / "_finalized_output"`.
-113:     """
-114:     if _is_dir_writable(preferred):
-115:         logging.info(f"Destination vérifiée: '{preferred}' est inscriptible")
-116:         return preferred
-117: 
-118:     logging.warning(
-119:         f"La destination préférée '{preferred}' n'est pas inscriptible (montage RO ? permissions ?). "
-120:         "Activation d'une destination de repli."
-121:     )
-122: 
-123:     env_fallback = os.environ.get("FALLBACK_OUTPUT_DIR")
-124:     if env_fallback:
-125:         fb = Path(env_fallback)
-126:         if _is_dir_writable(fb):
-127:             logging.warning(f"Bascule vers FALLBACK_OUTPUT_DIR: '{fb}'")
-128:             return fb
-129:         else:
-130:             logging.warning(f"FALLBACK_OUTPUT_DIR défini mais non inscriptible: '{fb}'")
-131: 
-132:     local_fb = base_dir / "_finalized_output"
-133:     local_fb.mkdir(parents=True, exist_ok=True)
-134:     logging.warning(f"Bascule vers le répertoire de repli local: '{local_fb}'")
-135:     return local_fb
-136: 
-137: 
-138: def _safe_rmtree(path: Path) -> None:
-139:     """Supprime un dossier en consignant proprement les erreurs de permissions."""
-140:     def _onerror(func, p, exc_info):
-141:         logging.error(f"Suppression échouée sur '{p}': {exc_info[1]}")
+ 89: 
+ 90: def _is_dir_writable(path: Path) -> bool:
+ 91:     """Teste la capacité d'écriture/suppression dans un répertoire cible.
+ 92: 
+ 93:     Plus fiable que os.access() sur des montages FUSE/NTFS.
+ 94:     """
+ 95:     try:
+ 96:         path.mkdir(parents=True, exist_ok=True)
+ 97:         with tempfile.NamedTemporaryFile(dir=str(path), delete=True) as tmp:
+ 98:             tmp.write(b"writable-check")
+ 99:             tmp.flush()
+100:         return True
+101:     except Exception:
+102:         return False
+103: 
+104: 
+105: def _select_output_dir(preferred: Path, base_dir: Path) -> Path:
+106:     """Sélectionne une destination inscriptible, avec repli si nécessaire.
+107: 
+108:     - Utilise `preferred` si inscriptible.
+109:     - Sinon, utilise `FALLBACK_OUTPUT_DIR` si défini et inscriptible.
+110:     - Sinon, utilise `base_dir / "_finalized_output"`.
+111:     """
+112:     if _is_dir_writable(preferred):
+113:         logging.info(f"Destination vérifiée: '{preferred}' est inscriptible")
+114:         return preferred
+115: 
+116:     logging.warning(
+117:         f"La destination préférée '{preferred}' n'est pas inscriptible (montage RO ? permissions ?). "
+118:         "Activation d'une destination de repli."
+119:     )
+120: 
+121:     env_fallback = os.environ.get("FALLBACK_OUTPUT_DIR")
+122:     if env_fallback:
+123:         fb = Path(env_fallback)
+124:         if _is_dir_writable(fb):
+125:             logging.warning(f"Bascule vers FALLBACK_OUTPUT_DIR: '{fb}'")
+126:             return fb
+127:         else:
+128:             logging.warning(f"FALLBACK_OUTPUT_DIR défini mais non inscriptible: '{fb}'")
+129: 
+130:     local_fb = base_dir / "_finalized_output"
+131:     local_fb.mkdir(parents=True, exist_ok=True)
+132:     logging.warning(f"Bascule vers le répertoire de repli local: '{local_fb}'")
+133:     return local_fb
+134: 
+135: 
+136: def _safe_rmtree(path: Path) -> None:
+137:     """Supprime un dossier en consignant proprement les erreurs de permissions."""
+138: 
+139:     def _onerror(func, p, exc_info):
+140:         logging.error(f"Suppression échouée sur '{p}': {exc_info[1]}")
+141: 
 142:     shutil.rmtree(path, onerror=_onerror)
 143: 
 144: 
 145: def _destination_supports_chmod(dest_dir: Path) -> bool:
 146:     """Détecte si le FS destination supporte chmod (NTFS typiquement renvoie EPERM).
-147:     
+147: 
 148:     Si on ne peut pas créer de fichier, la question du chmod est secondaire; laisser True.
 149:     """
 150:     try:
@@ -19563,113 +19110,113 @@ app_new.py
 179:     logging.info("Destination ne supporte pas chmod — copie sans préservation des permissions.")
 180:     # 1) rsync si disponible
 181:     try:
-182:         subprocess.run([
-183:             "rsync", "-a", "--no-perms", "--no-owner", "--no-group", "--no-times",
-184:             f"{str(src)}/", f"{str(dst)}/"
-185:         ], check=True)
-186:         return
-187:     except FileNotFoundError:
-188:         logging.info("rsync non disponible, tentative via cp --no-preserve")
-189:     except subprocess.CalledProcessError as e:
-190:         logging.warning(f"rsync a échoué: {e}")
-191: 
-192:     # 2) cp --no-preserve si disponible (fusionner le contenu dans dst)
-193:     try:
-194:         dst.mkdir(parents=True, exist_ok=True)
-195:         subprocess.run([
-196:             "bash", "-lc",
-197:             f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'"
-198:         ], check=True)
-199:         return
-200:     except subprocess.CalledProcessError as e:
-201:         logging.warning(f"cp --no-preserve a échoué: {e}")
-202: 
-203:     # 3) Fallback Python: os.walk et shutil.copyfile sans copystat
-204:     for root, dirs, files in os.walk(src):
-205:         rel = os.path.relpath(root, src)
-206:         target_dir = dst / rel if rel != "." else dst
-207:         target_dir.mkdir(parents=True, exist_ok=True)
-208:         for d in dirs:
-209:             (target_dir / d).mkdir(parents=True, exist_ok=True)
-210:         for f in files:
-211:             s = Path(root) / f
-212:             t = target_dir / f
-213:             shutil.copyfile(s, t)
-214: 
+182:         subprocess.run(
+183:             [
+184:                 "rsync",
+185:                 "-a",
+186:                 "--no-perms",
+187:                 "--no-owner",
+188:                 "--no-group",
+189:                 "--no-times",
+190:                 f"{str(src)}/",
+191:                 f"{str(dst)}/",
+192:             ],
+193:             check=True,
+194:         )
+195:         return
+196:     except FileNotFoundError:
+197:         logging.info("rsync non disponible, tentative via cp --no-preserve")
+198:     except subprocess.CalledProcessError as e:
+199:         logging.warning(f"rsync a échoué: {e}")
+200: 
+201:     # 2) cp --no-preserve si disponible (fusionner le contenu dans dst)
+202:     try:
+203:         dst.mkdir(parents=True, exist_ok=True)
+204:         subprocess.run(
+205:             [
+206:                 "bash",
+207:                 "-lc",
+208:                 f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'",
+209:             ],
+210:             check=True,
+211:         )
+212:         return
+213:     except subprocess.CalledProcessError as e:
+214:         logging.warning(f"cp --no-preserve a échoué: {e}")
 215: 
-216: def _compute_alternative_output_dir(existing_dst: Path) -> Path:
-217:     """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé.
-218: 
-219:     Ex.: /mnt/cache/33 Camille -> /mnt/cache/33 Camille__finalized_YYYYmmdd_HHMMSS[_n]
-220:     """
-221:     base = existing_dst.parent
-222:     name = existing_dst.name
-223:     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-224:     candidate = base / f"{name}__finalized_{ts}"
-225:     i = 1
-226:     while candidate.exists():
-227:         candidate = base / f"{name}__finalized_{ts}_{i}"
-228:         i += 1
-229:     return candidate
-230: 
-231: 
-232: def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
-233:     """Ensure destination project has a docs/ subfolder containing media and related files.
-234: 
-235:     If files are currently at the project root (common when previous steps didn't use a docs/
-236:     directory), move recognized media and analysis files into docs/.
-237:     """
-238:     docs_dir = dst_project_dir / "docs"
-239:     docs_dir.mkdir(parents=True, exist_ok=True)
+216:     # 3) Fallback Python: os.walk et shutil.copyfile sans copystat
+217:     for root, dirs, files in os.walk(src):
+218:         rel = os.path.relpath(root, src)
+219:         target_dir = dst / rel if rel != "." else dst
+220:         target_dir.mkdir(parents=True, exist_ok=True)
+221:         for d in dirs:
+222:             (target_dir / d).mkdir(parents=True, exist_ok=True)
+223:         for f in files:
+224:             s = Path(root) / f
+225:             t = target_dir / f
+226:             shutil.copyfile(s, t)
+227: 
+228: 
+229: def _compute_alternative_output_dir(existing_dst: Path) -> Path:
+230:     """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé."""
+231:     base = existing_dst.parent
+232:     name = existing_dst.name
+233:     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+234:     candidate = base / f"{name}__finalized_{ts}"
+235:     i = 1
+236:     while candidate.exists():
+237:         candidate = base / f"{name}__finalized_{ts}_{i}"
+238:         i += 1
+239:     return candidate
 240: 
-241:     media_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".png", ".jpg", ".jpeg"}
-242:     analysis_suffixes = {SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX}
-243: 
-244:     video_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
-245:     video_stems: set[str] = set()
-246:     try:
-247:         for p in dst_project_dir.iterdir():
-248:             if p.is_file() and p.suffix.lower() in video_exts:
-249:                 video_stems.add(p.stem)
-250:         if docs_dir.exists():
-251:             for p in docs_dir.rglob("*"):
-252:                 if p.is_file() and p.suffix.lower() in video_exts:
-253:                     video_stems.add(p.stem)
-254:     except Exception:
-255:         pass
-256: 
-257:     for entry in dst_project_dir.iterdir():
-258:         if entry.name == "docs":
-259:             continue
-260:         if entry.is_file():
-261:             ext = entry.suffix.lower()
-262:             stem = entry.stem
-263:             move = False
-264:             if ext in media_exts:
-265:                 move = True
-266:             else:
-267:                 for suf in analysis_suffixes:
-268:                     if entry.name.endswith(suf) or entry.name == f"{stem}.csv":
-269:                         move = True
-270:                         break
-271:                 if not move and ext == ".json" and stem in video_stems:
-272:                     move = True
-273:             if move:
-274:                 target = docs_dir / entry.name
-275:                 try:
-276:                     if target.exists():
-277:                         target.unlink()
-278:                     shutil.move(str(entry), str(target))
-279:                 except Exception as e:
-280:                     logging.warning(f"Impossible de déplacer '{entry}' vers '{target}': {e}")
-281: 
-282: 
-283: def restore_archived_analysis(project_name: str, output_project_dir: Path) -> None:
-284:     """Restore archived analysis artifacts into the destination project docs/ folder.
-285: 
-286:     For each detected video file in docs/, attempt to retrieve archived artifacts
-287:     (scenes CSV, audio JSON, tracking JSON) using ResultsArchiver and copy them next to the video.
-288:     """
+241: 
+242: def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
+243:     docs_dir = dst_project_dir / "docs"
+244:     docs_dir.mkdir(parents=True, exist_ok=True)
+245: 
+246:     media_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".png", ".jpg", ".jpeg"}
+247:     analysis_suffixes = {SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX}
+248: 
+249:     video_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+250:     video_stems: set[str] = set()
+251:     try:
+252:         for p in dst_project_dir.iterdir():
+253:             if p.is_file() and p.suffix.lower() in video_exts:
+254:                 video_stems.add(p.stem)
+255:         if docs_dir.exists():
+256:             for p in docs_dir.rglob("*"):
+257:                 if p.is_file() and p.suffix.lower() in video_exts:
+258:                     video_stems.add(p.stem)
+259:     except Exception:
+260:         pass
+261: 
+262:     for entry in dst_project_dir.iterdir():
+263:         if entry.name == "docs":
+264:             continue
+265:         if entry.is_file():
+266:             ext = entry.suffix.lower()
+267:             stem = entry.stem
+268:             move = False
+269:             if ext in media_exts:
+270:                 move = True
+271:             else:
+272:                 for suf in analysis_suffixes:
+273:                     if entry.name.endswith(suf) or entry.name == f"{stem}.csv":
+274:                         move = True
+275:                         break
+276:                 if not move and ext == ".json" and stem in video_stems:
+277:                     move = True
+278:             if move:
+279:                 target = docs_dir / entry.name
+280:                 try:
+281:                     if target.exists():
+282:                         target.unlink()
+283:                     shutil.move(str(entry), str(target))
+284:                 except Exception as e:
+285:                     logging.warning(f"Impossible de déplacer '{entry}' vers '{target}': {e}")
+286: 
+287: 
+288: def restore_archived_analysis(project_name: str, output_project_dir: Path) -> None:
 289:     try:
 290:         docs_dir = output_project_dir / "docs"
 291:         docs_dir.mkdir(parents=True, exist_ok=True)
@@ -19710,8 +19257,8 @@ app_new.py
 326:     except Exception as e:
 327:         logging.warning(f"Restauration des analyses archivées échouée (projet={project_name}): {e}")
 328: 
-329: def finalize_project(project_dir):
-330:     """Copie un projet vers la destination finale et supprime la source."""
+329: 
+330: def finalize_project(project_dir):
 331:     try:
 332:         project_name = project_dir.name
 333:         logging.info(f"Finalisation du projet: {project_name}")
@@ -19723,7 +19270,7 @@ app_new.py
 339:             if arch_summary and not arch_summary.get("error"):
 340:                 logging.info(
 341:                     "Archivage des analyses terminé: %s",
-342:                     json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False)
+342:                     json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False),
 343:                 )
 344:             else:
 345:                 logging.warning(f"Archivage des analyses non effectué ou en erreur: {arch_summary}")
@@ -19739,575 +19286,81 @@ app_new.py
 355:             _safe_rmtree(output_project_dir)
 356:             if output_project_dir.exists():
 357:                 alt_dir = _compute_alternative_output_dir(output_project_dir)
-358:                 logging.warning(
-359:                     f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'"
-360:                 )
-361:                 output_project_dir = alt_dir
-362: 
-363:         try:
-364:             _copy_project_tree(project_dir, output_project_dir)
-365:         except Exception as e:
-366:             logging.error("Erreur lors de la copie du projet: %s", e, exc_info=True)
-367:             raise
-368:         logging.info(f"Projet '{project_name}' copié avec succès vers '{output_project_dir}'")
+358:                 logging.warning(f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'")
+359:                 output_project_dir = alt_dir
+360: 
+361:         try:
+362:             _copy_project_tree(project_dir, output_project_dir)
+363:         except Exception as e:
+364:             logging.error("Erreur lors de la copie du projet: %s", e, exc_info=True)
+365:             raise
+366:         logging.info(f"Projet '{project_name}' copié avec succès vers '{output_project_dir}'")
+367: 
+368:         _normalize_project_docs_structure(output_project_dir)
 369: 
-370:         _normalize_project_docs_structure(output_project_dir)
-371: 
-372:         if os.environ.get("RESTORE_ARCHIVES_TO_OUTPUT", "0") in ("1", "true", "True"):
-373:             try:
-374:                 restore_archived_analysis(project_name, output_project_dir)
-375:             except Exception as e:
-376:                 logging.warning(f"Restauration des analyses archivées échouée: {e}")
-377: 
-378:         # --- Suppression du dossier source (après archivage) ---
-379:         try:
-380:             project_dir.resolve().relative_to(config.ARCHIVES_DIR.resolve())
-381:             logging.error(f"Refus de suppression: '{project_dir}' est sous ARCHIVES_DIR")
-382:             return False
-383:         except Exception:
-384:             pass
-385:         _safe_rmtree(project_dir)
-386:         logging.info(f"Dossier source '{project_dir}' supprimé avec succès.")
-387:         # --- FIN suppression ---
-388: 
-389:         # --- MODIFICATION: Suppression de la création du fichier metadata_final.json ---
-390:         # --- FIN DE LA MODIFICATION ---
-391: 
-392:         logging.info(f"Finalisation terminée pour '{project_name}'")
-393:         print(f"Finalisation terminée pour '{project_name}'")
-394:         return True
-395: 
-396:     except Exception as e:
-397:         logging.error(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}", exc_info=True)
-398:         return False
-399: 
-400: 
-401: def main():
-402:     """Fonction principale du script."""
-403:     logging.info(f"--- Démarrage du script de Finalisation et Nettoyage ---")
-404: 
-405:     global OUTPUT_DIR
-406:     try:
-407:         OUTPUT_DIR = _select_output_dir(OUTPUT_DIR, BASE_DIR)
-408:         logging.info(f"Le répertoire de destination est: {OUTPUT_DIR.resolve()}")
-409:     except Exception as e:
-410:         logging.critical(
-411:             f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}"
-412:         )
-413:         sys.exit(1)
+370:         if os.environ.get("RESTORE_ARCHIVES_TO_OUTPUT", "0") in ("1", "true", "True"):
+371:             try:
+372:                 restore_archived_analysis(project_name, output_project_dir)
+373:             except Exception as e:
+374:                 logging.warning(f"Restauration des analyses archivées échouée: {e}")
+375: 
+376:         # --- Suppression du dossier source (après archivage) ---
+377:         try:
+378:             project_dir.resolve().relative_to(config.ARCHIVES_DIR.resolve())
+379:             logging.error(f"Refus de suppression: '{project_dir}' est sous ARCHIVES_DIR")
+380:             return False
+381:         except Exception:
+382:             pass
+383:         _safe_rmtree(project_dir)
+384:         logging.info(f"Dossier source '{project_dir}' supprimé avec succès.")
+385: 
+386:         logging.info(f"Finalisation terminée pour '{project_name}'")
+387:         print(f"Finalisation terminée pour '{project_name}'")
+388:         return True
+389: 
+390:     except Exception as e:
+391:         logging.error(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}", exc_info=True)
+392:         return False
+393: 
+394: 
+395: def main():
+396:     logging.info("--- Démarrage du script de Finalisation et Nettoyage ---")
+397: 
+398:     global OUTPUT_DIR
+399:     try:
+400:         OUTPUT_DIR = _select_output_dir(OUTPUT_DIR, BASE_DIR)
+401:         logging.info(f"Le répertoire de destination est: {OUTPUT_DIR.resolve()}")
+402:     except Exception as e:
+403:         logging.critical(f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}")
+404:         sys.exit(1)
+405: 
+406:     projects = find_projects_to_finalize()
+407:     total_projects = len(projects)
+408:     logging.info(f"{total_projects} projet(s) à finaliser")
+409:     print(f"{total_projects} projet(s) à finaliser")
+410: 
+411:     if total_projects == 0:
+412:         logging.info("Aucun projet à finaliser. Fin du script.")
+413:         return
 414: 
-415:     projects = find_projects_to_finalize()
-416:     total_projects = len(projects)
-417:     logging.info(f"{total_projects} projet(s) à finaliser")
-418:     print(f"{total_projects} projet(s) à finaliser")
+415:     successful_count = 0
+416:     for project in projects:
+417:         if finalize_project(project):
+418:             successful_count += 1
 419: 
-420:     if total_projects == 0:
-421:         logging.info("Aucun projet à finaliser. Fin du script.")
-422:         return
-423: 
-424:     successful_count = 0
-425:     for project in projects:
-426:         if finalize_project(project):
-427:             successful_count += 1
-428: 
-429:     logging.info(f"--- Finalisation terminée ---")
-430:     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")
-431: 
-432:     if successful_count < total_projects:
-433:         sys.exit(1)
-434: 
-435: 
-436: if __name__ == "__main__":
-437:     try:
-438:         main()
-439:     except Exception as e:
-440:         logging.critical(f"Erreur critique non gérée dans le script de finalisation: {e}", exc_info=True)
-441:         sys.exit(1)
-```
-
-## File: config/workflow_commands.py
-```python
-  1: #!/usr/bin/env python3
-  2: # -*- coding: utf-8 -*-
-  3: """
-  4: Workflow Commands Configuration
-  5: 
-  6: Centralized configuration for all workflow steps.
-  7: Defines commands, working directories, log paths, and progress patterns.
-  8: """
-  9: 
- 10: import re
- 11: from pathlib import Path
- 12: from typing import Dict, Any, List, Optional
- 13: import logging
- 14: 
- 15: from config.settings import config
- 16: 
- 17: logger = logging.getLogger(__name__)
- 18: 
- 19: 
- 20: class WorkflowCommandsConfig:
- 21:     """Centralized workflow commands configuration.
- 22:     
- 23:     This class provides configuration for all 8 workflow steps, including:
- 24:     - Command line arguments
- 25:     - Working directories
- 26:     - Log file locations
- 27:     - Progress parsing patterns
- 28:     - Display names for UI
- 29:     """
- 30:     
- 31:     def __init__(self, base_path: Path = None, hf_token: str = None):
- 32:         """Initialize workflow commands configuration.
- 33:         
- 34:         Args:
- 35:             base_path: Base path for scripts (defaults to config.BASE_PATH_SCRIPTS)
- 36:             hf_token: HuggingFace authentication token for Step 4
- 37:         """
- 38:         self.base_path = base_path or config.BASE_PATH_SCRIPTS
- 39:         self.hf_token = hf_token
- 40:         
- 41:         # Setup log directories
- 42:         self.logs_base_dir = self.base_path / "logs"
- 43:         self._ensure_log_directories()
- 44:         
- 45:         # Build configuration
- 46:         self._config = self._build_configuration()
- 47:         
- 48:         logger.info(f"WorkflowCommandsConfig initialized with base_path: {self.base_path}")
- 49:     
- 50:     def _ensure_log_directories(self) -> None:
- 51:         """Ensure all log directories exist."""
- 52:         self.logs_base_dir.mkdir(exist_ok=True)
- 53:         for step in range(1, 9):
- 54:             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
- 55:     
- 56:     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
- 57:         """Build the complete workflow commands configuration.
- 58:         
- 59:         Returns:
- 60:             Dictionary mapping step keys to their configuration
- 61:         """
- 62:         return {
- 63:             "STEP1": self._get_step1_config(),
- 64:             "STEP2": self._get_step2_config(),
- 65:             "STEP3": self._get_step3_config(),
- 66:             "STEP4": self._get_step4_config(),
- 67:             "STEP5": self._get_step5_config(),
- 68:             "STEP6": self._get_step6_config(),
- 69:             "STEP7": self._get_step7_config(),
- 70:             "STEP8": self._get_step8_config(),
- 71:         }
- 72:     
- 73:     def _get_step1_config(self) -> Dict[str, Any]:
- 74:         """Get configuration for Step 1: Archive Extraction.
- 75:         
- 76:         Returns:
- 77:             Step 1 configuration dictionary
- 78:         """
- 79:         step1_log_dir = self.logs_base_dir / "step1"
- 80:         
- 81:         return {
- 82:             "display_name": "1. Extraction des archives",
- 83:             "cmd": [
- 84:                 str(config.get_venv_python("env")),
- 85:                 str(self.base_path / "workflow_scripts" / "step1" / "extract_archives.py"),
- 86:                 "--source-dir", str(Path.home() / "Téléchargements")
- 87:             ],
- 88:             "cwd": str(self.base_path),
- 89:             "specific_logs": [
- 90:                 {
- 91:                     "name": "Log Extraction",
- 92:                     "type": "directory_latest",
- 93:                     "path": step1_log_dir,
- 94:                     "pattern": "*.log",
- 95:                     "lines": 150
- 96:                 },
- 97:                 {
- 98:                     "name": "Liste Archives Traitées",
- 99:                     "type": "file",
-100:                     "path": step1_log_dir / "processed_archives.txt",
-101:                     "lines": 50
-102:                 }
-103:             ],
-104:             "progress_patterns": {
-105:                 "total": re.compile(r"Trouvé (\d+) archive\(s\) à traiter", re.IGNORECASE),
-106:                 "current_success_line_pattern": re.compile(
-107:                     r"Extraction terminée pour (.*?)$", re.IGNORECASE
-108:                 ),
-109:                 "current_item_text_from_success_line": True
-110:             }
-111:         }
-112:     
-113:     def _get_step2_config(self) -> Dict[str, Any]:
-114:         """Get configuration for Step 2: Video Conversion.
-115:         
-116:         Returns:
-117:             Step 2 configuration dictionary
-118:         """
-119:         step2_log_dir = self.logs_base_dir / "step2"
-120:         
-121:         return {
-122:             "display_name": "2. Conversion des vidéos",
-123:             "cmd": [
-124:                 str(config.get_venv_python("env")),
-125:                 str(self.base_path / "workflow_scripts" / "step2" / "convert_videos.py")
-126:             ],
-127:             "cwd": str(self.base_path / "projets_extraits"),
-128:             "specific_logs": [
-129:                 {
-130:                     "name": "Log Conversion",
-131:                     "type": "directory_latest",
-132:                     "path": step2_log_dir,
-133:                     "pattern": "*.log",
-134:                     "lines": 200
-135:                 }
-136:             ],
-137:             "progress_patterns": {
-138:                 "total": re.compile(r"TOTAL_VIDEOS_TO_PROCESS:\s*(\d+)", re.IGNORECASE),
-139:                 "current": re.compile(
-140:                     r"--- Traitement de la vidéo \((\d+)/(\d+)\): (.*?) ---", re.IGNORECASE
-141:                 )
-142:             }
-143:         }
-144:     
-145:     def _get_step3_config(self) -> Dict[str, Any]:
-146:         """Get configuration for Step 3: Scene Detection.
-147:         
-148:         Returns:
-149:             Step 3 configuration dictionary
-150:         """
-151:         step3_log_dir = self.logs_base_dir / "step3"
-152:         
-153:         return {
-154:             "display_name": "3. Analyse des transitions",
-155:             "cmd": [
-156:                 str(config.get_venv_python("transnet_env")),
-157:                 str(self.base_path / "workflow_scripts" / "step3" / "run_transnet.py"),
-158:             ],
-159:             "cwd": str(self.base_path / "projets_extraits"),
-160:             "specific_logs": [
-161:                 {
-162:                     "name": "Log Analyse Transitions",
-163:                     "type": "directory_latest",
-164:                     "path": step3_log_dir,
-165:                     "pattern": "*.log",
-166:                     "lines": 150
-167:                 }
-168:             ],
-169:             "progress_patterns": {
-170:                 # Accept both underscore and space variants
-171:                 "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
-172:                 "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
-173:                 "internal_simple": re.compile(
-174:                     r"INTERNAL[_ ]PROGRESS:\s*(\d+)\s*batches\s*-\s*(.*)$", re.IGNORECASE
-175:                 ),
-176:                 "current_success_line_pattern": re.compile(
-177:                     r"Succès:\s*(.*?)(?:\.csv|\.json)\s+créé", re.IGNORECASE
-178:                 ),
-179:                 "current_item_text_from_success_line": True
-180:             }
-181:         }
-182:     
-183:     def _get_step4_config(self) -> Dict[str, Any]:
-184:         """Get configuration for Step 4: Audio Analysis.
-185:         
-186:         Returns:
-187:             Step 4 configuration dictionary
-188:         """
-189:         step4_log_dir = self.logs_base_dir / "step4"
-190: 
-191:         step4_script_name = "run_audio_analysis_lemonfox.py" if config.STEP4_USE_LEMONFOX else "run_audio_analysis.py"
-192:         cmd = [
-193:             str(config.get_venv_python("audio_env")),
-194:             str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
-195:             "--log_dir", str(step4_log_dir),
-196:         ]
-197: 
-198:         if step4_script_name == "run_audio_analysis.py" and self.hf_token:
-199:             cmd.extend(["--hf_auth_token", str(self.hf_token)])
-200:         
-201:         return {
-202:             "display_name": "4. Analyse audio",
-203:             "cmd": cmd,
-204:             "cwd": str(self.base_path / "projets_extraits"),
-205:             "specific_logs": [
-206:                 {
-207:                     "name": "Log Analyse Audio",
-208:                     "type": "directory_latest",
-209:                     "path": step4_log_dir,
-210:                     "pattern": "*.log",
-211:                     "lines": 150
-212:                 }
-213:             ],
-214:             "progress_patterns": {
-215:                 "total": re.compile(r"TOTAL_AUDIO_TO_ANALYZE:\s*(\d+)", re.IGNORECASE),
-216:                 "current": re.compile(r"ANALYZING_AUDIO:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
-217:                 "internal": re.compile(
-218:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)",
-219:                     re.IGNORECASE
-220:                 ),
-221:                 "current_success_line_pattern": re.compile(
-222:                     r"Succès: analyse audio terminée pour (.*?)$", re.IGNORECASE
-223:                 ),
-224:                 "current_item_text_from_success_line": True
-225:             }
-226:         }
-227:     
-228:     def _get_step5_config(self) -> Dict[str, Any]:
-229:         """Get configuration for Step 5: Tracking Analysis.
-230:         
-231:         Returns:
-232:             Step 5 configuration dictionary
-233:         """
-234:         step5_log_dir = self.logs_base_dir / "step5"
-235:         
-236:         return {
-237:             "display_name": "5. Analyse du tracking",
-238:             "cmd": [
-239:                 str(config.get_venv_python("tracking_env_slim")),
-240:                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
-241:             ],
-242:             "cwd": str(self.base_path / "projets_extraits"),
-243:             "specific_logs": [
-244:                 {
-245:                     "name": "Log Tracking Manager",
-246:                     "type": "directory_latest",
-247:                     "path": step5_log_dir,
-248:                     "pattern": "manager_tracking*.log",
-249:                     "lines": 100
-250:                 },
-251:                 {
-252:                     "name": "Log Worker CPU",
-253:                     "type": "directory_latest",
-254:                     "path": step5_log_dir,
-255:                     "pattern": "*worker_CPU*.log",
-256:                     "lines": 100
-257:                 },
-258:                 {
-259:                     "name": "Log Worker GPU",
-260:                     "type": "directory_latest",
-261:                     "path": step5_log_dir,
-262:                     "pattern": "*worker_GPU*.log",
-263:                     "lines": 100
-264:                 }
-265:             ],
-266:             "progress_patterns": {
-267:                 "total": re.compile(r"Vidéos à traiter: (\d+)", re.IGNORECASE),
-268:                 "current": re.compile(r"Traitement de (.*?):\s*(\d+)%", re.IGNORECASE),
-269:                 "internal": re.compile(r"(.*?):\s*(\d+)%", re.IGNORECASE),
-270:                 "current_success_line_pattern": re.compile(
-271:                     r"\[Gestionnaire\] Succès pour (.*?)$", re.IGNORECASE
-272:                 ),
-273:                 "current_item_text_from_success_line": True
-274:             },
-275:             "post_completion_message_ui": "Traitement du tracking terminé."
-276:         }
-277:     
-278:     def _get_step6_config(self) -> Dict[str, Any]:
-279:         """Get configuration for Step 6: JSON Reduction.
-280:         
-281:         Returns:
-282:             Step 6 configuration dictionary
-283:         """
-284:         step6_log_dir = self.logs_base_dir / "step6"
-285:         
-286:         return {
-287:             "display_name": "6. Réduction JSON",
-288:             "cmd": [
-289:                 str(config.get_venv_python("env")),
-290:                 str(self.base_path / "workflow_scripts" / "step6" / "json_reducer.py"),
-291:                 "--log_dir", str(step6_log_dir),
-292:                 "--work_dir", str(self.base_path / "projets_extraits")
-293:             ],
-294:             "cwd": str(self.base_path / "projets_extraits"),
-295:             "specific_logs": [
-296:                 {
-297:                     "name": "Log Réduction JSON",
-298:                     "type": "directory_latest",
-299:                     "path": step6_log_dir,
-300:                     "pattern": "*.log",
-301:                     "lines": 150
-302:                 }
-303:             ],
-304:             "progress_patterns": {
-305:                 "total": re.compile(r"TOTAL_JSON_TO_REDUCE:\s*(\d+)", re.IGNORECASE),
-306:                 "current": re.compile(r"REDUCING_JSON:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
-307:                 "internal": re.compile(
-308:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
-309:                     re.IGNORECASE
-310:                 ),
-311:                 "current_success_line_pattern": re.compile(
-312:                     r"Succès: réduction JSON terminée pour (.*?)$", re.IGNORECASE
-313:                 ),
-314:                 "current_item_text_from_success_line": True
-315:             }
-316:         }
-317:     
-318:     def _get_step7_config(self) -> Dict[str, Any]:
-319:         """Get configuration for Step 7: AE JSON preprocessing.
-320: 
-321:         Returns:
-322:             Step 7 configuration dictionary
-323:         """
-324:         step7_log_dir = self.logs_base_dir / "step7"
-325: 
-326:         return {
-327:             "display_name": "7. Pré-traitement AE",
-328:             "cmd": [
-329:                 str(config.get_venv_python("env")),
-330:                 str(self.base_path / "workflow_scripts" / "step7" / "preprocess_ae_json.py"),
-331:                 "--log_dir", str(step7_log_dir),
-332:                 "--work_dir", str(self.base_path / "projets_extraits"),
-333:             ],
-334:             "cwd": str(self.base_path / "projets_extraits"),
-335:             "specific_logs": [
-336:                 {
-337:                     "name": "Log Pré-traitement AE",
-338:                     "type": "directory_latest",
-339:                     "path": step7_log_dir,
-340:                     "pattern": "*.log",
-341:                     "lines": 150,
-342:                 }
-343:             ],
-344:             "progress_patterns": {
-345:                 "total": re.compile(r"TOTAL_AE_PREPROCESS:\s*(\d+)", re.IGNORECASE),
-346:                 "current": re.compile(r"PREPROCESS_AE:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
-347:                 "internal": re.compile(
-348:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
-349:                     re.IGNORECASE,
-350:                 ),
-351:                 "current_success_line_pattern": re.compile(
-352:                     r"Succès: pré-traitement AE terminé pour (.*?)$", re.IGNORECASE
-353:                 ),
-354:                 "current_item_text_from_success_line": True,
-355:             },
-356:             "post_completion_message_ui": "Pré-traitement AE terminé.",
-357:         }
-358: 
-359:     def _get_step8_config(self) -> Dict[str, Any]:
-360:         """Get configuration for Step 8: Finalization.
-361: 
-362:         Returns:
-363:             Step 8 configuration dictionary
-364:         """
-365:         step8_log_dir = self.logs_base_dir / "step8"
-366: 
-367:         return {
-368:             "display_name": "8. Finalisation",
-369:             "cmd": [
-370:                 str(config.get_venv_python("env")),
-371:                 str(self.base_path / "workflow_scripts" / "step8" / "finalize_and_copy.py"),
-372:             ],
-373:             "cwd": str(self.base_path / "projets_extraits"),
-374:             "specific_logs": [
-375:                 {
-376:                     "name": "Log Finalisation",
-377:                     "type": "directory_latest",
-378:                     "path": step8_log_dir,
-379:                     "pattern": "*.log",
-380:                     "lines": 150,
-381:                 }
-382:             ],
-383:             "progress_patterns": {
-384:                 "total": re.compile(r"(\d+) projet\(s\) à finaliser", re.IGNORECASE),
-385:                 "current_success_line_pattern": re.compile(
-386:                     r"Finalisation terminée pour '(.*?)'", re.IGNORECASE
-387:                 ),
-388:                 "current_item_text_from_success_line": True,
-389:             },
-390:             "post_completion_message_ui": "Finalisation des projets terminée.",
-391:         }
-392:     
-393:     # ========== Public API ==========
-394:     
-395:     def get_config(self) -> Dict[str, Dict[str, Any]]:
-396:         """Get the complete workflow commands configuration.
-397:         
-398:         Returns:
-399:             Dictionary mapping step keys to their configuration
-400:         """
-401:         return self._config.copy()
-402:     
-403:     def get_step_config(self, step_key: str) -> Optional[Dict[str, Any]]:
-404:         """Get configuration for a specific step.
-405:         
-406:         Args:
-407:             step_key: Step identifier (e.g., 'STEP1', 'STEP2')
-408:             
-409:         Returns:
-410:             Step configuration dictionary or None if not found
-411:         """
-412:         return self._config.get(step_key)
-413:     
-414:     def validate_step_key(self, step_key: str) -> bool:
-415:         """Validate if a step key exists in configuration.
-416:         
-417:         Args:
-418:             step_key: Step identifier to validate
-419:             
-420:         Returns:
-421:             True if step key is valid
-422:         """
-423:         return step_key in self._config
-424:     
-425:     def get_all_step_keys(self) -> List[str]:
-426:         """Get all valid step keys.
-427:         
-428:         Returns:
-429:             List of step keys
-430:         """
-431:         return list(self._config.keys())
-432:     
-433:     def get_step_display_name(self, step_key: str) -> Optional[str]:
-434:         """Get display name for a step.
-435:         
-436:         Args:
-437:             step_key: Step identifier
-438:             
-439:         Returns:
-440:             Display name or None if step not found
-441:         """
-442:         step_config = self.get_step_config(step_key)
-443:         return step_config.get('display_name') if step_config else None
-444:     
-445:     def get_step_command(self, step_key: str) -> Optional[List[str]]:
-446:         """Get command line for a step.
-447:         
-448:         Args:
-449:             step_key: Step identifier
-450:             
-451:         Returns:
-452:             Command line as list of strings or None if step not found
-453:         """
-454:         step_config = self.get_step_config(step_key)
-455:         return step_config.get('cmd') if step_config else None
-456:     
-457:     def get_step_cwd(self, step_key: str) -> Optional[str]:
-458:         """Get working directory for a step.
-459:         
-460:         Args:
-461:             step_key: Step identifier
-462:             
-463:         Returns:
-464:             Working directory path or None if step not found
-465:         """
-466:         step_config = self.get_step_config(step_key)
-467:         return step_config.get('cwd') if step_config else None
-468:     
-469:     def update_hf_token(self, hf_token: str) -> None:
-470:         """Update HuggingFace token and rebuild Step 4 configuration.
-471:         
-472:         Args:
-473:             hf_token: New HuggingFace authentication token
-474:         """
-475:         self.hf_token = hf_token
-476:         self._config["STEP4"] = self._get_step4_config()
-477:         logger.info("HuggingFace token updated in configuration")
-478:     
-479:     def __repr__(self) -> str:
-480:         """String representation of configuration."""
-481:         return f"WorkflowCommandsConfig(base_path={self.base_path}, steps={len(self._config)})"
+420:     logging.info("--- Finalisation terminée ---")
+421:     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")
+422: 
+423:     if successful_count < total_projects:
+424:         sys.exit(1)
+425: 
+426: 
+427: if __name__ == "__main__":
+428:     try:
+429:         main()
+430:     except Exception as e:
+431:         logging.critical(f"Erreur critique non gérée dans le script de finalisation: {e}", exc_info=True)
+432:         sys.exit(1)
 ```
 
 ## File: services/cache_service.py
@@ -24322,6 +23375,23 @@ app_new.py
 318: window.pollingManager = pollingManager;
 ```
 
+## File: static/constants.js
+```javascript
+ 1: export const POLLING_INTERVAL = 2000; // Increased from 500ms to 2000ms to reduce logging
+ 2: 
+ 3: // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
+ 4: export const defaultSequenceableStepsKeys = [
+ 5:     "STEP1",
+ 6:     "STEP2",
+ 7:     "STEP3",
+ 8:     "STEP4",
+ 9:     "STEP5",
+10:     "STEP6",
+11:     "STEP7",
+12:     "STEP8"
+13: ];
+```
+
 ## File: static/scrollManager.js
 ```javascript
   1: /**
@@ -27838,6 +26908,936 @@ app_new.py
 1011:         sys.exit(1)
 ```
 
+## File: workflow_scripts/step7/finalize_and_copy.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: 
+  4: """
+  5: Script de finalisation et copie des projets vers la destination finale.
+  6: Étape 7 (Ubuntu)
+  7: \- Archive d'abord les artefacts d'analyse (scènes/tracking/audio) avant suppression
+  8: \- Copie ensuite le dossier du projet vers la destination finale
+  9: """
+ 10: 
+ 11: import os
+ 12: import errno
+ 13: import sys
+ 14: import json
+ 15: import shutil
+ 16: import logging
+ 17: import subprocess
+ 18: import tempfile
+ 19: from pathlib import Path
+ 20: from datetime import datetime
+ 21: 
+ 22: ROOT_DIR = Path(__file__).resolve().parents[2]
+ 23: if str(ROOT_DIR) not in sys.path:
+ 24:     sys.path.insert(0, str(ROOT_DIR))
+ 25: 
+ 26: from config.settings import config
+ 27: from services.results_archiver import ResultsArchiver, SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX, VIDEO_METADATA_NAME
+ 28: 
+ 29: # --- Configuration ---
+ 30: WORK_DIR = Path(os.getcwd())
+ 31: # --- MODIFICATION: Changer la destination ---
+ 32: OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/mnt/cache"))
+ 33: # --- FIN DE LA MODIFICATION ---
+ 34: FINALIZE_MODE = os.environ.get("FINALIZE_MODE", "lenient").lower()
+ 35: BASE_DIR = ROOT_DIR
+ 36: LOG_DIR = BASE_DIR / "logs" / "step8"
+ 37: 
+ 38: # --- Configuration du Logger ---
+ 39: LOG_DIR.mkdir(parents=True, exist_ok=True)
+ 40: log_file = LOG_DIR / f"finalize_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+ 41: 
+ 42: logging.basicConfig(
+ 43:     level=logging.INFO,
+ 44:     format='%(asctime)s - %(levelname)s - %(message)s',
+ 45:     handlers=[
+ 46:         logging.FileHandler(log_file, encoding='utf-8'),
+ 47:         logging.StreamHandler(sys.stdout)
+ 48:     ]
+ 49: )
+ 50: 
+ 51: 
+ 52: def find_projects_to_finalize():
+ 53:     """Trouve tous les projets dans WORK_DIR qui sont prêts à être finalisés."""
+ 54:     projects = []
+ 55:     logging.info(f"Recherche de projets à finaliser dans: {WORK_DIR}")
+ 56: 
+ 57:     for project_dir in WORK_DIR.iterdir():
+ 58:         if not project_dir.is_dir() or project_dir.name.startswith("_temp_"):
+ 59:             continue
+ 60: 
+ 61:         is_ready = False
+ 62:         found_reason = ""
+ 63:         for video_file in project_dir.rglob("*.mp4"):
+ 64:             stem = video_file.stem
+ 65:             scenes_csv = next(project_dir.rglob(f"{stem}{SCENES_SUFFIX}"), None)
+ 66:             tracking_json = next(project_dir.rglob(f"{stem}{TRACKING_SUFFIX}"), None)
+ 67:             audio_json = next(project_dir.rglob(f"{stem}{AUDIO_SUFFIX}"), None)
+ 68:             if FINALIZE_MODE == "strict":
+ 69:                 if scenes_csv and scenes_csv.exists() and tracking_json and tracking_json.exists():
+ 70:                     found_reason = f"artefacts scènes+tracking pour '{video_file.name}'"
+ 71:                     is_ready = True
+ 72:                     break
+ 73:             elif FINALIZE_MODE == "videos":
+ 74:                 found_reason = f"vidéo présente '{video_file.name}'"
+ 75:                 is_ready = True
+ 76:                 break
+ 77:             else:
+ 78:                 if (scenes_csv and scenes_csv.exists()) or (tracking_json and tracking_json.exists()) or (audio_json and audio_json.exists()):
+ 79:                     found_reason = f"au moins un artefact pour '{video_file.name}'"
+ 80:                     is_ready = True
+ 81:                     break
+ 82: 
+ 83:         if is_ready:
+ 84:             logging.info(f"Projet '{project_dir.name}' est prêt ({found_reason}). Mode: {FINALIZE_MODE}")
+ 85:             projects.append(project_dir)
+ 86:         else:
+ 87:             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
+ 88: 
+ 89:     return projects
+ 90: 
+ 91: 
+ 92: def _is_dir_writable(path: Path) -> bool:
+ 93:     """Teste la capacité d'écriture/suppression dans un répertoire cible.
+ 94: 
+ 95:     Plus fiable que os.access() sur des montages FUSE/NTFS.
+ 96:     """
+ 97:     try:
+ 98:         path.mkdir(parents=True, exist_ok=True)
+ 99:         with tempfile.NamedTemporaryFile(dir=str(path), delete=True) as tmp:
+100:             tmp.write(b"writable-check")
+101:             tmp.flush()
+102:         return True
+103:     except Exception:
+104:         return False
+105: 
+106: 
+107: def _select_output_dir(preferred: Path, base_dir: Path) -> Path:
+108:     """Sélectionne une destination inscriptible, avec repli si nécessaire.
+109: 
+110:     - Utilise `preferred` si inscriptible.
+111:     - Sinon, utilise `FALLBACK_OUTPUT_DIR` si défini et inscriptible.
+112:     - Sinon, utilise `base_dir / "_finalized_output"`.
+113:     """
+114:     if _is_dir_writable(preferred):
+115:         logging.info(f"Destination vérifiée: '{preferred}' est inscriptible")
+116:         return preferred
+117: 
+118:     logging.warning(
+119:         f"La destination préférée '{preferred}' n'est pas inscriptible (montage RO ? permissions ?). "
+120:         "Activation d'une destination de repli."
+121:     )
+122: 
+123:     env_fallback = os.environ.get("FALLBACK_OUTPUT_DIR")
+124:     if env_fallback:
+125:         fb = Path(env_fallback)
+126:         if _is_dir_writable(fb):
+127:             logging.warning(f"Bascule vers FALLBACK_OUTPUT_DIR: '{fb}'")
+128:             return fb
+129:         else:
+130:             logging.warning(f"FALLBACK_OUTPUT_DIR défini mais non inscriptible: '{fb}'")
+131: 
+132:     local_fb = base_dir / "_finalized_output"
+133:     local_fb.mkdir(parents=True, exist_ok=True)
+134:     logging.warning(f"Bascule vers le répertoire de repli local: '{local_fb}'")
+135:     return local_fb
+136: 
+137: 
+138: def _safe_rmtree(path: Path) -> None:
+139:     """Supprime un dossier en consignant proprement les erreurs de permissions."""
+140:     def _onerror(func, p, exc_info):
+141:         logging.error(f"Suppression échouée sur '{p}': {exc_info[1]}")
+142:     shutil.rmtree(path, onerror=_onerror)
+143: 
+144: 
+145: def _destination_supports_chmod(dest_dir: Path) -> bool:
+146:     """Détecte si le FS destination supporte chmod (NTFS typiquement renvoie EPERM).
+147:     
+148:     Si on ne peut pas créer de fichier, la question du chmod est secondaire; laisser True.
+149:     """
+150:     try:
+151:         dest_dir.mkdir(parents=True, exist_ok=True)
+152:         with tempfile.NamedTemporaryFile(dir=str(dest_dir), delete=True) as tmp:
+153:             try:
+154:                 os.chmod(tmp.name, 0o664)
+155:             except PermissionError:
+156:                 return False
+157:             except OSError as e:
+158:                 err = getattr(e, 'errno', None)
+159:                 if err in (errno.EPERM, errno.EACCES, getattr(errno, 'EOPNOTSUPP', None)):
+160:                     return False
+161:                 raise
+162:     except Exception:
+163:         return True
+164: 
+165: 
+166: def _copy_project_tree(src: Path, dst: Path) -> None:
+167:     """Copie le projet sans préserver les permissions sur FS type NTFS.
+168: 
+169:     Stratégie:
+170:     - Si chmod supporté: utiliser shutil.copytree (comportement standard).
+171:     - Sinon: tenter rsync --no-perms/owner/group; à défaut cp --no-preserve; à défaut copie Python manuelle.
+172:     """
+173:     dst.parent.mkdir(parents=True, exist_ok=True)
+174:     supports_chmod = _destination_supports_chmod(dst)
+175:     if supports_chmod:
+176:         shutil.copytree(src, dst, dirs_exist_ok=True)
+177:         return
+178: 
+179:     logging.info("Destination ne supporte pas chmod — copie sans préservation des permissions.")
+180:     # 1) rsync si disponible
+181:     try:
+182:         subprocess.run([
+183:             "rsync", "-a", "--no-perms", "--no-owner", "--no-group", "--no-times",
+184:             f"{str(src)}/", f"{str(dst)}/"
+185:         ], check=True)
+186:         return
+187:     except FileNotFoundError:
+188:         logging.info("rsync non disponible, tentative via cp --no-preserve")
+189:     except subprocess.CalledProcessError as e:
+190:         logging.warning(f"rsync a échoué: {e}")
+191: 
+192:     # 2) cp --no-preserve si disponible (fusionner le contenu dans dst)
+193:     try:
+194:         dst.mkdir(parents=True, exist_ok=True)
+195:         subprocess.run([
+196:             "bash", "-lc",
+197:             f"cp -r --no-preserve=mode,ownership '{str(src)}/.' '{str(dst)}/'"
+198:         ], check=True)
+199:         return
+200:     except subprocess.CalledProcessError as e:
+201:         logging.warning(f"cp --no-preserve a échoué: {e}")
+202: 
+203:     # 3) Fallback Python: os.walk et shutil.copyfile sans copystat
+204:     for root, dirs, files in os.walk(src):
+205:         rel = os.path.relpath(root, src)
+206:         target_dir = dst / rel if rel != "." else dst
+207:         target_dir.mkdir(parents=True, exist_ok=True)
+208:         for d in dirs:
+209:             (target_dir / d).mkdir(parents=True, exist_ok=True)
+210:         for f in files:
+211:             s = Path(root) / f
+212:             t = target_dir / f
+213:             shutil.copyfile(s, t)
+214: 
+215: 
+216: def _compute_alternative_output_dir(existing_dst: Path) -> Path:
+217:     """Calcule un répertoire de sortie alternatif si `existing_dst` ne peut pas être supprimé.
+218: 
+219:     Ex.: /mnt/cache/33 Camille -> /mnt/cache/33 Camille__finalized_YYYYmmdd_HHMMSS[_n]
+220:     """
+221:     base = existing_dst.parent
+222:     name = existing_dst.name
+223:     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+224:     candidate = base / f"{name}__finalized_{ts}"
+225:     i = 1
+226:     while candidate.exists():
+227:         candidate = base / f"{name}__finalized_{ts}_{i}"
+228:         i += 1
+229:     return candidate
+230: 
+231: 
+232: def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
+233:     """Ensure destination project has a docs/ subfolder containing media and related files.
+234: 
+235:     If files are currently at the project root (common when previous steps didn't use a docs/
+236:     directory), move recognized media and analysis files into docs/.
+237:     """
+238:     docs_dir = dst_project_dir / "docs"
+239:     docs_dir.mkdir(parents=True, exist_ok=True)
+240: 
+241:     media_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".png", ".jpg", ".jpeg"}
+242:     analysis_suffixes = {SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX}
+243: 
+244:     video_exts = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+245:     video_stems: set[str] = set()
+246:     try:
+247:         for p in dst_project_dir.iterdir():
+248:             if p.is_file() and p.suffix.lower() in video_exts:
+249:                 video_stems.add(p.stem)
+250:         if docs_dir.exists():
+251:             for p in docs_dir.rglob("*"):
+252:                 if p.is_file() and p.suffix.lower() in video_exts:
+253:                     video_stems.add(p.stem)
+254:     except Exception:
+255:         pass
+256: 
+257:     for entry in dst_project_dir.iterdir():
+258:         if entry.name == "docs":
+259:             continue
+260:         if entry.is_file():
+261:             ext = entry.suffix.lower()
+262:             stem = entry.stem
+263:             move = False
+264:             if ext in media_exts:
+265:                 move = True
+266:             else:
+267:                 for suf in analysis_suffixes:
+268:                     if entry.name.endswith(suf) or entry.name == f"{stem}.csv":
+269:                         move = True
+270:                         break
+271:                 if not move and ext == ".json" and stem in video_stems:
+272:                     move = True
+273:             if move:
+274:                 target = docs_dir / entry.name
+275:                 try:
+276:                     if target.exists():
+277:                         target.unlink()
+278:                     shutil.move(str(entry), str(target))
+279:                 except Exception as e:
+280:                     logging.warning(f"Impossible de déplacer '{entry}' vers '{target}': {e}")
+281: 
+282: 
+283: def restore_archived_analysis(project_name: str, output_project_dir: Path) -> None:
+284:     """Restore archived analysis artifacts into the destination project docs/ folder.
+285: 
+286:     For each detected video file in docs/, attempt to retrieve archived artifacts
+287:     (scenes CSV, audio JSON, tracking JSON) using ResultsArchiver and copy them next to the video.
+288:     """
+289:     try:
+290:         docs_dir = output_project_dir / "docs"
+291:         docs_dir.mkdir(parents=True, exist_ok=True)
+292: 
+293:         video_exts = (".mp4", ".mov", ".avi", ".mkv", ".webm")
+294:         videos = []
+295:         if docs_dir.exists():
+296:             videos.extend([p for p in docs_dir.rglob("*") if p.is_file() and p.suffix.lower() in video_exts])
+297:         videos.extend([p for p in output_project_dir.iterdir() if p.is_file() and p.suffix.lower() in video_exts])
+298: 
+299:         for v in videos:
+300:             target_dir = docs_dir if v.parent != docs_dir else v.parent
+301:             stem = v.stem
+302: 
+303:             scenes_path = ResultsArchiver.find_analysis_file(project_name, v, SCENES_SUFFIX)
+304:             if scenes_path:
+305:                 dst = target_dir / f"{stem}{SCENES_SUFFIX}"
+306:                 try:
+307:                     shutil.copy2(scenes_path, dst)
+308:                 except Exception as e:
+309:                     logging.warning(f"Restauration scenes échouée {scenes_path} -> {dst}: {e}")
+310: 
+311:             audio_path = ResultsArchiver.find_analysis_file(project_name, v, AUDIO_SUFFIX)
+312:             if audio_path:
+313:                 dst = target_dir / f"{stem}{AUDIO_SUFFIX}"
+314:                 try:
+315:                     shutil.copy2(audio_path, dst)
+316:                 except Exception as e:
+317:                     logging.warning(f"Restauration audio échouée {audio_path} -> {dst}: {e}")
+318: 
+319:             tracking_path = ResultsArchiver.find_analysis_file(project_name, v, TRACKING_SUFFIX)
+320:             if tracking_path:
+321:                 dst = target_dir / f"{stem}{TRACKING_SUFFIX}"
+322:                 try:
+323:                     shutil.copy2(tracking_path, dst)
+324:                 except Exception as e:
+325:                     logging.warning(f"Restauration tracking échouée {tracking_path} -> {dst}: {e}")
+326:     except Exception as e:
+327:         logging.warning(f"Restauration des analyses archivées échouée (projet={project_name}): {e}")
+328: 
+329: def finalize_project(project_dir):
+330:     """Copie un projet vers la destination finale et supprime la source."""
+331:     try:
+332:         project_name = project_dir.name
+333:         logging.info(f"Finalisation du projet: {project_name}")
+334:         print(f"Finalisation en cours pour '{project_name}'...")
+335: 
+336:         # 1) Archiver d'abord tous les artefacts d'analyse disponibles
+337:         try:
+338:             arch_summary = ResultsArchiver.archive_project_analysis(project_name)
+339:             if arch_summary and not arch_summary.get("error"):
+340:                 logging.info(
+341:                     "Archivage des analyses terminé: %s",
+342:                     json.dumps({k: arch_summary.get(k) for k in ("processed", "copied")}, ensure_ascii=False)
+343:                 )
+344:             else:
+345:                 logging.warning(f"Archivage des analyses non effectué ou en erreur: {arch_summary}")
+346:         except Exception as e:
+347:             logging.warning(f"Erreur lors de l'archivage des analyses du projet '{project_name}': {e}")
+348: 
+349:         output_project_dir = OUTPUT_DIR / project_name
+350: 
+351:         if output_project_dir.exists():
+352:             logging.warning(
+353:                 f"Le dossier de destination '{output_project_dir}' existe déjà. Tentative de suppression avant copie."
+354:             )
+355:             _safe_rmtree(output_project_dir)
+356:             if output_project_dir.exists():
+357:                 alt_dir = _compute_alternative_output_dir(output_project_dir)
+358:                 logging.warning(
+359:                     f"Impossible de supprimer la destination existante. Bascule vers: '{alt_dir}'"
+360:                 )
+361:                 output_project_dir = alt_dir
+362: 
+363:         try:
+364:             _copy_project_tree(project_dir, output_project_dir)
+365:         except Exception as e:
+366:             logging.error("Erreur lors de la copie du projet: %s", e, exc_info=True)
+367:             raise
+368:         logging.info(f"Projet '{project_name}' copié avec succès vers '{output_project_dir}'")
+369: 
+370:         _normalize_project_docs_structure(output_project_dir)
+371: 
+372:         if os.environ.get("RESTORE_ARCHIVES_TO_OUTPUT", "0") in ("1", "true", "True"):
+373:             try:
+374:                 restore_archived_analysis(project_name, output_project_dir)
+375:             except Exception as e:
+376:                 logging.warning(f"Restauration des analyses archivées échouée: {e}")
+377: 
+378:         # --- Suppression du dossier source (après archivage) ---
+379:         try:
+380:             project_dir.resolve().relative_to(config.ARCHIVES_DIR.resolve())
+381:             logging.error(f"Refus de suppression: '{project_dir}' est sous ARCHIVES_DIR")
+382:             return False
+383:         except Exception:
+384:             pass
+385:         _safe_rmtree(project_dir)
+386:         logging.info(f"Dossier source '{project_dir}' supprimé avec succès.")
+387:         # --- FIN suppression ---
+388: 
+389:         # --- MODIFICATION: Suppression de la création du fichier metadata_final.json ---
+390:         # --- FIN DE LA MODIFICATION ---
+391: 
+392:         logging.info(f"Finalisation terminée pour '{project_name}'")
+393:         print(f"Finalisation terminée pour '{project_name}'")
+394:         return True
+395: 
+396:     except Exception as e:
+397:         logging.error(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}", exc_info=True)
+398:         return False
+399: 
+400: 
+401: def main():
+402:     """Fonction principale du script."""
+403:     logging.info(f"--- Démarrage du script de Finalisation et Nettoyage ---")
+404: 
+405:     global OUTPUT_DIR
+406:     try:
+407:         OUTPUT_DIR = _select_output_dir(OUTPUT_DIR, BASE_DIR)
+408:         logging.info(f"Le répertoire de destination est: {OUTPUT_DIR.resolve()}")
+409:     except Exception as e:
+410:         logging.critical(
+411:             f"Impossible de préparer un répertoire de destination inscriptible. Erreur: {e}"
+412:         )
+413:         sys.exit(1)
+414: 
+415:     projects = find_projects_to_finalize()
+416:     total_projects = len(projects)
+417:     logging.info(f"{total_projects} projet(s) à finaliser")
+418:     print(f"{total_projects} projet(s) à finaliser")
+419: 
+420:     if total_projects == 0:
+421:         logging.info("Aucun projet à finaliser. Fin du script.")
+422:         return
+423: 
+424:     successful_count = 0
+425:     for project in projects:
+426:         if finalize_project(project):
+427:             successful_count += 1
+428: 
+429:     logging.info(f"--- Finalisation terminée ---")
+430:     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")
+431: 
+432:     if successful_count < total_projects:
+433:         sys.exit(1)
+434: 
+435: 
+436: if __name__ == "__main__":
+437:     try:
+438:         main()
+439:     except Exception as e:
+440:         logging.critical(f"Erreur critique non gérée dans le script de finalisation: {e}", exc_info=True)
+441:         sys.exit(1)
+```
+
+## File: config/workflow_commands.py
+```python
+  1: #!/usr/bin/env python3
+  2: # -*- coding: utf-8 -*-
+  3: """
+  4: Workflow Commands Configuration
+  5: 
+  6: Centralized configuration for all workflow steps.
+  7: Defines commands, working directories, log paths, and progress patterns.
+  8: """
+  9: 
+ 10: import re
+ 11: from pathlib import Path
+ 12: from typing import Dict, Any, List, Optional
+ 13: import logging
+ 14: 
+ 15: from config.settings import config
+ 16: 
+ 17: logger = logging.getLogger(__name__)
+ 18: 
+ 19: 
+ 20: class WorkflowCommandsConfig:
+ 21:     """Centralized workflow commands configuration.
+ 22:     
+ 23:     This class provides configuration for all 8 workflow steps, including:
+ 24:     - Command line arguments
+ 25:     - Working directories
+ 26:     - Log file locations
+ 27:     - Progress parsing patterns
+ 28:     - Display names for UI
+ 29:     """
+ 30:     
+ 31:     def __init__(self, base_path: Path = None, hf_token: str = None):
+ 32:         """Initialize workflow commands configuration.
+ 33:         
+ 34:         Args:
+ 35:             base_path: Base path for scripts (defaults to config.BASE_PATH_SCRIPTS)
+ 36:             hf_token: HuggingFace authentication token for Step 4
+ 37:         """
+ 38:         self.base_path = base_path or config.BASE_PATH_SCRIPTS
+ 39:         self.hf_token = hf_token
+ 40:         
+ 41:         # Setup log directories
+ 42:         self.logs_base_dir = self.base_path / "logs"
+ 43:         self._ensure_log_directories()
+ 44:         
+ 45:         # Build configuration
+ 46:         self._config = self._build_configuration()
+ 47:         
+ 48:         logger.info(f"WorkflowCommandsConfig initialized with base_path: {self.base_path}")
+ 49:     
+ 50:     def _ensure_log_directories(self) -> None:
+ 51:         """Ensure all log directories exist."""
+ 52:         self.logs_base_dir.mkdir(exist_ok=True)
+ 53:         for step in range(1, 9):
+ 54:             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
+ 55:     
+ 56:     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
+ 57:         """Build the complete workflow commands configuration.
+ 58:         
+ 59:         Returns:
+ 60:             Dictionary mapping step keys to their configuration
+ 61:         """
+ 62:         return {
+ 63:             "STEP1": self._get_step1_config(),
+ 64:             "STEP2": self._get_step2_config(),
+ 65:             "STEP3": self._get_step3_config(),
+ 66:             "STEP4": self._get_step4_config(),
+ 67:             "STEP5": self._get_step5_config(),
+ 68:             "STEP6": self._get_step6_config(),
+ 69:             "STEP7": self._get_step7_config(),
+ 70:             "STEP8": self._get_step8_config(),
+ 71:         }
+ 72:     
+ 73:     def _get_step1_config(self) -> Dict[str, Any]:
+ 74:         """Get configuration for Step 1: Archive Extraction.
+ 75:         
+ 76:         Returns:
+ 77:             Step 1 configuration dictionary
+ 78:         """
+ 79:         step1_log_dir = self.logs_base_dir / "step1"
+ 80:         
+ 81:         return {
+ 82:             "display_name": "1. Extraction des archives",
+ 83:             "cmd": [
+ 84:                 str(config.get_venv_python("env")),
+ 85:                 str(self.base_path / "workflow_scripts" / "step1" / "extract_archives.py"),
+ 86:                 "--source-dir", str(Path.home() / "Téléchargements")
+ 87:             ],
+ 88:             "cwd": str(self.base_path),
+ 89:             "specific_logs": [
+ 90:                 {
+ 91:                     "name": "Log Extraction",
+ 92:                     "type": "directory_latest",
+ 93:                     "path": step1_log_dir,
+ 94:                     "pattern": "*.log",
+ 95:                     "lines": 150
+ 96:                 },
+ 97:                 {
+ 98:                     "name": "Liste Archives Traitées",
+ 99:                     "type": "file",
+100:                     "path": step1_log_dir / "processed_archives.txt",
+101:                     "lines": 50
+102:                 }
+103:             ],
+104:             "progress_patterns": {
+105:                 "total": re.compile(r"Trouvé (\d+) archive\(s\) à traiter", re.IGNORECASE),
+106:                 "current_success_line_pattern": re.compile(
+107:                     r"Extraction terminée pour (.*?)$", re.IGNORECASE
+108:                 ),
+109:                 "current_item_text_from_success_line": True
+110:             }
+111:         }
+112:     
+113:     def _get_step2_config(self) -> Dict[str, Any]:
+114:         """Get configuration for Step 2: Video Conversion.
+115:         
+116:         Returns:
+117:             Step 2 configuration dictionary
+118:         """
+119:         step2_log_dir = self.logs_base_dir / "step2"
+120:         
+121:         return {
+122:             "display_name": "2. Conversion des vidéos",
+123:             "cmd": [
+124:                 str(config.get_venv_python("env")),
+125:                 str(self.base_path / "workflow_scripts" / "step2" / "convert_videos.py")
+126:             ],
+127:             "cwd": str(self.base_path / "projets_extraits"),
+128:             "specific_logs": [
+129:                 {
+130:                     "name": "Log Conversion",
+131:                     "type": "directory_latest",
+132:                     "path": step2_log_dir,
+133:                     "pattern": "*.log",
+134:                     "lines": 200
+135:                 }
+136:             ],
+137:             "progress_patterns": {
+138:                 "total": re.compile(r"TOTAL_VIDEOS_TO_PROCESS:\s*(\d+)", re.IGNORECASE),
+139:                 "current": re.compile(
+140:                     r"--- Traitement de la vidéo \((\d+)/(\d+)\): (.*?) ---", re.IGNORECASE
+141:                 )
+142:             }
+143:         }
+144:     
+145:     def _get_step3_config(self) -> Dict[str, Any]:
+146:         """Get configuration for Step 3: Scene Detection.
+147:         
+148:         Returns:
+149:             Step 3 configuration dictionary
+150:         """
+151:         step3_log_dir = self.logs_base_dir / "step3"
+152:         
+153:         return {
+154:             "display_name": "3. Analyse des transitions",
+155:             "cmd": [
+156:                 str(config.get_venv_python("transnet_env")),
+157:                 str(self.base_path / "workflow_scripts" / "step3" / "run_transnet.py"),
+158:             ],
+159:             "cwd": str(self.base_path / "projets_extraits"),
+160:             "specific_logs": [
+161:                 {
+162:                     "name": "Log Analyse Transitions",
+163:                     "type": "directory_latest",
+164:                     "path": step3_log_dir,
+165:                     "pattern": "*.log",
+166:                     "lines": 150
+167:                 }
+168:             ],
+169:             "progress_patterns": {
+170:                 # Accept both underscore and space variants
+171:                 "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
+172:                 "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
+173:                 "internal_simple": re.compile(
+174:                     r"INTERNAL[_ ]PROGRESS:\s*(\d+)\s*batches\s*-\s*(.*)$", re.IGNORECASE
+175:                 ),
+176:                 "current_success_line_pattern": re.compile(
+177:                     r"Succès:\s*(.*?)(?:\.csv|\.json)\s+créé", re.IGNORECASE
+178:                 ),
+179:                 "current_item_text_from_success_line": True
+180:             }
+181:         }
+182:     
+183:     def _get_step4_config(self) -> Dict[str, Any]:
+184:         """Get configuration for Step 4: Audio Analysis.
+185:         
+186:         Returns:
+187:             Step 4 configuration dictionary
+188:         """
+189:         step4_log_dir = self.logs_base_dir / "step4"
+190: 
+191:         step4_script_name = "run_audio_analysis_lemonfox.py" if config.STEP4_USE_LEMONFOX else "run_audio_analysis.py"
+192:         cmd = [
+193:             str(config.get_venv_python("audio_env")),
+194:             str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
+195:             "--log_dir", str(step4_log_dir),
+196:         ]
+197: 
+198:         if step4_script_name == "run_audio_analysis.py" and self.hf_token:
+199:             cmd.extend(["--hf_auth_token", str(self.hf_token)])
+200:         
+201:         return {
+202:             "display_name": "4. Analyse audio",
+203:             "cmd": cmd,
+204:             "cwd": str(self.base_path / "projets_extraits"),
+205:             "specific_logs": [
+206:                 {
+207:                     "name": "Log Analyse Audio",
+208:                     "type": "directory_latest",
+209:                     "path": step4_log_dir,
+210:                     "pattern": "*.log",
+211:                     "lines": 150
+212:                 }
+213:             ],
+214:             "progress_patterns": {
+215:                 "total": re.compile(r"TOTAL_AUDIO_TO_ANALYZE:\s*(\d+)", re.IGNORECASE),
+216:                 "current": re.compile(r"ANALYZING_AUDIO:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+217:                 "internal": re.compile(
+218:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)",
+219:                     re.IGNORECASE
+220:                 ),
+221:                 "current_success_line_pattern": re.compile(
+222:                     r"Succès: analyse audio terminée pour (.*?)$", re.IGNORECASE
+223:                 ),
+224:                 "current_item_text_from_success_line": True
+225:             }
+226:         }
+227:     
+228:     def _get_step5_config(self) -> Dict[str, Any]:
+229:         """Get configuration for Step 5: Tracking Analysis.
+230:         
+231:         Returns:
+232:             Step 5 configuration dictionary
+233:         """
+234:         step5_log_dir = self.logs_base_dir / "step5"
+235:         
+236:         return {
+237:             "display_name": "5. Analyse du tracking",
+238:             "cmd": [
+239:                 str(config.get_venv_python("tracking_env_slim")),
+240:                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
+241:             ],
+242:             "cwd": str(self.base_path / "projets_extraits"),
+243:             "specific_logs": [
+244:                 {
+245:                     "name": "Log Tracking Manager",
+246:                     "type": "directory_latest",
+247:                     "path": step5_log_dir,
+248:                     "pattern": "manager_tracking*.log",
+249:                     "lines": 100
+250:                 },
+251:                 {
+252:                     "name": "Log Worker CPU",
+253:                     "type": "directory_latest",
+254:                     "path": step5_log_dir,
+255:                     "pattern": "*worker_CPU*.log",
+256:                     "lines": 100
+257:                 },
+258:                 {
+259:                     "name": "Log Worker GPU",
+260:                     "type": "directory_latest",
+261:                     "path": step5_log_dir,
+262:                     "pattern": "*worker_GPU*.log",
+263:                     "lines": 100
+264:                 }
+265:             ],
+266:             "progress_patterns": {
+267:                 "total": re.compile(r"Vidéos à traiter: (\d+)", re.IGNORECASE),
+268:                 "current": re.compile(r"Traitement de (.*?):\s*(\d+)%", re.IGNORECASE),
+269:                 "internal": re.compile(r"(.*?):\s*(\d+)%", re.IGNORECASE),
+270:                 "current_success_line_pattern": re.compile(
+271:                     r"\[Gestionnaire\] Succès pour (.*?)$", re.IGNORECASE
+272:                 ),
+273:                 "current_item_text_from_success_line": True
+274:             },
+275:             "post_completion_message_ui": "Traitement du tracking terminé."
+276:         }
+277:     
+278:     def _get_step6_config(self) -> Dict[str, Any]:
+279:         """Get configuration for Step 6: JSON Reduction.
+280:         
+281:         Returns:
+282:             Step 6 configuration dictionary
+283:         """
+284:         step6_log_dir = self.logs_base_dir / "step6"
+285:         
+286:         return {
+287:             "display_name": "6. Réduction JSON",
+288:             "cmd": [
+289:                 str(config.get_venv_python("env")),
+290:                 str(self.base_path / "workflow_scripts" / "step6" / "json_reducer.py"),
+291:                 "--log_dir", str(step6_log_dir),
+292:                 "--work_dir", str(self.base_path / "projets_extraits")
+293:             ],
+294:             "cwd": str(self.base_path / "projets_extraits"),
+295:             "specific_logs": [
+296:                 {
+297:                     "name": "Log Réduction JSON",
+298:                     "type": "directory_latest",
+299:                     "path": step6_log_dir,
+300:                     "pattern": "*.log",
+301:                     "lines": 150
+302:                 }
+303:             ],
+304:             "progress_patterns": {
+305:                 "total": re.compile(r"TOTAL_JSON_TO_REDUCE:\s*(\d+)", re.IGNORECASE),
+306:                 "current": re.compile(r"REDUCING_JSON:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+307:                 "internal": re.compile(
+308:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
+309:                     re.IGNORECASE
+310:                 ),
+311:                 "current_success_line_pattern": re.compile(
+312:                     r"Succès: réduction JSON terminée pour (.*?)$", re.IGNORECASE
+313:                 ),
+314:                 "current_item_text_from_success_line": True
+315:             }
+316:         }
+317:     
+318:     def _get_step7_config(self) -> Dict[str, Any]:
+319:         """Get configuration for Step 7: AE JSON preprocessing.
+320: 
+321:         Returns:
+322:             Step 7 configuration dictionary
+323:         """
+324:         step7_log_dir = self.logs_base_dir / "step7"
+325: 
+326:         return {
+327:             "display_name": "7. Pré-traitement AE",
+328:             "cmd": [
+329:                 str(config.get_venv_python("env")),
+330:                 str(self.base_path / "workflow_scripts" / "step7" / "preprocess_ae_json.py"),
+331:                 "--log_dir", str(step7_log_dir),
+332:                 "--work_dir", str(self.base_path / "projets_extraits"),
+333:             ],
+334:             "cwd": str(self.base_path / "projets_extraits"),
+335:             "specific_logs": [
+336:                 {
+337:                     "name": "Log Pré-traitement AE",
+338:                     "type": "directory_latest",
+339:                     "path": step7_log_dir,
+340:                     "pattern": "*.log",
+341:                     "lines": 150,
+342:                 }
+343:             ],
+344:             "progress_patterns": {
+345:                 "total": re.compile(r"TOTAL_AE_PREPROCESS:\s*(\d+)", re.IGNORECASE),
+346:                 "current": re.compile(r"PREPROCESS_AE:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+347:                 "internal": re.compile(
+348:                     r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*items\s*\((\d+)%\)\s*-\s*(.*)",
+349:                     re.IGNORECASE,
+350:                 ),
+351:                 "current_success_line_pattern": re.compile(
+352:                     r"Succès: pré-traitement AE terminé pour (.*?)$", re.IGNORECASE
+353:                 ),
+354:                 "current_item_text_from_success_line": True,
+355:             },
+356:             "post_completion_message_ui": "Pré-traitement AE terminé.",
+357:         }
+358: 
+359:     def _get_step8_config(self) -> Dict[str, Any]:
+360:         """Get configuration for Step 8: Finalization.
+361: 
+362:         Returns:
+363:             Step 8 configuration dictionary
+364:         """
+365:         step8_log_dir = self.logs_base_dir / "step8"
+366: 
+367:         return {
+368:             "display_name": "8. Finalisation",
+369:             "cmd": [
+370:                 str(config.get_venv_python("env")),
+371:                 str(self.base_path / "workflow_scripts" / "step8" / "finalize_and_copy.py"),
+372:             ],
+373:             "cwd": str(self.base_path / "projets_extraits"),
+374:             "specific_logs": [
+375:                 {
+376:                     "name": "Log Finalisation",
+377:                     "type": "directory_latest",
+378:                     "path": step8_log_dir,
+379:                     "pattern": "*.log",
+380:                     "lines": 150,
+381:                 }
+382:             ],
+383:             "progress_patterns": {
+384:                 "total": re.compile(r"(\d+) projet\(s\) à finaliser", re.IGNORECASE),
+385:                 "current_success_line_pattern": re.compile(
+386:                     r"Finalisation terminée pour '(.*?)'", re.IGNORECASE
+387:                 ),
+388:                 "current_item_text_from_success_line": True,
+389:             },
+390:             "post_completion_message_ui": "Finalisation des projets terminée.",
+391:         }
+392:     
+393:     # ========== Public API ==========
+394:     
+395:     def get_config(self) -> Dict[str, Dict[str, Any]]:
+396:         """Get the complete workflow commands configuration.
+397:         
+398:         Returns:
+399:             Dictionary mapping step keys to their configuration
+400:         """
+401:         return self._config.copy()
+402:     
+403:     def get_step_config(self, step_key: str) -> Optional[Dict[str, Any]]:
+404:         """Get configuration for a specific step.
+405:         
+406:         Args:
+407:             step_key: Step identifier (e.g., 'STEP1', 'STEP2')
+408:             
+409:         Returns:
+410:             Step configuration dictionary or None if not found
+411:         """
+412:         return self._config.get(step_key)
+413:     
+414:     def validate_step_key(self, step_key: str) -> bool:
+415:         """Validate if a step key exists in configuration.
+416:         
+417:         Args:
+418:             step_key: Step identifier to validate
+419:             
+420:         Returns:
+421:             True if step key is valid
+422:         """
+423:         return step_key in self._config
+424:     
+425:     def get_all_step_keys(self) -> List[str]:
+426:         """Get all valid step keys.
+427:         
+428:         Returns:
+429:             List of step keys
+430:         """
+431:         return list(self._config.keys())
+432:     
+433:     def get_step_display_name(self, step_key: str) -> Optional[str]:
+434:         """Get display name for a step.
+435:         
+436:         Args:
+437:             step_key: Step identifier
+438:             
+439:         Returns:
+440:             Display name or None if step not found
+441:         """
+442:         step_config = self.get_step_config(step_key)
+443:         return step_config.get('display_name') if step_config else None
+444:     
+445:     def get_step_command(self, step_key: str) -> Optional[List[str]]:
+446:         """Get command line for a step.
+447:         
+448:         Args:
+449:             step_key: Step identifier
+450:             
+451:         Returns:
+452:             Command line as list of strings or None if step not found
+453:         """
+454:         step_config = self.get_step_config(step_key)
+455:         return step_config.get('cmd') if step_config else None
+456:     
+457:     def get_step_cwd(self, step_key: str) -> Optional[str]:
+458:         """Get working directory for a step.
+459:         
+460:         Args:
+461:             step_key: Step identifier
+462:             
+463:         Returns:
+464:             Working directory path or None if step not found
+465:         """
+466:         step_config = self.get_step_config(step_key)
+467:         return step_config.get('cwd') if step_config else None
+468:     
+469:     def update_hf_token(self, hf_token: str) -> None:
+470:         """Update HuggingFace token and rebuild Step 4 configuration.
+471:         
+472:         Args:
+473:             hf_token: New HuggingFace authentication token
+474:         """
+475:         self.hf_token = hf_token
+476:         self._config["STEP4"] = self._get_step4_config()
+477:         logger.info("HuggingFace token updated in configuration")
+478:     
+479:     def __repr__(self) -> str:
+480:         """String representation of configuration."""
+481:         return f"WorkflowCommandsConfig(base_path={self.base_path}, steps={len(self._config)})"
+```
+
 ## File: static/css/components/steps.css
 ```css
   1: .step {
@@ -29598,160 +29598,6 @@ app_new.py
 177: }
 ```
 
-## File: static/state.js
-```javascript
-  1: // Import new immutable state management
-  2: import { appState } from './state/AppState.js';
-  3: 
-  4: export const PROCESS_INFO_CLIENT = new Proxy({}, {
-  5:     get(_target, prop) {
-  6:         if (typeof prop !== 'string') return undefined;
-  7:         return appState.getStateProperty(`processInfo.${prop}`);
-  8:     },
-  9:     set(_target, prop, value) {
- 10:         if (typeof prop !== 'string') return false;
- 11:         appState.setState({ processInfo: { [prop]: value } }, 'process_info_update');
- 12:         return true;
- 13:     },
- 14:     ownKeys() {
- 15:         const root = appState.getStateProperty('processInfo') || {};
- 16:         return Reflect.ownKeys(root);
- 17:     },
- 18:     getOwnPropertyDescriptor(_target, prop) {
- 19:         const root = appState.getStateProperty('processInfo') || {};
- 20:         if (Object.prototype.hasOwnProperty.call(root, prop)) {
- 21:             return { enumerable: true, configurable: true };
- 22:         }
- 23:         return undefined;
- 24:     }
- 25: });
- 26: 
- 27: // Legacy exports for backward compatibility (deprecated - use appState instead)
- 28: export let pollingIntervals = {};
- 29: export let activeStepKeyForLogsPanel = null;
- 30: export let stepTimers = {};
- 31: export let selectedStepsOrder = [];
- 32: export let isAnySequenceRunning = false;
- 33: export let focusedElementBeforePopup = null;
- 34: export let autoOpenLogOverlay = true;
- 35: 
- 36: 
- 37: // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
- 38: export const REMOTE_SEQUENCE_STEP_KEYS = [
- 39:     "STEP1",
- 40:     "STEP2",
- 41:     "STEP3",
- 42:     "STEP4",
- 43:     "STEP5",
- 44:     "STEP6",
- 45:     "STEP7",
- 46:     "STEP8"
- 47: ];
- 48: 
- 49: // Modern state management functions using AppState
- 50: export function setActiveStepKeyForLogs(key) {
- 51:     activeStepKeyForLogsPanel = key; // Legacy
- 52:     appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
- 53: }
- 54: export function getActiveStepKeyForLogs() {
- 55:     return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
- 56: }
- 57: 
- 58: export function addStepTimer(stepKey, timerData) {
- 59:     stepTimers[stepKey] = timerData; // Legacy
- 60:     appState.setState({
- 61:         stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
- 62:     }, 'addStepTimer');
- 63: }
- 64: export function getStepTimer(stepKey) {
- 65:     return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
- 66: }
- 67: export function clearStepTimerInterval(stepKey) {
- 68:     const timer = getStepTimer(stepKey);
- 69:     if (timer && timer.intervalId) {
- 70:         clearInterval(timer.intervalId);
- 71:         const updatedTimer = { ...timer, intervalId: null };
- 72:         addStepTimer(stepKey, updatedTimer);
- 73:     }
- 74: }
- 75: export function deleteStepTimer(stepKey) {
- 76:     if (getStepTimer(stepKey)) {
- 77:         clearStepTimerInterval(stepKey);
- 78:         delete stepTimers[stepKey]; // Legacy
- 79:         const currentTimers = appState.getStateProperty('stepTimers') || {};
- 80:         const { [stepKey]: removed, ...remainingTimers } = currentTimers;
- 81:         appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
- 82:     }
- 83: }
- 84: 
- 85: export function setSelectedStepsOrder(order) {
- 86:     selectedStepsOrder = order; // Legacy
- 87:     appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
- 88: }
- 89: export function getSelectedStepsOrder() {
- 90:     return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
- 91: }
- 92: 
- 93: export function setIsAnySequenceRunning(running) {
- 94:     isAnySequenceRunning = running; // Legacy
- 95:     appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
- 96: }
- 97: export function getIsAnySequenceRunning() {
- 98:     return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
- 99: }
-100: 
-101: export function setFocusedElementBeforePopup(element) {
-102:     focusedElementBeforePopup = element; // Legacy
-103:     appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
-104: }
-105: export function getFocusedElementBeforePopup() {
-106:     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
-107: }
-108: 
-109: export function setAutoOpenLogOverlay(enabled) {
-110:     autoOpenLogOverlay = !!enabled;
-111:     const currentUI = appState.getStateProperty('ui') || {};
-112:     appState.setState({ ui: { ...currentUI, autoOpenLogOverlay: autoOpenLogOverlay } }, 'setAutoOpenLogOverlay');
-113: }
-114: 
-115: export function getAutoOpenLogOverlay() {
-116:     const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
-117:     return typeof uiValue === 'boolean' ? uiValue : autoOpenLogOverlay;
-118: }
-119: 
-120: export function setAutoModeLogPanelOpened(opened) {
-121:     appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
-122: }
-123: 
-124: export function getAutoModeLogPanelOpened() {
-125:     return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
-126: }
-127: 
-128: export function addPollingInterval(stepKey, id) {
-129:     pollingIntervals[stepKey] = id; // Legacy
-130:     appState.setState({
-131:         pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
-132:     }, 'addPollingInterval');
-133: }
-134: export function clearPollingInterval(stepKey) {
-135:     if (pollingIntervals[stepKey]) {
-136:         clearInterval(pollingIntervals[stepKey]);
-137:         delete pollingIntervals[stepKey]; // Legacy
-138:     }
-139:     const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
-140:     const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
-141:     appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
-142: }
-143: export function getPollingInterval(stepKey) {
-144:     return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
-145: }
-146: 
-147: 
-148: 
-149: // Export the appState for direct access to modern state management
-150: export { appState };
-```
-
 ## File: workflow_scripts/step5/run_tracking_manager.py
 ```python
   1: #!/usr/bin/env python3
@@ -31285,6 +31131,886 @@ app_new.py
 891:     main()
 ```
 
+## File: static/css/components/logs.css
+```css
+  1: .logs-overlay-container {
+  2:     z-index: 1100;
+  3:     background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
+  4:     padding: clamp(16px, 3vw, 36px);
+  5:     opacity: 0;
+  6:     visibility: hidden;
+  7:     transform: translateY(20px) scale(0.96);
+  8:     transition:
+  9:         opacity var(--motion-duration-slow) var(--motion-ease-out-expo),
+ 10:         visibility var(--motion-duration-slow) var(--motion-ease-out-expo),
+ 11:         transform var(--motion-duration-slow) var(--motion-ease-out-expo);
+ 12:     backdrop-filter: blur(8px);
+ 13: }
+ 14: 
+ 15: .logs-content-wrapper {
+ 16:     width: min(80vw, 1100px);
+ 17:     height: min(80vh, 780px);
+ 18:     display: flex;
+ 19:     flex-direction: column;
+ 20:     gap: 18px;
+ 21:     background: var(--bg-card);
+ 22:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
+ 23:     border-radius: 28px;
+ 24:     padding: 20px 22px 24px;
+ 25:     box-shadow:
+ 26:         0 28px 60px rgba(0, 0, 0, 0.45),
+ 27:         0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
+ 28:     overflow: hidden;
+ 29: }
+ 30: 
+ 31: .logs-overlay-container[data-visible="true"] {
+ 32:     opacity: 1;
+ 33:     visibility: visible;
+ 34:     transform: translateY(0) scale(1);
+ 35: }
+ 36: 
+ 37: .logs-overlay-container[data-visible="true"] .logs-content-wrapper {
+ 38:     animation: logPanelEntrance 0.6s var(--motion-ease-out-expo) 0.1s both;
+ 39: }
+ 40: 
+ 41: @keyframes logPanelEntrance {
+ 42:     0% {
+ 43:         opacity: 0;
+ 44:         transform: translateY(16px) scale(0.98);
+ 45:         filter: blur(2px);
+ 46:     }
+ 47:     50% {
+ 48:         opacity: 0.8;
+ 49:         transform: translateY(-2px) scale(1.01);
+ 50:         filter: blur(0px);
+ 51:     }
+ 52:     100% {
+ 53:         opacity: 1;
+ 54:         transform: translateY(0) scale(1);
+ 55:         filter: blur(0px);
+ 56:     }
+ 57: }
+ 58: 
+ 59: .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
+ 60:     animation: logPanelExit 0.4s var(--motion-ease-in-expo) both;
+ 61: }
+ 62: 
+ 63: @keyframes logPanelExit {
+ 64:     0% {
+ 65:         opacity: 1;
+ 66:         transform: translateY(0) scale(1);
+ 67:         filter: blur(0px);
+ 68:     }
+ 69:     100% {
+ 70:         opacity: 0;
+ 71:         transform: translateY(20px) scale(0.96);
+ 72:         filter: blur(1px);
+ 73:     }
+ 74: }
+ 75: 
+ 76: @media (prefers-reduced-motion: reduce) {
+ 77:     .logs-overlay-container {
+ 78:         transition: opacity 0.2s ease, visibility 0.2s ease;
+ 79:         transform: none;
+ 80:     }
+ 81:     
+ 82:     .logs-overlay-container[data-visible="true"] .logs-content-wrapper,
+ 83:     .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
+ 84:         animation: none;
+ 85:         opacity: 1;
+ 86:         transform: none;
+ 87:         filter: none;
+ 88:     }
+ 89: }
+ 90: 
+ 91: @media (max-width: 900px) {
+ 92:     .logs-content-wrapper {
+ 93:         width: 95vw;
+ 94:         height: 90vh;
+ 95:         border-radius: 20px;
+ 96:         padding: 18px;
+ 97:     }
+ 98: }
+ 99: 
+100: .log-panel-header {
+101:     display: flex;
+102:     flex-direction: column;
+103:     align-items: stretch;
+104:     gap: 10px;
+105:     padding-bottom: 10px;
+106:     margin-bottom: 15px;
+107:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+108:     color: var(--accent-primary);
+109:     font-size: 1.3em;
+110:     font-weight: 500;
+111:     flex-shrink: 0;
+112:     transition: color var(--motion-duration-medium) var(--motion-ease-standard);
+113: }
+114: 
+115: .log-panel-header-main {
+116:     display: flex;
+117:     justify-content: space-between;
+118:     align-items: center;
+119:     gap: 12px;
+120: }
+121: 
+122: .log-panel-subheader {
+123:     display: flex;
+124:     flex-wrap: wrap;
+125:     align-items: baseline;
+126:     gap: 10px;
+127:     font-size: 0.85em;
+128:     color: var(--text-secondary);
+129: }
+130: 
+131: #log-panel-context-step {
+132:     color: var(--text-primary);
+133:     font-weight: 500;
+134: }
+135: 
+136: .log-panel-specific-buttons {
+137:     display: flex;
+138:     flex-wrap: wrap;
+139:     gap: 10px;
+140: }
+141: 
+142: .log-panel-specific-buttons .specific-log-button {
+143:     display: inline-flex;
+144:     align-items: center;
+145:     justify-content: center;
+146:     gap: 8px;
+147:     border-radius: 999px;
+148:     padding: 10px 18px;
+149:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
+150:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
+151:     color: var(--text-secondary);
+152:     cursor: pointer;
+153:     transition:
+154:         color var(--motion-duration-fast) var(--motion-ease-standard),
+155:         background var(--motion-duration-fast) var(--motion-ease-standard),
+156:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
+157:         transform var(--motion-duration-fast) var(--motion-ease-standard);
+158: }
+159: 
+160: .log-panel-specific-buttons .specific-log-button:hover {
+161:     color: var(--text-primary);
+162:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
+163:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
+164: }
+165: 
+166: .log-panel-specific-buttons .specific-log-button:active {
+167:     transform: scale(0.98);
+168: }
+169: 
+170: #close-log-panel {
+171:     display: inline-flex;
+172:     align-items: center;
+173:     justify-content: center;
+174:     width: 44px;
+175:     height: 44px;
+176:     background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
+177:     border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
+178:     border-radius: 999px;
+179:     color: var(--text-bright);
+180:     font-size: 1.45em;
+181:     cursor: pointer;
+182:     box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
+183:     transition:
+184:         color var(--motion-duration-fast) var(--motion-ease-standard),
+185:         background var(--motion-duration-fast) var(--motion-ease-standard),
+186:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
+187:         transform var(--motion-duration-fast) var(--motion-ease-standard),
+188:         box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+189: }
+190: 
+191: #close-log-panel:hover {
+192:     color: var(--text-primary);
+193:     background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
+194:     border-color: rgb(var(--accent-primary-rgb) / 0.7);
+195:     box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+196: }
+197: 
+198: #close-log-panel:focus-visible {
+199:     outline: none;
+200:     box-shadow:
+201:         0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
+202:         0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
+203: }
+204: 
+205: #close-log-panel:active {
+206:     transform: scale(0.96);
+207: }
+208: 
+209: .log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
+210: .log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
+211: 
+212: .log-output,
+213: .specific-log-output {
+214:     background-color: var(--log-bg);
+215:     color: var(--text-bright);
+216:     padding: 15px;
+217:     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+218:     font-size: 1em;
+219:     line-height: 1.45;
+220:     max-height: 300px;
+221:     overflow-y: auto;
+222:     white-space: pre-wrap;
+223:     word-break: break-all;
+224:     border-radius: 0 0 8px 8px;
+225:     flex-grow: 1;
+226: }
+227: 
+228: /* Enhanced Log Styling - Different log types */
+229: .log-line {
+230:     display: block;
+231:     margin: 2px 0;
+232:     padding: 2px 6px;
+233:     border-radius: 3px;
+234:     position: relative;
+235: }
+236: 
+237: .log-line.log-success {
+238:     background-color: rgb(var(--status-success-rgb) / 0.12);
+239:     border-left: 3px solid var(--status-success);
+240:     color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
+241: }
+242: 
+243: .log-line.log-warning {
+244:     background-color: rgb(var(--status-warning-rgb) / 0.12);
+245:     border-left: 3px solid var(--status-warning);
+246:     color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
+247: }
+248: 
+249: .log-line.log-error {
+250:     background-color: rgb(var(--status-error-rgb) / 0.12);
+251:     border-left: 3px solid var(--status-error);
+252:     color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
+253:     font-weight: 500;
+254: }
+255: 
+256: .log-line.log-info {
+257:     background-color: rgb(var(--status-running-rgb) / 0.12);
+258:     border-left: 3px solid var(--status-running);
+259:     color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
+260: }
+261: 
+262: .log-line.log-debug {
+263:     background-color: rgba(158, 158, 158, 0.1);
+264:     border-left: 3px solid #9e9e9e;
+265:     color: #616161;
+266:     font-size: 0.85em;
+267: }
+268: 
+269: .log-line.log-command {
+270:     background-color: rgba(156, 39, 176, 0.1);
+271:     border-left: 3px solid #9c27b0;
+272:     color: #7b1fa2;
+273:     font-weight: 500;
+274: }
+275: 
+276: .log-line.log-progress {
+277:     background-color: rgb(var(--accent-primary-rgb) / 0.10);
+278:     border-left: 3px solid var(--accent-primary);
+279:     color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+280: }
+281: 
+282: /* Log icons for better visual distinction */
+283: .log-line::before {
+284:     content: '';
+285:     display: inline-block;
+286:     width: 12px;
+287:     height: 12px;
+288:     margin-right: 8px;
+289:     border-radius: 50%;
+290:     vertical-align: middle;
+291: }
+292: 
+293: .log-line.log-success::before {
+294:     background-color: var(--status-success);
+295:     content: '✓';
+296:     color: white;
+297:     font-size: 8px;
+298:     text-align: center;
+299:     line-height: 12px;
+300:     font-weight: bold;
+301: }
+302: 
+303: .log-line.log-warning::before {
+304:     background-color: var(--status-warning);
+305:     content: '⚠';
+306:     color: white;
+307:     font-size: 8px;
+308:     text-align: center;
+309:     line-height: 12px;
+310: }
+311: 
+312: .log-line.log-error::before {
+313:     background-color: var(--status-error);
+314:     content: '✕';
+315:     color: white;
+316:     font-size: 8px;
+317:     text-align: center;
+318:     line-height: 12px;
+319:     font-weight: bold;
+320: }
+321: 
+322: .log-line.log-info::before {
+323:     background-color: var(--status-running);
+324:     content: 'ℹ';
+325:     color: white;
+326:     font-size: 8px;
+327:     text-align: center;
+328:     line-height: 12px;
+329: }
+330: 
+331: .log-line.log-debug::before {
+332:     background-color: #9e9e9e;
+333:     content: '•';
+334:     color: white;
+335:     font-size: 10px;
+336:     text-align: center;
+337:     line-height: 12px;
+338: }
+339: 
+340: .log-line.log-command::before {
+341:     background-color: #9c27b0;
+342:     content: '$';
+343:     color: white;
+344:     font-size: 8px;
+345:     text-align: center;
+346:     line-height: 12px;
+347:     font-weight: bold;
+348: }
+349: 
+350: .log-line.log-progress::before {
+351:     background-color: var(--accent-primary);
+352:     content: '⟳';
+353:     color: white;
+354:     font-size: 8px;
+355:     text-align: center;
+356:     line-height: 12px;
+357: }
+358: 
+359: /* Dark mode adjustments for log styling */
+360: @media (prefers-color-scheme: dark) {
+361:     .log-line.log-success {
+362:         background-color: rgb(var(--status-success-rgb) / 0.15);
+363:         color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
+364:     }
+365: 
+366:     .log-line.log-warning {
+367:         background-color: rgb(var(--status-warning-rgb) / 0.15);
+368:         color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
+369:     }
+370: 
+371:     .log-line.log-error {
+372:         background-color: rgb(var(--status-error-rgb) / 0.15);
+373:         color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
+374:     }
+375: 
+376:     .log-line.log-info {
+377:         background-color: rgb(var(--status-running-rgb) / 0.15);
+378:         color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
+379:     }
+380: 
+381:     .log-line.log-debug {
+382:         background-color: rgba(158, 158, 158, 0.15);
+383:         color: #bdbdbd;
+384:     }
+385: 
+386:     .log-line.log-command {
+387:         background-color: rgba(156, 39, 176, 0.15);
+388:         color: #ba68c8;
+389:     }
+390: 
+391:     .log-line.log-progress {
+392:         background-color: rgb(var(--accent-primary-rgb) / 0.15);
+393:         color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
+394:     }
+395: }
+396: 
+397: /* Hover effects for better interactivity */
+398: .log-line:hover {
+399:     background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
+400:     transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+401: }
+402: 
+403: /* Improved spacing and readability */
+404: .log-output .log-line:first-child {
+405:     margin-top: 0;
+406: }
+407: 
+408: .log-output .log-line:last-child {
+409:     margin-bottom: 0;
+410: }
+411: .log-output:empty:before {
+412:     content: "En attente de logs...";
+413:     color: var(--text-secondary);
+414:     font-style: italic;
+415: }
+416: .specific-log-output:empty:before {
+417:     content: "Aucun log spécifique chargé.";
+418:     color: var(--text-secondary);
+419:     font-style: italic;
+420: }
+421: 
+422: .specific-log-controls-wrapper { margin-top: 15px; }
+423: .specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
+424: 
+425: .specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
+426: 
+427: .log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
+428: .log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
+429: .log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
+430: .log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
+```
+
+## File: static/css/layout.css
+```css
+ 1: .workflow-wrapper {
+ 2:     display: flex;
+ 3:     width: 100%;
+ 4:     max-width: 1600px;
+ 5:     flex-grow: 1;
+ 6: }
+ 7: 
+ 8: /* Local Downloads panel animation (class-based for max browser compatibility) */
+ 9: .local-downloads-section {
+10:     opacity: 0;
+11:     transform: translateX(30px) scale(0.98);
+12:     transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+13:                 transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+14: }
+15: 
+16: .local-downloads-section.downloads-visible {
+17:     opacity: 1;
+18:     transform: translateX(0) scale(1);
+19: }
+20: 
+21: @media (prefers-reduced-motion: reduce) {
+22:     .local-downloads-section { transition: none !important; transform: none !important; }
+23: }
+24: 
+25: /* Keep vertical scrollbar always present to avoid layout jank during height changes */
+26: html, body { overflow-y: scroll; }
+27: 
+28: .steps-column {
+29:     flex: 1 1 100%;
+30:     padding: 10px 20px;
+31:     display: flex;
+32:     flex-direction: column;
+33:     align-items: center;
+34:     transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+35:     opacity: 1;
+36:     scroll-margin-top: 0;
+37: }
+38: 
+39: /* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
+40: .workflow-wrapper.compact-mode .steps-column {
+41:     display: grid;
+42:     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+43:     grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
+44:     gap: 16px 16px; /* row gap, column gap */
+45:     align-items: start; /* cards height adapt to content by default */
+46:     align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
+47:     justify-items: center; /* center cards if column wider than minmax */
+48:     padding: 10px 20px;
+49:     transition: opacity 0.5s ease-in-out;
+50: }
+51: 
+52: /* Desktop optimization: uniformize row heights to avoid subtle misalignment */
+53: @media (min-width: 1200px) {
+54:   .workflow-wrapper.compact-mode .steps-column {
+55:     align-items: start;
+56:   }
+57: }
+58: 
+59: 
+60: .workflow-wrapper.compact-mode .step-details-panel {
+61:     position: fixed;
+62:     right: 16px;
+63:     top: 120px;
+64:     width: min(30vw, 420px);
+65:     height: calc(100vh - 140px);
+66:     z-index: 19;
+67:     opacity: 0;
+68:     pointer-events: none;
+69:     transform: translateX(30px);
+70:     transition: opacity 0.3s ease, transform 0.3s ease;
+71:  }
+72: 
+73: .workflow-wrapper.compact-mode.details-active .step-details-panel {
+74:     opacity: 1;
+75:     pointer-events: auto;
+76:     transform: translateX(0);
+77:  }
+78: 
+79: .workflow-wrapper.compact-mode.details-active .steps-column {
+80:     margin-right: min(30vw, 420px);
+81:     padding-right: 16px;
+82:  }
+83: 
+84: /* Unified controls section compatibility with slideshow mode */
+85: .workflow-wrapper.slideshow-mode ~ .unified-controls-section,
+86: .unified-controls-section + .workflow-wrapper.slideshow-mode {
+87:     /* Ensure proper spacing and visibility during slideshow */
+88:     z-index: 1;
+89:     position: relative;
+90:  }
+```
+
+## File: static/sequenceManager.js
+```javascript
+  1: import { POLLING_INTERVAL } from './constants.js';
+  2: import * as ui from './uiUpdater.js';
+  3: import { runStepAPI } from './apiService.js';
+  4: import { showSequenceSummaryUI } from './popupManager.js';
+  5: import { formatElapsedTime } from './utils.js';
+  6: import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
+  7: 
+  8: import { appState } from './state/AppState.js';
+  9: 
+ 10: import { soundEvents } from './soundManager.js';
+ 11: 
+ 12: /**
+ 13:  * Executes and tracks a single step within a sequence.
+ 14:  * This helper function encapsulates all logic for one step, from initiation to completion.
+ 15:  * @private
+ 16:  * @param {string} stepKey - The unique key for the step.
+ 17:  * @param {string} sequenceName - The name of the parent sequence.
+ 18:  * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
+ 19:  * @param {number} totalSteps - The total number of steps in the sequence.
+ 20:  * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
+ 21:  */
+ 22: async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
+ 23:     const stepConfig = ui.getStepsConfig()[stepKey];
+ 24:     const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
+ 25: 
+ 26:     console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
+ 27: 
+ 28:     ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
+ 29:         Math.round(((currentStepNum - 1) / totalSteps) * 100)
+ 30:     );
+ 31: 
+ 32:     if (stepKey !== 'clear_disk_cache') {
+ 33:         ui.openLogPanelUI(stepKey);
+ 34:         ui.setActiveStepForLogPanelUI(stepKey);
+ 35:         
+ 36:         if (isSequenceAutoScrollEnabled()) {
+ 37:             setTimeout(() => {
+ 38:                 scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
+ 39:             }, 0);
+ 40:         }
+ 41:     }
+ 42: 
+ 43:     const stepInitiated = await runStepAPI(stepKey);
+ 44:     if (!stepInitiated) {
+ 45:         console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
+ 46:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
+ 47:             Math.round(((currentStepNum - 1) / totalSteps) * 100), true
+ 48:         );
+ 49:         return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
+ 50:     }
+ 51: 
+ 52:     ui.startStepTimer(stepKey);
+ 53:     console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
+ 54: 
+ 55:     try {
+ 56:         ui.setActiveStepForLogPanelUI(stepKey);
+ 57:     } catch (e) {
+ 58:         console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
+ 59:     }
+ 60: 
+ 61:     let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+ 62:     if (timerData && timerData.startTime) {
+ 63:         console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
+ 64:     } else {
+ 65:         console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
+ 66:     }
+ 67: 
+ 68:     console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
+ 69:     const stepCompleted = await waitForStepCompletionInSequence(stepKey);
+ 70: 
+ 71:     ui.stopStepTimer(stepKey);
+ 72:     console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
+ 73: 
+ 74:     timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
+ 75:     const duration = (timerData?.elapsedTimeFormatted) || "N/A";
+ 76: 
+ 77:     console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
+ 78:         timerData,
+ 79:         duration,
+ 80:         startTime: timerData?.startTime,
+ 81:         elapsedTimeFormatted: timerData?.elapsedTimeFormatted
+ 82:     });
+ 83: 
+ 84:     if (!stepCompleted) {
+ 85:         console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
+ 86: 
+ 87:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
+ 88:             Math.round((currentStepNum / totalSteps) * 100), true
+ 89:         );
+ 90:         return { name: stepDisplayName, success: false, duration };
+ 91:     }
+ 92: 
+ 93:     console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
+ 94: 
+ 95:     soundEvents.stepSuccess();
+ 96: 
+ 97:     return { name: stepDisplayName, success: true, duration };
+ 98: }
+ 99: 
+100: export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
+101:     console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
+102:     ui.updateGlobalUIForSequenceState(true);
+103:     ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
+104: 
+105:     const sequenceStart = Date.now();
+106: 
+107:     const sequenceResults = [];
+108:     const totalStepsInThisSequence = stepsToExecute.length;
+109:     const isAutoModeSequence = sequenceName === "AutoMode";
+110:     let sequenceFailed = false;
+111: 
+112:     if (isAutoModeSequence) {
+113:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
+114:     }
+115: 
+116:     for (let i = 0; i < stepsToExecute.length; i++) {
+117:         const stepKey = stepsToExecute[i];
+118:         const currentStepNum = i + 1;
+119: 
+120:         const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
+121:         sequenceResults.push(result);
+122: 
+123:         if (!result.success) {
+124:             sequenceFailed = true;
+125:             break; // Exit the loop immediately on failure
+126:         }
+127: 
+128:         if (i < stepsToExecute.length - 1) {
+129:             const nextStepKey = stepsToExecute[i + 1];
+130:             if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
+131:                 try {
+132:                     ui.openLogPanelUI(nextStepKey);
+133:                     ui.setActiveStepForLogPanelUI(nextStepKey);
+134:                     
+135:                     if (isSequenceAutoScrollEnabled()) {
+136:                         setTimeout(() => {
+137:                             scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
+138:                         }, 0);
+139:                     }
+140:                 } catch (e) {
+141:                     console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
+142:                 }
+143:             }
+144:             ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
+145:                 Math.round((currentStepNum / totalStepsInThisSequence) * 100)
+146:             );
+147:         }
+148:     }
+149: 
+150:     console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
+151: 
+152:     if (sequenceFailed) {
+153:     } else {
+154:         ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
+155:         soundEvents.workflowCompletion();
+156:     }
+157: 
+158:     if (sequenceResults.length > 0) {
+159:         const overallDuration = formatElapsedTime(new Date(sequenceStart));
+160:         showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
+161:     } else {
+162:         console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
+163:     }
+164: 
+165:     ui.updateGlobalUIForSequenceState(false);
+166:     if (isAutoModeSequence) {
+167:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
+168:     }
+169: }
+170: 
+171: function waitForStepCompletionInSequence(stepKey) {
+172:     return new Promise((resolve) => {
+173:         const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
+174:         console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
+175: 
+176:         const checkInterval = setInterval(() => {
+177:             const data = appState.getStateProperty(`processInfo.${stepKey}`);
+178: 
+179:             if (!data) {
+180:                 return;
+181:             }
+182: 
+183:             if (data.status === 'completed') {
+184:                 console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
+185:                 clearInterval(checkInterval);
+186:                 resolve(true);
+187:             } else if (data.status === 'failed' || data.return_code === -9) {
+188:                 console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
+189:                 clearInterval(checkInterval);
+190:                 resolve(false);
+191:             }
+192:             }, POLLING_INTERVAL / 2);
+193:     });
+194: }
+```
+
+## File: static/state.js
+```javascript
+  1: // Import new immutable state management
+  2: import { appState } from './state/AppState.js';
+  3: 
+  4: export const PROCESS_INFO_CLIENT = new Proxy({}, {
+  5:     get(_target, prop) {
+  6:         if (typeof prop !== 'string') return undefined;
+  7:         return appState.getStateProperty(`processInfo.${prop}`);
+  8:     },
+  9:     set(_target, prop, value) {
+ 10:         if (typeof prop !== 'string') return false;
+ 11:         appState.setState({ processInfo: { [prop]: value } }, 'process_info_update');
+ 12:         return true;
+ 13:     },
+ 14:     ownKeys() {
+ 15:         const root = appState.getStateProperty('processInfo') || {};
+ 16:         return Reflect.ownKeys(root);
+ 17:     },
+ 18:     getOwnPropertyDescriptor(_target, prop) {
+ 19:         const root = appState.getStateProperty('processInfo') || {};
+ 20:         if (Object.prototype.hasOwnProperty.call(root, prop)) {
+ 21:             return { enumerable: true, configurable: true };
+ 22:         }
+ 23:         return undefined;
+ 24:     }
+ 25: });
+ 26: 
+ 27: // Legacy exports for backward compatibility (deprecated - use appState instead)
+ 28: export let pollingIntervals = {};
+ 29: export let activeStepKeyForLogsPanel = null;
+ 30: export let stepTimers = {};
+ 31: export let selectedStepsOrder = [];
+ 32: export let isAnySequenceRunning = false;
+ 33: export let focusedElementBeforePopup = null;
+ 34: export let autoOpenLogOverlay = true;
+ 35: 
+ 36: 
+ 37: // --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
+ 38: export const REMOTE_SEQUENCE_STEP_KEYS = [
+ 39:     "STEP1",
+ 40:     "STEP2",
+ 41:     "STEP3",
+ 42:     "STEP4",
+ 43:     "STEP5",
+ 44:     "STEP6",
+ 45:     "STEP7",
+ 46:     "STEP8"
+ 47: ];
+ 48: 
+ 49: // Modern state management functions using AppState
+ 50: export function setActiveStepKeyForLogs(key) {
+ 51:     activeStepKeyForLogsPanel = key; // Legacy
+ 52:     appState.setState({ activeStepKeyForLogsPanel: key }, 'setActiveStepKeyForLogs');
+ 53: }
+ 54: export function getActiveStepKeyForLogs() {
+ 55:     return appState.getStateProperty('activeStepKeyForLogsPanel') || activeStepKeyForLogsPanel;
+ 56: }
+ 57: 
+ 58: export function addStepTimer(stepKey, timerData) {
+ 59:     stepTimers[stepKey] = timerData; // Legacy
+ 60:     appState.setState({
+ 61:         stepTimers: { ...appState.getStateProperty('stepTimers'), [stepKey]: timerData }
+ 62:     }, 'addStepTimer');
+ 63: }
+ 64: export function getStepTimer(stepKey) {
+ 65:     return appState.getStateProperty(`stepTimers.${stepKey}`) || stepTimers[stepKey];
+ 66: }
+ 67: export function clearStepTimerInterval(stepKey) {
+ 68:     const timer = getStepTimer(stepKey);
+ 69:     if (timer && timer.intervalId) {
+ 70:         clearInterval(timer.intervalId);
+ 71:         const updatedTimer = { ...timer, intervalId: null };
+ 72:         addStepTimer(stepKey, updatedTimer);
+ 73:     }
+ 74: }
+ 75: export function deleteStepTimer(stepKey) {
+ 76:     if (getStepTimer(stepKey)) {
+ 77:         clearStepTimerInterval(stepKey);
+ 78:         delete stepTimers[stepKey]; // Legacy
+ 79:         const currentTimers = appState.getStateProperty('stepTimers') || {};
+ 80:         const { [stepKey]: removed, ...remainingTimers } = currentTimers;
+ 81:         appState.setState({ stepTimers: remainingTimers }, 'deleteStepTimer');
+ 82:     }
+ 83: }
+ 84: 
+ 85: export function setSelectedStepsOrder(order) {
+ 86:     selectedStepsOrder = order; // Legacy
+ 87:     appState.setState({ selectedStepsOrder: order }, 'setSelectedStepsOrder');
+ 88: }
+ 89: export function getSelectedStepsOrder() {
+ 90:     return appState.getStateProperty('selectedStepsOrder') || selectedStepsOrder;
+ 91: }
+ 92: 
+ 93: export function setIsAnySequenceRunning(running) {
+ 94:     isAnySequenceRunning = running; // Legacy
+ 95:     appState.setState({ isAnySequenceRunning: running }, 'setIsAnySequenceRunning');
+ 96: }
+ 97: export function getIsAnySequenceRunning() {
+ 98:     return appState.getStateProperty('isAnySequenceRunning') || isAnySequenceRunning;
+ 99: }
+100: 
+101: export function setFocusedElementBeforePopup(element) {
+102:     focusedElementBeforePopup = element; // Legacy
+103:     appState.setState({ focusedElementBeforePopup: element }, 'setFocusedElementBeforePopup');
+104: }
+105: export function getFocusedElementBeforePopup() {
+106:     return appState.getStateProperty('focusedElementBeforePopup') || focusedElementBeforePopup;
+107: }
+108: 
+109: export function setAutoOpenLogOverlay(enabled) {
+110:     autoOpenLogOverlay = !!enabled;
+111:     const currentUI = appState.getStateProperty('ui') || {};
+112:     appState.setState({ ui: { ...currentUI, autoOpenLogOverlay: autoOpenLogOverlay } }, 'setAutoOpenLogOverlay');
+113: }
+114: 
+115: export function getAutoOpenLogOverlay() {
+116:     const uiValue = appState.getStateProperty('ui.autoOpenLogOverlay');
+117:     return typeof uiValue === 'boolean' ? uiValue : autoOpenLogOverlay;
+118: }
+119: 
+120: export function setAutoModeLogPanelOpened(opened) {
+121:     appState.setState({ ui: { autoModeLogPanelOpened: !!opened } }, 'setAutoModeLogPanelOpened');
+122: }
+123: 
+124: export function getAutoModeLogPanelOpened() {
+125:     return !!appState.getStateProperty('ui.autoModeLogPanelOpened');
+126: }
+127: 
+128: export function addPollingInterval(stepKey, id) {
+129:     pollingIntervals[stepKey] = id; // Legacy
+130:     appState.setState({
+131:         pollingIntervals: { ...appState.getStateProperty('pollingIntervals'), [stepKey]: id }
+132:     }, 'addPollingInterval');
+133: }
+134: export function clearPollingInterval(stepKey) {
+135:     if (pollingIntervals[stepKey]) {
+136:         clearInterval(pollingIntervals[stepKey]);
+137:         delete pollingIntervals[stepKey]; // Legacy
+138:     }
+139:     const currentIntervals = appState.getStateProperty('pollingIntervals') || {};
+140:     const { [stepKey]: removed, ...remainingIntervals } = currentIntervals;
+141:     appState.setState({ pollingIntervals: remainingIntervals }, 'clearPollingInterval');
+142: }
+143: export function getPollingInterval(stepKey) {
+144:     return appState.getStateProperty(`pollingIntervals.${stepKey}`) || pollingIntervals[stepKey];
+145: }
+146: 
+147: 
+148: 
+149: // Export the appState for direct access to modern state management
+150: export { appState };
+```
+
 ## File: app_new.py
 ```python
    1: import csv
@@ -32353,732 +33079,6 @@ app_new.py
 1064:     )
 ```
 
-## File: static/css/components/logs.css
-```css
-  1: .logs-overlay-container {
-  2:     z-index: 1100;
-  3:     background: color-mix(in oklab, rgba(0, 0, 0, 0.88) 70%, var(--bg-card));
-  4:     padding: clamp(16px, 3vw, 36px);
-  5:     opacity: 0;
-  6:     visibility: hidden;
-  7:     transform: translateY(20px) scale(0.96);
-  8:     transition:
-  9:         opacity var(--motion-duration-slow) var(--motion-ease-out-expo),
- 10:         visibility var(--motion-duration-slow) var(--motion-ease-out-expo),
- 11:         transform var(--motion-duration-slow) var(--motion-ease-out-expo);
- 12:     backdrop-filter: blur(8px);
- 13: }
- 14: 
- 15: .logs-content-wrapper {
- 16:     width: min(80vw, 1100px);
- 17:     height: min(80vh, 780px);
- 18:     display: flex;
- 19:     flex-direction: column;
- 20:     gap: 18px;
- 21:     background: var(--bg-card);
- 22:     border: 1px solid color-mix(in oklab, var(--border-color) 70%, transparent);
- 23:     border-radius: 28px;
- 24:     padding: 20px 22px 24px;
- 25:     box-shadow:
- 26:         0 28px 60px rgba(0, 0, 0, 0.45),
- 27:         0 0 0 1px rgb(var(--accent-primary-rgb) / 0.16);
- 28:     overflow: hidden;
- 29: }
- 30: 
- 31: .logs-overlay-container[data-visible="true"] {
- 32:     opacity: 1;
- 33:     visibility: visible;
- 34:     transform: translateY(0) scale(1);
- 35: }
- 36: 
- 37: .logs-overlay-container[data-visible="true"] .logs-content-wrapper {
- 38:     animation: logPanelEntrance 0.6s var(--motion-ease-out-expo) 0.1s both;
- 39: }
- 40: 
- 41: @keyframes logPanelEntrance {
- 42:     0% {
- 43:         opacity: 0;
- 44:         transform: translateY(16px) scale(0.98);
- 45:         filter: blur(2px);
- 46:     }
- 47:     50% {
- 48:         opacity: 0.8;
- 49:         transform: translateY(-2px) scale(1.01);
- 50:         filter: blur(0px);
- 51:     }
- 52:     100% {
- 53:         opacity: 1;
- 54:         transform: translateY(0) scale(1);
- 55:         filter: blur(0px);
- 56:     }
- 57: }
- 58: 
- 59: .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
- 60:     animation: logPanelExit 0.4s var(--motion-ease-in-expo) both;
- 61: }
- 62: 
- 63: @keyframes logPanelExit {
- 64:     0% {
- 65:         opacity: 1;
- 66:         transform: translateY(0) scale(1);
- 67:         filter: blur(0px);
- 68:     }
- 69:     100% {
- 70:         opacity: 0;
- 71:         transform: translateY(20px) scale(0.96);
- 72:         filter: blur(1px);
- 73:     }
- 74: }
- 75: 
- 76: @media (prefers-reduced-motion: reduce) {
- 77:     .logs-overlay-container {
- 78:         transition: opacity 0.2s ease, visibility 0.2s ease;
- 79:         transform: none;
- 80:     }
- 81:     
- 82:     .logs-overlay-container[data-visible="true"] .logs-content-wrapper,
- 83:     .logs-overlay-container:not([data-visible="true"]) .logs-content-wrapper {
- 84:         animation: none;
- 85:         opacity: 1;
- 86:         transform: none;
- 87:         filter: none;
- 88:     }
- 89: }
- 90: 
- 91: @media (max-width: 900px) {
- 92:     .logs-content-wrapper {
- 93:         width: 95vw;
- 94:         height: 90vh;
- 95:         border-radius: 20px;
- 96:         padding: 18px;
- 97:     }
- 98: }
- 99: 
-100: .log-panel-header {
-101:     display: flex;
-102:     flex-direction: column;
-103:     align-items: stretch;
-104:     gap: 10px;
-105:     padding-bottom: 10px;
-106:     margin-bottom: 15px;
-107:     border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-108:     color: var(--accent-primary);
-109:     font-size: 1.3em;
-110:     font-weight: 500;
-111:     flex-shrink: 0;
-112:     transition: color var(--motion-duration-medium) var(--motion-ease-standard);
-113: }
-114: 
-115: .log-panel-header-main {
-116:     display: flex;
-117:     justify-content: space-between;
-118:     align-items: center;
-119:     gap: 12px;
-120: }
-121: 
-122: .log-panel-subheader {
-123:     display: flex;
-124:     flex-wrap: wrap;
-125:     align-items: baseline;
-126:     gap: 10px;
-127:     font-size: 0.85em;
-128:     color: var(--text-secondary);
-129: }
-130: 
-131: #log-panel-context-step {
-132:     color: var(--text-primary);
-133:     font-weight: 500;
-134: }
-135: 
-136: .log-panel-specific-buttons {
-137:     display: flex;
-138:     flex-wrap: wrap;
-139:     gap: 10px;
-140: }
-141: 
-142: .log-panel-specific-buttons .specific-log-button {
-143:     display: inline-flex;
-144:     align-items: center;
-145:     justify-content: center;
-146:     gap: 8px;
-147:     border-radius: 999px;
-148:     padding: 10px 18px;
-149:     background: color-mix(in oklab, var(--bg-card) 80%, transparent);
-150:     border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent);
-151:     color: var(--text-secondary);
-152:     cursor: pointer;
-153:     transition:
-154:         color var(--motion-duration-fast) var(--motion-ease-standard),
-155:         background var(--motion-duration-fast) var(--motion-ease-standard),
-156:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-157:         transform var(--motion-duration-fast) var(--motion-ease-standard);
-158: }
-159: 
-160: .log-panel-specific-buttons .specific-log-button:hover {
-161:     color: var(--text-primary);
-162:     background: color-mix(in oklab, var(--bg-card) 70%, var(--accent-primary) 10%);
-163:     border-color: rgb(var(--accent-primary-rgb) / 0.35);
-164: }
-165: 
-166: .log-panel-specific-buttons .specific-log-button:active {
-167:     transform: scale(0.98);
-168: }
-169: 
-170: #close-log-panel {
-171:     display: inline-flex;
-172:     align-items: center;
-173:     justify-content: center;
-174:     width: 44px;
-175:     height: 44px;
-176:     background: color-mix(in oklab, var(--accent-primary) 70%, var(--bg-card));
-177:     border: 1px solid color-mix(in oklab, var(--accent-primary) 55%, var(--border-color));
-178:     border-radius: 999px;
-179:     color: var(--text-bright);
-180:     font-size: 1.45em;
-181:     cursor: pointer;
-182:     box-shadow: 0 8px 18px rgb(var(--accent-primary-rgb) / 0.25);
-183:     transition:
-184:         color var(--motion-duration-fast) var(--motion-ease-standard),
-185:         background var(--motion-duration-fast) var(--motion-ease-standard),
-186:         border-color var(--motion-duration-fast) var(--motion-ease-standard),
-187:         transform var(--motion-duration-fast) var(--motion-ease-standard),
-188:         box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
-189: }
-190: 
-191: #close-log-panel:hover {
-192:     color: var(--text-primary);
-193:     background: color-mix(in oklab, var(--accent-primary) 85%, var(--bg-card));
-194:     border-color: rgb(var(--accent-primary-rgb) / 0.7);
-195:     box-shadow: 0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
-196: }
-197: 
-198: #close-log-panel:focus-visible {
-199:     outline: none;
-200:     box-shadow:
-201:         0 0 0 3px rgb(var(--accent-primary-rgb) / 0.35),
-202:         0 10px 24px rgb(var(--accent-primary-rgb) / 0.35);
-203: }
-204: 
-205: #close-log-panel:active {
-206:     transform: scale(0.96);
-207: }
-208: 
-209: .log-container { border: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px); margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; background: color-mix(in oklab, var(--bg-card) 94%, transparent);}
-210: .log-header { background-color: color-mix(in oklab, var(--bg-card) 78%, black 10%); padding: 10px 15px; font-weight: 600; border-bottom: 1px solid color-mix(in oklab, var(--border-color) 80%, transparent); border-radius: calc(var(--pipeline-card-radius) - 8px) calc(var(--pipeline-card-radius) - 8px) 0 0; color: var(--text-secondary); }
-211: 
-212: .log-output,
-213: .specific-log-output {
-214:     background-color: var(--log-bg);
-215:     color: var(--text-bright);
-216:     padding: 15px;
-217:     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-218:     font-size: 1em;
-219:     line-height: 1.45;
-220:     max-height: 300px;
-221:     overflow-y: auto;
-222:     white-space: pre-wrap;
-223:     word-break: break-all;
-224:     border-radius: 0 0 8px 8px;
-225:     flex-grow: 1;
-226: }
-227: 
-228: /* Enhanced Log Styling - Different log types */
-229: .log-line {
-230:     display: block;
-231:     margin: 2px 0;
-232:     padding: 2px 6px;
-233:     border-radius: 3px;
-234:     position: relative;
-235: }
-236: 
-237: .log-line.log-success {
-238:     background-color: rgb(var(--status-success-rgb) / 0.12);
-239:     border-left: 3px solid var(--status-success);
-240:     color: color-mix(in oklab, var(--status-success) 55%, var(--text-primary));
-241: }
-242: 
-243: .log-line.log-warning {
-244:     background-color: rgb(var(--status-warning-rgb) / 0.12);
-245:     border-left: 3px solid var(--status-warning);
-246:     color: color-mix(in oklab, var(--status-warning) 55%, var(--text-primary));
-247: }
-248: 
-249: .log-line.log-error {
-250:     background-color: rgb(var(--status-error-rgb) / 0.12);
-251:     border-left: 3px solid var(--status-error);
-252:     color: color-mix(in oklab, var(--status-error) 55%, var(--text-primary));
-253:     font-weight: 500;
-254: }
-255: 
-256: .log-line.log-info {
-257:     background-color: rgb(var(--status-running-rgb) / 0.12);
-258:     border-left: 3px solid var(--status-running);
-259:     color: color-mix(in oklab, var(--status-running) 55%, var(--text-primary));
-260: }
-261: 
-262: .log-line.log-debug {
-263:     background-color: rgba(158, 158, 158, 0.1);
-264:     border-left: 3px solid #9e9e9e;
-265:     color: #616161;
-266:     font-size: 0.85em;
-267: }
-268: 
-269: .log-line.log-command {
-270:     background-color: rgba(156, 39, 176, 0.1);
-271:     border-left: 3px solid #9c27b0;
-272:     color: #7b1fa2;
-273:     font-weight: 500;
-274: }
-275: 
-276: .log-line.log-progress {
-277:     background-color: rgb(var(--accent-primary-rgb) / 0.10);
-278:     border-left: 3px solid var(--accent-primary);
-279:     color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-280: }
-281: 
-282: /* Log icons for better visual distinction */
-283: .log-line::before {
-284:     content: '';
-285:     display: inline-block;
-286:     width: 12px;
-287:     height: 12px;
-288:     margin-right: 8px;
-289:     border-radius: 50%;
-290:     vertical-align: middle;
-291: }
-292: 
-293: .log-line.log-success::before {
-294:     background-color: var(--status-success);
-295:     content: '✓';
-296:     color: white;
-297:     font-size: 8px;
-298:     text-align: center;
-299:     line-height: 12px;
-300:     font-weight: bold;
-301: }
-302: 
-303: .log-line.log-warning::before {
-304:     background-color: var(--status-warning);
-305:     content: '⚠';
-306:     color: white;
-307:     font-size: 8px;
-308:     text-align: center;
-309:     line-height: 12px;
-310: }
-311: 
-312: .log-line.log-error::before {
-313:     background-color: var(--status-error);
-314:     content: '✕';
-315:     color: white;
-316:     font-size: 8px;
-317:     text-align: center;
-318:     line-height: 12px;
-319:     font-weight: bold;
-320: }
-321: 
-322: .log-line.log-info::before {
-323:     background-color: var(--status-running);
-324:     content: 'ℹ';
-325:     color: white;
-326:     font-size: 8px;
-327:     text-align: center;
-328:     line-height: 12px;
-329: }
-330: 
-331: .log-line.log-debug::before {
-332:     background-color: #9e9e9e;
-333:     content: '•';
-334:     color: white;
-335:     font-size: 10px;
-336:     text-align: center;
-337:     line-height: 12px;
-338: }
-339: 
-340: .log-line.log-command::before {
-341:     background-color: #9c27b0;
-342:     content: '$';
-343:     color: white;
-344:     font-size: 8px;
-345:     text-align: center;
-346:     line-height: 12px;
-347:     font-weight: bold;
-348: }
-349: 
-350: .log-line.log-progress::before {
-351:     background-color: var(--accent-primary);
-352:     content: '⟳';
-353:     color: white;
-354:     font-size: 8px;
-355:     text-align: center;
-356:     line-height: 12px;
-357: }
-358: 
-359: /* Dark mode adjustments for log styling */
-360: @media (prefers-color-scheme: dark) {
-361:     .log-line.log-success {
-362:         background-color: rgb(var(--status-success-rgb) / 0.15);
-363:         color: color-mix(in oklab, var(--status-success) 60%, var(--text-primary));
-364:     }
-365: 
-366:     .log-line.log-warning {
-367:         background-color: rgb(var(--status-warning-rgb) / 0.15);
-368:         color: color-mix(in oklab, var(--status-warning) 60%, var(--text-primary));
-369:     }
-370: 
-371:     .log-line.log-error {
-372:         background-color: rgb(var(--status-error-rgb) / 0.15);
-373:         color: color-mix(in oklab, var(--status-error) 60%, var(--text-primary));
-374:     }
-375: 
-376:     .log-line.log-info {
-377:         background-color: rgb(var(--status-running-rgb) / 0.15);
-378:         color: color-mix(in oklab, var(--status-running) 60%, var(--text-primary));
-379:     }
-380: 
-381:     .log-line.log-debug {
-382:         background-color: rgba(158, 158, 158, 0.15);
-383:         color: #bdbdbd;
-384:     }
-385: 
-386:     .log-line.log-command {
-387:         background-color: rgba(156, 39, 176, 0.15);
-388:         color: #ba68c8;
-389:     }
-390: 
-391:     .log-line.log-progress {
-392:         background-color: rgb(var(--accent-primary-rgb) / 0.15);
-393:         color: color-mix(in oklab, var(--accent-primary) 70%, var(--text-primary));
-394:     }
-395: }
-396: 
-397: /* Hover effects for better interactivity */
-398: .log-line:hover {
-399:     background-color: color-mix(in oklab, rgb(var(--accent-primary-rgb) / 0.10) 40%, transparent);
-400:     transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
-401: }
-402: 
-403: /* Improved spacing and readability */
-404: .log-output .log-line:first-child {
-405:     margin-top: 0;
-406: }
-407: 
-408: .log-output .log-line:last-child {
-409:     margin-bottom: 0;
-410: }
-411: .log-output:empty:before {
-412:     content: "En attente de logs...";
-413:     color: var(--text-secondary);
-414:     font-style: italic;
-415: }
-416: .specific-log-output:empty:before {
-417:     content: "Aucun log spécifique chargé.";
-418:     color: var(--text-secondary);
-419:     font-style: italic;
-420: }
-421: 
-422: .specific-log-controls-wrapper { margin-top: 15px; }
-423: .specific-log-controls-wrapper h4 { font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; font-size: 1em;}
-424: 
-425: .specific-log-path { font-size: 0.8em; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; padding: 5px 15px;}
-426: 
-427: .log-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 5px; }
-428: .log-table th, .log-table td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
-429: .log-table th { background-color: color-mix(in oklab, var(--bg-card) 88%, black 8%); color: var(--text-primary); }
-430: .log-table tr:nth-child(even) { background-color: color-mix(in oklab, var(--bg-card) 85%, black 10%); }
-```
-
-## File: static/css/layout.css
-```css
- 1: .workflow-wrapper {
- 2:     display: flex;
- 3:     width: 100%;
- 4:     max-width: 1600px;
- 5:     flex-grow: 1;
- 6: }
- 7: 
- 8: /* Local Downloads panel animation (class-based for max browser compatibility) */
- 9: .local-downloads-section {
-10:     opacity: 0;
-11:     transform: translateX(30px) scale(0.98);
-12:     transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-13:                 transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-14: }
-15: 
-16: .local-downloads-section.downloads-visible {
-17:     opacity: 1;
-18:     transform: translateX(0) scale(1);
-19: }
-20: 
-21: @media (prefers-reduced-motion: reduce) {
-22:     .local-downloads-section { transition: none !important; transform: none !important; }
-23: }
-24: 
-25: /* Keep vertical scrollbar always present to avoid layout jank during height changes */
-26: html, body { overflow-y: scroll; }
-27: 
-28: .steps-column {
-29:     flex: 1 1 100%;
-30:     padding: 10px 20px;
-31:     display: flex;
-32:     flex-direction: column;
-33:     align-items: center;
-34:     transition: flex-basis 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
-35:     opacity: 1;
-36:     scroll-margin-top: 0;
-37: }
-38: 
-39: /* Compact mode: grid layout (multiple cards per row, no large vertical gaps) */
-40: .workflow-wrapper.compact-mode .steps-column {
-41:     display: grid;
-42:     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-43:     grid-auto-flow: row dense; /* backfill holes to reduce empty spaces between rows */
-44:     gap: 16px 16px; /* row gap, column gap */
-45:     align-items: start; /* cards height adapt to content by default */
-46:     align-content: start; /* pack rows at the top to avoid large vertical gaps between groups */
-47:     justify-items: center; /* center cards if column wider than minmax */
-48:     padding: 10px 20px;
-49:     transition: opacity 0.5s ease-in-out;
-50: }
-51: 
-52: /* Desktop optimization: uniformize row heights to avoid subtle misalignment */
-53: @media (min-width: 1200px) {
-54:   .workflow-wrapper.compact-mode .steps-column {
-55:     align-items: start;
-56:   }
-57: }
-58: 
-59: 
-60: .workflow-wrapper.compact-mode .step-details-panel {
-61:     position: fixed;
-62:     right: 16px;
-63:     top: 120px;
-64:     width: min(30vw, 420px);
-65:     height: calc(100vh - 140px);
-66:     z-index: 19;
-67:     opacity: 0;
-68:     pointer-events: none;
-69:     transform: translateX(30px);
-70:     transition: opacity 0.3s ease, transform 0.3s ease;
-71:  }
-72: 
-73: .workflow-wrapper.compact-mode.details-active .step-details-panel {
-74:     opacity: 1;
-75:     pointer-events: auto;
-76:     transform: translateX(0);
-77:  }
-78: 
-79: .workflow-wrapper.compact-mode.details-active .steps-column {
-80:     margin-right: min(30vw, 420px);
-81:     padding-right: 16px;
-82:  }
-83: 
-84: /* Unified controls section compatibility with slideshow mode */
-85: .workflow-wrapper.slideshow-mode ~ .unified-controls-section,
-86: .unified-controls-section + .workflow-wrapper.slideshow-mode {
-87:     /* Ensure proper spacing and visibility during slideshow */
-88:     z-index: 1;
-89:     position: relative;
-90:  }
-```
-
-## File: static/sequenceManager.js
-```javascript
-  1: import { POLLING_INTERVAL } from './constants.js';
-  2: import * as ui from './uiUpdater.js';
-  3: import { runStepAPI } from './apiService.js';
-  4: import { showSequenceSummaryUI } from './popupManager.js';
-  5: import { formatElapsedTime } from './utils.js';
-  6: import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
-  7: 
-  8: import { appState } from './state/AppState.js';
-  9: 
- 10: import { soundEvents } from './soundManager.js';
- 11: 
- 12: /**
- 13:  * Executes and tracks a single step within a sequence.
- 14:  * This helper function encapsulates all logic for one step, from initiation to completion.
- 15:  * @private
- 16:  * @param {string} stepKey - The unique key for the step.
- 17:  * @param {string} sequenceName - The name of the parent sequence.
- 18:  * @param {number} currentStepNum - The step's number in the sequence (e.g., 1, 2, 3...).
- 19:  * @param {number} totalSteps - The total number of steps in the sequence.
- 20:  * @returns {Promise<object>} A promise that resolves to a result object: { name, success, duration }.
- 21:  */
- 22: async function _executeSingleStep(stepKey, sequenceName, currentStepNum, totalSteps) {
- 23:     const stepConfig = ui.getStepsConfig()[stepKey];
- 24:     const stepDisplayName = stepConfig ? stepConfig.display_name : stepKey;
- 25: 
- 26:     console.log(`[SEQ_MGR] ${sequenceName} - Step ${currentStepNum}/${totalSteps}: ${stepDisplayName} (${stepKey})`);
- 27: 
- 28:     ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalSteps}: ${stepDisplayName}`,
- 29:         Math.round(((currentStepNum - 1) / totalSteps) * 100)
- 30:     );
- 31: 
- 32:     if (stepKey !== 'clear_disk_cache') {
- 33:         ui.openLogPanelUI(stepKey);
- 34:         ui.setActiveStepForLogPanelUI(stepKey);
- 35:         
- 36:         if (isSequenceAutoScrollEnabled()) {
- 37:             setTimeout(() => {
- 38:                 scrollToActiveStep(stepKey, { behavior: 'smooth', scrollDelay: 0 });
- 39:             }, 0);
- 40:         }
- 41:     }
- 42: 
- 43:     const stepInitiated = await runStepAPI(stepKey);
- 44:     if (!stepInitiated) {
- 45:         console.error(`[SEQ_MGR] Initiation FAILED for ${stepKey}`);
- 46:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" n'a pas pu être initiée. Séquence interrompue.`,
- 47:             Math.round(((currentStepNum - 1) / totalSteps) * 100), true
- 48:         );
- 49:         return { name: stepDisplayName, success: false, duration: "N/A (échec initiation)" };
- 50:     }
- 51: 
- 52:     ui.startStepTimer(stepKey);
- 53:     console.log(`[SEQ_MGR] Started timer for ${stepKey}`);
- 54: 
- 55:     try {
- 56:         ui.setActiveStepForLogPanelUI(stepKey);
- 57:     } catch (e) {
- 58:         console.debug('[SEQ_MGR] setActiveStepForLogPanelUI post-start failed (non-fatal):', e);
- 59:     }
- 60: 
- 61:     let timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
- 62:     if (timerData && timerData.startTime) {
- 63:         console.log(`[SEQ_MGR] Timer verified for ${stepKey}, start time:`, timerData.startTime);
- 64:     } else {
- 65:         console.error(`[SEQ_MGR] Timer NOT properly started for ${stepKey}:`, timerData);
- 66:     }
- 67: 
- 68:     console.log(`[SEQ_MGR] Waiting for completion of ${stepKey}`);
- 69:     const stepCompleted = await waitForStepCompletionInSequence(stepKey);
- 70: 
- 71:     ui.stopStepTimer(stepKey);
- 72:     console.log(`[SEQ_MGR] Stopped timer for ${stepKey}`);
- 73: 
- 74:     timerData = appState.getStateProperty(`stepTimers.${stepKey}`);
- 75:     const duration = (timerData?.elapsedTimeFormatted) || "N/A";
- 76: 
- 77:     console.log(`[SEQ_MGR] Timer data for ${stepKey}:`, {
- 78:         timerData,
- 79:         duration,
- 80:         startTime: timerData?.startTime,
- 81:         elapsedTimeFormatted: timerData?.elapsedTimeFormatted
- 82:     });
- 83: 
- 84:     if (!stepCompleted) {
- 85:         console.error(`[SEQ_MGR] Execution FAILED for ${stepKey}`);
- 86: 
- 87:         ui.updateGlobalProgressUI(`ÉCHEC: L'étape "${stepDisplayName}" a échoué. Séquence interrompue.`,
- 88:             Math.round((currentStepNum / totalSteps) * 100), true
- 89:         );
- 90:         return { name: stepDisplayName, success: false, duration };
- 91:     }
- 92: 
- 93:     console.log(`[SEQ_MGR] Step ${stepDisplayName} completed successfully.`);
- 94: 
- 95:     soundEvents.stepSuccess();
- 96: 
- 97:     return { name: stepDisplayName, success: true, duration };
- 98: }
- 99: 
-100: export async function runStepSequence(stepsToExecute, sequenceName = "Séquence") {
-101:     console.log(`[SEQ_MGR] Starting sequence: ${sequenceName} with steps:`, stepsToExecute);
-102:     ui.updateGlobalUIForSequenceState(true);
-103:     ui.updateGlobalProgressUI(`Démarrage de la ${sequenceName}...`, 0);
-104: 
-105:     const sequenceStart = Date.now();
-106: 
-107:     const sequenceResults = [];
-108:     const totalStepsInThisSequence = stepsToExecute.length;
-109:     const isAutoModeSequence = sequenceName === "AutoMode";
-110:     let sequenceFailed = false;
-111: 
-112:     if (isAutoModeSequence) {
-113:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset');
-114:     }
-115: 
-116:     for (let i = 0; i < stepsToExecute.length; i++) {
-117:         const stepKey = stepsToExecute[i];
-118:         const currentStepNum = i + 1;
-119: 
-120:         const result = await _executeSingleStep(stepKey, sequenceName, currentStepNum, totalStepsInThisSequence);
-121:         sequenceResults.push(result);
-122: 
-123:         if (!result.success) {
-124:             sequenceFailed = true;
-125:             break; // Exit the loop immediately on failure
-126:         }
-127: 
-128:         if (i < stepsToExecute.length - 1) {
-129:             const nextStepKey = stepsToExecute[i + 1];
-130:             if (nextStepKey && nextStepKey !== 'clear_disk_cache') {
-131:                 try {
-132:                     ui.openLogPanelUI(nextStepKey);
-133:                     ui.setActiveStepForLogPanelUI(nextStepKey);
-134:                     
-135:                     if (isSequenceAutoScrollEnabled()) {
-136:                         setTimeout(() => {
-137:                             scrollToActiveStep(nextStepKey, { behavior: 'smooth', scrollDelay: 0 });
-138:                         }, 0);
-139:                     }
-140:                 } catch (e) {
-141:                     console.debug('[SEQ_MGR] Pre-focus next step failed (non-fatal):', e);
-142:                 }
-143:             }
-144:             ui.updateGlobalProgressUI(`${sequenceName} - Étape ${currentStepNum}/${totalStepsInThisSequence}: ${result.name} terminée.`,
-145:                 Math.round((currentStepNum / totalStepsInThisSequence) * 100)
-146:             );
-147:         }
-148:     }
-149: 
-150:     console.log(`[SEQ_MGR] Sequence ${sequenceName} finished. sequenceFailed: ${sequenceFailed}`);
-151: 
-152:     if (sequenceFailed) {
-153:     } else {
-154:         ui.updateGlobalProgressUI(`${sequenceName} terminée avec succès ! 🎉`, 100);
-155:         soundEvents.workflowCompletion();
-156:     }
-157: 
-158:     if (sequenceResults.length > 0) {
-159:         const overallDuration = formatElapsedTime(new Date(sequenceStart));
-160:         showSequenceSummaryUI(sequenceResults, !sequenceFailed, sequenceName, overallDuration);
-161:     } else {
-162:         console.warn(`[SEQ_MGR] No results to show for sequence ${sequenceName}`);
-163:     }
-164: 
-165:     ui.updateGlobalUIForSequenceState(false);
-166:     if (isAutoModeSequence) {
-167:         appState.setState({ ui: { autoModeLogPanelOpened: false } }, 'auto_mode_sequence_reset_end');
-168:     }
-169: }
-170: 
-171: function waitForStepCompletionInSequence(stepKey) {
-172:     return new Promise((resolve) => {
-173:         const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
-174:         console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
-175: 
-176:         const checkInterval = setInterval(() => {
-177:             const data = appState.getStateProperty(`processInfo.${stepKey}`);
-178: 
-179:             if (!data) {
-180:                 return;
-181:             }
-182: 
-183:             if (data.status === 'completed') {
-184:                 console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
-185:                 clearInterval(checkInterval);
-186:                 resolve(true);
-187:             } else if (data.status === 'failed' || data.return_code === -9) {
-188:                 console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
-189:                 clearInterval(checkInterval);
-190:                 resolve(false);
-191:             }
-192:             }, POLLING_INTERVAL / 2);
-193:     });
-194: }
-```
-
 ## File: config/settings.py
 ```python
   1: """
@@ -33677,267 +33677,6 @@ app_new.py
 594: 
 595: # Global configuration instance
 596: config = Config()
-```
-
-## File: static/eventHandlers.js
-```javascript
-  1: import * as dom from './domElements.js';
-  2: import * as ui from './uiUpdater.js';
-  3: import * as api from './apiService.js';
-  4: import { runStepSequence } from './sequenceManager.js';
-  5: import { defaultSequenceableStepsKeys } from './constants.js';
-  6: import { showNotification } from './utils.js';
-  7: import { openPopupUI, closePopupUI, showCustomSequenceConfirmUI } from './popupManager.js';
-  8: import { scrollToStepImmediate } from './scrollManager.js';
-  9: import { soundEvents } from './soundManager.js';
- 10: import { appState } from './state/AppState.js';
- 11: import { setAutoOpenLogOverlay, getAutoOpenLogOverlay } from './state.js';
- 12: 
- 13: function getIsAnySequenceRunning() {
- 14:     return !!appState.getStateProperty('isAnySequenceRunning');
- 15: }
- 16: 
- 17: function getSelectedStepsOrder() {
- 18:     return appState.getStateProperty('selectedStepsOrder') || [];
- 19: }
- 20: 
- 21: function setSelectedStepsOrder(order) {
- 22:     const safeOrder = Array.isArray(order) ? [...order] : [];
- 23:     appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
- 24: }
- 25: 
- 26: function resolveElement(getterFn, legacyValue = null) {
- 27:     if (typeof getterFn === 'function') {
- 28:         try {
- 29:             return getterFn();
- 30:         } catch (_) {
- 31:             return legacyValue;
- 32:         }
- 33:     }
- 34:     return legacyValue;
- 35: }
- 36: 
- 37: function resolveCollection(getterFn, legacyValue = null) {
- 38:     const resolved = resolveElement(getterFn, legacyValue);
- 39:     if (!resolved) return [];
- 40:     return Array.from(resolved);
- 41: }
- 42: 
- 43: export function initializeEventHandlers() {
- 44:     const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
- 45:     if (closeLogButton) {
- 46:         closeLogButton.addEventListener('click', ui.closeLogPanelUI);
- 47:     }
- 48: 
- 49:     const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
- 50:     runButtons.forEach(button => {
- 51:         button.addEventListener('click', async () => {
- 52:             try {
- 53:                 if (getIsAnySequenceRunning()) {
- 54:                     showNotification("Une séquence est déjà en cours. Veuillez attendre sa fin.", 'warning');
- 55:                     return;
- 56:                 }
- 57:                 const stepKey = button.dataset.step;
- 58:                 ui.updateMainLogOutputUI('');
- 59:                 const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
- 60:                 if (specificLogContainer) specificLogContainer.style.display = 'none';
- 61:                 if (getAutoOpenLogOverlay()) {
- 62:                     ui.openLogPanelUI(stepKey, true);
- 63:                 }
- 64: 
- 65:                 scrollToStepImmediate(stepKey, { scrollDelay: 0 });
- 66: 
- 67:                 soundEvents.workflowStart();
- 68: 
- 69:                 await api.runStepAPI(stepKey);
- 70:             } catch (error) {
- 71:                 console.error('[EVENT] Error in run button handler:', error);
- 72:                 showNotification("Erreur lors de l'exécution de l'étape", 'error');
- 73:             }
- 74:         });
- 75:     });
- 76: 
- 77:     const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
- 78:     cancelButtons.forEach(button => {
- 79:         button.addEventListener('click', async () => {
- 80:             try {
- 81:                 const stepKey = button.dataset.step;
- 82:                 await api.cancelStepAPI(stepKey);
- 83:             } catch (error) {
- 84:                 console.error('[EVENT] Error in cancel button handler:', error);
- 85:                 showNotification("Erreur lors de l'annulation de l'étape", 'error');
- 86:             }
- 87:         });
- 88:     });
- 89: 
- 90:     const logsAutoOpenToggle = resolveElement(dom.getLogsAutoOpenToggle, dom.logsAutoOpenToggle);
- 91:     if (logsAutoOpenToggle) {
- 92:         const savedPreference = localStorage.getItem('autoOpenLogOverlay');
- 93:         const initialValue = savedPreference === null ? getAutoOpenLogOverlay() : savedPreference === 'true';
- 94:         logsAutoOpenToggle.checked = initialValue;
- 95:         setAutoOpenLogOverlay(initialValue);
- 96:         logsAutoOpenToggle.addEventListener('change', (event) => {
- 97:             const enabled = event.target.checked;
- 98:             localStorage.setItem('autoOpenLogOverlay', enabled.toString());
- 99:             setAutoOpenLogOverlay(enabled);
-100:             console.log(`[EVENT] Auto log overlay ${enabled ? 'enabled' : 'disabled'} by user`);
-101:         });
-102:     }
-103: 
-104:     const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
-105:     specificLogButtons.forEach(button => {
-106:         button.addEventListener('click', async () => {
-107:             const stepKey = button.dataset.step;
-108:             const logIndex = button.dataset.logIndex;
-109:             const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
-110: 
-111:             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
-112:                 ui.openLogPanelUI(stepKey, true);
-113:                 try {
-114:                     const statusResponse = await fetch(`/status/${stepKey}`);
-115:                     if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
-116:                     const statusData = await statusResponse.json();
-117:                     ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');
-118:                 } catch (error) {
-119:                     console.error("Erreur chargement statut pour log panel:", error);
-120:                     ui.updateMainLogOutputUI(`<i>Erreur chargement log principal: ${error.message}</i>`);
-121:                 }
-122:             }
-123:             // Pass the clicked button to enable loading state (spinner + disabled)
-124:             await api.fetchSpecificLogAPI(stepKey, logIndex, button.textContent.trim(), button);
-125:         });
-126:     });
-127: 
-128:     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
-129:     if (runAllButton) {
-130:         runAllButton.addEventListener('click', async () => {
-131:             if (getIsAnySequenceRunning()) {
-132:                 showNotification("Séquence déjà en cours.", 'warning'); return;
-133:             }
-134:             // Play workflow start sound for complete sequence 1-8
-135:             soundEvents.workflowStart();
-136:             await runStepSequence(defaultSequenceableStepsKeys, "Séquence 1-8");
-137:         });
-138:     }
-139: 
-140:     const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
-141:     customSequenceCheckboxes.forEach(checkbox => {
-142:         checkbox.addEventListener('change', (event) => {
-143:             const stepKey = event.target.dataset.stepKey;
-144:             const stepCard = document.getElementById(`step-${stepKey}`);
-145:             const orderNumberEl = document.getElementById(`order-${stepKey}`);
-146:             let currentOrder = getSelectedStepsOrder();
-147: 
-148:             // Play checkbox interaction sound
-149:             soundEvents.checkboxInteraction();
-150: 
-151:             if (event.target.checked) {
-152:                 if (!currentOrder.includes(stepKey)) {
-153:                     currentOrder.push(stepKey);
-154:                     if (stepCard) stepCard.classList.add('custom-sequence-selected');
-155:                 }
-156:             } else {
-157:                 const index = currentOrder.indexOf(stepKey);
-158:                 if (index > -1) currentOrder.splice(index, 1);
-159:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
-160:             }
-161:             setSelectedStepsOrder(currentOrder);
-162:             document.querySelectorAll('.step-selection-order-number').forEach(el => { el.textContent = ''; });
-163:             getSelectedStepsOrder().forEach((sk, idx) => {
-164:                 const orderEl = document.getElementById(`order-${sk}`);
-165:                 if (orderEl) orderEl.textContent = idx + 1;
-166:             });
-167:             ui.updateCustomSequenceButtonsUI();
-168:         });
-169:     });
-170: 
-171:     const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
-172:     if (clearCustomSequenceButton) {
-173:         clearCustomSequenceButton.addEventListener('click', () => {
-174:             setSelectedStepsOrder([]);
-175:             customSequenceCheckboxes.forEach(cb => {
-176:                 cb.checked = false;
-177:                 const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
-178:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
-179:                 const orderEl = document.getElementById(`order-${cb.dataset.stepKey}`);
-180:                 if (orderEl) orderEl.textContent = '';
-181:             });
-182:             ui.updateCustomSequenceButtonsUI();
-183:         });
-184:     }
-185: 
-186:     const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
-187:     if (runCustomSequenceButton) {
-188:         runCustomSequenceButton.addEventListener('click', () => {
-189:             if (getSelectedStepsOrder().length === 0) {
-190:                 showNotification("Veuillez sélectionner au moins une étape.", 'warning');
-191:                 return;
-192:             }
-193:             if (getIsAnySequenceRunning()) {
-194:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
-195:             }
-196:             showCustomSequenceConfirmUI();
-197:         });
-198:     }
-199: 
-200:     const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
-201:     const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
-202:     if (confirmRunCustomSequenceButton) {
-203:         confirmRunCustomSequenceButton.addEventListener('click', async () => {
-204:             closePopupUI(customSequenceConfirmOverlay);
-205:             if (getIsAnySequenceRunning()) {
-206:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
-207:             }
-208:             // Loading state on confirm button and disable run-custom while executing
-209:             try {
-210:                 confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
-211:                 confirmRunCustomSequenceButton.disabled = true;
-212:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = true;
-213: 
-214:                 // Play workflow start sound for custom sequence
-215:                 soundEvents.workflowStart();
-216:                 await runStepSequence(getSelectedStepsOrder(), "Séquence Personnalisée");
-217:             } finally {
-218:                 confirmRunCustomSequenceButton.removeAttribute('data-loading');
-219:                 confirmRunCustomSequenceButton.disabled = false;
-220:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = getIsAnySequenceRunning();
-221:             }
-222:         });
-223:     }
-224: 
-225:     const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
-226:     if (cancelRunCustomSequenceButton) {
-227:         cancelRunCustomSequenceButton.addEventListener('click', () => {
-228:             closePopupUI(customSequenceConfirmOverlay);
-229:         });
-230:     }
-231:     const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
-232:     const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
-233:     if (closeSummaryPopupButton) {
-234:         closeSummaryPopupButton.addEventListener('click', () => {
-235:             closePopupUI(sequenceSummaryOverlay);
-236:         });
-237:     }
-238: 
-239:     if (dom.getSoundToggle()) {
-240:         import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
-241:             const isEnabled = isSoundEnabled();
-242:             dom.getSoundToggle().checked = isEnabled;
-243:             if (dom.getSoundStatus()) {
-244:                 dom.getSoundStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
-245:             }
-246: 
-247:             dom.getSoundToggle().addEventListener('change', (event) => {
-248:                 const enabled = event.target.checked;
-249:                 setSoundEnabled(enabled);
-250:                 if (dom.getSoundStatus()) {
-251:                     dom.getSoundStatus().textContent = enabled ? 'Activé' : 'Désactivé';
-252:                 }
-253:                 console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
-254:             });
-255:         });
-256:     }
-257: }
 ```
 
 ## File: static/main.js
@@ -34568,281 +34307,6 @@ app_new.py
 624: }
 ```
 
-## File: templates/index_new.html
-```html
-  1: <!DOCTYPE html>
-  2: <html lang="fr">
-  3: 
-  4: <head>
-  5:     <meta charset="UTF-8">
-  6:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  7:     <title>Workflow Manager</title>
-  8:     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
-  9:     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
- 10:     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ cache_buster }}">
- 11:     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v={{ cache_buster }}">
- 12: 
- 13:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}?v={{ cache_buster }}">
- 14:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/controls.css') }}?v={{ cache_buster }}">
- 15:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/steps.css') }}?v={{ cache_buster }}">
- 16:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/logs.css') }}?v={{ cache_buster }}">
- 17:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/workflow-buttons.css') }}?v={{ cache_buster }}">
- 18:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/popups.css') }}?v={{ cache_buster }}">
- 19:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
- 20:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
- 21:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
- 22:     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
- 23:     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
- 24: </head>
- 25: 
- 26: <body>
- 27:     <div id="notifications-area" aria-live="assertive"></div>
- 28: 
- 29:     <div class="topbar-affix" id="topbar-affix">
- 30:         <div class="unified-controls-section unified-controls--topbar" id="topbar-controls">
- 31:             <div class="workflow-controls">
- 32:                 <div class="sequence-controls">
- 33:                     <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
- 34:                         <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-8)</button>
- 35:                     </div>
- 36:                     <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
- 37:                         <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
- 38:                         <button id="clear-custom-sequence-button" disabled>🗑️ Vider Séquence</button>
- 39:                         <button id="toggle-local-downloads" class="downloads-toggle" aria-pressed="true" title="Afficher/Masquer les Téléchargements Locaux">📥 Téléchargements</button>
- 40:                         <button id="settings-toggle" class="settings-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel" title="Afficher les options">⚙️ Settings</button>
- 41:                     </div>
- 42:                 </div>
- 43:             </div>
- 44: 
- 45:             <div class="global-progress-affix" id="global-progress-affix">
- 46:                 <div class="global-progress-container" id="global-progress-container">
- 47:                     <div id="global-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
- 48:                 </div>
- 49:                 <div id="global-progress-text" aria-live="polite"></div>
- 50:             </div>
- 51:             <div id="settings-panel" class="settings-panel" hidden>
- 52:                 <section class="settings-section" aria-label="Affichage et préférences">
- 53:                     <p class="settings-title">Affichage & Préférences</p>
- 54:                     <div class="settings-row settings-row--stacked">
- 55:                         <div class="theme-selector-container settings-block">
- 56:                             <label for="theme-selector" class="theme-selector-label">Thème:</label>
- 57:                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
- 58:                             </select>
- 59:                         </div>
- 60: 
- 61:                         <div id="sound-control-widget" class="sound-control-widget settings-block">
- 62:                             <label class="btn-like-switch" for="sound-toggle" aria-label="Activer/Désactiver les effets sonores">
- 63:                                 🔊 Effets Sonores
- 64:                                 <input type="checkbox" id="sound-toggle" checked>
- 65:                             </label>
- 66:                         </div>
- 67: 
- 68:                         <div class="settings-block">
- 69:                             <label class="btn-like-switch" for="logs-auto-open-toggle" aria-label="Activer/Désactiver l'ouverture auto du panneau de logs">
- 70:                                 📟 Auto-ouverture des logs
- 71:                                 <input type="checkbox" id="logs-auto-open-toggle" checked>
- 72:                             </label>
- 73:                             <small class="settings-helper">Ouvrir automatiquement la popup de logs lors du lancement d'une étape.</small>
- 74:                         </div>
- 75:                     </div>
- 76:                 </section>
- 77: 
- 78:                         </div>
- 79:         </div>
- 80: 
- 81:     </div>
- 82: 
- 83:     <div id="topbar-spacer" aria-hidden="true"></div>
- 84: 
- 85:     <div class="local-downloads-section card-like-section">
- 86:         <h2>
- 87:             <span class="section-icon">📥</span> Téléchargements Locaux
- 88:         </h2>
- 89:         <div class="local-downloads-list-container">
- 90:             <ul id="local-downloads-list" class="status-list" aria-live="polite">
- 91:                 <li class="placeholder">Aucune activité de téléchargement locale récente.</li>
- 92:             </ul>
- 93:         </div>
- 94:     </div>
- 95: 
- 96:     <div class="workflow-wrapper compact-mode" id="workflow-wrapper">
- 97:         <div class="steps-column" id="steps-column">
- 98:             <section id="workflow-steps" class="workflow-pipeline" role="region" aria-label="Pipeline de traitement">
- 99:                 <div class="pipeline-timeline" role="list">
-100:                     <div class="timeline-axis" aria-hidden="true"></div>
-101:                     {% for step_key, config in steps_config.items() %}
-102:                     {% if config %}
-103:                     <div class="timeline-row">
-104:                         <div class="timeline-rail-column" aria-hidden="true">
-105:                             <div class="timeline-node" data-step="{{ step_key }}"></div>
-106:                         </div>
-107:                         <div class="timeline-cards-column">
-108:                             <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0" aria-controls="step-details-panel" aria-expanded="false">
-109:                                 <div class="timeline-content">
-110:                             <div class="timeline-head">
-111:                                 <div class="step-title-group">
-112:                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}🧠{% elif step_key == 'STEP8' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
-113:                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
-114:                                 </div>
-115:                                 <div class="step-selection-control">
-116:                                     <span class="step-selection-order-number" id="order-{{step_key}}"></span>
-117:                                     <input type="checkbox" class="custom-sequence-checkbox" data-step-key="{{ step_key }}" title="Sélectionner pour séquence personnalisée" aria-label="Sélectionner {{ config.display_name }} pour séquence personnalisée">
-118:                                 </div>
-119:                             </div>
-120:                             <div class="node-actions step-controls">
-121:                                 <button class="run-button" data-step="{{ step_key }}">Lancer</button>
-122:                                 <button class="cancel-button" data-step="{{ step_key }}" disabled>Annuler</button>
-123:                             </div>
-124:                             <div class="timeline-body">
-125:                                 <div class="status-line">
-126:                                     Statut:
-127:                                     <span id="status-{{ step_key }}" class="status-badge status-idle" aria-live="polite">Prêt</span>
-128:                                     <span class="timer" id="timer-{{ step_key }}"></span>
-129:                                 </div>
-130:                                 <div class="step-progress-container" id="progress-container-{{ step_key }}" style="display: none;">
-131:                                     <div class="progress-bar-wrapper">
-132:                                         <div class="progress-bar-step" id="progress-bar-{{ step_key }}" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-133:                                     </div>
-134:                                     <div class="progress-text-step" id="progress-text-{{ step_key }}" aria-live="polite"></div>
-135:                                 </div>
-136:                                 {% if config.specific_logs %}
-137:                                 <div class="specific-log-controls-wrapper">
-138:                                     <h4>Logs Spécifiques :</h4>
-139:                                     <div id="log-panel-specific-buttons-container-{{ step_key }}">
-140:                                         {% for log_conf in config.specific_logs %}
-141:                                         <button class="specific-log-button" data-step="{{ step_key }}" data-log-index="{{ loop.index0 }}">{{ log_conf.name }}</button>
-142:                                         {% endfor %}
-143:                                     </div>
-144:                                 </div>
-145:                                 {% endif %}
-146:                             </div>
-147:                         </div>
-148:                     </div>
-149:                         </div>
-150:                     </div>
-151:                     {% endif %}
-152:                     {% endfor %}
-153:                 </div>
-154:                 <div class="timeline-scroll-spacer" aria-hidden="true"></div>
-155:                 <aside id="step-details-panel" class="step-details-panel" role="complementary" aria-label="Détails de l'étape" hidden>
-156:                     <div class="step-details-header">
-157:                         <div class="step-details-title" id="step-details-title">Détails</div>
-158:                         <button id="close-step-details" class="step-details-close" type="button" aria-label="Fermer le panneau détails">×</button>
-159:                     </div>
-160:                     <div class="step-details-body">
-161:                         <div class="step-details-meta">
-162:                             <span id="step-details-status" class="status-badge status-idle" aria-live="polite">Prêt</span>
-163:                             <span id="step-details-timer" class="timer"></span>
-164:                         </div>
-165:                         <div class="step-details-progress">
-166:                             <div id="step-details-progress-text" class="progress-text-step" aria-live="polite"></div>
-167:                         </div>
-168:                         <div class="step-details-actions">
-169:                             <button id="step-details-run" class="run-button" type="button" disabled>Lancer</button>
-170:                             <button id="step-details-cancel" class="cancel-button" type="button" disabled>Annuler</button>
-171:                             <button id="step-details-open-logs" class="step-details-open-logs" type="button" disabled>Logs</button>
-172:                         </div>
-173:                     </div>
-174:                 </aside>
-175:             </section>
-176:         </div>
-177:     </div>
-178: 
-179:     <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
-180:         <div class="popup-content">
-181:             <h3 id="sequence-summary-title">Résumé de la Séquence</h3>
-182:             <ul id="sequence-summary-list" class="popup-list"></ul>
-183:             <button id="close-summary-popup" class="popup-cancel-button">Fermer</button>
-184:         </div>
-185:     </div>
-186:     <div id="custom-sequence-confirm-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-sequence-confirm-title">
-187:         <div class="popup-content">
-188:             <h3 id="custom-sequence-confirm-title">Confirmer la Séquence Personnalisée</h3>
-189:             <p>
-190:                 Les étapes suivantes seront lancées dans cet ordre :
-191:             </p>
-192:             <ul id="custom-sequence-confirm-list" class="popup-list"></ul>
-193:             <div class="popup-buttons">
-194:                 <button id="confirm-run-custom-sequence-button" class="popup-confirm-button">Lancer la Séquence</button>
-195:                 <button id="cancel-run-custom-sequence-button" class="popup-cancel-button">Annuler</button>
-196:             </div>
-197:         </div>
-198:     </div>
-199: 
-200:     <div id="system-monitor-widget" class="system-monitor-widget">
-201:         <div class="monitor-header">
-202:             <span class="monitor-icon">💻</span>
-203:             <span class="monitor-title">Moniteur Système</span>
-204:             <button id="system-monitor-minimize" class="monitor-close" aria-label="Réduire le moniteur" title="Réduire (affichage compact)">×</button>
-205:         </div>
-206:         <div id="monitor-compact-line" class="monitor-compact-line" aria-hidden="true" style="display:none;">
-207:             C: <span id="compact-cpu"></span> · R: <span id="compact-ram"></span> · G: <span id="compact-gpu"></span>
-208:         </div>
-209:         <div class="monitor-item">
-210:             <span class="monitor-label">CPU</span>
-211:             <div class="monitor-bar-container">
-212:                 <div id="cpu-monitor-bar" class="monitor-bar"></div>
-213:             </div>
-214:             <span id="cpu-monitor-value" class="monitor-value">... %</span>
-215:         </div>
-216:         <div class="monitor-item">
-217:             <span class="monitor-label">RAM</span>
-218:             <div class="monitor-bar-container">
-219:                 <div id="ram-monitor-bar" class="monitor-bar"></div>
-220:             </div>
-221:             <span id="ram-monitor-value" class="monitor-value">... %</span>
-222:         </div>
-223:         <div id="ram-monitor-details" class="monitor-details">... / ... GB</div>
-224: 
-225:         <div id="gpu-monitor-section" style="display: none;">
-226:             <div class="monitor-item">
-227:                 <span class="monitor-label">GPU</span>
-228:                 <div class="monitor-bar-container">
-229:                     <div id="gpu-monitor-bar" class="monitor-bar"></div>
-230:                 </div>
-231:                 <span id="gpu-monitor-value" class="monitor-value">... %</span>
-232:             </div>
-233:             <div id="gpu-monitor-details" class="monitor-details">... °C | ... / ... GB</div>
-234:         </div>
-235:         <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
-236:     </div>
-237: 
-238:     <div class="logs-overlay-container popup-overlay" id="logs-column-global">
-239:         <div class="logs-content-wrapper">
-240:             <div class="log-panel-header">
-241:                 <div class="log-panel-header-main">
-242:                     <span id="log-panel-title">Logs</span>
-243:                     <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
-244:                 </div>
-245:                 <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
-246:                     <span id="log-panel-context-step">Aucune étape active</span>
-247:                     <span id="log-panel-context-status"></span>
-248:                     <span id="log-panel-context-timer"></span>
-249:                 </div>
-250:                 <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
-251:             </div>
-252:             <div class="log-container" id="main-log-container-panel">
-253:                 <div class="log-header">
-254:                     Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
-255:                 </div>
-256:                 <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
-257:             </div>
-258:             <div class="log-container" id="specific-log-container-panel" style="display:none;">
-259:                 <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
-260:                 <div class="specific-log-path" id="specific-log-path-info-panel"></div>
-261:                 <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
-262:             </div>
-263:         </div>
-264:     </div>
-265: 
-266: 
-267:     <script id="steps-config-data" type="application/json">{{ steps_config | tojson | safe }}</script>
-268:     <script src="{{ url_for('static', filename='main.js') }}?v={{ cache_buster }}" type="module" defer></script>
-269: </body>
-270: 
-271: </html>
-```
-
 ## File: static/domElements.js
 ```javascript
   1: const _SAFE_STEP_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -35002,6 +34466,267 @@ app_new.py
 155: // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
 156: export const getSettingsToggle = () => byId('settings-toggle');
 157: export const getSettingsPanel = () => byId('settings-panel');
+```
+
+## File: static/eventHandlers.js
+```javascript
+  1: import * as dom from './domElements.js';
+  2: import * as ui from './uiUpdater.js';
+  3: import * as api from './apiService.js';
+  4: import { runStepSequence } from './sequenceManager.js';
+  5: import { defaultSequenceableStepsKeys } from './constants.js';
+  6: import { showNotification } from './utils.js';
+  7: import { openPopupUI, closePopupUI, showCustomSequenceConfirmUI } from './popupManager.js';
+  8: import { scrollToStepImmediate } from './scrollManager.js';
+  9: import { soundEvents } from './soundManager.js';
+ 10: import { appState } from './state/AppState.js';
+ 11: import { setAutoOpenLogOverlay, getAutoOpenLogOverlay } from './state.js';
+ 12: 
+ 13: function getIsAnySequenceRunning() {
+ 14:     return !!appState.getStateProperty('isAnySequenceRunning');
+ 15: }
+ 16: 
+ 17: function getSelectedStepsOrder() {
+ 18:     return appState.getStateProperty('selectedStepsOrder') || [];
+ 19: }
+ 20: 
+ 21: function setSelectedStepsOrder(order) {
+ 22:     const safeOrder = Array.isArray(order) ? [...order] : [];
+ 23:     appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
+ 24: }
+ 25: 
+ 26: function resolveElement(getterFn, legacyValue = null) {
+ 27:     if (typeof getterFn === 'function') {
+ 28:         try {
+ 29:             return getterFn();
+ 30:         } catch (_) {
+ 31:             return legacyValue;
+ 32:         }
+ 33:     }
+ 34:     return legacyValue;
+ 35: }
+ 36: 
+ 37: function resolveCollection(getterFn, legacyValue = null) {
+ 38:     const resolved = resolveElement(getterFn, legacyValue);
+ 39:     if (!resolved) return [];
+ 40:     return Array.from(resolved);
+ 41: }
+ 42: 
+ 43: export function initializeEventHandlers() {
+ 44:     const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
+ 45:     if (closeLogButton) {
+ 46:         closeLogButton.addEventListener('click', ui.closeLogPanelUI);
+ 47:     }
+ 48: 
+ 49:     const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
+ 50:     runButtons.forEach(button => {
+ 51:         button.addEventListener('click', async () => {
+ 52:             try {
+ 53:                 if (getIsAnySequenceRunning()) {
+ 54:                     showNotification("Une séquence est déjà en cours. Veuillez attendre sa fin.", 'warning');
+ 55:                     return;
+ 56:                 }
+ 57:                 const stepKey = button.dataset.step;
+ 58:                 ui.updateMainLogOutputUI('');
+ 59:                 const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+ 60:                 if (specificLogContainer) specificLogContainer.style.display = 'none';
+ 61:                 if (getAutoOpenLogOverlay()) {
+ 62:                     ui.openLogPanelUI(stepKey, true);
+ 63:                 }
+ 64: 
+ 65:                 scrollToStepImmediate(stepKey, { scrollDelay: 0 });
+ 66: 
+ 67:                 soundEvents.workflowStart();
+ 68: 
+ 69:                 await api.runStepAPI(stepKey);
+ 70:             } catch (error) {
+ 71:                 console.error('[EVENT] Error in run button handler:', error);
+ 72:                 showNotification("Erreur lors de l'exécution de l'étape", 'error');
+ 73:             }
+ 74:         });
+ 75:     });
+ 76: 
+ 77:     const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
+ 78:     cancelButtons.forEach(button => {
+ 79:         button.addEventListener('click', async () => {
+ 80:             try {
+ 81:                 const stepKey = button.dataset.step;
+ 82:                 await api.cancelStepAPI(stepKey);
+ 83:             } catch (error) {
+ 84:                 console.error('[EVENT] Error in cancel button handler:', error);
+ 85:                 showNotification("Erreur lors de l'annulation de l'étape", 'error');
+ 86:             }
+ 87:         });
+ 88:     });
+ 89: 
+ 90:     const logsAutoOpenToggle = resolveElement(dom.getLogsAutoOpenToggle, dom.logsAutoOpenToggle);
+ 91:     if (logsAutoOpenToggle) {
+ 92:         const savedPreference = localStorage.getItem('autoOpenLogOverlay');
+ 93:         const initialValue = savedPreference === null ? getAutoOpenLogOverlay() : savedPreference === 'true';
+ 94:         logsAutoOpenToggle.checked = initialValue;
+ 95:         setAutoOpenLogOverlay(initialValue);
+ 96:         logsAutoOpenToggle.addEventListener('change', (event) => {
+ 97:             const enabled = event.target.checked;
+ 98:             localStorage.setItem('autoOpenLogOverlay', enabled.toString());
+ 99:             setAutoOpenLogOverlay(enabled);
+100:             console.log(`[EVENT] Auto log overlay ${enabled ? 'enabled' : 'disabled'} by user`);
+101:         });
+102:     }
+103: 
+104:     const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
+105:     specificLogButtons.forEach(button => {
+106:         button.addEventListener('click', async () => {
+107:             const stepKey = button.dataset.step;
+108:             const logIndex = button.dataset.logIndex;
+109:             const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
+110: 
+111:             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
+112:                 ui.openLogPanelUI(stepKey, true);
+113:                 try {
+114:                     const statusResponse = await fetch(`/status/${stepKey}`);
+115:                     if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
+116:                     const statusData = await statusResponse.json();
+117:                     ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');
+118:                 } catch (error) {
+119:                     console.error("Erreur chargement statut pour log panel:", error);
+120:                     ui.updateMainLogOutputUI(`<i>Erreur chargement log principal: ${error.message}</i>`);
+121:                 }
+122:             }
+123:             // Pass the clicked button to enable loading state (spinner + disabled)
+124:             await api.fetchSpecificLogAPI(stepKey, logIndex, button.textContent.trim(), button);
+125:         });
+126:     });
+127: 
+128:     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+129:     if (runAllButton) {
+130:         runAllButton.addEventListener('click', async () => {
+131:             if (getIsAnySequenceRunning()) {
+132:                 showNotification("Séquence déjà en cours.", 'warning'); return;
+133:             }
+134:             // Play workflow start sound for complete sequence 1-8
+135:             soundEvents.workflowStart();
+136:             await runStepSequence(defaultSequenceableStepsKeys, "Séquence 1-8");
+137:         });
+138:     }
+139: 
+140:     const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+141:     customSequenceCheckboxes.forEach(checkbox => {
+142:         checkbox.addEventListener('change', (event) => {
+143:             const stepKey = event.target.dataset.stepKey;
+144:             const stepCard = document.getElementById(`step-${stepKey}`);
+145:             const orderNumberEl = document.getElementById(`order-${stepKey}`);
+146:             let currentOrder = getSelectedStepsOrder();
+147: 
+148:             // Play checkbox interaction sound
+149:             soundEvents.checkboxInteraction();
+150: 
+151:             if (event.target.checked) {
+152:                 if (!currentOrder.includes(stepKey)) {
+153:                     currentOrder.push(stepKey);
+154:                     if (stepCard) stepCard.classList.add('custom-sequence-selected');
+155:                 }
+156:             } else {
+157:                 const index = currentOrder.indexOf(stepKey);
+158:                 if (index > -1) currentOrder.splice(index, 1);
+159:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
+160:             }
+161:             setSelectedStepsOrder(currentOrder);
+162:             document.querySelectorAll('.step-selection-order-number').forEach(el => { el.textContent = ''; });
+163:             getSelectedStepsOrder().forEach((sk, idx) => {
+164:                 const orderEl = document.getElementById(`order-${sk}`);
+165:                 if (orderEl) orderEl.textContent = idx + 1;
+166:             });
+167:             ui.updateCustomSequenceButtonsUI();
+168:         });
+169:     });
+170: 
+171:     const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+172:     if (clearCustomSequenceButton) {
+173:         clearCustomSequenceButton.addEventListener('click', () => {
+174:             setSelectedStepsOrder([]);
+175:             customSequenceCheckboxes.forEach(cb => {
+176:                 cb.checked = false;
+177:                 const stepCard = document.getElementById(`step-${cb.dataset.stepKey}`);
+178:                 if (stepCard) stepCard.classList.remove('custom-sequence-selected');
+179:                 const orderEl = document.getElementById(`order-${cb.dataset.stepKey}`);
+180:                 if (orderEl) orderEl.textContent = '';
+181:             });
+182:             ui.updateCustomSequenceButtonsUI();
+183:         });
+184:     }
+185: 
+186:     const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+187:     if (runCustomSequenceButton) {
+188:         runCustomSequenceButton.addEventListener('click', () => {
+189:             if (getSelectedStepsOrder().length === 0) {
+190:                 showNotification("Veuillez sélectionner au moins une étape.", 'warning');
+191:                 return;
+192:             }
+193:             if (getIsAnySequenceRunning()) {
+194:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
+195:             }
+196:             showCustomSequenceConfirmUI();
+197:         });
+198:     }
+199: 
+200:     const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
+201:     const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
+202:     if (confirmRunCustomSequenceButton) {
+203:         confirmRunCustomSequenceButton.addEventListener('click', async () => {
+204:             closePopupUI(customSequenceConfirmOverlay);
+205:             if (getIsAnySequenceRunning()) {
+206:                 showNotification("Une autre séquence est déjà en cours.", 'warning'); return;
+207:             }
+208:             // Loading state on confirm button and disable run-custom while executing
+209:             try {
+210:                 confirmRunCustomSequenceButton.setAttribute('data-loading', 'true');
+211:                 confirmRunCustomSequenceButton.disabled = true;
+212:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = true;
+213: 
+214:                 // Play workflow start sound for custom sequence
+215:                 soundEvents.workflowStart();
+216:                 await runStepSequence(getSelectedStepsOrder(), "Séquence Personnalisée");
+217:             } finally {
+218:                 confirmRunCustomSequenceButton.removeAttribute('data-loading');
+219:                 confirmRunCustomSequenceButton.disabled = false;
+220:                 if (runCustomSequenceButton) runCustomSequenceButton.disabled = getIsAnySequenceRunning();
+221:             }
+222:         });
+223:     }
+224: 
+225:     const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
+226:     if (cancelRunCustomSequenceButton) {
+227:         cancelRunCustomSequenceButton.addEventListener('click', () => {
+228:             closePopupUI(customSequenceConfirmOverlay);
+229:         });
+230:     }
+231:     const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
+232:     const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
+233:     if (closeSummaryPopupButton) {
+234:         closeSummaryPopupButton.addEventListener('click', () => {
+235:             closePopupUI(sequenceSummaryOverlay);
+236:         });
+237:     }
+238: 
+239:     if (dom.getSoundToggle()) {
+240:         import('./soundManager.js').then(({ isSoundEnabled, setSoundEnabled }) => {
+241:             const isEnabled = isSoundEnabled();
+242:             dom.getSoundToggle().checked = isEnabled;
+243:             if (dom.getSoundStatus()) {
+244:                 dom.getSoundStatus().textContent = isEnabled ? 'Activé' : 'Désactivé';
+245:             }
+246: 
+247:             dom.getSoundToggle().addEventListener('change', (event) => {
+248:                 const enabled = event.target.checked;
+249:                 setSoundEnabled(enabled);
+250:                 if (dom.getSoundStatus()) {
+251:                     dom.getSoundStatus().textContent = enabled ? 'Activé' : 'Désactivé';
+252:                 }
+253:                 console.log(`[EVENT] Sound effects ${enabled ? 'enabled' : 'disabled'} by user`);
+254:             });
+255:         });
+256:     }
+257: }
 ```
 
 ## File: static/uiUpdater.js
@@ -36048,4 +35773,279 @@ app_new.py
 1040:             dom.clearCacheGlobalButton.classList.add('idle');
 1041:     }
 1042: }
+```
+
+## File: templates/index_new.html
+```html
+  1: <!DOCTYPE html>
+  2: <html lang="fr">
+  3: 
+  4: <head>
+  5:     <meta charset="UTF-8">
+  6:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  7:     <title>Workflow Manager</title>
+  8:     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
+  9:     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
+ 10:     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ cache_buster }}">
+ 11:     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}?v={{ cache_buster }}">
+ 12: 
+ 13:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/notifications.css') }}?v={{ cache_buster }}">
+ 14:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/controls.css') }}?v={{ cache_buster }}">
+ 15:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/steps.css') }}?v={{ cache_buster }}">
+ 16:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/logs.css') }}?v={{ cache_buster }}">
+ 17:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/workflow-buttons.css') }}?v={{ cache_buster }}">
+ 18:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/popups.css') }}?v={{ cache_buster }}">
+ 19:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/downloads.css') }}?v={{ cache_buster }}">
+ 20:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/widgets.css') }}?v={{ cache_buster }}">
+ 21:     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/csv-workflow-prompt.css') }}?v={{ cache_buster }}">
+ 22:     <link rel="stylesheet" href="{{ url_for('static', filename='css/utils/animations.css') }}?v={{ cache_buster }}">
+ 23:     <link rel="stylesheet" href="{{ url_for('static', filename='css/features/responsive.css') }}?v={{ cache_buster }}">
+ 24: </head>
+ 25: 
+ 26: <body>
+ 27:     <div id="notifications-area" aria-live="assertive"></div>
+ 28: 
+ 29:     <div class="topbar-affix" id="topbar-affix">
+ 30:         <div class="unified-controls-section unified-controls--topbar" id="topbar-controls">
+ 31:             <div class="workflow-controls">
+ 32:                 <div class="sequence-controls">
+ 33:                     <div class="control-group control-group--primary" role="group" aria-label="Actions principales du workflow">
+ 34:                         <button id="run-all-steps-button">✨ Lancer le Workflow Complet (1-8)</button>
+ 35:                     </div>
+ 36:                     <div class="control-group control-group--secondary" role="group" aria-label="Actions secondaires du workflow">
+ 37:                         <button id="run-custom-sequence-button" disabled>🎯 Lancer Séquence Personnalisée</button>
+ 38:                         <button id="clear-custom-sequence-button" disabled>🗑️ Vider Séquence</button>
+ 39:                         <button id="toggle-local-downloads" class="downloads-toggle" aria-pressed="true" title="Afficher/Masquer les Téléchargements Locaux">📥 Téléchargements</button>
+ 40:                         <button id="settings-toggle" class="settings-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="settings-panel" title="Afficher les options">⚙️ Settings</button>
+ 41:                     </div>
+ 42:                 </div>
+ 43:             </div>
+ 44: 
+ 45:             <div class="global-progress-affix" id="global-progress-affix">
+ 46:                 <div class="global-progress-container" id="global-progress-container">
+ 47:                     <div id="global-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+ 48:                 </div>
+ 49:                 <div id="global-progress-text" aria-live="polite"></div>
+ 50:             </div>
+ 51:             <div id="settings-panel" class="settings-panel" hidden>
+ 52:                 <section class="settings-section" aria-label="Affichage et préférences">
+ 53:                     <p class="settings-title">Affichage & Préférences</p>
+ 54:                     <div class="settings-row settings-row--stacked">
+ 55:                         <div class="theme-selector-container settings-block">
+ 56:                             <label for="theme-selector" class="theme-selector-label">Thème:</label>
+ 57:                             <select id="theme-selector" class="theme-selector" aria-label="Sélectionner un thème visuel">
+ 58:                             </select>
+ 59:                         </div>
+ 60: 
+ 61:                         <div id="sound-control-widget" class="sound-control-widget settings-block">
+ 62:                             <label class="btn-like-switch" for="sound-toggle" aria-label="Activer/Désactiver les effets sonores">
+ 63:                                 🔊 Effets Sonores
+ 64:                                 <input type="checkbox" id="sound-toggle" checked>
+ 65:                             </label>
+ 66:                         </div>
+ 67: 
+ 68:                         <div class="settings-block">
+ 69:                             <label class="btn-like-switch" for="logs-auto-open-toggle" aria-label="Activer/Désactiver l'ouverture auto du panneau de logs">
+ 70:                                 📟 Auto-ouverture des logs
+ 71:                                 <input type="checkbox" id="logs-auto-open-toggle" checked>
+ 72:                             </label>
+ 73:                             <small class="settings-helper">Ouvrir automatiquement la popup de logs lors du lancement d'une étape.</small>
+ 74:                         </div>
+ 75:                     </div>
+ 76:                 </section>
+ 77: 
+ 78:                         </div>
+ 79:         </div>
+ 80: 
+ 81:     </div>
+ 82: 
+ 83:     <div id="topbar-spacer" aria-hidden="true"></div>
+ 84: 
+ 85:     <div class="local-downloads-section card-like-section">
+ 86:         <h2>
+ 87:             <span class="section-icon">📥</span> Téléchargements Locaux
+ 88:         </h2>
+ 89:         <div class="local-downloads-list-container">
+ 90:             <ul id="local-downloads-list" class="status-list" aria-live="polite">
+ 91:                 <li class="placeholder">Aucune activité de téléchargement locale récente.</li>
+ 92:             </ul>
+ 93:         </div>
+ 94:     </div>
+ 95: 
+ 96:     <div class="workflow-wrapper compact-mode" id="workflow-wrapper">
+ 97:         <div class="steps-column" id="steps-column">
+ 98:             <section id="workflow-steps" class="workflow-pipeline" role="region" aria-label="Pipeline de traitement">
+ 99:                 <div class="pipeline-timeline" role="list">
+100:                     <div class="timeline-axis" aria-hidden="true"></div>
+101:                     {% for step_key, config in steps_config.items() %}
+102:                     {% if config %}
+103:                     <div class="timeline-row">
+104:                         <div class="timeline-rail-column" aria-hidden="true">
+105:                             <div class="timeline-node" data-step="{{ step_key }}"></div>
+106:                         </div>
+107:                         <div class="timeline-cards-column">
+108:                             <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0" aria-controls="step-details-panel" aria-expanded="false">
+109:                                 <div class="timeline-content">
+110:                             <div class="timeline-head">
+111:                                 <div class="step-title-group">
+112:                                 <h2><span class="step-icon">{% if step_key == 'STEP1' %}🗜️{% elif step_key == 'STEP2' %}🔄{% elif step_key == 'STEP3' %}✂️{% elif step_key == 'STEP4' %}🔊{% elif step_key == 'STEP5' %}👀{% elif step_key == 'STEP6' %}🧩{% elif step_key == 'STEP7' %}🧠{% elif step_key == 'STEP8' %}📦{% else %}⚙️{% endif %}</span>{{ config.display_name }}</h2>
+113:                                 <span class="step-state-chip state-idle" id="state-chip-{{ step_key }}" aria-live="polite">Prêt</span>
+114:                                 </div>
+115:                                 <div class="step-selection-control">
+116:                                     <span class="step-selection-order-number" id="order-{{step_key}}"></span>
+117:                                     <input type="checkbox" class="custom-sequence-checkbox" data-step-key="{{ step_key }}" title="Sélectionner pour séquence personnalisée" aria-label="Sélectionner {{ config.display_name }} pour séquence personnalisée">
+118:                                 </div>
+119:                             </div>
+120:                             <div class="node-actions step-controls">
+121:                                 <button class="run-button" data-step="{{ step_key }}">Lancer</button>
+122:                                 <button class="cancel-button" data-step="{{ step_key }}" disabled>Annuler</button>
+123:                             </div>
+124:                             <div class="timeline-body">
+125:                                 <div class="status-line">
+126:                                     Statut:
+127:                                     <span id="status-{{ step_key }}" class="status-badge status-idle" aria-live="polite">Prêt</span>
+128:                                     <span class="timer" id="timer-{{ step_key }}"></span>
+129:                                 </div>
+130:                                 <div class="step-progress-container" id="progress-container-{{ step_key }}" style="display: none;">
+131:                                     <div class="progress-bar-wrapper">
+132:                                         <div class="progress-bar-step" id="progress-bar-{{ step_key }}" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+133:                                     </div>
+134:                                     <div class="progress-text-step" id="progress-text-{{ step_key }}" aria-live="polite"></div>
+135:                                 </div>
+136:                                 {% if config.specific_logs %}
+137:                                 <div class="specific-log-controls-wrapper">
+138:                                     <h4>Logs Spécifiques :</h4>
+139:                                     <div id="log-panel-specific-buttons-container-{{ step_key }}">
+140:                                         {% for log_conf in config.specific_logs %}
+141:                                         <button class="specific-log-button" data-step="{{ step_key }}" data-log-index="{{ loop.index0 }}">{{ log_conf.name }}</button>
+142:                                         {% endfor %}
+143:                                     </div>
+144:                                 </div>
+145:                                 {% endif %}
+146:                             </div>
+147:                         </div>
+148:                     </div>
+149:                         </div>
+150:                     </div>
+151:                     {% endif %}
+152:                     {% endfor %}
+153:                 </div>
+154:                 <div class="timeline-scroll-spacer" aria-hidden="true"></div>
+155:                 <aside id="step-details-panel" class="step-details-panel" role="complementary" aria-label="Détails de l'étape" hidden>
+156:                     <div class="step-details-header">
+157:                         <div class="step-details-title" id="step-details-title">Détails</div>
+158:                         <button id="close-step-details" class="step-details-close" type="button" aria-label="Fermer le panneau détails">×</button>
+159:                     </div>
+160:                     <div class="step-details-body">
+161:                         <div class="step-details-meta">
+162:                             <span id="step-details-status" class="status-badge status-idle" aria-live="polite">Prêt</span>
+163:                             <span id="step-details-timer" class="timer"></span>
+164:                         </div>
+165:                         <div class="step-details-progress">
+166:                             <div id="step-details-progress-text" class="progress-text-step" aria-live="polite"></div>
+167:                         </div>
+168:                         <div class="step-details-actions">
+169:                             <button id="step-details-run" class="run-button" type="button" disabled>Lancer</button>
+170:                             <button id="step-details-cancel" class="cancel-button" type="button" disabled>Annuler</button>
+171:                             <button id="step-details-open-logs" class="step-details-open-logs" type="button" disabled>Logs</button>
+172:                         </div>
+173:                     </div>
+174:                 </aside>
+175:             </section>
+176:         </div>
+177:     </div>
+178: 
+179:     <div id="sequence-summary-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="sequence-summary-title">
+180:         <div class="popup-content">
+181:             <h3 id="sequence-summary-title">Résumé de la Séquence</h3>
+182:             <ul id="sequence-summary-list" class="popup-list"></ul>
+183:             <button id="close-summary-popup" class="popup-cancel-button">Fermer</button>
+184:         </div>
+185:     </div>
+186:     <div id="custom-sequence-confirm-popup-overlay" class="popup-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-sequence-confirm-title">
+187:         <div class="popup-content">
+188:             <h3 id="custom-sequence-confirm-title">Confirmer la Séquence Personnalisée</h3>
+189:             <p>
+190:                 Les étapes suivantes seront lancées dans cet ordre :
+191:             </p>
+192:             <ul id="custom-sequence-confirm-list" class="popup-list"></ul>
+193:             <div class="popup-buttons">
+194:                 <button id="confirm-run-custom-sequence-button" class="popup-confirm-button">Lancer la Séquence</button>
+195:                 <button id="cancel-run-custom-sequence-button" class="popup-cancel-button">Annuler</button>
+196:             </div>
+197:         </div>
+198:     </div>
+199: 
+200:     <div id="system-monitor-widget" class="system-monitor-widget">
+201:         <div class="monitor-header">
+202:             <span class="monitor-icon">💻</span>
+203:             <span class="monitor-title">Moniteur Système</span>
+204:             <button id="system-monitor-minimize" class="monitor-close" aria-label="Réduire le moniteur" title="Réduire (affichage compact)">×</button>
+205:         </div>
+206:         <div id="monitor-compact-line" class="monitor-compact-line" aria-hidden="true" style="display:none;">
+207:             C: <span id="compact-cpu"></span> · R: <span id="compact-ram"></span> · G: <span id="compact-gpu"></span>
+208:         </div>
+209:         <div class="monitor-item">
+210:             <span class="monitor-label">CPU</span>
+211:             <div class="monitor-bar-container">
+212:                 <div id="cpu-monitor-bar" class="monitor-bar"></div>
+213:             </div>
+214:             <span id="cpu-monitor-value" class="monitor-value">... %</span>
+215:         </div>
+216:         <div class="monitor-item">
+217:             <span class="monitor-label">RAM</span>
+218:             <div class="monitor-bar-container">
+219:                 <div id="ram-monitor-bar" class="monitor-bar"></div>
+220:             </div>
+221:             <span id="ram-monitor-value" class="monitor-value">... %</span>
+222:         </div>
+223:         <div id="ram-monitor-details" class="monitor-details">... / ... GB</div>
+224: 
+225:         <div id="gpu-monitor-section" style="display: none;">
+226:             <div class="monitor-item">
+227:                 <span class="monitor-label">GPU</span>
+228:                 <div class="monitor-bar-container">
+229:                     <div id="gpu-monitor-bar" class="monitor-bar"></div>
+230:                 </div>
+231:                 <span id="gpu-monitor-value" class="monitor-value">... %</span>
+232:             </div>
+233:             <div id="gpu-monitor-details" class="monitor-details">... °C | ... / ... GB</div>
+234:         </div>
+235:         <div id="gpu-monitor-error" class="monitor-details" style="display: none; color: var(--red);"></div>
+236:     </div>
+237: 
+238:     <div class="logs-overlay-container popup-overlay" id="logs-column-global">
+239:         <div class="logs-content-wrapper">
+240:             <div class="log-panel-header">
+241:                 <div class="log-panel-header-main">
+242:                     <span id="log-panel-title">Logs</span>
+243:                     <button id="close-log-panel" title="Fermer le panneau des logs" aria-label="Fermer le panneau des logs">×</button>
+244:                 </div>
+245:                 <div class="log-panel-subheader" id="log-panel-subheader" aria-live="polite">
+246:                     <span id="log-panel-context-step">Aucune étape active</span>
+247:                     <span id="log-panel-context-status"></span>
+248:                     <span id="log-panel-context-timer"></span>
+249:                 </div>
+250:                 <div class="log-panel-specific-buttons" id="log-panel-specific-buttons-container" aria-label="Logs spécifiques"></div>
+251:             </div>
+252:             <div class="log-container" id="main-log-container-panel">
+253:                 <div class="log-header">
+254:                     Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
+255:                 </div>
+256:                 <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
+257:             </div>
+258:             <div class="log-container" id="specific-log-container-panel" style="display:none;">
+259:                 <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
+260:                 <div class="specific-log-path" id="specific-log-path-info-panel"></div>
+261:                 <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
+262:             </div>
+263:         </div>
+264:     </div>
+265: 
+266: 
+267:     <script id="steps-config-data" type="application/json">{{ steps_config | tojson | safe }}</script>
+268:     <script src="{{ url_for('static', filename='main.js') }}?v={{ cache_buster }}" type="module" defer></script>
+269: </body>
+270: 
+271: </html>
 ```
