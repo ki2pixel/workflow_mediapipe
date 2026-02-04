@@ -67,15 +67,8 @@ E 714:0 process_directory - Orchestration multi-projets
 **Impact** : Agrégation données tracking, analytics
 **Défis** : Parsing gros JSON, calculs statistiques, validation structurelle
 
-### 5. ReportService (Score F) - 1 méthode F
-**Localisation** : `services/report_service.py`
-```python
-F 261:4 ReportService.generate_monthly_archive_report - Génération rapports
-E 32:4 ReportService.analyze_monthly_report_html - Parsing HTML
-D 612:4 ReportService.generate_project_report - Rapports projet
-```
-**Impact** : Génération rapports HTML, analyse mensuelle
-**Défis** : Templating, parsing HTML, agrégation données
+### 5. Génération Rapports (retiré)
+> _Note 2026-02-04_ : `ReportService` et ses méthodes (anciennement notées F/E) ont été supprimés. Cette entrée reste pour mémoire historique et ne reflète plus un point chaud actif.
 
 ### 6. STEP7 Preprocess AE (Score F) - 1 méthode F
 **Localisation** : `workflow_scripts/step7/preprocess_ae_json.py`
@@ -190,23 +183,8 @@ def _analyze_layer(manifest: Dict) -> Dict[str, Any]:
     # Évite boucle coûteuse côté ExtendScript
 ```
 
-### Génération Rapports (ReportService)
-**Caractéristiques** :
-- Templating HTML complexe
-- Parsing et extraction données
-- Agrégation multi-sources
-- Formatage et mise en page
-
-**Exemples** :
-```python
-# Templating avec Jinja2
-template = env.get_template('monthly_report.html')
-html_content = template.render(
-    projects=projects_data,
-    metrics=calculated_metrics,
-    period=report_period
-)
-```
+### Génération Rapports (retiré)
+> Ce pattern n'est plus actif depuis la suppression de `ReportService`. Les notes restent pour contextualiser les anciens audits Radon.
 
 ---
 
@@ -334,7 +312,7 @@ L'analyse de complexité révèle que **80% de la complexité technique** est co
 2. **Multiprocessing** (STEP5) - Coordination workers (simplifié v4.2)
 3. **Agrégation données** (STEP6, Viz) - Parsing gros volumes
 4. **Pré-traitement AE** (STEP7) - Optimisations After Effects, mode analyzer
-5. **Génération rapports** - Templating complexe
+> _Note 2026-02-04_ : La génération de rapports a été retirée du système.
 
 La documentation ciblée de ces points chauds, combinée avec des patterns d'architecture sains (DI, streaming, cache), assure la maintenabilité du système malgré sa complexité intrinsèque.
 

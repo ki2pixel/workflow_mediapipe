@@ -29,12 +29,7 @@
 
 **Documentation** : 🔄 `features/VISUALIZATION_SERVICE.md` (à créer)
 
-### ReportService - Score F
-**Méthodes critiques** :
-- `generate_monthly_archive_report` (F) - Génération rapports HTML complexes
-- `analyze_monthly_report_html` (E) - Parsing HTML avec extraction données
-
-**Documentation** : ✅ Référencé dans `ARCHITECTURE_COMPLETE_FR.md`
+> _Note 2026-02-04_ : `ReportService` a été retiré du codebase. Les anciens points chauds F/E associés ne sont plus actifs.
 
 ---
 
@@ -91,7 +86,7 @@
 | CSVService | F | `features/CSV_SERVICE.md` | ✅ Complet |
 | STEP5 Tracking | F/E | `pipeline/STEP5_SUIVI_VIDEO.md` | ✅ Complet |
 | VisualizationService | D | `features/VISUALIZATION_SERVICE.md` | 🔄 À créer |
-| ReportService | F | `ARCHITECTURE_COMPLETE_FR.md` | ✅ Référencé |
+| ReportService | F | _Retiré 2026-02-04_ | ❌ Supprimé |
 | STEP4 Audio | F | `pipeline/STEP4_ANALYSE_AUDIO.md` | ✅ Complet |
 | STEP3 Scenes | E | `pipeline/STEP3_DETECTION_SCENES.md` | ✅ Complet |
 

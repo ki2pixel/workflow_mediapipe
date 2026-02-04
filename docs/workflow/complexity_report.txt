@@ -26,11 +26,8 @@ services/csv_service.py
     M 203:4 CSVService._normalize_url - F
     M 324:4 CSVService._load_structured_history - C
     M 365:4 CSVService.migrate_history_to_local_time - C
-services/report_service.py
-    M 261:4 ReportService.generate_monthly_archive_report - F
-    M 32:4 ReportService.analyze_monthly_report_html - E
-    M 612:4 ReportService.generate_project_report - D
-    C 23:0 ReportService - C
+# services/report_service.py - RETIRÉ 2026-02-04
+# Anciennement: generate_monthly_archive_report (F), analyze_monthly_report_html (E), generate_project_report (D)
 services/lemonfox_audio_service.py
     M 72:4 LemonfoxAudioService._apply_speech_smoothing - C
     M 231:4 LemonfoxAudioService._call_lemonfox_api - C

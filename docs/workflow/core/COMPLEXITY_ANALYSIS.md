@@ -23,9 +23,6 @@
 - **`VisualizationService._get_video_metadata`** (Score D) : Extraction FFmpeg avec gestion timeout
 - **`VisualizationService._load_tracking_data`** (Score D) : Parsing JSON volumineux optimisé
 - **`VisualizationService.get_project_timeline`** (Score C) : Agrégation multi-sources
-- **`ReportService.generate_monthly_archive_report`** (Score F) : Génération rapports mensuels HTML
-- **`ReportService.analyze_monthly_report_html`** (Score E) : Parsing HTML existant complexe
-- **`ReportService.generate_project_report`** (Score D) : Rapports détaillés par projet
 
 #### Face Engines STEP5 (Score E/D)
 - **`InsightFaceEngine.detect`** (Score E) : Détection faciale GPU optimisée
@@ -41,7 +38,6 @@
 
 ### Documentation Créée
 - ✅ `features/VISUALIZATION_SERVICE.md` : Documentation complète VisualizationService
-- ✅ `features/REPORT_SERVICE.md` : Documentation complète ReportService
 - ✅ `technical/COMPLEXITY_HOTSPOTS.md` : Synthèse points chauds Radon
 - ✅ `post_production/AFTER_EFFECTS_SCRIPTS_ANALYSIS.md` : Analyse scripts JSX
 
@@ -72,9 +68,7 @@
 - **`init_worker_process`** (Score F) : Initialisation multiprocessing
 - **Impact** : Cœur du pipeline de suivi vidéo
 
-#### ReportService (`services/report_service.py`)
-- **`generate_monthly_archive_report`** (Score F) : Génération HTML complexe
-- **Impact** : Rapports mensuels pour l'analyse de projet
+> _Note 2026-02-04_ : `ReportService` a été retiré du codebase et n'apparaît plus dans cette analyse.
 
 ### Points Chauds (Score E/D)
 
