@@ -105,7 +105,7 @@
                             <div class="timeline-node" data-step="{{ step_key }}"></div>
                         </div>
                         <div class="timeline-cards-column">
-                            <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0" aria-controls="step-details-panel" aria-expanded="false">
+                            <div class="step timeline-step" id="step-{{ step_key }}" data-step-key="{{ step_key }}" data-step-name="{{ config.display_name }}" data-status="idle" role="listitem" tabindex="0">
                                 <div class="timeline-content">
                             <div class="timeline-head">
                                 <div class="step-title-group">
@@ -152,26 +152,6 @@
                     {% endfor %}
                 </div>
                 <div class="timeline-scroll-spacer" aria-hidden="true"></div>
-                <aside id="step-details-panel" class="step-details-panel" role="complementary" aria-label="Détails de l'étape" hidden>
-                    <div class="step-details-header">
-                        <div class="step-details-title" id="step-details-title">Détails</div>
-                        <button id="close-step-details" class="step-details-close" type="button" aria-label="Fermer le panneau détails">×</button>
-                    </div>
-                    <div class="step-details-body">
-                        <div class="step-details-meta">
-                            <span id="step-details-status" class="status-badge status-idle" aria-live="polite">Prêt</span>
-                            <span id="step-details-timer" class="timer"></span>
-                        </div>
-                        <div class="step-details-progress">
-                            <div id="step-details-progress-text" class="progress-text-step" aria-live="polite"></div>
-                        </div>
-                        <div class="step-details-actions">
-                            <button id="step-details-run" class="run-button" type="button" disabled>Lancer</button>
-                            <button id="step-details-cancel" class="cancel-button" type="button" disabled>Annuler</button>
-                            <button id="step-details-open-logs" class="step-details-open-logs" type="button" disabled>Logs</button>
-                        </div>
-                    </div>
-                </aside>
             </section>
         </div>
     </div>

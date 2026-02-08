@@ -22,7 +22,7 @@ import { themeManager } from './themeManager.js';
 import { reportViewer } from './reportViewer.js';
 import { fetchWithLoadingState } from './apiService.js';
 
-import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
+// import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
 
 window.addEventListener('unhandledrejection', (event) => {
     console.error('[MAIN] Unhandled promise rejection:', event.reason);
@@ -465,7 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupKeyboardShortcuts();
 
-    initializeStepDetailsPanel();
+    // initializeStepDetailsPanel();
 });
 
 function setupCompactMode() {

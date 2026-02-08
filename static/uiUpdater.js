@@ -14,8 +14,6 @@ import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
 import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
 import { openPopupUI, closePopupUI } from './popupManager.js';
 
-let _stepDetailsPanelModulePromise = null;
-
 const STATUS_UI_MAP = {
     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
     starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },

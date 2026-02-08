@@ -46,4 +46,4 @@
 ```bash
 git diff --stat templates/index_new.html static/css/components/steps.css static/uiUpdater.js
 ```
-- Relecture obligatoire de `docs/workflow/audits/AUDIT_UX_DASHBOARD_UNIFIED-2026-01-20.md` pour rester aligné avec la phase courante.
+- Relecture obligatoire de `memory-bank/progress.md` (entrées Timeline Connectée) pour rester aligné avec la phase courante.

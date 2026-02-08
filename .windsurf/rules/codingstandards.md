@@ -44,7 +44,7 @@ alwaysApply: true
 - `services/` : classes/fonctions pures (aucun accès Flask) ex: `FilesystemService` pour I/O sécurisée.
 - `routes/` : validation I/O, instrumentation `PerformanceService`, appel service.
 - `workflow_scripts/` : exécutables par étape alignés sur `WorkflowCommandsConfig`.
-- `static/` + `templates/` : Timeline, overlay logs, Step Details.
+- `static/` + `templates/` : Timeline, overlay logs et settings consolidés.
 - `docs/workflow/` : référence unique des specs/audits.
 
 ## Code Style
@@ -61,7 +61,7 @@ alwaysApply: true
 - `AppState.setState()` reste immuable (diff superficiel, aucun `state` muté).
 - DOM : `DOMBatcher.scheduleUpdate()` + `DOMUpdateUtils.escapeHtml()` (pas d'`innerHTML` non échappé).
 - Polling : `PollingManager` uniquement, bannir les `setInterval` isolés.
-- Composants clés : Logs Overlay (focus trap, sync timeline, fermeture auto), Step Details Panel (`aside` contrôlé AppState), FromSmash/téléchargements externes en lecture seule.
+- Composants clés : Logs Overlay (focus trap, sync timeline, fermeture auto), Timeline connectée (badges d’état dynamiques, auto-scroll structurel) et FromSmash/téléchargements externes en lecture seule. (Le panneau Step Details a été retiré le 2026-02-04.)
 
 ## Core Patterns
 ### Services
@@ -137,6 +137,9 @@ domBatcher.scheduleUpdate(() => {
 - Skips conditionnels autorisés pour STEP3/STEP5 quand dépendances spécialisées manquent, mais documenter les limitations.
 
 ## Process & Tooling
+
+### Mises à jour de la Documentation
+- Toute création ou modification de documentation (README, docs/, guides Markdown) **doit** appliquer la méthodologie définie dans `.windsurf/skills/documentation/SKILL.md` (TL;DR en premier, ouverture problem-first, blocs ❌/✅, trade-offs, Golden Rule). Considérer ce fichier skill comme la checklist obligatoire avant toute rédaction.
 - Git : Conventional Commits (`feat(step5): ...`, `fix(filesystem): ...`).
 - Documentation : chaque changement majeur doit mettre à jour `docs/workflow/` (guide pipeline, audits, security notes).
 - Scripts : lancer les étapes via `WorkflowCommandsConfig` uniquement; pas d’invocation directe des scripts sans passer par `utils.resource_manager`.
@@ -146,7 +149,7 @@ domBatcher.scheduleUpdate(() => {
 ### Politique d’utilisation des Skills
 1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre.
 2. **Debugging systématique** : Charger `.windsurf/skills/debugging-strategies/SKILL.md` pour bug/crash.
-3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer` selon la tâche.
+3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer`, `after-effects-scripts`, `after-effects-cep-panel` selon la tâche.
 4. **Fallback contrôlé** : Skills globales uniquement si aucune skill locale ne couvre le besoin.
 5. **Hiérarchie** : `workflow-operator` > Skills locales > Règles ce doc > Docs > Skills globales.
 

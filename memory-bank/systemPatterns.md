@@ -54,29 +54,26 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
 - **Cache Mémoire** : Maintien d'un cache en mémoire pour éviter les lectures disque inutiles et fournir un fallback en cas d'erreur.
 - **Migration Progressive** : Support rétrocompatible des anciens formats de données avec migration automatique vers le nouveau format structuré.
 
-### Suivi Vidéo (STEP5) - 2025-12-18
-- **Moteurs de Tracking** :
-  - `mediapipe` : Moteur par défaut avec support GPU, fournissant 478 landmarks et 52 blendshapes ARKit
-  - `opencv_haar` : Alternative légère basée sur les classificateurs en cascade d'OpenCV
-  - `opencv_yunet` : Détecteur de visages YuNet optimisé pour la performance
-  - `opencv_yunet_pyfeat` : Moteur hybride combinant YuNet, FaceMesh ONNX et py-feat pour les blendshapes
+### Suivi Vidéo (STEP5) — 2026-02-03
+- **Moteurs supportés** :
+  - `mediapipe` (valeur vide) : moteur par défaut CPU-only exécuté dans `tracking_env_slim`. Fournit 478 landmarks + 52 blendshapes ARKit via MediaPipe Tasks. Import lazy pour éviter TensorFlow.
+  - `insightface` : unique moteur GPU autorisé (ONNX Runtime) exécuté dans `insightface_env`. Nécessite `STEP5_ENABLE_GPU=1`, `STEP5_TRACKING_ENGINE=insightface` et présence dans `STEP5_GPU_ENGINES`. Toute autre valeur est rejetée par `run_tracking_manager.py`.
+  - Tous les moteurs historiques (OpenCV, OpenSeeFace, EOS, pyfeat) et options UI avancées ont été supprimés.
 
-- **Multiprocessing** :
-  - Tous les moteurs supportent le traitement parallèle via `process_video_worker_multiprocessing.py`
-  - Configuration via `TRACKING_CPU_WORKERS` (nombre de workers) et `TRACKING_DISABLE_GPU` (désactivation GPU)
-  - Gestion automatique des ressources et équilibrage de charge entre les workers
+- **Multiprocessing / workers** :
+  - MediaPipe utilise `process_video_worker_multiprocessing.py` (workers CPU). `TRACKING_CPU_WORKERS` est injecté via `_EnvConfig`; chaque worker initialise `FaceLandmarker` + `ObjectDetector` via `ObjectDetectorRegistry`.
+  - InsightFace est GPU-only; aucun worker CPU n’est lancé lorsque ce moteur est sélectionné. Si la validation GPU échoue (`Config.check_gpu_availability()`), le manager tombe en erreur (ou fallback CPU si `STEP5_GPU_FALLBACK_AUTO=1`).
+  - Les snapshots d’environnement (`_log_env_snapshot()`) et la gestion `resource_worker_loop` s’assurent que GPU/CPU ne tournent que lorsque le moteur choisi le permet.
 
-- **Format de Sortie** :
-  - JSON dense avec une entrée par frame (1..N)
-  - Chaque frame contient un tableau `tracked_objects` (vide si aucun objet détecté)
-  - Les visages détectés incluent des landmarks et des blendshapes normalisés
+- **Format de sortie** :
+  - STEP5 produit toujours un JSON dense frame-by-frame (`tracked_objects[]`, blendshapes/throttles configurables). `STEP5_EXPORT_VERBOSE_FIELDS` reste un flag de debugging.
+  - STEP6 `json_reducer.py` produit la source de vérité `*_tracking.json` (analytics, `temporal_alignment`). Les scripts AE consomment STEP6 en priorité.
 
-### STEP5 — Profiling & Performance (2025-12-19)
-- **Chargement `.env` en multiprocessing** : les workers sont des processus isolés; le `.env` doit être chargé côté worker/module (pas uniquement côté manager) pour que `STEP5_ENABLE_PROFILING`, `STEP5_BLENDSHAPES_THROTTLE_N`, etc. soient effectifs.
-- **Profiling compatible chunking** : en multiprocessing, chaque worker peut traiter <100 frames; le seuil de log des stats doit être adapté (ex. toutes les 20 frames) pour que les logs `[PROFILING]` apparaissent.
-- **YuNet downscaling + rescale coordonnées** : utiliser une largeur max configurable (`STEP5_YUNET_MAX_WIDTH`, défaut 640) pour accélérer YuNet, tout en rescalant `bbox/centroid` en coordonnées de la vidéo originale afin de garder un JSON exploitable.
-- **OpenCV threads** : forcer `cv2.setNumThreads(1)` côté YuNet pour éviter la contention avec le multiprocessing.
-- **Tuning workers CPU** : réduire `TRACKING_CPU_WORKERS` peut améliorer la stabilité et les perfs (moins de contention CPU).
+### STEP5 — Profiling & Performance (v4.3)
+- `_EnvConfig` centralise la lecture des variables (workers, GPU flags, throttle). Les workers héritent d’un `args_dict` complet pour garantir que les throttles (`blendshapes_throttle_n`, `mediapipe_max_width`, `mediapipe_jawopen_scale`) sont appliqués.
+- `ObjectDetectorRegistry` est la source unique pour les modèles EfficientDet (résolution, overrides). Toute erreur de résolution stoppe le worker.
+- Le manager journalise la validation GPU (pynvml + `nvidia-smi`). InsightFace est strictement GPU-only : si `STEP5_ENABLE_GPU=0` ou `insightface` n’est pas listé dans `STEP5_GPU_ENGINES`, l’exécution est refusée.
+- `tracking_env_slim` embarque uniquement Mediapipe + dépendances minimales : toute tentative d’activer YuNet/OpenCV doit être considérée comme non supportée.
 
 ### STEP5 — GPU Support (2025-12-22)
 - **Lazy import MediaPipe** : Utiliser `importlib.import_module("mediapipe")` avec gestion d'exception pour éviter l'import automatique de TensorFlow dans `tracking_env` lors du chargement des workers. Permet de différer l'import jusqu'à l'utilisation réelle du moteur MediaPipe, évitant les conflits NumPy/TensorFlow. Exemple : `_ensure_mediapipe_loaded(required=True)` pour les moteurs MediaPipe, `required=False` pour les fallback object detector.
@@ -88,10 +85,16 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
 - **Logging upscale** : Logs DEBUG pour confirmer le rescale des coordonnées dans YuNet, OpenSeeFace, EOS lors de downscale.
 
 ### Frontend (JavaScript)
--   **État Centralisé (`AppState.js`)** : L'état de l'interface est immutable et géré de manière centralisée.
--   **Optimisation des Mises à Jour DOM (`DOMBatcher.js`)** : Les manipulations du DOM sont groupées pour de meilleures performances.
--   **Modals Conditionnelles** : Pour les types de contenu spécifiques (ex: FromSmash), adapter dynamiquement le titre, contenu et actions de la modale.
--   **Auto-scroll Timeline Connectée (2026-01-20)** : Utiliser un scroll déterministe basé sur `calculateOptimalScrollPosition()` + `window.scrollTo()` pour respecter la topbar. Éviter `scrollIntoView()` qui ignore les éléments fixes. Ajouter un espace scrollable en bas de timeline (`timeline-scroll-spacer`) pour permettre le centrage de la dernière étape. Supprimer les `scroll-margin-top` qui interfèrent avec le calcul. Recentrer de manière throttlée pendant les séquences pour compenser les changements de hauteur dynamiques.
+-   **AppState** : Immutable (diff via `structuredClone`). Préférences (auto-ouverture logs, toggles settings) persistées dans localStorage.
+-   **DOMBatcher** : Toutes les mutations DOM doivent passer par `DOMBatcher.scheduleUpdate()`. `DOMUpdateUtils.escapeHtml()` obligatoire pour les contenus dynamiques (logs, popups).
+-   **Timeline Connectée** : Spine unique, auto-scroll déterministe (calcul `calculateOptimalScrollPosition` + `window.scrollTo`). Panneau Step Details supprimé (2026-02-04) : ne plus dépendre de `stepDetailsPanel.js`.
+-   **Overlay de logs Phase 4** : Header contextuel (étape/statut/timer), focus trap, bouton close robuste. Respecter la préférence `getAutoOpenLogOverlay()` (pas d’ouverture forcée pendant les séquences si désactivé).
+-   **Modales actives** : Supervision/Smart Upload supprimées. Les modales restantes (diagnostics, téléchargements) doivent conserver focus trap et A11y (focus-visible global, support `prefers-reduced-motion`).
+
+### Post-production / After Effects (2026-02-03)
+- STEP7 `preprocess_ae_json.py` prépare `*_ae.json` (filtrage par frames, structures compactes). Les scripts ExtendScript (`Analyse-Écart-X...jsx`, `Media-Solution-v11.2-production.jsx`) déclenchent ce script via `system.callSystem()` (manifestes `--manifest_path/--output_path`).
+- `media_solution_bridge.py` fournit un mode `cuts` pour externaliser le parsing CSV et générer des segments (`ms_cuts_manifest_*`). Feature flag `enablePythonCutsParser` + fallback ExtendScript automatique.
+- Le pipeline AE consomme en priorité `*_tracking.json` (STEP6). STEP5 brut n’est utilisé qu’en fallback streaming. Les logs `[PY]` doivent être visibles côté script AE pour diagnostiquer les ponts Python.
 
 ## Général
 -   **Logging** : Utiliser le logger centralisé et les logs spécifiques à chaque étape.

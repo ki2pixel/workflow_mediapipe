@@ -1067,7 +1067,38 @@
          logMessage("No tracking JSON found for " + videoName + " (or disabled). Using default centering.", 'info');
       }
 
-      parsedSegments.sort(function (a, b) { return a.startTime - b.startTime; });
+      // --- DEBUT DU CORRECTIF : SNAP GAPS ---
+      // On corrige les micro-trous (souvent 1 frame) entre les segments
+      var frameDuration = 1 / layerCache.compFrameRate;
+      var snapThreshold = frameDuration * 1.5; // Tolérance de 1.5 images
+
+      for (var k = 0; k < parsedSegments.length - 1; k++) {
+         var currSeg = parsedSegments[k];
+         var nextSeg = parsedSegments[k + 1];
+         var gap = nextSeg.startTime - currSeg.endTime;
+         if (gap > 0 && gap <= snapThreshold) {
+            currSeg.endTime = nextSeg.startTime;
+         }
+      }
+
+      // --- DEBUT DU CORRECTIF : SNAP FIN DE COMP ---
+      // Vérifie si le tout dernier segment s'arrête juste avant la fin de la comp
+      if (parsedSegments.length > 0) {
+         var lastSeg = parsedSegments[parsedSegments.length - 1];
+         var compDuration = initialComp.duration;
+         
+         // Calcul de l'écart avec la fin absolue de la composition
+         var gapToEnd = compDuration - lastSeg.endTime;
+
+         // Si l'écart est positif (il y a un vide) mais petit (< 1.5 frame)
+         // On force la fin du segment à la durée exacte de la composition
+         if (gapToEnd > 0 && gapToEnd <= snapThreshold) {
+            lastSeg.endTime = compDuration;
+            // Optionnel : logger pour debug
+            // logMessage("Dernier segment ajusté à la fin de la comp", 'info');
+         }
+      }
+      // --- FIN DU CORRECTIF ---
 
       app.beginUndoGroup("Create Segments from CSV");
       var createdCount = 0;

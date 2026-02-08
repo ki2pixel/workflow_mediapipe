@@ -1,4 +1,4 @@
-# Contexte Produit : Workflow MediaPipe v4.0
+# Contexte Produit : Workflow MediaPipe v4.3
 
 ## Objectif du Produit
 Le projet est une application web complète qui automatise le traitement et l'analyse de fichiers vidéo à travers un pipeline modulaire en plusieurs étapes. Le système est conçu pour être robuste, performant et facilement maintenable.
@@ -6,16 +6,11 @@ Le projet est une application web complète qui automatise le traitement et l'an
 ## Architecture Générale
 Le système est composé d'un backend **Flask** et d'un frontend **JavaScript** natif. Il suit une **architecture orientée services** où la logique métier est découplée de l'API.
 
-### Note de version (v4.1)
-- Optimisation tracking: exécution par défaut en mode CPU-only avec 15 workers internes pour de meilleures performances et stabilité dans l'Étape 5.
-- Optimisation audio: extraction ffmpeg vers tmpfs, diarisation GPU-first, écriture JSON streaming pour réduire les goulots d'étranglement I/O dans l'Étape 4.
-- Génération de rapports: standardisée en HTML-only (PDF retiré).
-
-### Note de version (v4.2) - Support GPU optionnel (2025-12-22)
-- Support GPU **optionnel et expérimental** ajouté pour les moteurs STEP5 MediaPipe Face Landmarker et OpenSeeFace via `STEP5_ENABLE_GPU=1` et `STEP5_GPU_ENGINES`.
-- Architecture lazy import pour éviter les conflits TensorFlow dans `tracking_env`.
-- Gains observés : FaceMesh ~34× plus rapide, PyFeat ~5-6× (GTX 1650, 1 worker séquentiel).
-- Mode CPU-only reste par défaut pour stabilité v4.1.
+### Note de version (v4.3) — Février 2026
+- Pipeline 8 étapes : introduction du STEP7 « Pré-traitement After Effects » (Python) et renumérotation de la finalisation en STEP8. Le script AE consomme désormais les fichiers `*_ae.json` produits par STEP7 avec fallback contrôlé.
+- STEP5 simplifié : MediaPipe Landmarker sur CPU (via `tracking_env_slim`) devient le moteur par défaut; InsightFace est l’unique moteur GPU supporté via `insightface_env`. Tous les anciens moteurs (OpenCV, OpenSeeFace, EOS) et options avancées ont été retirés.
+- Ponts After Effects : `preprocess_ae_json.py` est réutilisable depuis les scripts ExtendScript (Media-Solution) pour le recentrage et la génération des coupes CSV via `media_solution_bridge.py` (exécution `system.callSystem()`).
+- UI pipeline : Timeline connectée, overlay de logs Phase 4 et paramètres consolidés. Le panneau Step Details a été supprimé (2026-02-04) pour alléger l’interface, mais l’overlay de logs reste synchronisé avec AppState et les séquences.
 
 ### Maintenabilité v4.1 (documentée)
 - État centralisé avec `WorkflowState` (thread-safe via RLock; API étapes, séquences, téléchargements).
@@ -26,28 +21,27 @@ Le système est composé d'un backend **Flask** et d'un frontend **JavaScript** 
 - Statut: documenté; validation codebase en cours côté `WorkflowService` (voir `docs/MIGRATION_STATUS.md`).
 
 ### Pipeline de Traitement
-Le cœur du système est un pipeline en 8 étapes, chacune utilisant un environnement virtuel Python optimisé :
-1.  **Extraction** (`env/`): Extrait de manière sécurisée les archives (ZIP, RAR, TAR).
-2.  **Conversion Vidéo** (`env/`): Standardise toutes les vidéos à 25 FPS en utilisant FFmpeg et l'accélération GPU.
-3.  **Détection de Scènes** (`transnet_env/`): Utilise TransNetV2 (PyTorch) pour identifier les changements de scène.
-4.  **Analyse Audio** (`audio_env/`): Utilise Pyannote.audio pour la diarisation des locuteurs.
-5.  **Suivi Vidéo** (`tracking_env/`, `insightface_env/`): Détection et suivi des visages/objets avec MediaPipe CPU par défaut ou InsightFace GPU optionnel.
-6.  **Réduction JSON** (`env/`): Optimise la taille des fichiers de métadonnées JSON générés.
-7.  **Pré-traitement AE** (`env/`): Prépare et optimise les données JSON spécifiquement pour After Effects.
-8.  **Finalisation** (`env/`): Consolide, valide et archive tous les résultats.
+Le cœur du système est un pipeline en 8 étapes, chacune isolée dans son environnement Python :
+1.  **Extraction** (`env/`) : Extraction sécurisée des apports (ZIP/RAR/TAR) via `FilesystemService`, avec cache relocalisable (`CACHE_ROOT_DIR`).
+2.  **Conversion Vidéo** (`env/`) : Normalisation FFmpeg (25 FPS, profil GPU si disponible) et instrumentation de progression.
+3.  **Détection de Scènes** (`transnet_env/`) : TransNetV2 PyTorch pour les coupures, avec skips conditionnels documentés lorsque les modèles manquent.
+4.  **Analyse Audio** (`audio_env/`) : Pipeline Lemonfox + Pyannote (fallback) avec embeddings locuteurs optionnels (`AUDIO_INCLUDE_SPEAKER_EMBEDDINGS`).
+5.  **Suivi Vidéo** (`tracking_env_slim/`, `insightface_env/`) : MediaPipe Landmarker CPU-only en multiprocessing (valeur par défaut). InsightFace GPU est disponible uniquement si `STEP5_ENABLE_GPU=1` et `STEP5_TRACKING_ENGINE=insightface`, sinon fallback CPU automatique.
+6.  **Réduction JSON** (`env/`) : `json_reducer.py` produit `*_tracking.json` (source primaire AE) avec analytics et `temporal_alignment`.
+7.  **Pré-traitement AE** (`env/`) : `preprocess_ae_json.py` génère `*_ae.json` optimisés, utilisables directement par le script AE et par `Media-Solution` via manifest.
+8.  **Finalisation** (`env/`) : `finalize_and_copy.py` archive les sorties (ResultsArchiver) et publie les artefacts.
 
 ### Intégrations Clés
--   **Webhook JSON** : Source unique pour le monitoring en temps réel des téléchargements (https://webhook.kidpixel.fr/data/webhook_links.json).
--   **FromSmash** : Support ajouté pour les URLs FromSmash.com avec ouverture manuelle dans un nouvel onglet.
--   **NVIDIA GPU** : Utilisé pour l'accélération matérielle dans les étapes de conversion et d'analyse.
+-   **Webhook JSON** : Source unique pour le monitoring temps réel (`CSVMonitorService` + `download_history.sqlite3`).
+-   **FromSmash / Dropbox / SwissTransfer** : Parcours validé avec ouverture manuelle sécurisée lorsqu’un téléchargement automatique est impossible.
+-   **NVIDIA GPU** : Exploité pour FFmpeg (STEP2), InsightFace (STEP5) et profils audio `gpu_fp32`. La validation GPU passe par `Config.check_gpu_availability()` (pynvml + `nvidia-smi`).
 
 ### Interface Utilisateur
-Le frontend offre une interface interactive pour :
--   Exécuter chaque étape individuellement ou en séquence.
--   Monitorer en temps réel l'état du système (CPU, RAM, GPU).
--   Visualiser les logs en direct.
--   Configurer et suivre le monitoring des téléchargements avec support multi-sources (Dropbox, FromSmash).
--   **Timeline Connectée** : Visualisation pipeline moderne avec nœuds connectés, spine lumineux et micro-interactions (implémenté Phase 1 HTML/CSS).
+Le frontend (vanilla JS + DOMBatcher/AppState) offre :
+-   Lancement des étapes individuelles, séquences personnalisées et monitoring temps réel (Timeline connectée avec spine, statuts et auto-scroll structurel).
+-   Overlay de logs Phase 4 : header contextuel, focus trap, préférence d’auto-ouverture persistée dans `AppState`/localStorage.
+-   Paramètres consolidés : toggles structurés (Settings Sprint 2), badges d’état dynamiques, modales sécurisées.
+-   Suppression des panneaux obsolètes (Step Details, Supervision, Smart Upload) pour réduire la dette UI tout en conservant l’accessibilité (focus-visible global, support `prefers-reduced-motion`).
 
 ### Gestion des Téléchargements
 -   **Système de suivi** : Historique persistant stocké en SQLite (table `download_history`) via `download_history_repository`, garantissant l’intégrité en mode multi-workers.

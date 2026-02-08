@@ -76,3 +76,36 @@ Générer un plan de modification avant d'appliquer :
 1.  **Exécution** : Après validation, utiliser `apply_patch` ou `multi_edit`.
 2.  **Mise à jour Memory Bank** :
     - Si une dette technique importante est découverte via `radon` (Score D/F), ajouter impérativement une entrée dans `decisionLog.md` ou `systemPatterns.md`.
+
+### Sous-protocole Rédaction — Application de documentation/SKILL.md
+
+#### 5.1 Point d'Entrée Explicite
+- **Mode Rédaction** : Déclenché après validation du plan de mise à jour.
+- **Lecture obligatoire** : `.windsurf/skills/documentation/SKILL.md`.
+- **Modèle à appliquer** : Spécifié dans le plan (article deep-dive, README, fiche technique, etc.).
+
+#### 5.2 Checkpoints Obligatoires
+**Avant rédaction** :
+- [ ] TL;DR présent (section 1 du skill)
+- [ ] Problem-first opening (section 2 du skill)
+
+**Pendant rédaction** :
+- [ ] Comparaison ❌/✅ (section 4 du skill)
+- [ ] Trade-offs table si applicable (section 7 du skill)
+- [ ] Golden Rule (section 8 du skill)
+- [ ] Éviter les artefacts AI (section 6 du skill)
+
+**Après rédaction** :
+- [ ] Validation checklist « Avoiding AI-Generated Feel »
+- [ ] Vérification ponctuation (remplacer " - " par ;/:/—)
+
+#### 5.3 Traçabilité
+Dans la proposition de mise à jour (Étape 4), ajouter :
+#### Application du skill
+- **Modèle** : [Article deep-dive | README | Technique]
+- **Éléments appliqués** : TL;DR ✔, Problem-First ✔, Comparaison ✔, Trade-offs ✔, Golden Rule ✔
+
+#### 5.4 Hook d'Automation
+- **Validation Git** : Commentaire de commit « Guidé par documentation/SKILL.md — sections: [liste] »
+- **Blocking** : Le workflow ne peut pas se terminer si les checkpoints ne sont pas cochés
+- **Audit trail** : Chaque fichier modifié contient une note de validation interne

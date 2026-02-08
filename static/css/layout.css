@@ -57,30 +57,6 @@ html, body { overflow-y: scroll; }
 }
 
 
-.workflow-wrapper.compact-mode .step-details-panel {
-    position: fixed;
-    right: 16px;
-    top: 120px;
-    width: min(30vw, 420px);
-    height: calc(100vh - 140px);
-    z-index: 19;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(30px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
- }
-
-.workflow-wrapper.compact-mode.details-active .step-details-panel {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateX(0);
- }
-
-.workflow-wrapper.compact-mode.details-active .steps-column {
-    margin-right: min(30vw, 420px);
-    padding-right: 16px;
- }
-
 /* Unified controls section compatibility with slideshow mode */
 .workflow-wrapper.slideshow-mode ~ .unified-controls-section,
 .unified-controls-section + .workflow-wrapper.slideshow-mode {

@@ -17,7 +17,6 @@ description: Operate and refine the unified Logs Overlay (Phases 2-4). Use when 
 2. Header contextuel affiche étape active, statut, timer (alimenté via `AppState` + `WorkflowState`).
 3. Boutons "logs spécifiques" regroupés dans un conteneur global, accessibles clavier.
 4. Auto-ouverture configurable : toggle "📟 Auto-ouverture des logs" (Settings). `openLogPanelUI()` respecte `AppState.getAutoOpenLogOverlay()`.
-5. Coexistence Step Details Panel : ouverture overlay ferme Step Details.
 
 ## Checklist implémentation
 1. **Structure** : maintenir `data-log-type`, `aria-modal="true"`, `role="dialog"`. Ajouter `aria-live` uniquement si nécessaire.
@@ -28,10 +27,9 @@ description: Operate and refine the unified Logs Overlay (Phases 2-4). Use when 
 6. **Tests** : `npm run test:frontend` doit réussir (`test_timeline_logs_phase2.mjs` vérifie header/boutons/auto-open).
 
 ## Diagnostics rapides
-- Overlay ne s’ouvre pas → vérifier `AppState.getAutoOpenLogOverlay()` (toggle). Forcer via bouton `Logs`.
+- Overlay ne s'ouvre pas → vérifier `AppState.getAutoOpenLogOverlay()` (toggle). Forcer via bouton `Logs`.
 - Header vide → confirmer que `uiUpdater._updateLogPanelHeader()` reçoit `activeStep`. Revoir `WorkflowState` payload.
 - Focus trap cassé → inspecter `popupManager.js` (hooks `onOpenLogPanel`, `onCloseLogPanel`). Vérifier `DOMUpdateUtils.escapeHtml()` sur contenu logs.
 
 ## Références
 - `memory-bank/progress.md` (Phases Logs Overlay 2-4, toggle auto-open).
-- `docs/workflow/audits/Ergonomie-Amelioree-Pour-Les-Logs.md` pour exigences.

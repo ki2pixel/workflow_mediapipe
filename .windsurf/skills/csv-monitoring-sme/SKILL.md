@@ -44,5 +44,5 @@ python scripts/migrate_download_history_to_sqlite.py \
 
 ## Références
 - `memory-bank/decisionLog.md` (sections migration SQLite et politique Dropbox-only).
-- `docs/workflow/monitoring/CSV_DOWNLOADS_MANAGEMENT.md` (si présent) pour procédures complètes.
+- `docs/workflow/services/csv-service.md` pour procédures complètes.
 - `resources/sqlite_triage_commands.md` pour copier/coller les requêtes SQLite et le script Python de synthèse.
