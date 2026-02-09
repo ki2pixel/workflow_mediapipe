@@ -45,9 +45,11 @@ def update_step_status(step_key, status):
 
 ```python
 from config.settings import config
-python_env = config.get_venv_python("tracking_env")
+python_env = config.get_venv_python("tracking_env_slim")
 subprocess.run([python_env, "workflow_scripts/step5/run_tracking_manager.py"])
 ```
+
+> **Pourquoi `tracking_env_slim` ?** Depuis la décision du 2026‑02‑03, l'environnement `tracking_env` a été officiellement remplacé par `tracking_env_slim` pour MediaPipe CPU. InsightFace GPU reste dans `insightface_env`. Voir `decisionLog.md` pour l'historique complet.
 
 Aucun chemin `env/bin/python` en dur dans le code.
 
@@ -265,32 +267,6 @@ GET /api/system/diagnostics
     "FLASK_DEBUG": false
   },
   "timestamp": "2025-11-18T16:45:00+01:00"
-}
-```
-
-### Projets Disponibles
-
-```bash
-GET /api/visualization/projects
-```
-
-**Réponse** :
-```json
-{
-  "projects": [
-    {
-      "name": "projet_camille_001",
-      "path": "/path/to/projets_extraits/projet_camille_001",
-      "videos": ["video1.mp4", "video2.mov"],
-      "has_scenes": true,
-      "has_audio": true,
-      "has_tracking": true,
-      "video_count": 2,
-      "source": "projects",
-      "display_base": "projet_camille_001"
-    }
-  ],
-  "count": 1
 }
 ```
 

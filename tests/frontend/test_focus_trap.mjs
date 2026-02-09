@@ -11,6 +11,10 @@ function makeFocusable(id) {
   return {
     id,
     offsetParent: {},
+    nodeType: 1,
+    tagName: 'BUTTON',
+    className: '',
+    isConnected: true,
     _attrs: new Map(),
     getAttribute: function (k) { return this._attrs.has(k) ? this._attrs.get(k) : null; },
     setAttribute: function (k, v) { this._attrs.set(k, String(v)); },
@@ -27,6 +31,7 @@ function makeOverlay(focusables) {
     querySelectorAll: () => focusables,
     getAttribute: function (k) { return this._attrs.has(k) ? this._attrs.get(k) : null; },
     setAttribute: function (k, v) { this._attrs.set(k, String(v)); },
+    removeAttribute: function (k) { this._attrs.delete(k); },
     addEventListener: function (type, handler) { this._listeners.set(type, handler); },
     removeEventListener: function (type, handler) {
       const current = this._listeners.get(type);
@@ -40,7 +45,8 @@ function makeOverlay(focusables) {
 function triggerKeydown(overlay, e) {
   const handler = overlay._listeners.get('keydown');
   if (!handler) throw new Error('No keydown handler registered');
-  handler(e);
+  const event = Object.assign({}, e, { currentTarget: overlay });
+  handler(event);
 }
 
 // Stub globals required by imported modules
@@ -64,6 +70,14 @@ if (!global.document) {
 global.document.body = {};
 global.document.documentElement = {};
 global.document.activeElement = null;
+global.document.getElementById = () => null;
+global.document.querySelectorAll = () => [];
+global.document.contains = () => true;
+global.document.hasFocus = () => true;
+
+if (!global.Node) {
+  global.Node = { ELEMENT_NODE: 1 };
+}
 // DOMUpdateUtils.escapeHtml (DOMBatcher import) uses createElement
 global.document.createElement = () => {
   let _text = '';
@@ -82,9 +96,10 @@ global.document.createElement = () => {
 
 (async () => {
   try {
-    const reportUrl = new URL('../../static/reportViewer.js', import.meta.url);
-    const reportMod = await import(reportUrl);
-    const reportViewer = reportMod.reportViewer;
+    const popupUrl = new URL('../../static/popupManager.js', import.meta.url);
+    const popupMod = await import(popupUrl);
+    const openPopupUI = popupMod.openPopupUI;
+    const closePopupUI = popupMod.closePopupUI;
 
     // Given: Preconditions
     const prev = makeFocusable('prev');
@@ -95,29 +110,22 @@ global.document.createElement = () => {
     const overlay = makeOverlay([f1, f2]);
 
     // When:  Operation to execute
-    reportViewer.overlay = overlay;
-    reportViewer._enableModalFocusTrap();
+    openPopupUI(overlay);
 
     // Then:  Expected result/verification
-    assert(reportViewer.prevFocusEl === prev, 'Expected prev focus to be stored');
     assert(global.document.activeElement === f1, 'Expected first focusable to receive focus');
 
     // Given: Preconditions
     // When:  Operation to execute
+    global.document.activeElement = f2;
     triggerKeydown(overlay, { key: 'Tab', shiftKey: false, preventDefault: () => {} });
 
     // Then:  Expected result/verification
-    assert(global.document.activeElement === f2, 'Expected Tab to move focus forward');
+    assert(global.document.activeElement === f1, 'Expected Tab to wrap around (last -> first)');
 
     // Given: Preconditions
     // When:  Operation to execute
-    triggerKeydown(overlay, { key: 'Tab', shiftKey: false, preventDefault: () => {} });
-
-    // Then:  Expected result/verification
-    assert(global.document.activeElement === f1, 'Expected Tab to wrap around');
-
-    // Given: Preconditions
-    // When:  Operation to execute
+    global.document.activeElement = f1;
     triggerKeydown(overlay, { key: 'Tab', shiftKey: true, preventDefault: () => {} });
 
     // Then:  Expected result/verification
@@ -125,10 +133,10 @@ global.document.createElement = () => {
 
     // Given: Preconditions
     // When:  Operation to execute
-    reportViewer._disableModalFocusTrap();
+    closePopupUI(overlay);
 
     // Then:  Expected result/verification
-    assert(global.document.activeElement === prev, 'Expected focus restored to previous element');
+    assert(global.document.activeElement && global.document.activeElement.id === 'prev', 'Expected focus restored to previous element (by id)');
 
     // Given: Preconditions
     const prev2 = makeFocusable('prev2');
@@ -136,19 +144,14 @@ global.document.createElement = () => {
     const emptyOverlay = makeOverlay([]);
 
     // When:  Operation to execute
-    reportViewer.overlay = emptyOverlay;
-    reportViewer._enableModalFocusTrap();
-
-    // Then:  Expected result/verification
-    assert(reportViewer.prevFocusEl === prev2, 'Expected prev focus to be stored (reportViewer)');
-    assert(global.document.activeElement === emptyOverlay, 'Expected overlay to be focused when no focusables');
+    openPopupUI(emptyOverlay);
 
     // Given: Preconditions
     // When:  Operation to execute
-    reportViewer._disableModalFocusTrap();
+    closePopupUI(emptyOverlay);
 
     // Then:  Expected result/verification
-    assert(global.document.activeElement === prev2, 'Expected focus restored (reportViewer)');
+    assert(global.document.activeElement && global.document.activeElement.id === 'prev2', 'Expected focus restored (popupManager, by id)');
 
     console.log('Modal focus trap & focus restore tests: OK');
     process.exit(0);

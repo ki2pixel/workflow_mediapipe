@@ -1,30 +1,32 @@
 # Tracking Vidéo
 
-**TL;DR** : Détection faciale avec MediaPipe (CPU par défaut) ou InsightFace (GPU optionnel). 478 landmarks + 52 blendshapes ARKit par frame. Multiprocessing optimisé.
+**TL;DR** : Détection faciale avec MediaPipe (CPU multiprocessing) ou InsightFace (GPU unique). 478 landmarks + 52 blendshapes ARKit par frame. Architecture simplifiée : pas d'OpenCV/EOS/YuNet depuis v4.3.
 
 ## Le Problème : Tracking Manuel Impossible
 
 Tu dois suivre les visages et expressions dans tes vidéos frame par frame, mais le faire manuellement est inenvisageable pour des contenus longs. Tu as besoin d'une solution automatique qui détecte les visages, extrait les points faciaux précis, et génère les données d'animation 3D.
 
-## Notre Solution : Double Moteur de Tracking
+## Notre Solution : Duo de Tracking Simplifié
 
-Nous utilisons deux approches complémentaires : MediaPipe pour le traitement CPU robuste, et InsightFace pour la haute précision GPU. Le système génère des données denses avec landmarks faciaux et blendshapes ARKit, parfaitement synchronisées avec les frames vidéo.
+Nous utilisons deux approches complémentaires : MediaPipe pour le traitement CPU robuste en multiprocessing, et InsightFace pour la haute précision GPU. Le système génère des données denses avec landmarks faciaux et blendshapes ARKit, parfaitement synchronisées avec les frames vidéo. **Les moteurs historiques (OpenCV, YuNet, EOS, OpenSeeFace) ont été retirés en v4.3**.
 
-### ❌ GPU activé inutilement (anti-pattern)
+### ❌ Anciens moteurs retirés (anti-pattern)
 ```bash
-# Approche confuse - GPU activé mais MediaPipe reste CPU
-STEP5_ENABLE_GPU=1  # N'affecte PAS MediaPipe !
-STEP5_TRACKING_ENGINE=  # vide = MediaPipe CPU
-# Résultat : GPU inutilisé, performance dégradée
+# Approche obsolète - moteurs supprimés en v4.3
+STEP5_TRACKING_ENGINE=yunet      # Plus supporté
+STEP5_TRACKING_ENGINE=opencv     # Plus supporté  
+STEP5_TRACKING_ENGINE=eos        # Plus supporté
+STEP5_TRACKING_ENGINE=openseeface # Plus supporté
+# Résultat : erreur de validation, fallback MediaPipe automatique
 ```
 
-### ✅ Moteur adaptatif (pattern recommandé)
+### ✅ Duo simplifié (pattern recommandé)
 ```python
 # Approche claire - choix explicite du moteur
 if gpu_available and high_precision_required:
-    engine = "insightface"  # GPU haute précision
+    engine = "insightface"  # GPU haute précision, worker unique
 else:
-    engine = "mediapipe"   # CPU stable
+    engine = ""            # vide = MediaPipe CPU, 15 workers
 # Résultat : ressources optimisées selon le besoin
 ```
 
@@ -109,15 +111,19 @@ STEP5_ENABLE_GPU=0                  # 1 pour activer GPU InsightFace
 STEP5_GPU_ENGINES=insightface        # Moteurs GPU autorisés
 STEP5_GPU_FALLBACK_AUTO=1           # Bascule CPU auto si GPU échoue
 
-# Performance CPU
+# Performance CPU (MediaPipe)
 TRACKING_CPU_WORKERS=15              # Workers MediaPipe (défaut)
 STEP5_BLENDSHAPES_THROTTLE_N=2       # Calcul blendshapes toutes les N frames
 
 # Options avancées
 STEP5_ENABLE_PROFILING=0            # Logs performance toutes les 20 frames
 STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
-STEP5_ENABLE_OBJECT_DETECTION=0     # Fallback object detector
 ```
+
+> **Note v4.3** : Les variables suivantes ont été supprimées et ne sont plus prises en compte :
+> - `STEP5_ENABLE_OBJECT_DETECTION` (plus de fallback object detector)
+> - `STEP5_OPENCV_*`, `STEP5_YUNET_*`, `STEP5_EOS_*`, `STEP5_OPENSEEFACE_*` (moteurs retirés)
+> - `STEP5_BLENDSHAPES_PROFILE` (profil unique conservé)
 
 ### Configuration MediaPipe (CPU)
 
@@ -146,6 +152,8 @@ STEP5_ENABLE_OBJECT_DETECTION=0     # Fallback object detector
 
 ## Les Deux Moteurs de Tracking
 
+> **Architecture v4.3** : Seuls MediaPipe et InsightFace sont supportés. Les autres moteurs ont été retirés pour simplifier la maintenance et améliorer la fiabilité.
+
 ### MediaPipe (CPU - Défaut Recommandé)
 
 **Avantages** :
@@ -159,6 +167,7 @@ STEP5_ENABLE_OBJECT_DETECTION=0     # Fallback object detector
 - 52 blendshapes ARKit
 - 15 workers multiprocessing
 - CPU-only (jamais de GPU même si activé)
+- Throttling blendshapes configurable
 
 **Cas d'usage** :
 - Production stable
@@ -177,7 +186,7 @@ STEP5_ENABLE_OBJECT_DETECTION=0     # Fallback object detector
 **Contraintes** :
 - GPU NVIDIA obligatoire (CUDA ≥ 12.0)
 - 2+ Go VRAM minimum (4+ recommandés)
-- 1 worker séquentiel (pas de parallélisme)
+- **1 worker séquentiel** (pas de parallélisme)
 - Environnement `insightface_env` dédié
 
 **Cas d'usage** :
@@ -188,11 +197,11 @@ STEP5_ENABLE_OBJECT_DETECTION=0     # Fallback object detector
 
 ## Trade-offs par Moteur de Tracking
 
-| Moteur | Précision | Ressources | Risques | Quand l'utiliser |
-|--------|-----------|------------|---------|-----------------|
-| **MediaPipe CPU** | Bonne (478 landmarks) | 15 workers CPU | Lent sur vidéos longues | Production stable, batch massif |
-| **InsightFace GPU** | Excellente (embeddings) | 1 worker GPU | VRAM limitée, CUDA requis | Haute précision, contenus courts |
-| **Hybrid Auto** | Adaptatif | Variable | Complexité configuration | Environnements mixtes |
+| Moteur | Précision | Ressources | Workers | Risques | Quand l'utiliser |
+|--------|-----------|------------|---------|---------|-----------------|
+| **MediaPipe CPU** | Bonne (478 landmarks) | 15 workers CPU | 15 | Lent sur vidéos longues | Production stable, batch massif |
+| **InsightFace GPU** | Excellente (embeddings) | 1 worker GPU | 1 | VRAM limitée, CUDA requis | Haute précision, contenus courts |
+| **Hybrid Auto** | Adaptatif | Variable | Variable | Complexité configuration | Environnements mixtes |
 
 ## Trade-offs par Configuration Workers
 
@@ -202,9 +211,11 @@ STEP5_ENABLE_OBJECT_DETECTION=0     # Fallback object detector
 | **15** (défaut) | Optimale | Équilibrée | Production standard |
 | **20+** | Maximale | Surcharge CPU | Serveur puissant |
 
+> **Note** : Les workers ne s'appliquent qu'à MediaPipe. InsightFace utilise toujours 1 worker GPU unique.
+
 ## Analogie : Studio de Capture vs Laboratoire
 
-Pense au tracking comme un **studio de capture** vs un **laboratoire de recherche**. **MediaPipe** est le studio de capture : rapide, efficace, produit des résultats standards pour tous les projets. **InsightFace** est le laboratoire : précis, analytique, parfait pour les projets qui demandent une qualité exceptionnelle. Les **workers** sont les assistants qui permettent de traiter plusieurs projets simultanément.
+Pense au tracking comme un **studio de capture** vs un **laboratoire de recherche**. **MediaPipe** est le studio de capture : rapide, efficace, produit des résultats standards pour tous les projets avec 15 assistants (workers) qui travaillent en parallèle. **InsightFace** est le laboratoire : précis, analytique, parfait pour les projets qui demandent une qualité exceptionnelle, mais avec un seul chercheur (worker GPU) très spécialisé. Les **moteurs historiques** étaient des équipements obsolètes qui ont été retirés pour simplifier l'exploitation.
 
 ## Formats Supportés
 
@@ -560,22 +571,28 @@ for frame_data in tracking_data['tracked_objects']:
 
 ## Pièges Courants et Solutions
 
-### Piège #1 : GPU activé inutilement
+### Piège #1 : Anciens moteurs dans la configuration
+**Solution** : Les variables `STEP5_TRACKING_ENGINE=yunet/opencv/eos/openseeface` ne sont plus supportées. Le système fallback automatiquement vers MediaPipe.
+
+### Piège #2 : GPU activé inutilement
 **Solution** : MediaPipe reste CPU-only même si `STEP5_ENABLE_GPU=1`. GPU réservé à InsightFace.
 
-### Piège #2 : Trop de workers CPU
+### Piège #3 : Trop de workers CPU
 **Solution** : Surveiller la charge CPU et ajuster `TRACKING_CPU_WORKERS` (15 par défaut).
 
-### Piège #3 : VRAM insuffisante
+### Piège #4 : VRAM insuffisante
 **Solution** : Activer `STEP5_GPU_FALLBACK_AUTO=1` pour basculer CPU automatiquement.
 
-### Piège #4 : JSON trop volumineux
-**Solution** : Utiliser `STEP5_EXPORT_VERBOSE_FIELDS=0` et profil blendshapes pour réduire la taille.
+### Piège #5 : JSON trop volumineux
+**Solution** : Utiliser `STEP5_EXPORT_VERBOSE_FIELDS=0` pour réduire la taille.
 
-### Piège #5 : Fichiers sans audio STEP4
+### Piège #6 : Fichiers sans audio STEP4
 **Solution** : Le tracking fonctionne sans audio, mais la détection de parole améliore les résultats.
 
-L'étape 5 transforme les vidéos en données faciales 3D précises, créant une base riche pour l'animation et l'analyse. La double approche CPU/GPU garantit que le système fonctionne dans tous les environnements tout en offrant une haute précision quand les ressources le permettent.
+### Piège #7 : Variables obsolètes
+**Solution** : Supprimer les variables `STEP5_ENABLE_OBJECT_DETECTION` et `STEP5_*ENGINE_*` des fichiers `.env`.
+
+L'étape 5 transforme les vidéos en données faciales 3D précises avec une architecture simplifiée et fiable. La double approche CPU/GPU garantit que le système fonctionne dans tous les environnements tout en offrant une haute précision quand les ressources le permettent. Le retrait des moteurs historiques simplifie la maintenance et élimine les points de défaillance.
 
 ---
 

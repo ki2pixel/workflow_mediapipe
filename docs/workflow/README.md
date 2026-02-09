@@ -69,8 +69,8 @@ python app_new.py
 ### ⚙️ **Services** - Composants Métier
 - **[CSV Service](services/csv-service.md)** : Monitoring téléchargements webhook
 - **[Workflow Service](services/workflow-service.md)** : Orchestrateur central du pipeline
-- **[Visualization Service](services/visualization-service.md)** : Métriques et rapports
 - **[Results Archiver](services/results-archiver-service.md)** : Archivage automatique
+- **(Archive) [VisualizationService](archives/visualization-service.md)** : Service décommissionné (voir [plan de décommissionnement](DECOMMISSIONING_VISUALIZATION_SERVICE.md))
 
 ### 🔧 **Ops** - Technique et API
 - **[API Reference](ops/api-routes.md)** : Endpoints REST et contrats
@@ -94,6 +94,10 @@ python app_new.py
 - **Webhook-Only** : Source unique de données externes
 - **Tokens Internes** : Protection des endpoints sensibles
 - **Validation Entrées** : Sanitisation systématique
+
+### Services Retirés
+
+**VisualizationService** : Décommissionné depuis le 2026‑02‑08. Le service de visualisation a été retiré car l'interface principale ne l'utilisait plus. La documentation complète et le plan de décommissionnement sont disponibles dans `archives/visualization-service.md` et `DECOMMISSIONING_VISUALIZATION_SERVICE.md`.
 
 ## Environnements Virtuels
 

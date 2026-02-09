@@ -19,7 +19,6 @@ import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
 import { appState } from './state/AppState.js';
 import { initializeCSVDownloadMonitor } from './csvDownloadMonitor.js';
 import { themeManager } from './themeManager.js';
-import { reportViewer } from './reportViewer.js';
 import { fetchWithLoadingState } from './apiService.js';
 
 // import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
@@ -385,10 +384,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (dom.customSequenceConfirmPopupOverlay) dom.customSequenceConfirmPopupOverlay.style.display = 'none';
 
     themeManager.init();
-
-    if (document.getElementById('report-overlay')) {
-        reportViewer.init();
-    }
 
 
     const initialStatusPromises = [];

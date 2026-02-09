@@ -12,7 +12,6 @@ from services.monitoring_service import MonitoringService
 from services.workflow_service import WorkflowService
 from services.performance_service import PerformanceService
 from services.filesystem_service import FilesystemService
-from services.visualization_service import VisualizationService
 from services.lemonfox_audio_service import LemonfoxAudioService
 
 logger = logging.getLogger(__name__)
@@ -557,38 +556,6 @@ def stats_history():
         logger.error(f"Historical data error: {e}")
         return jsonify({"error": "Unable to retrieve historical data"}), 500
 
-
-
-@api_bp.route('/visualization/projects', methods=['GET'])
-@measure_api('/api/visualization/projects')
-def visualization_projects():
-    """
-    List available projects and their videos for visualization/reporting.
-
-    Returns:
-        JSON response:
-        {
-            "projects": [
-                {"name": str, "path": str, "videos": [str], "video_count": int,
-                 "has_scenes": bool, "has_audio": bool, "has_tracking": bool, "source": "projects|archives"}
-            ],
-            "count": int,
-            "timestamp": str
-        }
-
-    Status Codes:
-        200: Success
-        500: Server error
-    """
-    try:
-        data = VisualizationService.get_available_projects()
-        # If service reports an error, surface as 500 while returning payload
-        if data.get("error"):
-            return jsonify(data), 500
-        return jsonify(data)
-    except Exception as e:
-        logger.error(f"Visualization projects error: {e}", exc_info=True)
-        return jsonify({"error": "Unable to list visualization projects"}), 500
 
 
 @api_bp.route('/step4/lemonfox_audio', methods=['POST'])
