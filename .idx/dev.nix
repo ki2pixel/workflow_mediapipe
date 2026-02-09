@@ -25,7 +25,7 @@
 
     workspace = {
       onCreate = {
-        install-python-deps = "python3 -m pip install --upgrade pip && python3 -m pip install -r requirements-dev.txt";
+        install-python-deps = "python3 -m ensurepip --upgrade && pip3 install --upgrade pip && pip3 install -r requirements-dev.txt";
         install-node-deps = "npm install";
         default.openFiles = [
           "README.md"
