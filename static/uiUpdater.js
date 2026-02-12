@@ -282,8 +282,8 @@ export function resetStepTimerDisplay(stepKey) {
 
 export function updateGlobalUIForSequenceState(isRunning) {
     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
-    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
-    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, null);
+    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, null);
     const customSequenceCheckboxes = resolveElement(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes) || [];
 
     if (runAllButton) runAllButton.disabled = isRunning;
@@ -779,8 +779,20 @@ export function updateStepCardUI(stepKey, data) {
 
 export function updateCustomSequenceButtonsUI() {
     const hasSelection = getSelectedStepsOrder().length > 0;
-    if (dom.runCustomSequenceButton) dom.runCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
-    if (dom.clearCustomSequenceButton) dom.clearCustomSequenceButton.disabled = !hasSelection || getIsAnySequenceRunning();
+    const isRunning = getIsAnySequenceRunning();
+    const shouldDisable = !hasSelection || isRunning;
+
+    domBatcher.scheduleUpdate('custom-sequence-buttons', () => {
+        const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, null);
+        const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, null);
+
+        if (runCustomSequenceButton) {
+            runCustomSequenceButton.disabled = shouldDisable;
+        }
+        if (clearCustomSequenceButton) {
+            clearCustomSequenceButton.disabled = shouldDisable;
+        }
+    });
 }
 
 export function updateGlobalProgressUI(text, percentage, isError = false) {

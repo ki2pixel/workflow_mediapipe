@@ -1,45 +1,80 @@
-# Réduction JSON
+# STEP6 - Réduction JSON et Analytics
 
-**TL;DR** : Réduit les fichiers JSON de tracking de 74-95% tout en enrichissant les données avec analytics, résumés d'expressions et alignement audio/vidéo. Génère le format standard pour After Effects.
+**TL;DR** : Réduction des JSON bruts STEP5 en fichiers optimisés `*_tracking.json` avec analytics, confidence filtering, et temporal alignment pour After Effects.
 
-## Le Problème : JSON Tracking Trop Volumineux
+## Le Problème : JSON Bruts Inutilisables
 
-Les fichiers JSON de tracking STEP5 contiennent des dizaines de milliers de landmarks et blendshapes par frame, ce qui les rend extrêmement lourds (plusieurs centaines de MB) et lents à traiter dans After Effects. Tu as besoin d'une version optimisée qui conserve les données essentielles tout en étant performante.
+Tu as des fichiers JSON de 500MB+ avec 468 landmarks par frame, mais After Effects ne peut pas gérer cette masse de données et tu as besoin d'analytics pour comprendre la qualité du tracking. Tu dois réduire la taille tout en préservant les informations essentielles et en ajoutant des métriques utilisables.
 
-## Notre Solution : Réduction Intelligente avec Enrichissement
+## Notre Solution : Réduction Intelligente avec Analytics
 
-Nous réduisons drastiquement la taille des fichiers JSON en supprimant les données volumineuses (landmarks 3D, eos.*) tout en ajoutant des analytics avancés. Le système génère un format standardisé optimisé pour After Effects avec des métriques de confidence et des résumés d'expressions.
+Nous utilisons `json_reducer.py` pour transformer les JSON denses STEP5 en fichiers optimisés avec analytics, filtering, et métadonnées temporelles. Le reducer génère la source de vérité pour After Effects avec une réduction de 70-90% de la taille tout en ajoutant des métriques de qualité.
 
-### ❌ Conservation brute (anti-pattern)
-```python
-# Approche inefficace - tout conserver
-tracking_data = {
-    "landmarks": [[x,y,z] for _ in range(468*2500)],  # 300MB !
-    "blendshapes": full_data  # 50MB !
+### ❌ JSON brut direct (anti-pattern)
+```json
+// Fichier STEP5 brut - 500MB+, inutilisable directement
+{
+  "tracked_objects": [
+    {
+      "frame": 1,
+      "faces": [
+        {
+          "landmarks": [[x1,y1,z1], [x2,y2,z2], ...],  // 468 points
+          "blendshapes": {"jawOpen": 0.12, "mouthSmileLeft": 0.34, ...},
+          "confidence": 0.95
+        }
+      ]
+    }
+  ]
 }
-# Résultat : After Effects plante, chargement 2-3 minutes
 ```
 
-### ✅ Réduction intelligente (pattern recommandé)
-```python
-# Approche optimisée - réduire et enrichir
-reduced_data = {
-    "tracking_analytics": confidence_histogram,  # +1MB
-    "expression_summary": key_metrics,           # +0.5MB
-    "tracked_objects": centroids_only             # 12MB total
+### ✅ JSON réduit optimisé (pattern recommandé)
+```json
+// Fichier STEP6 réduit - 50MB, analytics inclus
+{
+  "video_metadata": {
+    "filename": "video1.mp4",
+    "total_frames": 2500,
+    "fps": 25.0,
+    "duration_sec": 100.0
+  },
+  "tracking_summary": {
+    "total_faces_detected": 12450,
+    "average_confidence": 0.87,
+    "confidence_histogram": {"0.9-1.0": 8900, "0.8-0.9": 2800, ...}
+  },
+  "tracked_objects": [
+    {
+      "frame": 1,
+      "faces": [
+        {
+          "id": 0,
+          "confidence": 0.95,
+          "landmarks_2d": [[x1,y1], [x2,y2], ...],  // 2D seulement
+          "blendshapes": {"jawOpen": 0.12, "mouthSmileLeft": 0.34}
+        }
+      ]
+    }
+  ],
+  "temporal_alignment": {
+    "audio_video_sync": true,
+    "frame_drops": [],
+    "temporal_gaps": []
+  }
 }
-# Résultat : After Effects instantané, données enrichies
 ```
 
-### Flux de Réduction Intelligente
+### Flux de Réduction Intelligent
 
-1. **Analyse des fichiers** : Scan des projets avec JSON tracking et audio
-2. **Fusion données** : Intégration tracking + audio pour enrichissement
-3. **Réduction volumineuse** : Suppression landmarks/blendshapes détaillés
-4. **Enrichissement analytics** : Histogrammes confidence, statistiques par objet
-5. **Résumé expressions** : Synthèse des blendshapes principaux
-6. **Alignement temporel** : Détection désynchronisations audio/vidéo
-7. **Écriture atomique** : Sauvegarde sécurisée avec fichier temporaire
+1. **Chargement JSON bruts** : Lecture des fichiers STEP5 et STEP4
+2. **Validation structure** : Vérification cohérence frames/fps
+3. **Filtrage confidence** : Suppression des détections faible confiance
+4. **Réduction dimensions** : 3D→2D pour landmarks, filtering blendshapes
+5. **Calcul analytics** : Histogrammes confidence, stats par objet
+6. **Temporal alignment** : Synchronisation audio/vidéo, détection gaps
+7. **Écriture atomique** : Fichier temporaire puis rename pour éviter corruption
+8. **Métadonnées enrichies** : Informations de processing et qualité
 
 ## Utilisation Rapide
 

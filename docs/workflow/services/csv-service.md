@@ -1,14 +1,14 @@
-# Service CSV - Monitoring et Historique
+# CSV Service - Monitoring Temps Réel et Historique
 
-**TL;DR** : Service central qui surveille **uniquement** le webhook JSON et déclenche des workers **seulement** pour les archives Dropbox conformes. Normalise les URLs complexes, évite les doublons via WorkflowState, et persiste l'historique dans SQLite.
+**TL;DR** : Service de monitoring temps réel qui surveille le webhook JSON, normalise les URLs complexes, et persiste l'historique dans SQLite avec détection des doublons et support multi-sources (Dropbox, FromSmash, SwissTransfer).
 
-## Le Problème : Historique des Téléchargements Fragmenté
+## Le Problème : Monitoring Fragmenté et URLs Complexes
 
-Tu hérites d'un système où plusieurs sources CSV (Dropbox, FromSmash, SwissTransfer) coexistent avec des logiques de parsing différentes. Aujourd'hui, tu veux une source unique, mais tu dois conserver la compatibilité historique tout en évitant les téléchargements incontrôlés.
+Tu as plusieurs sources de téléchargements (Dropbox proxy, FromSmash, SwissTransfer) avec des URLs complexes (double encodage, paramètres variables) et un historique fragmenté. Tu as besoin d'une source unique de vérité avec normalisation automatique et déduplication intelligente.
 
-## Notre Solution : Webhook Unique + Heuristiques Dropbox Sécurisées
+## Notre Solution : Webhook Centralisé avec Normalisation Avancée
 
-Nous utilisons le webhook JSON comme **seule source de vérité**. Le service normalise les URLs, mais n'automatise que les archives Dropbox qui respectent les critères de sécurité (fallback_url, original_filename, proxy R2). Tout le reste est ignoré en silence pour éviter les téléchargements non contrôlés.
+Nous utilisons `CSVService` comme point de surveillance unique qui normalise toutes les URLs, détecte les doublons via SQLite, et gère les workers de téléchargement avec des heuristiques de sécurité. Le service garantit la cohérence des données tout en supportant la diversité des sources.
 
 ### ❌ Multi-sources non contrôlées (anti-pattern)
 ```python
@@ -20,23 +20,42 @@ if url.startswith('https://swisstransfer.com/'):
 # Résultat : téléchargements incontrôlés, sécurité compromise
 ```
 
-### ✅ Webhook-only avec heuristiques (pattern recommandé)
+### ✅ Webhook centralisé avec normalisation (pattern recommandé)
 ```python
-# Approche sécurisée - filtrage strict
-if _is_dropbox_proxy_url(url) and _looks_like_archive_download(url):
-    download_worker(url)  # Dropbox sécurisé uniquement
-else:
-    log_url_only(url)  # Archive sans téléchargement
-# Résultat : traçabilité totale, zéro risque
+# Approche robuste - normalisation + déduplication
+class CSVService:
+    def __init__(self, download_history_repo: DownloadHistoryRepository):
+        self._repo = download_history_repo
+        self._processed_urls = set()
+    
+    def process_webhook_entry(self, entry: dict) -> None:
+        # Normalisation URL avancée
+        normalized_url = self._normalize_url(entry['url'])
+        
+        # Détection doublon SQLite
+        if self._repo.url_exists(normalized_url):
+            logger.info(f"URL already processed: {normalized_url}")
+            return
+        
+        # Détection source et heuristiques
+        source = self._detect_url_source(normalized_url)
+        if self._should_download(source, normalized_url):
+            self._queue_download(normalized_url, entry)
+        
+        # Persistance atomique
+        self._repo.save_url_entry(normalized_url, source, entry)
 ```
 
-### Flux de Monitoring Webhook-Only
+### Flux de Monitoring Intelligent
 
 1. **Webhook JSON** : Source unique depuis webhook.kidpixel.fr
-2. **Normalisation** : `_normalize_url()` gère le double encodage et les variantes Dropbox
-3. **Heuristiques Dropbox** : `_check_csv_for_downloads()` filtre pour les archives conformes uniquement
-4. **WorkflowState** : Suivi actif des téléchargements pour éviter les doublons
-5. **SQLite** : Persistance atomique via `download_history_repository`
+2. **Normalisation URL** : Gère double encodage, paramètres variants, proxies
+3. **Détection doublons** : Vérification SQLite avant traitement
+4. **Classification source** : Dropbox/FromSmash/SwissTransfer automatique
+5. **Heuristiques sécurité** : Validation patterns par type de source
+6. **Queue workers** : Téléchargements parallèles avec limitation
+7. **Persistance SQLite** : Écritures atomiques et lectures optimisées
+8. **Monitoring temps réel** : État des workers et progression
 
 ## Utilisation Rapide
 

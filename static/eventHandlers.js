@@ -168,7 +168,7 @@ export function initializeEventHandlers() {
         });
     });
 
-    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, dom.clearCustomSequenceButton);
+    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, null);
     if (clearCustomSequenceButton) {
         clearCustomSequenceButton.addEventListener('click', () => {
             setSelectedStepsOrder([]);
@@ -183,7 +183,7 @@ export function initializeEventHandlers() {
         });
     }
 
-    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, dom.runCustomSequenceButton);
+    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, null);
     if (runCustomSequenceButton) {
         runCustomSequenceButton.addEventListener('click', () => {
             if (getSelectedStepsOrder().length === 0) {
@@ -197,7 +197,7 @@ export function initializeEventHandlers() {
         });
     }
 
-    const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, dom.confirmRunCustomSequenceButton);
+    const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, null);
     const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
     if (confirmRunCustomSequenceButton) {
         confirmRunCustomSequenceButton.addEventListener('click', async () => {
@@ -222,14 +222,14 @@ export function initializeEventHandlers() {
         });
     }
 
-    const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, dom.cancelRunCustomSequenceButton);
+    const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, null);
     if (cancelRunCustomSequenceButton) {
         cancelRunCustomSequenceButton.addEventListener('click', () => {
             closePopupUI(customSequenceConfirmOverlay);
         });
     }
-    const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, dom.closeSummaryPopupButton);
-    const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, dom.sequenceSummaryPopupOverlay);
+    const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, null);
+    const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, null);
     if (closeSummaryPopupButton) {
         closeSummaryPopupButton.addEventListener('click', () => {
             closePopupUI(sequenceSummaryOverlay);

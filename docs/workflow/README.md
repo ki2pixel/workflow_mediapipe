@@ -69,6 +69,7 @@ python app_new.py
 ### ⚙️ **Services** - Composants Métier
 - **[CSV Service](services/csv-service.md)** : Monitoring téléchargements webhook
 - **[Workflow Service](services/workflow-service.md)** : Orchestrateur central du pipeline
+- **[Lemonfox Audio Service](services/lemonfox-audio-service.md)** : Analyse audio Lemonfox/Pyannote
 - **[Results Archiver](services/results-archiver-service.md)** : Archivage automatique
 - **(Archive) [VisualizationService](archives/visualization-service.md)** : Service décommissionné (voir [plan de décommissionnement](DECOMMISSIONING_VISUALIZATION_SERVICE.md))
 
