@@ -1,0 +1,48 @@
+# Universal Fine-Tuning Requirements
+# Dependencies for the universal fine-tuning scripts
+
+# Core ML/AI
+mistralai>=1.0.0
+openai>=1.0.0
+
+# Data processing and validation
+pydantic>=2.0.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Configuration and CLI
+pyyaml>=6.0
+click>=8.0.0
+python-dotenv>=1.0.0
+
+# Text processing and NLP
+nltk>=3.8.0
+tiktoken>=0.5.0
+sentence-transformers>=2.2.0
+
+# Monitoring and metrics
+prometheus-client>=0.17.0
+tqdm>=4.65.0
+
+# Security and encryption
+cryptography>=41.0.0
+passlib>=1.7.4
+
+# Testing and validation
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Development and utilities
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Optional: GPU support (uncomment if needed)
+# torch>=2.0.0
+# transformers>=4.30.0
+# accelerate>=0.20.0
+
+# Optional: Advanced NLP (uncomment if needed)
+# spacy>=3.6.0
+# transformers>=4.30.0
+# datasets>=2.12.0

@@ -1,9 +1,7 @@
 ---
+name: enhance
 description: Améliorer un Prompt avec le Contexte du Projet, Techniques Avancées et Skills Spécialisés
----
-
----
-description: Améliorer un Prompt avec le Contexte du Projet, Techniques Avancées et Skills Spécialisés
+invokable: true
 ---
 
 ### `/enhance` — Optimisation Avancée de Prompt
@@ -11,12 +9,12 @@ description: Améliorer un Prompt avec le Contexte du Projet, Techniques Avancé
    - Lire la requête brute de l'utilisateur.
    - Charger le contexte global via `read_text_file` sur les fichiers de la Memory Bank (`activeContext.md`, `progress.md`, `systemPatterns.md`, etc.).
    - **Détection de Skill** : Analyser la nature de la tâche :
-     - Si **Debugging** (bug, crash, erreur, performance) : Charger immédiatement `.windsurf/skills/debugging-strategies/SKILL.md`.
-     - Si **Architecture** : Charger d'abord `.windsurf/skills/workflow-operator/SKILL.md`, puis chercher les docs d'architecture pertinentes.
-     - Si **Feature** : Identifier et charger le(s) SKILL(s) applicables dans `.windsurf/skills/` (ex: `frontend-timeline-designer`, `logs-overlay-conductor`, `pipeline-diagnostics`, `step4-audio-orchestrator`, `step5-gpu-ops`, `after-effects-scripts`, `after-effects-cep-panel`) avant de chercher les specs fonctionnelles liées.
+     - Si **Debugging** (bug, crash, erreur, performance) : Charger immédiatement `.continue/rules/debugging-strategies.md`.
+     - Si **Architecture** : Charger d'abord `.continue/rules/workflow-operator.md`, puis chercher les docs d'architecture pertinentes.
+     - Si **Feature** : Identifier et charger le(s) SKILL(s) applicables dans `.continue/rules/` (ex: `frontend-timeline-designer`, `logs-overlay-conductor`, `pipeline-diagnostics`, `step4-audio-orchestrator`, `step5-gpu-ops`, `after-effects-scripts`, `after-effects-cep-panel`) avant de chercher les specs fonctionnelles liées.
 
 2. **Recherche Active de Documentation**
-   - Identifier les règles spécifiques au projet via `mcp0_search_files` dans `docs/workflow` et `.windsurf/rules/codingstandards.md`.
+   - Identifier les règles spécifiques au projet via `mcp0_search_files` dans `docs/workflow` et `.continue/rules/codingstandards.md`.
    - Utiliser `read_text_file` sur les documents pertinents trouvés.
    - Si mode **Debugging** activé : Vérifier via `mcp1_search` si les outils mentionnés dans le Skill (ex: configurations de log, profileurs) sont déjà présents dans le code source pour les inclure dans le contexte.
 

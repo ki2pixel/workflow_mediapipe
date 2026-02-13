@@ -1,0 +1,11 @@
+{
+  "job_id": "3466ca39-4ceb-4ed0-9843-ed9ac8afcc55",
+  "status": "QUEUED",
+  "model": "mistral-small-latest",
+  "training_file": "323cadff-37f5-4869-8c6e-0b40542e58ad",
+  "validation_file": "d761c8eb-9fd6-4808-b434-aa93b96ef0d8",
+  "hyperparameters": {
+    "training_steps": 25,
+    "learning_rate": 0.0001
+  }
+}

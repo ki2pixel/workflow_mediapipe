@@ -1,0 +1,236 @@
+# Universal Fine-Tuning Configuration Template
+# Adapt this file for your specific domain
+
+# Training Configuration
+training:
+  # Model selection
+  model: "mistral-small-latest"  # Options: mistral-tiny, mistral-small, mistral-medium
+  
+  # Dataset configuration
+  dataset:
+    path: "dataset/[PROJECT_NAME]_train.jsonl"
+    validation_split: 0.1
+    shuffle: true
+  
+  # Hyperparameters (adapt based on dataset size)
+  hyperparameters:
+    learning_rate: 2e-5
+    batch_size: 4
+    epochs: 3
+    warmup_steps: 100
+    weight_decay: 0.01
+    gradient_accumulation_steps: 1
+    
+  # Domain-specific configuration
+  domain:
+    name: "[DOMAIN]"  # Replace with your domain
+    experience_years: "[EXPERIENCE_YEARS]"  # e.g., "5"
+    expertise_level: "senior"
+    
+    # Distribution 40/35/15/10
+    categories:
+      architecture: 40
+      operations: 35
+      integration: 15
+      best_practices: 10
+    
+    # Key domain elements
+    key_tools: [KEY_TOOLS]  # Replace with your tools
+    patterns: [SPECIFIC_PATTERNS]  # Replace with your patterns
+    concepts: [DOMAIN_CONCEPTS]  # Replace with your concepts
+
+# Evaluation Configuration
+evaluation:
+  # Metrics to track
+  metrics:
+    technical_accuracy: 0.90  # Target: 90%
+    command_precision: 0.95    # Target: 95%
+    domain_knowledge: 0.85     # Target: 85%
+    integration_accuracy: 0.80 # Target: 80%
+  
+  # Testing configuration
+  testing:
+    test_cases_file: "tests/domain_test_cases.json"
+    validation_split: 0.1
+    cross_validation_folds: 5
+    
+  # Quality thresholds
+  thresholds:
+    min_response_length: 100
+    max_response_length: 2000
+    required_keywords: [REQUIRED_KEYWORDS]  # Domain-specific keywords
+
+# Deployment Configuration
+deployment:
+  # Model information
+  model:
+    name: "[PROJECT_NAME]_v1"
+    version: "1.0.0"
+    description: "Specialized LLM for [DOMAIN]"
+    
+  # API configuration
+  api:
+    host: "0.0.0.0"
+    port: 8000
+    workers: 4
+    timeout: 300
+    
+  # Production settings
+  production:
+    model_path: "models/production/[PROJECT_NAME]_v1"
+    backup_enabled: true
+    monitoring_enabled: true
+    health_check_interval: 30
+
+# Monitoring and Logging
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    prometheus_port: 9090
+    collection_interval: 15
+    
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+    format: "json"
+    file: "logs/training.log"
+    rotation: "daily"
+    retention_days: 30
+    
+  # Performance tracking
+  performance:
+    track_inference_time: true
+    track_memory_usage: true
+    track_gpu_utilization: true
+
+# Security Configuration
+security:
+  # API security
+  api:
+    rate_limiting:
+      enabled: true
+      requests_per_minute: 100
+    authentication:
+      enabled: true
+      method: "jwt"  # jwt, api_key, oauth2
+    encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+  
+  # Data security
+  data:
+    encryption_at_rest: true
+    encryption_in_transit: true
+    key_rotation_days: 90
+    
+  # Access control
+  access_control:
+    principle_of_least_privilege: true
+    rbac_enabled: true
+    audit_logging: true
+
+# Development Configuration
+development:
+  # Environment settings
+  environment:
+    name: "development"
+    debug: true
+    verbose_logging: true
+    
+  # Testing settings
+  testing:
+    unit_test_coverage: 0.80
+    integration_test_enabled: true
+    end_to_end_test_enabled: false
+    
+  # Code quality
+  code_quality:
+    linting:
+      enabled: true
+      tools: ["black", "flake8", "mypy"]
+    formatting:
+      enabled: true
+      tool: "black"
+    type_checking:
+      enabled: true
+      tool: "mypy"
+
+# Resource Configuration
+resources:
+  # Compute requirements
+  compute:
+    cpu_cores: 4
+    memory_gb: 16
+    gpu_enabled: false  # Set to true for GPU training
+    
+  # Storage requirements
+  storage:
+    dataset_size_gb: 1
+    model_size_gb: 5
+    logs_size_gb: 2
+    
+  # Network requirements
+  network:
+    bandwidth_mbps: 100
+    latency_ms: 50
+
+# Cost and Optimization
+optimization:
+  # Cost optimization
+  cost:
+    budget_usd_per_month: 100
+    spot_instances_enabled: false
+    
+  # Performance optimization
+  performance:
+    model_quantization: false  # Enable for smaller models
+    inference_optimization: true
+    caching_enabled: true
+    
+  # Resource optimization
+  resources:
+    auto_scaling: false
+    load_balancing: false
+    cdn_enabled: false
+
+# Integration Settings
+integrations:
+  # External services
+  external_services:
+    - name: "monitoring"
+      type: "prometheus"
+      enabled: true
+    - name: "logging"
+      type: "elasticsearch"
+      enabled: false
+    - name: "storage"
+      type: "s3"
+      enabled: false
+      
+  # APIs and bridges
+  apis:
+    - name: "[DOMAIN]_api"
+      version: "v1"
+      base_url: "http://localhost:8000"
+      authentication: "bearer_token"
+
+# Backup and Recovery
+backup:
+  # Backup configuration
+  schedule:
+    enabled: true
+    frequency: "daily"  # hourly, daily, weekly
+    retention_days: 30
+    
+  # Storage settings
+  storage:
+    type: "local"  # local, s3, gcs, azure
+    path: "backups/"
+    encryption: true
+    
+  # Recovery settings
+  recovery:
+    point_in_time_recovery: true
+    automated_failover: false
+    disaster_recovery_plan: true
