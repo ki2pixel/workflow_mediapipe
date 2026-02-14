@@ -8,9 +8,9 @@ invokable: true
 Processus standard pour mettre à jour la branche locale depuis `origin/main` lorsqu'on travaille en hybride local/cloud.
 
 ## Prérequis
-- Git configuré avec le remote `origin`
-- Connaissance de la branche locale active (ex: `git branch --show-current`)
-- Arbre de travail propre ou changements sauvegardés/stashés
+- Git configuré avec le remote `origin` (vérifier avec `run_command "git remote -v"`)
+- Connaissance de la branche locale active (ex: `run_command "git branch --show-current"`)
+- Arbre de travail propre ou changements sauvegardés/stashés (vérifier avec `run_command "git status -sb"`)
 
 ## Étapes
 1. **Vérifier l'état local**

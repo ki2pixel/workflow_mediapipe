@@ -1,8 +1,6 @@
 ---
 description: Operate and debug STEP5 tracking with MediaPipe (CPU) or InsightFace (GPU-only). Use when selecting engines, tuning multiprocessing, or validating STEP5 GPU env vars/logs.
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # STEP5 GPU Ops Skill

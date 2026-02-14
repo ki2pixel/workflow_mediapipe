@@ -1,8 +1,6 @@
 ---
 description: Expert Opérateur certifié v4.1. Lance, monitore et débogue le pipeline MediaPipe en respectant strictement l'architecture Services/State et les environnements virtuels dédiés.
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Workflow MediaPipe Operator (v4.1 Standards Compliant)

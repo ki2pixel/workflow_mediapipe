@@ -1,8 +1,6 @@
 ---
 description: Docs Updater (Context-Aware with Code Verification)
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Workflow Docs Updater Plus

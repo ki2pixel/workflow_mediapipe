@@ -138,7 +138,7 @@ domBatcher.scheduleUpdate(() => {
 ### Politique d'utilisation des Skills
 1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre.
 2. **Debugging systématique** : Charger `.continue/rules/debugging-strategies.md` pour bug/crash.
-3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer`, `after-effects-scripts`, `after-effects-cep-panel` selon la tâche.
+3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer`, `after-effects-scripts`, `after-effects-cep-panel`, `logs-overlay-conductor`, `workflow-docs-updater-plus`, `csv-monitoring-sme`, `debugging-strategies`, `step4-audio-orchestrator`, `tests-suite-guardian`, `workflow-operator`, `documentation` selon la tâche.
 4. **Fallback contrôlé** : Skills globales uniquement si aucune skill locale ne couvre le besoin.
 5. **Hiérarchie** : `workflow-operator` > Skills locales > Règles ce doc > Docs > Skills globales.
 

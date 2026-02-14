@@ -1,8 +1,6 @@
 ---
 description: pipeline-diagnostics skill migrated from Windsurf as contextual rules
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Pipeline Diagnostics Skill

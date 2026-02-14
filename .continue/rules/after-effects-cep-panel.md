@@ -1,8 +1,8 @@
 ---
 description: after-effects-cep-panel skill migrated from Windsurf as contextual rules
 globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+  - "**/*.{html,css,js}"
+alwaysApply: false
 ---
 
 # After Effects CEP Panel Expert (Media Solution v12.0)

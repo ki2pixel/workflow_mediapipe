@@ -12,19 +12,19 @@ Créer un bundle optimisé du codebase pour analyse par LLMs externes (Claude, C
 ## Étapes
 
 1. **Vérification de la configuration**
-   - Confirmer que `repomix.config.json` existe et est à jour
-   - Vérifier les patterns d'inclusion/exclusion
+   - Confirmer que `repomix.config.json` existe et est à jour avec `read_text_file`
+   - Vérifier les patterns d'inclusion/exclusion avec `read_text_file`
 
 2. **Génération du bundle**
    // turbo
    ```bash
-   npx repomix --config repomix.config.json
+   run_command "npx repomix --config repomix.config.json"
    ```
 
 3. **Vérification du résultat**
-   - Contrôler que `repomix-output.md` a été généré
-   - Vérifier la taille et le compte de tokens
-   - Valider que les fichiers critiques sont inclus
+   - Contrôler que `repomix-output.md` a été généré avec `list_directory`
+   - Vérifier la taille et le compte de tokens avec `run_command "wc -c repomix-output.md"`
+   - Valider que les fichiers critiques sont inclus avec `search_files`
 
 ## Résultat attendu
 
@@ -37,5 +37,5 @@ Créer un bundle optimisé du codebase pour analyse par LLMs externes (Claude, C
 
 - Le bundle exclut automatiquement: archives, modèles, logs, assets volumineux
 - La configuration utilise `.gitignore` et patterns par défaut pour la sécurité
-- Le header inclut référence aux `codingstandards.md` obligatoires
-- Régénérer après modifications significatives du codebase
+- Le header inclut référence aux `codingstandards.md` obligatoires (vérifier avec `read_text_file`)
+- Régénérer après modifications significatives du codebase (utiliser `search` pour détecter les changements)

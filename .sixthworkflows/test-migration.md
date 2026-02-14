@@ -1,10 +1,14 @@
 # Migration Test Workflow
 
 ## Steps
-1. Verify all rules load correctly
-2. Test skill detection patterns
-3. Validate workflow execution
-4. Check Memory Bank functionality
+
+1. Verify all rules load correctly using `read_text_file`, `read_multiple_files`, `list_directory`, `directory_tree`, `search_files`, `edit_file`, `write_file`, `move_file`, `create_directory`, `search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`, `run_command`
+
+2. Test skill detection patterns using `search_files`, `search`, `advanced-search`, `count-matches`
+
+3. Validate workflow execution using `read_text_file`, `read_multiple_files`, `list_directory`, `directory_tree`, `search_files`, `edit_file`, `write_file`, `move_file`, `create_directory`, `search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`, `run_command`
+
+4. Check Memory Bank functionality using `read_text_file`, `read_multiple_files`, `list_directory`, `directory_tree`, `search_files`, `edit_file`, `write_file`, `move_file`, `create_directory`, `search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`, `run_command`
 
 ## Validation Commands
 ```bash

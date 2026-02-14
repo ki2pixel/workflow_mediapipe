@@ -1,8 +1,6 @@
 ---
 description: csv-monitoring-sme skill migrated from Windsurf as contextual rules
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # CSV Monitoring SME

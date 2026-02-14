@@ -1,8 +1,8 @@
 ---
 description: after-effects-scripts skill migrated from Windsurf as contextual rules
 globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+  - "**/*.{jsx,ts}"
+alwaysApply: false
 ---
 
 # After Effects Scripts Expert (Post-Production MediaPipe v4.3)

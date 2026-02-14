@@ -1,8 +1,8 @@
 ---
 description: frontend-timeline-designer skill migrated from Windsurf as contextual rules
 globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+  - "**/*.{html,css,js,mjs}"
+alwaysApply: false
 ---
 
 # Frontend Timeline Designer

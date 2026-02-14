@@ -1,8 +1,6 @@
 ---
 description: debugging-strategies skill migrated from Windsurf as contextual rules
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Debugging Strategies

@@ -3,7 +3,7 @@
 > Ce workflow harmonise la documentation en utilisant l'analyse statique standard (`cloc`, `radon`, `tree`) pour la précision technique et les modèles de référence pour la qualité éditoriale.
 
 ## 🚨 Protocoles Critiques
-1.  **Outils autorisés** : L'usage de `run_command` est **strictement limité** aux commandes d'audit : `tree`, `cloc`, `radon`, `ls`.
+1.  **Outils autorisés** : MCP filesystem (`read_text_file`, `read_multiple_files`, `list_directory`, `directory_tree`, `search_files`, `edit_file`, `write_file`, `move_file`, `create_directory`), MCP ripgrep (`search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `ls`).
 2.  **Contexte** : Charger la Memory Bank (`productContext.md`, `systemPatterns.md`, `activeContext.md`, `progress.md`) via `read_file` avant toute action.
 3.  **Source de Vérité** : Le Code (analysé par outils) > La Documentation existante > La Mémoire.
 
@@ -24,10 +24,9 @@ Lancer les commandes suivantes pour ignorer les dossiers de données (ex: "Camil
 ## Étape 2 — Diagnostic Triangulé
 Comparer les sources pour détecter les incohérences :
 
-| Source | Rôle | Outil |
-| :--- | :--- | :--- |
 | **Intention** | Le "Pourquoi" | `read_file` (Memory Bank) |
-| **Réalité** | Le "Quoi" & "Comment" | `radon` (complexité), `cloc` (volume), `code_search` |
+| :--- | :--- | :--- |
+| **Réalité** | Le "Quoi" & "Comment" | `radon` (complexité), `cloc` (volume), `search_files` |
 | **Existant** | L'état actuel | `find_by_name` (sur `docs/workflow`), `read_file` |
 
 **Action** : Identifier les divergences. Ex: "Le service `transnetv2_library.py` est complexe (Radon C) mais absent de la doc technique."
@@ -65,7 +64,7 @@ Générer un plan de modification avant d'appliquer :
 ```
 
 ## Étape 5 — Application et Finalisation
-1.  **Exécution** : Après validation, utiliser `apply_patch` ou `multi_edit`.
+1.  **Exécution** : Après validation, utiliser `edit_file` ou `multi_edit`.
 2.  **Mise à jour Memory Bank** :
     - Si une dette technique importante est découverte via `radon` (Score D/F), ajouter impérativement une entrée dans `decisionLog.md` ou `systemPatterns.md`.
 

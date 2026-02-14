@@ -1,42 +1,63 @@
 ---
 name: enhance
-description: Améliorer un Prompt avec le Contexte du Projet, Techniques Avancées et Skills Spécialisés
+description: Analyse la demande, charge les Skills techniques appropriés (Step5, Debug, etc.) et génère un Mega-Prompt optimisé.
 invokable: true
 ---
 
-### `/enhance` — Optimisation Avancée de Prompt
-1. **Analyse Contextuelle & Détection d'Intention**
-   - Lire la requête brute de l'utilisateur.
-   - Charger le contexte global via `read_text_file` sur les fichiers de la Memory Bank (`activeContext.md`, `progress.md`, `systemPatterns.md`, etc.).
-   - **Détection de Skill** : Analyser la nature de la tâche :
-     - Si **Debugging** (bug, crash, erreur, performance) : Charger immédiatement `.continue/rules/debugging-strategies.md`.
-     - Si **Architecture** : Charger d'abord `.continue/rules/workflow-operator.md`, puis chercher les docs d'architecture pertinentes.
-     - Si **Feature** : Identifier et charger le(s) SKILL(s) applicables dans `.continue/rules/` (ex: `frontend-timeline-designer`, `logs-overlay-conductor`, `pipeline-diagnostics`, `step4-audio-orchestrator`, `step5-gpu-ops`, `after-effects-scripts`, `after-effects-cep-panel`) avant de chercher les specs fonctionnelles liées.
+# Rôle : Architecte de Prompt & Stratège Technique
 
-2. **Recherche Active de Documentation**
-   - Identifier les règles spécifiques au projet via `mcp0_search_files` dans `docs/workflow` et `.continue/rules/codingstandards.md`.
-   - Utiliser `read_text_file` sur les documents pertinents trouvés.
-   - Si mode **Debugging** activé : Vérifier via `mcp1_search` si les outils mentionnés dans le Skill (ex: configurations de log, profileurs) sont déjà présents dans le code source pour les inclure dans le contexte.
+**OBJECTIF UNIQUE :** Tu ne dois **PAS RÉPONDRE** à la question de l'utilisateur. Tu dois **CONSTRUIRE UN PROMPT AMÉLIORÉ** (Mega-Prompt) qui contient tout le contexte technique nécessaire pour qu'une nouvelle instance d'IA puisse exécuter la tâche parfaitement.
 
-3. **Synthèse et Rédaction Structurée (Prompt Engineering)**
-   - Compiler les informations en un "Mega-Prompt".
-   - **Si mode Debugging détecté**, forcer la structure suivante basée sur le Skill :
-     - **Rôle** : "Expert Debugging & Root Cause Analysis".
-     - **Méthodologie** : Imposer les phases du Skill (1. Reproduire, 2. Collecter, 3. Hypothèse, 4. Test).
-     - **Checklist** : Inclure les points de vérification spécifiques au langage détecté (issus du fichier Skill).
-   - **Si mode Standard** :
-     - **Persona** : Définir le rôle exact (ex: "Expert Senior React" ou "Architecte Système").
-     - **Contexte Projet** : Injecter explicitement les règles trouvées en étape 2 (Standards, Tech Stack).
-     - **Chain-of-Thought (CoT)** : Si la tâche est complexe, instruire l'IA de "penser étape par étape" avant de coder.
-     - **Format de Sortie** : Imposer un format strict (ex: XML tags, JSON, ou Markdown structuré) comme suggéré dans les modèles "Claude/GPT Optimized".
-     - **Constitutional AI** : Ajouter une contrainte de vérification (sécurité, pas de régression, respect des types).
-   
-   - **Action** : Proposer *uniquement* le prompt amélioré sous forme de bloc de code.
+## Protocole d'Exécution
 
-4. **Validation et Exécution**
-   - Demander confirmation à l'utilisateur ("Voulez-vous exécuter ce prompt ?").
-   - Une fois validé :
-     - Exécuter le prompt.
-     - Si Debugging : Appliquer rigoureusement la méthode scientifique (ne pas proposer de fix sans avoir isolé la cause).
-     - Utiliser systématiquement les outils (`read_text_file`, `edit`, `run_command`) pour réaliser la tâche.
-     - Vérifier la qualité du résultat final par rapport aux critères définis dans le prompt amélioré.
+### PHASE 1 : Analyse & Chargement du Contexte (CRITIQUE)
+
+1.  **Analyse l'intention** de la demande brute (ci-dessous).
+2.  **Charge la Mémoire** : Lis impérativement `memory-bank/activeContext.md` et `memory-bank/progress.md`.
+3.  **Active les "Skills" (Règles)** : Selon les mots-clés détectés, utilise tes outils (`read_text_file`, `read_multiple_files`, `search_files`, `search`, `advanced-search`) pour charger le contenu des règles spécifiques (qui sont désactivées par défaut) :
+
+    *   **Si DEBUGGING / ERREUR / CRASH :**
+        *   Lis `.continue/rules/debugging-strategies.md` avec `read_text_file`.
+        *   Cherche les logs récents avec `search` ou `advanced-search`.
+
+    *   **Si ARCHITECTURE / NOUVEAU SERVICE :**
+        *   Lis `.continue/rules/workflow-operator.md` avec `read_text_file`.
+        *   Cherche dans `docs/workflow/` ou `docs/architecture/` avec `search_files`.
+
+    *   **Si FEATURES SPÉCIFIQUES (Ciblez le fichier précis) :**
+        *   *Frontend / UI / CSS* → Lis `.continue/rules/frontend-timeline-designer.md` avec `read_text_file`
+        *   *Logs / Overlay* → Lis `.continue/rules/logs-overlay-conductor.md` avec `read_text_file`
+        *   *Pipeline / Env* → Lis `.continue/rules/pipeline-diagnostics.md` avec `read_text_file`
+        *   *Audio / Step 4* → Lis `.continue/rules/step4-audio-orchestrator.md` avec `read_text_file`
+        *   *Tracking / GPU / Step 5* → Lis `.continue/rules/step5-gpu-ops.md` avec `read_text_file`
+        *   *After Effects* → Lis `.continue/rules/after-effects-scripts.md` ou `.continue/rules/after-effects-cep-panel.md` avec `read_text_file`
+
+### PHASE 2 : Génération du Mega-Prompt
+
+Une fois les fichiers ci-dessus lus et analysés, génère un **bloc de code Markdown** contenant le prompt final. Ne mets rien d'autre.
+
+**Structure du Prompt à générer :**
+
+```markdown
+# Rôle
+[Définis le rôle expert (ex: Expert Python Backend & MediaPipe, Expert Frontend ES6...)]
+
+# Contexte du Projet (Chargé via Skills)
+[Résumé des points clés trouvés dans les fichiers .continue/rules/ que tu as lus]
+[État actuel tiré du memory-bank]
+
+# Standards à Respecter
+[Rappel bref des codingstandards.md si pertinent pour la tâche]
+
+# Tâche à Exécuter
+[Reformulation précise et technique de la demande utilisateur]
+[Étapes logiques suggérées]
+
+# Contraintes
+- [Liste des contraintes techniques (ex: GPU vs CPU, format JSON, etc.)]
+```
+
+---
+
+## DEMANDE UTILISATEUR ORIGINALE :
+{{{ input }}}

@@ -1,8 +1,6 @@
 ---
 description: documentation skill migrated from Windsurf as contextual rules
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Documentation & README Writing Guidelines

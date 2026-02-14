@@ -6,13 +6,13 @@ invokable: true
 
 ### `/end` — Terminer la session et synchroniser la Memory Bank
 1. **Charger le contexte**  
-   - Utiliser `read_text_file` pour ouvrir successivement `memory-bank/productContext.md`, `activeContext.md`, `progress.md`, `decisionLog.md` et `systemPatterns.md`.  
-   - Si d'anciennes décisions doivent être relues, employer `mcp0_search_files` ou `mcp1_search` pour retrouver les sections pertinentes avant modification.
+   - Utiliser `read_text_file` ou `read_multiple_files` pour ouvrir successivement `memory-bank/productContext.md`, `activeContext.md`, `progress.md`, `decisionLog.md` et `systemPatterns.md`.  
+   - Si d'anciennes décisions doivent être relues, employer `search_files`, `search` ou `advanced-search` pour retrouver les sections pertinentes avant modification.
 2. **Exécuter `UMB` conformément aux règles**  
    - Suspendre la tâche en cours puis résumer la session.  
-   - Utiliser `mcp0_search_files`/`mcp1_search` pour identifier les fichiers additionnels à consulter (ex. docs liés à la session).
+   - Utiliser `search_files`/`search` pour identifier les fichiers additionnels à consulter (ex. docs liés à la session).
 3. **Mettre à jour la Memory Bank**  
-   - Modifier chaque fichier concerné via `edit` (remplaçant local d'`edit`/`multi_edit`).  
+   - Modifier chaque fichier concerné via `edit_file`.  
    - Avant chaque modification, relire la portion à éditer avec `read_text_file` pour limiter le diff.  
    - Documenter les décisions, progrès et contexte actif selon le protocole.
 4. **Clôturer la session**  

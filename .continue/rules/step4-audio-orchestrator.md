@@ -1,8 +1,6 @@
 ---
 description: step4-audio-orchestrator skill migrated from Windsurf as contextual rules
-globs: 
-  - "**/*.{py,js,md}"
-alwaysApply: true
+alwaysApply: false
 ---
 
 # STEP4 Audio Orchestrator

@@ -42,8 +42,6 @@ Ce fichier contient les informations essentielles pour les agents d'IA travailla
 
 This project is a complex pipeline spread across 5 virtual environments. You **MUST** route requests to the correct specialized skill in `.sixthskills/` to avoid environment mismatches.
 
-| User Intent / Context | Target Skill File (load with @) | Key Focus |
-|:---|:---|:---|
 | **Run Pipeline / Execute Step** | `.sixthskills/workflow-operator/SKILL.md` | **PRIMARY SKILL**. Command matrix, VENV selection. |
 | **Tracking / STEP5 / GPU / Face** | `.sixthskills/step5-gpu-ops/SKILL.md` | MediaPipe (CPU) vs InsightFace (GPU), `tracking_env_slim`. |
 | **Audio / STEP4 / Diarization** | `.sixthskills/step4-audio-orchestrator/SKILL.md` | Lemonfox vs Pyannote, `audio_env`, GPU profiles. |
@@ -52,6 +50,11 @@ This project is a complex pipeline spread across 5 virtual environments. You **M
 | **UI / Timeline / Logs** | `.sixthskills/frontend-timeline-designer/SKILL.md` | DOMBatcher, AppState, Auto-scroll. |
 | **Tests / Pytest / CI** | `.sixthskills/tests-suite-guardian/SKILL.md` | Environment-specific test runners. |
 | **After Effects / Post-Prod** | `.sixthskills/after-effects-scripts/SKILL.md` | ExtendScript, system.callSystem bridges. |
+| **UI / Logs Overlay** | `.sixthskills/logs-overlay-conductor/SKILL.md` | Logs Overlay Phase 4, focus trap, auto-open. |
+| **Docs Update** | `.sixthskills/workflow-docs-updater-plus/SKILL.md` | Docs Updater with Code Verification. |
+| **After Effects / CEP Extension** | `.sixthskills/after-effects-cep-panel/SKILL.md` | CEP panels for After Effects. |
+| **Debugging / Errors / Crash** | `.sixthskills/debugging-strategies/SKILL.md` | Systematic debugging techniques. |
+| **Writing Docs / README** | `.sixthskills/documentation/SKILL.md` | Technical writing guidelines. |
 
 **Protocol:** If the user asks to "Run step 5", you MUST consult `.sixthskills/workflow-operator/SKILL.md` to get the exact command line with the correct python interpreter.
 
@@ -201,7 +204,7 @@ This project uses **5 isolated Virtual Environments**. NEVER use the system pyth
 ### Politique d'utilisation des Skills
 1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre.
 2. **Debugging systématique** : Charger `.sixthskills/debugging-strategies/SKILL.md` pour bug/crash.
-3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer`, `after-effects-scripts`, `after-effects-cep-panel` selon la tâche.
+3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer`, `after-effects-scripts`, `after-effects-cep-panel`, `logs-overlay-conductor`, `workflow-docs-updater-plus`, `csv-monitoring-sme`, `debugging-strategies`, `step4-audio-orchestrator`, `tests-suite-guardian`, `workflow-operator`, `documentation` selon la tâche.
 4. **Fallback contrôlé** : Skills globales uniquement si aucune skill locale ne couvre le besoin.
 5. **Hiérarchie** : `workflow-operator` > Skills locales > Règles ce doc > Docs > Skills globales.
 
