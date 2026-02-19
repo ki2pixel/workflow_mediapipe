@@ -1,4 +1,5 @@
 ---
+name: tests-suite-guardian
 description: Maintain and execute the backend/frontend test suites with environment-specific runners. Use when wiring pytest skips, running step-specific scripts, or diagnosing failing tests.
 alwaysApply: false
 ---

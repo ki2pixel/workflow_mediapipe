@@ -1,4 +1,5 @@
 ---
+name: frontend-timeline-designer
 description: frontend-timeline-designer skill migrated from Windsurf as contextual rules
 globs: 
   - "**/*.{html,css,js,mjs}"

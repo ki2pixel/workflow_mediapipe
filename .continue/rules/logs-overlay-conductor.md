@@ -1,4 +1,5 @@
 ---
+name: logs-overlay-conductor
 description: logs-overlay-conductor skill migrated from Windsurf as contextual rules
 alwaysApply: false
 ---

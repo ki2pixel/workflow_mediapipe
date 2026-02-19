@@ -33,3 +33,5 @@ description: Operate and refine the unified Logs Overlay (Phases 2-4). Use when 
 
 ## Références
 - `memory-bank/progress.md` (Phases Logs Overlay 2-4, toggle auto-open).
+
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.

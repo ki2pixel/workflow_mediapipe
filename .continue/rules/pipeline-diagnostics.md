@@ -1,4 +1,5 @@
 ---
+name: pipeline-diagnostics
 description: pipeline-diagnostics skill migrated from Windsurf as contextual rules
 alwaysApply: false
 ---

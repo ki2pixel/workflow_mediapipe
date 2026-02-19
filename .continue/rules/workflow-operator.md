@@ -1,4 +1,5 @@
 ---
+name: workflow-operator
 description: Expert Opérateur certifié v4.1. Lance, monitore et débogue le pipeline MediaPipe en respectant strictement l'architecture Services/State et les environnements virtuels dédiés.
 alwaysApply: false
 ---

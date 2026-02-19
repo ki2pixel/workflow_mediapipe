@@ -1,4 +1,5 @@
 ---
+name: after-effects-scripts
 description: after-effects-scripts skill migrated from Windsurf as contextual rules
 globs: 
   - "**/*.{jsx,ts}"

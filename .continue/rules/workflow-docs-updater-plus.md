@@ -1,4 +1,5 @@
 ---
+name: workflow-docs-updater-plus
 description: Docs Updater (Context-Aware with Code Verification)
 alwaysApply: false
 ---

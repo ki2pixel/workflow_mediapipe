@@ -47,3 +47,5 @@
 git diff --stat templates/index_new.html static/css/components/steps.css static/uiUpdater.js
 ```
 - Relecture obligatoire de `memory-bank/progress.md` (entrées Timeline Connectée) pour rester aligné avec la phase courante.
+
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.

@@ -136,9 +136,9 @@ domBatcher.scheduleUpdate(() => {
 - Historique : migrations via script dédié (`scripts/migrate_download_history_to_sqlite.py`).
 
 ### Politique d'utilisation des Skills
-1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre.
+1. **Priorité locale absolue** : Toujours invoquer la skill workspace `.continue/rules/workflow-operator.md` avant toute autre.
 2. **Debugging systématique** : Charger `.continue/rules/debugging-strategies.md` pour bug/crash.
-3. **Catalogue local** : Utiliser `pipeline-diagnostics`, `step5-gpu-ops`, `frontend-timeline-designer`, `after-effects-scripts`, `after-effects-cep-panel`, `logs-overlay-conductor`, `workflow-docs-updater-plus`, `csv-monitoring-sme`, `debugging-strategies`, `step4-audio-orchestrator`, `tests-suite-guardian`, `workflow-operator`, `documentation` selon la tâche.
+3. **Catalogue local** : Utiliser `.continue/rules/pipeline-diagnostics`, `.continue/rules/step5-gpu-ops`, `.continue/rules/frontend-timeline-designer`, `.continue/rules/after-effects-scripts`, `.continue/rules/after-effects-cep-panel`, `.continue/rules/logs-overlay-conductor`, `.continue/rules/workflow-docs-updater-plus`, `.continue/rules/csv-monitoring-sme`, `.continue/rules/debugging-strategies`, `.continue/rules/step4-audio-orchestrator`, `.continue/rules/tests-suite-guardian`, `.continue/rules/workflow-operator`, `.continue/rules/documentation` selon la tâche.
 4. **Fallback contrôlé** : Skills globales uniquement si aucune skill locale ne couvre le besoin.
 5. **Hiérarchie** : `workflow-operator` > Skills locales > Règles ce doc > Docs > Skills globales.
 

@@ -1,4 +1,5 @@
 ---
+name: debugging-strategies
 description: debugging-strategies skill migrated from Windsurf as contextual rules
 alwaysApply: false
 ---

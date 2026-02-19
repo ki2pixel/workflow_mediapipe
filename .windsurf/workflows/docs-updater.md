@@ -2,18 +2,24 @@
 description: Docs Updater, Standard Tools, Cloc Radon, Quality Context
 ---
 
----
-description: Docs Updater (Standard Tools: Cloc/Radon + Quality Context)
----
-
 # Workflow: Docs Updater — Standardized & Metric-Driven
 
 > Ce workflow harmonise la documentation en utilisant l'analyse statique standard (`cloc`, `radon`, `tree`) pour la précision technique et les modèles de référence pour la qualité éditoriale.
 
 ## 🚨 Protocoles Critiques
-1.  **Outils autorisés** : MCP filesystem (`read_text_file`, `read_multiple_files`, `list_directory`, `directory_tree`, `search_files`, `edit_file`, `write_file`, `move_file`, `create_directory`), MCP ripgrep (`search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `ls`).
-2.  **Contexte** : Charger la Memory Bank (`productContext.md`, `systemPatterns.md`, `activeContext.md`, `progress.md`) via `read_text_file` avant toute action.
+1.  **Outils autorisés** : MCP fast-filesystem (`mcp0_fast_read_file`, `mcp0_fast_read_multiple_files`, `mcp0_fast_list_directory`, `mcp0_fast_get_directory_tree`, `mcp0_fast_search_files`, `mcp0_fast_edit_block`, `mcp0_fast_write_file`, `mcp0_fast_move_file`, `mcp0_fast_create_directory`), MCP ripgrep (`mcp9_search`, `mcp9_advanced-search`, `mcp9_count-matches`, `mcp9_list-files`, `mcp9_list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `ls`).
+2.  **Contexte** : Initialiser le contexte en appelant l'outil mcp0_fast_read_file du serveur memory-bank pour lire UNIQUEMENT activeContext.md. Ne lire les autres fichiers de la Memory Bank que si une divergence majeure est détectée lors du diagnostic.
 3.  **Source de Vérité** : Le Code (analysé par outils) > La Documentation existante > La Mémoire.
+4.  **Sécurité Memory Bank** : Utilisez les outils fast-filesystem (mcp0_fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.
+
+### Migration filesystem → fast-filesystem
+
+| Aspect | Outils filesystem | Outils fast-filesystem | Trade-offs |
+|--------|------------------|------------------------|------------|
+| **Performance** | Appels individuels | Traitement par lot avec chunking auto | ✅ + Optimisé pour gros volumes |
+| **Fiabilité** | Risque d'erreurs manuelles | Vérification intégrée + backup automatique | ✅ + Sécurité renforcée |
+| **Fonctionnalités** | Base standard | Fonctionnalités avancées (compression, sync, recherche avancée) | ✅ + Capacités étendues |
+| **Maintenance** | Outils génériques | Spécialisés MCP avec verrous | ✅ + Cohérence architecture |
 
 ## Étape 1 — Audit Structurel et Métrique
 Lancer les commandes suivantes pour ignorer les dossiers de données (ex: "Camille...", "assets") et cibler le cœur applicatif.
@@ -34,9 +40,9 @@ Comparer les sources pour détecter les incohérences :
 
 | Source | Rôle | Outil |
 | :--- | :--- | :--- |
-| **Intention** | Le "Pourquoi" | `read_text_file` (Memory Bank) |
-| **Réalité** | Le "Quoi" & "Comment" | `radon` (complexité), `cloc` (volume), `mcp0_search_files` |
-| **Existant** | L'état actuel | `mcp0_search_files` (sur `docs/workflow`), `read_text_file` |
+| **Intention** | Le "Pourquoi" | `mcp0_fast_read_file` (via MCP) |
+| **Réalité** | Le "Quoi" & "Comment" | `radon` (complexité), `cloc` (volume), `mcp0_fast_search_files` |
+| **Existant** | L'état actuel | `mcp0_fast_search_files` (sur `docs/workflow`), `mcp0_fast_read_file` |
 
 **Action** : Identifier les divergences. Ex: "Le service `transnetv2_library.py` est complexe (Radon C) mais absent de la doc technique."
 
@@ -73,9 +79,9 @@ Générer un plan de modification avant d'appliquer :
 ```
 
 ## Étape 5 — Application et Finalisation
-1.  **Exécution** : Après validation, utiliser `edit` ou `multi_edit`.
+1.  **Exécution** : Après validation, utiliser `mcp0_fast_edit_block` ou `mcp0_fast_edit_blocks`.
 2.  **Mise à jour Memory Bank** :
-    - Si une dette technique importante est découverte via `radon` (Score D/F), ajouter impérativement une entrée dans `decisionLog.md` ou `systemPatterns.md`.
+    - Mettre à jour la Memory Bank en utilisant EXCLUSIVEMENT l'outil mcp0_fast_edit_block.
 
 ### Sous-protocole Rédaction — Application de documentation/SKILL.md
 

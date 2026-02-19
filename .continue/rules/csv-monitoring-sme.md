@@ -1,4 +1,5 @@
 ---
+name: csv-monitoring-sme
 description: csv-monitoring-sme skill migrated from Windsurf as contextual rules
 alwaysApply: false
 ---

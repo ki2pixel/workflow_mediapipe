@@ -23,3 +23,5 @@
 - [ ] Résumer les fichiers modifiés + sections clé dans le ticket/PR.
 - [ ] Inclure les commandes/tests exécutés.
 - [ ] Lister les follow-ups éventuels (ex: screenshots manquants, migrations docs futures).
+
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.

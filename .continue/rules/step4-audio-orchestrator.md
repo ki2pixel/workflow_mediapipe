@@ -1,4 +1,5 @@
 ---
+name: step4-audio-orchestrator
 description: step4-audio-orchestrator skill migrated from Windsurf as contextual rules
 alwaysApply: false
 ---

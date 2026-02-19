@@ -1,4 +1,5 @@
 ---
+name: after-effects-cep-panel
 description: after-effects-cep-panel skill migrated from Windsurf as contextual rules
 globs: 
   - "**/*.{html,css,js}"
