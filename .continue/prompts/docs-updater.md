@@ -6,13 +6,13 @@ invokable: true
 
 # Workflow: Docs Updater — Standardized & Metric-Driven
 
-> Ce workflow harmonise la documentation en utilisant l'analyse statique standard (`cloc`, `radon`, `tree`) pour la précision technique et les modèles de référence pour la qualité éditoriale.
+> Ce workflow harmonise la documentation en utilisant l'analyse statique standard (`cloc`, `radon`, `tree`) étendue avec fast-filesystem et ripgrep pour la précision technique et les modèles de référence pour la qualité éditoriale. Couvre désormais l'ensemble du codebase incluant docs/, et tests pour éviter les lacunes de documentation.
 
 ## 🚨 Protocoles Critiques
-1.  **Outils autorisés** : MCP fast-filesystem (`mcp0_fast_read_file`, `mcp0_fast_read_multiple_files`, `mcp0_fast_list_directory`, `mcp0_fast_get_directory_tree`, `mcp0_fast_search_files`, `mcp0_fast_edit_block`, `mcp0_fast_write_file`, `mcp0_fast_move_file`, `mcp0_fast_create_directory`), MCP ripgrep (`mcp9_search`, `mcp9_advanced-search`, `mcp9_count-matches`, `mcp9_list-files`, `mcp9_list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `ls`).
-2.  **Contexte** : Initialiser le contexte en appelant l'outil mcp0_fast_read_file du serveur memory-bank pour lire UNIQUEMENT activeContext.md. Ne lire les autres fichiers de la Memory Bank que si une divergence majeure est détectée lors du diagnostic.
+1.  **Outils autorisés** : MCP fast-filesystem (`fast_read_file`, `fast_read_multiple_files`, `fast_list_directory`, `fast_get_directory_tree`, `fast_search_files`, `fast_edit_block`, `fast_write_file`, `fast_move_file`, `fast_create_directory`), MCP ripgrep (`search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `find`, `ls`).
+2.  **Contexte** : Initialiser le contexte en appelant l'outil fast_read_file du serveur memory-bank pour lire UNIQUEMENT activeContext.md. Ne lire les autres fichiers de la Memory Bank que si une divergence majeure est détectée lors du diagnostic.
 3.  **Source de Vérité** : Le Code (analysé par outils) > La Documentation existante > La Mémoire.
-4.  **Sécurité Memory Bank** : Utilisez les outils fast-filesystem (mcp0_fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.
+4.  **Sécurité Memory Bank** : Utilisez les outils fast-filesystem (fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.
 
 ### Migration filesystem → fast-filesystem
 
@@ -24,27 +24,51 @@ invokable: true
 | **Maintenance** | Outils génériques | Spécialisés MCP avec verrous | ✅ + Cohérence architecture |
 
 ## Étape 1 — Audit Structurel et Métrique
-Lancer les commandes suivantes pour ignorer les dossiers de données (ex: "Camille...", "assets") et cibler le cœur applicatif.
+Lancer les commandes suivantes pour ignorer les dossiers de données (ex: "Camille...", "assets") et cibler le cœur applicatif, étendu avec scanning large pour couvrir les répertoires scripts potentiellement manqués.
 
 1.  **Cartographie (Filtre Bruit)** :
     - `run_command "tree -L 2 -I '__pycache__|venv|node_modules|.git|logs|debug|assets|*_output|*Camille*|transnet*|test*'"`
     - *But* : Visualiser uniquement l'architecture logicielle (`services`, `routes`, `utils`, `workflow_scripts`).
-2.  **Volumétrie (Code Source)** :
+
+2.  **Cartographie Étendue (Fast-Filesystem)** :
+    - `fast_get_directory_tree(path="/home/kidpixel/workflow_mediapipe", max_depth=3, include_files=false, exclude_patterns=["__pycache__", "venv", "node_modules", ".git", "logs", "debug", "assets", "*_output", "*Camille*", "transnet*", "test*"])`
+    - *But* : Explorer récursivement la structure complète avec focus sur docs/, tests/, et sous-répertoires de scripts/.
+
+3.  **Scan des Scripts Manqués** :
+    - `fast_list_directory(path="/home/kidpixel/workflow_mediapipe/scripts", pattern="*.py|*.sh", show_hidden=false)`
+    - `fast_list_directory(path="/home/kidpixel/workflow_mediapipe/workflow_scripts", pattern="*.py", show_hidden=false)`
+    - *But* : Identifier tous les scripts exécutables dans scripts/ et workflow_scripts/ pour couverture complète.
+
+4.  **Volumétrie (Code Source)** :
     - `run_command "cloc services routes utils config scripts workflow_scripts static templates --md"`
     - *But* : Quantifier le code réel (Python vs JS) sans scanner les backups ou CSV.
-3.  **Complexité Cyclomatique (Python Core)** :
+
+5.  **Volumétrie Étendue (Documentation & Tests)** :
+    - `run_command "cloc docs tests --md"`
+    - *But* : Mesurer la volumétrie des zones documentation et tests pour équilibrer les efforts de mise à jour.
+
+6.  **Complexité Cyclomatique (Python Core)** :
     - `run_command "radon cc services routes utils workflow_scripts -a -nc"`
     - *But* : Repérer les points chauds (Score C/D/F).
     - **Règle** : Si Score > 10 (C), la doc DOIT expliquer la logique interne, pas juste les entrées/sorties.
+
+7.  **Analyse Patterns Large (Ripgrep)** :
+    - `advanced-search(pattern="class|def|function", path="/home/kidpixel/workflow_mediapipe", file_pattern="*.py", context=1)`
+    - `advanced-search(pattern="TODO|FIXME|HACK", path="/home/kidpixel/workflow_mediapipe", file_pattern="*.py|*.js|*.md", context=0)`
+    - *But* : Détecter les patterns architecturaux et marqueurs de dette technique à travers le codebase élargi.
+
+8.  **Fichiers Récemment Modifiés** :
+    - `run_command "find /home/kidpixel/workflow_mediapipe -name '*.py' -o -name '*.js' -o -name '*.md' -mtime -30 -type f | head -20"`
+    - *But* : Identifier les fichiers modifiés récemment (30 derniers jours) pour prioriser les zones nécessitant des mises à jour documentation.
 
 ## Étape 2 — Diagnostic Triangulé
 Comparer les sources pour détecter les incohérences :
 
 | Source | Rôle | Outil |
 | :--- | :--- | :--- |
-| **Intention** | Le "Pourquoi" | `mcp0_fast_read_file` (via MCP) |
-| **Réalité** | Le "Quoi" & "Comment" | `radon` (complexité), `cloc` (volume), `mcp0_fast_search_files` |
-| **Existant** | L'état actuel | `mcp0_fast_search_files` (sur `docs/workflow`), `mcp0_fast_read_file` |
+| **Intention** | Le "Pourquoi" | `fast_read_file` (via MCP) |
+| **Réalité** | Le "Quoi" & "Comment" | `radon` (complexité), `cloc` (volume), `fast_search_files` |
+| **Existant** | L'état actuel | `fast_search_files` (sur `docs/workflow`), `fast_read_file` |
 
 **Action** : Identifier les divergences. Ex: "Le service `transnetv2_library.py` est complexe (Radon C) mais absent de la doc technique."
 
@@ -77,18 +101,18 @@ Générer un plan de modification avant d'appliquer :
 - **Correction** :
   ```markdown
   [Contenu proposé respectant le standard choisi]
-  ```
+```
 
 ## Étape 5 — Application et Finalisation
-1.  **Exécution** : Après validation, utiliser `mcp0_fast_edit_block` ou `mcp0_fast_edit_blocks`.
+1.  **Exécution** : Après validation, utiliser `fast_edit_block` ou `fast_edit_blocks`.
 2.  **Mise à jour Memory Bank** :
-    - Mettre à jour la Memory Bank en utilisant EXCLUSIVEMENT l'outil mcp0_fast_edit_block.
+    - Mettre à jour la Memory Bank en utilisant EXCLUSIVEMENT l'outil fast_edit_block.
 
 ### Sous-protocole Rédaction — Application de documentation/SKILL.md
 
 #### 5.1 Point d'Entrée Explicite
 - **Mode Rédaction** : Déclenché après validation du plan de mise à jour.
-- **Lecture obligatoire** : `.continue/rules/documentation.md`.
+- **Lecture obligatoire** : `.windsurf/skills/documentation/SKILL.md`.
 - **Modèle à appliquer** : Spécifié dans le plan (article deep-dive, README, fiche technique, etc.).
 
 #### 5.2 Checkpoints Obligatoires
@@ -113,6 +137,6 @@ Dans la proposition de mise à jour (Étape 4), ajouter :
 - **Éléments appliqués** : TL;DR ✔, Problem-First ✔, Comparaison ✔, Trade-offs ✔, Golden Rule ✔
 
 #### 5.4 Hook d'Automation
-- **Validation Git** : Commentaire de commit « Guidé par documentation.md — sections: [liste] »
+- **Validation Git** : Commentaire de commit « Guidé par documentation/SKILL.md — sections: [liste] »
 - **Blocking** : Le workflow ne peut pas se terminer si les checkpoints ne sont pas cochés
 - **Audit trail** : Chaque fichier modifié contient une note de validation interne

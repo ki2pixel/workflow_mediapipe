@@ -1,91 +1,109 @@
-# CSV Service - Monitoring Temps Réel et Historique
+# CSV Service Documentation
 
-**TL;DR** : Service de monitoring temps réel qui surveille le webhook JSON, normalise les URLs complexes, et persiste l'historique dans SQLite avec détection des doublons et support multi-sources (Dropbox, FromSmash, SwissTransfer).
+## TL;DR
+Le CSV Service gère la surveillance et le téléchargement automatique des fichiers CSV depuis des sources webhook, avec normalisation URL complexe pour éviter les doublons et logique de filtrage strict pour les téléchargements automatiques (Dropbox uniquement).
 
-## Le Problème : Monitoring Fragmenté et URLs Complexes
+## Contexte Métier
+Le service traite des flux de données CSV provenant de webhooks externes, contenant des URLs de fichiers multimédia (vidéos, audio). Le défi principal est de détecter les nouveaux téléchargements éligibles tout en évitant les doublons dus aux variations d'URLs (encodage HTML, paramètres query, etc.).
 
-Tu as plusieurs sources de téléchargements (Dropbox proxy, FromSmash, SwissTransfer) avec des URLs complexes (double encodage, paramètres variables) et un historique fragmenté. Tu as besoin d'une source unique de vérité avec normalisation automatique et déduplication intelligente.
+## Architecture Service
 
-## Notre Solution : Webhook Centralisé avec Normalisation Avancée
+### Responsabilités
+- Surveillance des données CSV webhook
+- Normalisation d'URLs pour déduplication
+- Téléchargement automatique sélectif (Dropbox uniquement)
+- Gestion historique des téléchargements
 
-Nous utilisons `CSVService` comme point de surveillance unique qui normalise toutes les URLs, détecte les doublons via SQLite, et gère les workers de téléchargement avec des heuristiques de sécurité. Le service garantit la cohérence des données tout en supportant la diversité des sources.
+### Fonctions Clés
 
-### ❌ Multi-sources non contrôlées (anti-pattern)
-```python
-# Approche dangereuse - téléchargements automatiques
-if url.startswith('https://fromsmash.com/'):
-    download_worker(url)  # Pas de contrôle !
-if url.startswith('https://swisstransfer.com/'):
-    download_worker(url)  # Risque élevé !
-# Résultat : téléchargements incontrôlés, sécurité compromise
-```
+#### `_normalize_url(url: str) -> str` (Complexité F)
+**Rôle** : Normalise les URLs pour prévenir les doublons dus aux variations mineures.
 
-### ✅ Webhook centralisé avec normalisation (pattern recommandé)
-```python
-# Approche robuste - normalisation + déduplication
-class CSVService:
-    def __init__(self, download_history_repo: DownloadHistoryRepository):
-        self._repo = download_history_repo
-        self._processed_urls = set()
-    
-    def process_webhook_entry(self, entry: dict) -> None:
-        # Normalisation URL avancée
-        normalized_url = self._normalize_url(entry['url'])
-        
-        # Détection doublon SQLite
-        if self._repo.url_exists(normalized_url):
-            logger.info(f"URL already processed: {normalized_url}")
-            return
-        
-        # Détection source et heuristiques
-        source = self._detect_url_source(normalized_url)
-        if self._should_download(source, normalized_url):
-            self._queue_download(normalized_url, entry)
-        
-        # Persistance atomique
-        self._repo.save_url_entry(normalized_url, source, entry)
-```
+**Algorithme détaillé** :
+1. **Nettoyage initial** : Trim espaces, unescape HTML entities (`&amp;` → `&`)
+2. **Décodage récursif** : Gestion des double-encodages (`amp%3B` → `&`) avec limite d'itérations (3 max)
+3. **Parsing URL** : Séparation scheme/netloc/path/query/fragment
+4. **Normalisation composants** :
+   - Scheme/netloc en minuscules
+   - Suppression ports par défaut (80/443)
+   - Tri paramètres query par clé/valeur
+   - Suppression paramètres vides
+5. **Gestion spéciale Dropbox** : Consolidation paramètres `dl=1`, suppression doublons
+6. **Finalisation** : Suppression trailing slash, ré-encodage path sécurisé
 
-### Flux de Monitoring Intelligent
+**Edge cases gérés** :
+- URLs double-encodées (`amp%3Bdl=0&dl=1`)
+- Paramètres malformés (`?amp%3Bdl=0&dl=1`)
+- Encodage HTML dans CSV (`&amp;dl=1`)
+- Variations ports/casse dans hostnames
 
-1. **Webhook JSON** : Source unique depuis webhook.kidpixel.fr
-2. **Normalisation URL** : Gère double encodage, paramètres variants, proxies
-3. **Détection doublons** : Vérification SQLite avant traitement
-4. **Classification source** : Dropbox/FromSmash/SwissTransfer automatique
-5. **Heuristiques sécurité** : Validation patterns par type de source
-6. **Queue workers** : Téléchargements parallèles avec limitation
-7. **Persistance SQLite** : Écritures atomiques et lectures optimisées
-8. **Monitoring temps réel** : État des workers et progression
+#### `_check_csv_for_downloads(data, source_type, dry_run=False)` (Complexité F)
+**Rôle** : Analyse les données CSV pour identifier les nouveaux téléchargements éligibles.
 
-## Utilisation Rapide
+**Logique de filtrage** :
+1. **Validation base** : URL présente, non déjà trackée, scheme HTTP/HTTPS
+2. **Détermination type URL** :
+   - `dropbox` : Hostnames Dropbox ou proxy workers.dev
+   - `fromsmash`/`swisstransfer` : Domaines spécifiques
+   - `external` : Autres
+3. **Critères auto-download** :
+   - Type Dropbox-like uniquement
+   - Ressemble à une archive (`.zip`, `/scl/fo/`, filename `.zip`)
+   - Présence hints nouveau schéma (`original_filename`, `fallback_url`, proxy URL)
 
-### Intégration Automatique
+**Stratégies anti-duplication** :
+- Normalisation URL avec `_normalize_url`
+- Comparaison avec historique existant
+- Gestion URLs de fallback
+- Tracking des URLs traitées par passe
 
-```python
-# Le service est automatiquement initialisé par l'application Flask
-from services.csv_service import CSVService
+## Gestion Erreurs
 
-# Monitoring continu (automatique via thread csv_monitor_service)
-# Pas d'appel direct - le service tourne en arrière-plan
+### Cas d'échec normalisation URL
+- **Comportement** : Retour URL vide silencieusement
+- **Logging** : Aucun (fonction utilitaire)
 
-# Vérification du statut
-status = CSVService.get_monitor_status()
-print(f"Webhook available: {status['webhook']['available']}")
-print(f"Monitor status: {status['csv_monitor']['status']}")
-```
+### Erreurs parsing CSV
+- **Comportement** : Skip ligne problématique, continue traitement
+- **Logging** : Debug level pour diagnostics
 
-### Accès aux Données
+### Échecs téléchargement
+- **Comportement** : Thread daemon, échec isolé
+- **Logging** : Erreur avec stack trace
 
-```python
-# Historique complet (Set de URLs)
-history = CSVService.get_download_history()
-for url in sorted(history):
-    print(f"URL: {url}")
+## Optimisations Performance
 
-# Statut des téléchargements actifs
-downloads_status = CSVService.get_csv_downloads_status()
-print(f"Downloads actifs: {downloads_status['total_active']}")
-```
+### Cache in-memory
+- `_LAST_KNOWN_HISTORY_SET` : Backup en cas d'erreur lecture DB
+- Évite bursts sur erreurs transitoires
+
+### Tri paramètres query
+- Normalisation canonique pour hash maps efficaces
+- Comparaisons O(1) dans historique
+
+### Décodage limité
+- Maximum 3 itérations pour éviter boucles infinies
+- Protection contre URLs malicieuses
+
+## Trade-offs
+
+### ❌ Normalisation agressive vs ❌ Précision sémantique
+- **Choix** : Normalisation agressive (tri params, suppression ports) pour déduplication robuste
+- **Coût** : URLs sémantiquement différentes peuvent être considérées identiques
+- **Bénéfice** : Prévention doublons fiables dans historique grandissant
+
+### ❌ Auto-download restrictif vs ❌ Commodité utilisateur
+- **Choix** : Restriction Dropbox + archives uniquement
+- **Coût** : Téléchargements manuels requis pour autres sources
+- **Bénéfice** : Contrôle backlog, prévention abus
+
+### ❌ Complexité code vs ❌ Maintenabilité
+- **Choix** : Logique centralisée dans fonctions complexes
+- **Coût** : Tests unitaires lourds, debugging difficile
+- **Bénéfice** : Cohérence traitement, edge cases couverts
+
+## Golden Rule
+**Toute modification de logique normalisation doit être accompagnée de migration historique complète** pour éviter inconsistances entre anciennes et nouvelles URLs normalisées.
 
 ## Configuration Essentielle
 
@@ -129,187 +147,6 @@ webhook_config = {
     'cache_ttl': 60,
     'monitor_interval': 15
 }
-```
-
-## Architecture Technique
-
-### Service Principal
-
-```python
-class CSVService:
-    def __init__(self, 
-                 download_repo: DownloadHistoryRepository,
-                 webhook_service: WebhookService,
-                 workflow_state: WorkflowState):
-        self._repo = download_repo
-        self._webhook = webhook_service
-        self._state = workflow_state
-```
-
-### Flux de Données
-
-```mermaid
-graph TD
-    A[Webhook JSON] --> B[CSVService._check_csv_for_downloads]
-    B --> C[WorkflowState Tracking]
-    B --> D[SQLite Repository]
-    C --> E[Download Worker Thread]
-    D --> F[Download History]
-    E --> G[Archives Local]
-```
-
-### Composants Essentiels
-
-```python
-# Repository SQLite
-class DownloadHistoryRepository:
-    def persist_download(self, result: DownloadResult) -> None:
-        """Écriture atomique SQLite via verrouillage"""
-    
-    def get_download_history(self, limit: int = 100) -> List[Dict]:
-        """Récupère l'historique paginé"""
-    
-    def get_duplicate_urls(self) -> List[str]:
-        """Retourne les URLs dupliquées détectées"""
-
-# Service Webhook
-class WebhookService:
-    def fetch_records(self) -> List[Dict]:
-        """Récupère les URLs depuis le webhook JSON"""
-    
-    def is_available(self) -> bool:
-        """Vérifie la disponibilité du webhook"""
-```
-
-# État Centralisé
-class WorkflowState:
-    def get_csv_monitor_status(self) -> Dict:
-        """Retourne le statut du monitoring CSV"""
-```
-
-## API et Méthodes
-
-### Méthodes Principales
-
-```python
-# Monitoring principal (Score F)
-def _check_csv_for_downloads(self) -> None:
-    """Orchestrateur webhook-only avec heuristiques Dropbox"""
-    
-# Normalisation URLs (Score F)
-def _normalize_url(self, url: str) -> str:
-    """Normalisation complète avec décodage double encodage"""
-    
-# Heuristiques Dropbox
-def _is_dropbox_url(self, url: str) -> bool:
-    """Détection des domaines Dropbox autorisés"""
-
-def _is_dropbox_proxy_url(self, url: str) -> bool:
-    """Détection des proxies R2 Dropbox sécurisés"""
-
-def _looks_like_archive_download(self, url: str, filename: str) -> bool:
-    """Vérification que le lien pointe vers une archive"""
-    
-# Persistance SQLite
-def add_to_download_history_with_timestamp(self, url: str, timestamp: str) -> bool:
-    """Écriture atomique via repository"""
-
-### Patterns d'Utilisation
-
-```python
-# Initialisation du service (automatique dans app_new.py)
-# csv_service = CSVService()  # Géré par le framework
-
-# Validation URL
-from services.csv_service import CSVService
-normalized_url = CSVService._normalize_url(raw_url)
-is_duplicate = CSVService.is_url_downloaded(normalized_url)
-
-# Historique
-history = CSVService.get_download_history()
-print(f"Total URLs: {len(history)}")
-
-## Performance et Optimisations
-
-### Gestion Cache
-
-```python
-# Configuration TTL
-CACHE_TTL = 300  # 5 minutes
-CACHE_MAX_SIZE = 1000  # Entrées max en mémoire
-```
-
-### Retry Automatique
-
-```python
-# Configuration retry
-WEBHOOK_TIMEOUT = 10  # Timeout webhook
-MAX_RETRY_ATTEMPTS = 3
-RETRY_DELAY = 5    # Secondes entre tentatives
-```
-
-### Optimisations Mémoire
-
-```python
-# Chunking pour gros CSV
-CHUNK_SIZE = 1000  # Lignes par chunk
-MAX_MEMORY_USAGE = 512  # MB maximum par worker
-```
-
-## Monitoring et Logs
-
-### Structure des Logs
-
-```
-logs/app.log  # Logs unifiés de l'application Flask
-# Le service CSV écrit dans ce fichier via le logger CSVService
-```
-
-### Exemple de Logs
-
-```
-2026-02-07 19:30:22 - INFO - [CSV] WEBHOOK MONITOR: Service démarré.
-2026-02-07 19:30:23 - INFO - [CSV] WEBHOOK MONITOR: New eligible URL detected: https://dl.dropboxusercontent.com/... [type=dropbox]
-2026-02-07 19:30:24 - INFO - [CSV] WEBHOOK MONITOR: 1 new download(s) started
-2026-02-07 19:30:25 - DEBUG - [CSV] WEBHOOK MONITOR: No new items (rows=25, skipped_in_history=24, skipped_tracked=0)
-```
-
-### Métriques Clés
-
-```python
-# Statistiques de traitement
-logger.info(f"WEBHOOK MONITOR: {new_downloads} new download(s) started")
-logger.debug(f"WEBHOOK MONITOR: No new items (rows={total_rows}, skipped_in_history={skipped_already_in_history}, skipped_tracked={skipped_already_tracked})")
-logger.info(f"WEBHOOK MONITOR: New eligible URL detected: {url} (timestamp: {timestamp_str}) [type={url_type}]")
-
-## Dépendances et Prérequis
-
-### Bibliothèques Principales
-
-```python
-import json           # Manipulation JSON
-import os             # Opérations système
-import sqlite3         # Base de données
-import logging          # Journalisation
-import asyncio         # Opérations asynchrones
-from pathlib import Path  # Manipulation chemins modernes
-```
-
-### Dépendances Externes
-
-- **SQLite** : Base de données pour persistance (inclus dans Python standard)
-- **Requests** : Pour les appels webhook (HTTP/HTTPS)
-- **FFmpeg** : Pour les métadonnées vidéos (utilisé par d'autres services)
-
-### Environnement Virtuel
-
-```bash
-# Activation environnement principal
-source env/bin/activate
-
-# Installation dépendances principales
-pip install requests sqlite3 asyncio
-pip install pytest  # Pour tests
 ```
 
 ## Résolution de Problèmes
@@ -395,24 +232,6 @@ def validate_csv_service():
     return True
 ```
 
-### Test Performance
-
-```bash
-# Benchmark traitement URLs
-python -c "
-import time
-import asyncio
-from services.csv_service import CSVService
-
-# Test débit
-start = time.time()
-csv_service = CSVService(...)
-await csv_service.monitor_csv_downloads()
-elapsed = time.time() - start_time
-
-print(f"Processed {len(urls)} URLs in {elapsed:.2f}s")
-```
-
 ## Intégration Pipeline
 
 ### Position dans l'Architecture
@@ -446,100 +265,5 @@ ws.update_step_progress("CSV_MONITOR", current=25, total=100)
 ```python
 # Webhook → CSVService → SQLite → WorkflowState
 webhook_records → csv_service.monitor_csv_downloads() → csv_service._persist_download_result() → ws.set_step_field()
-```
-
-## Pièges Courants et Solutions
-
-### Piège #1 : Webhook Indisponible
-**Solution** : Vérifier la connectivité et la configuration `WEBHOOK_JSON_URL`.
-
-### Piège #2 : URLs Doublement Encodées
-**Solution** : Le service normalise automatiquement les URLs avec `_normalize_url()`.
-
-### Piège #3 : SQLite Corrompu
-**Solution** : Utiliser le script de migration `migrate_download_history_to_sqlite.py`.
-
-### Piège #4 : Fichiers CSV Corrompus
-**Solution** : Le système ignore les lignes invalides et continue le traitement.
-
-### Piège #5 : Performance Insuffisante
-**Solution** : Ajuster les paramètres cache/TTL et le nombre de workers.
-
-### Piège #6 : Permissions Base de Données
-**Solution** : Utiliser l'environnement principal avec permissions appropriées.
-
-## Notes Techniques
-
-### Normalisation URLs (Score F)
-
-```python
-def _normalize_url(self, url: str) -> str:
-    """Normalisation complète avec décodage double encodage"""
-    # 1. Décodage %3Bdl=0
-    decoded = urllib.parse.unquote(url)
-    
-    # 2. Décodage entities HTML
-    decoded = html.unescape(decoded)
-    
-    # 3. Nettoyage caractères spéciaux
-    decoded = re.sub(r'[\x00-\x1f\x7f]', '', decoded)
-    
-    # 4. Reconstruction URL propre
-    return urllib.parse.urlparse(decoded, decoded).geturl()
-```
-
-## Trade-offs par Source de Données
-
-| Source | Auto-download | Sécurité | Traçabilité | Quand l'utiliser |
-|--------|--------------|----------|-------------|-----------------|
-| **Webhook JSON** | Dropbox uniquement | Maximale | SQLite complète | Production, monitoring |
-| **FromSmash** | Jamais | Faible | Manuelle | Tests, développement |
-| **SwissTransfer** | Jamais | Faible | Manuelle | Legacy, compatibilité |
-| **Dropbox Direct** | Si hints | Moyenne | SQLite | Fallback proxy indisponible |
-
-## Trade-offs par Mode de Monitoring
-
-| Mode | Performance | Risques | Quand l'utiliser |
-|------|-------------|---------|-----------------|
-| **Actif** | Temps réel | Charge webhook | Production standard |
-| **Polling** | Contrôlé | Latence 15s | Développement, debug |
-| **Désactivé** | Minimal | Perte monitoring | Tests sans réseau |
-
-## Analogie : Bibliothécaire vs Gare Routière
-
-Pense au monitoring comme une **bibliothécaire** vs une **gare routière**. Le **webhook JSON** est la bibliothécaire : chaque livre (URL) est catalogué avec précision, et seuls les livres approuvés (Dropbox sécurisées) peuvent être empruntés (downloadés). Les **autres sources** sont comme une gare routière : beaucoup de monde passe, mais seuls les voyageurs avec billet valide (heuristiques) peuvent monter à bord.
-
-### Fonctions Clés
-
-```python
-def _is_dropbox_url(url: str) -> bool:
-    """Vérifie si l'URL appartient aux domaines Dropbox"""
-    hosts = {"dropbox.com", "www.dropbox.com", "dl.dropboxusercontent.com"}
-    return urlparse(url).hostname in hosts
-
-def _is_dropbox_proxy_url(url: str) -> bool:
-    """Détecte les proxies R2 sécurisés"""
-    return "/dropbox/" in url.lower() and "workers.dev" in url.lower()
-
-def _looks_like_archive_download(url: str, filename: str) -> bool:
-    """Heuristique pour les archives ZIP"""
-    return (filename or "").endswith('.zip') or '/scl/fo/' in url.lower()
-```
-
-### Mode DRY_RUN (Tests/CI)
-
-```bash
-# Mode test (pas de workers réels)
-export DRY_RUN_DOWNLOADS=true
-# Le service ajoute à l'historique mais ne lance pas de threads
-
-# Comportement normal
-# Les URLs éligibles déclenchent execute_csv_download_worker dans un thread dédié
-# Utile pour les tests d'intégration et CI/CD
-```
-
-## Golden Rule: Normalise Tout, Mais N'Automatise Que Ce Que Tu Contrôles
-
-Le service normalise **toutes** les URLs pour éviter les doublons, mais ne déclenche des workers **que pour les archives Dropbox conformes**. Cette approche garantit la traçabilité sans risquer les téléchargements non contrôlés.
-
-*Cette documentation suit la méthode SKILL.md pour une lecture rapide et une compréhension immédiate.*
+```</content>
+<parameter name="path">/home/kidpixel/workflow_mediapipe/docs/workflow/services/csv_service.md

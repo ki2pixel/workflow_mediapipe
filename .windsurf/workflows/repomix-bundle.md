@@ -38,4 +38,4 @@ Créer un bundle optimisé du codebase pour analyse par LLMs externes (Claude, C
 - Le header inclut référence aux `codingstandards.md` obligatoires (vérifier avec `read_text_file`)
 - Régénérer après modifications significatives du codebase (utiliser `search` pour détecter les changements)
 
-**Locking Instruction:** Utilisez les outils fast-filesystem (mcp0_fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.
+**Locking Instruction:** Utilisez les outils fast-filesystem (fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.

@@ -39,6 +39,7 @@ alwaysApply: true
   - `audio_env/` : Analyse audio (Whisper/Lemonfox).
   - `tracking_env_slim/` : Tracking MediaPipe (CPU-optimized, sans GPU torch).
   - `insightface_env/` : Tracking InsightFace (GPU-only, ONNX Runtime).
+  - *Note: Environnements créés dynamiquement via `setup_dev_environment.sh`, répertoire `envs/` non peuplé.*
 
 ## Project Structure
 - `services/` : classes/fonctions pures (aucun accès Flask) ex: `FilesystemService` pour I/O sécurisée.
@@ -61,22 +62,20 @@ alwaysApply: true
 - `AppState.setState()` reste immuable (diff superficiel, aucun `state` muté).
 - DOM : `DOMBatcher.scheduleUpdate()` + `DOMUpdateUtils.escapeHtml()` (pas d'`innerHTML` non échappé).
 - Polling : `PollingManager` uniquement, bannir les `setInterval` isolés.
-- Composants clés : Logs Overlay (focus trap, sync timeline, fermeture auto), Timeline connectée (badges d’état dynamiques, auto-scroll structurel) et FromSmash/téléchargements externes en lecture seule. (Le panneau Step Details a été retiré le 2026-02-04.)
+- Composants clés : Logs Overlay (focus trap, sync timeline, fermeture auto), Timeline connectée (badges d'état dynamiques, auto-scroll structurel) et FromSmash/téléchargements externes en lecture seule.
 
 ## Core Patterns
 ### Services
 ```python
 class ExampleService:
-    def __init__(self, filesystem: FilesystemService, state: WorkflowState):
-        self._fs = filesystem
-        self._state = state
-
-    def perform(self, step_key: str) -> None:
-        with self._state.step_context(step_key):
-            payload = self._fs.read_json(...)
-            # logique métier pure
+    """Service utilisant le pattern singleton pour l'accès aux dépendances."""
+    
+    @staticmethod
+    def perform(step_key: str) -> None:
+        workflow_state = get_workflow_state()  # Accès singleton
+        # logique métier pure
 ```
-- Toujours injecter les dépendances (FilesystemService, WorkflowState, WorkflowCommandsConfig) au constructeur.
+- Pattern singleton privilégié pour `WorkflowState` et `FilesystemService` (accès via `get_workflow_state()`, méthodes statiques).
 
 ### Routes
 ```python
@@ -130,9 +129,9 @@ domBatcher.scheduleUpdate(() => {
 - **After Effects Integration** : Le script AE `Analyse-Écart-X...jsx` priorise les `*_ae.json` avec fallback sur STEP6/STEP5.
 
 ## Quality & Testing
-- **Tests unitaires** : `tests/unit/` pour services isolés. Utiliser fixtures `patched_workflow_state()` et `patched_commands_config()`.
+- **Tests unitaires** : `tests/unit/` pour services isolés. Utiliser context managers `patched_workflow_state()` et `patched_commands_config()` depuis les tests unitaires.
 - **Tests intégration** : `tests/integration/` couvrent routes + WorkflowService.
-- **Tests frontend** : Node/ESM (`npm run test:frontend`) pour DOMBatcher, Step Details, focus trap, log safety.
+- **Tests frontend** : Node/ESM (`npm run test:frontend`) pour DOMBatcher, Logs Overlay, Timeline, focus trap, log safety.
 - **CI/Test env** : exécuter depuis `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour bloquer les téléchargements réseau.
 - Skips conditionnels autorisés pour STEP3/STEP5 quand dépendances spécialisées manquent, mais documenter les limitations.
 
@@ -167,7 +166,7 @@ domBatcher.scheduleUpdate(() => {
 ### Mettre à jour l’overlay logs frontend
 1. Modifier `static/css/components/logs.css` pour le style.
 2. Adapter `static/uiUpdater.js` pour alimenter header/timer.
-3. Synchroniser AppState (`logPanel.isOpen`) + Step Details pour éviter overlap.
+3. Synchroniser AppState (`logPanel.isOpen`) + Timeline pour éviter overlap.
 
 ## Anti-Patterns
 - Placer du métier dans un blueprint Flask ou manipuler `WorkflowState` sans verrou.

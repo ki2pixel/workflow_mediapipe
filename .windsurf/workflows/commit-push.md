@@ -66,4 +66,4 @@ git push -u origin "$BRANCH"
 - Recommended to run `git status` or `git diff` to review diffs before execution using `run_command`.
 - Use `list_directory` to verify repository state before operations.
 
-**Locking Instruction:** Utilisez les outils fast-filesystem (mcp0_fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.
+**Locking Instruction:** Utilisez les outils fast-filesystem (fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.

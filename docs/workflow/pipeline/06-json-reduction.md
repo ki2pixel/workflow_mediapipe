@@ -1,122 +1,100 @@
-# STEP6 - Réduction JSON et Analytics
+# STEP6 JSON Reduction Documentation
 
-**TL;DR** : Réduction des JSON bruts STEP5 en fichiers optimisés `*_tracking.json` avec analytics, confidence filtering, et temporal alignment pour After Effects.
+## TL;DR
+STEP6 réduit les JSON volumineux de STEP4/STEP5 en format optimisé After Effects, calculant analytics tracking, alignement temporel, et statistiques expressions tout en préservant compatibilité STEP7.
 
-## Le Problème : JSON Bruts Inutilisables
+## Contexte Métier
+Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes détaillés) inutiles pour post-production. STEP6 optimise pour After Effects : réduction objets trackés, calculs agrégés, alignement audio/vidéo.
 
-Tu as des fichiers JSON de 500MB+ avec 468 landmarks par frame, mais After Effects ne peut pas gérer cette masse de données et tu as besoin d'analytics pour comprendre la qualité du tracking. Tu dois réduire la taille tout en préservant les informations essentielles et en ajoutant des métriques utilisables.
+## Architecture Pipeline
 
-## Notre Solution : Réduction Intelligente avec Analytics
+### Flux de données
+1. **Scan projets** : Dossiers `projets_extraits/*{keyword}*`
+2. **Résolution paires** : `{stem}_audio.json` + `{stem}_tracking.json`
+3. **Réduction tracking** : Filtrage objets, calcul analytics/expressions
+4. **Réduction audio** : Timeline parole simplifiée
+5. **Alignement temporel** : Synchronisation audio/vidéo
+6. **Écriture atomique** : Remplacement sécurisé
 
-Nous utilisons `json_reducer.py` pour transformer les JSON denses STEP5 en fichiers optimisés avec analytics, filtering, et métadonnées temporelles. Le reducer génère la source de vérité pour After Effects avec une réduction de 70-90% de la taille tout en ajoutant des métriques de qualité.
+### Fonctions Clés
 
-### ❌ JSON brut direct (anti-pattern)
-```json
-// Fichier STEP5 brut - 500MB+, inutilisable directement
-{
-  "tracked_objects": [
-    {
-      "frame": 1,
-      "faces": [
-        {
-          "landmarks": [[x1,y1,z1], [x2,y2,z2], ...],  // 468 points
-          "blendshapes": {"jawOpen": 0.12, "mouthSmileLeft": 0.34, ...},
-          "confidence": 0.95
-        }
-      ]
-    }
-  ]
-}
-```
+#### `reduce_video_json(data)` (Complexité F)
+**Rôle** : Réduit JSON tracking en format After Effects-compatible.
 
-### ✅ JSON réduit optimisé (pattern recommandé)
-```json
-// Fichier STEP6 réduit - 50MB, analytics inclus
-{
-  "video_metadata": {
-    "filename": "video1.mp4",
-    "total_frames": 2500,
-    "fps": 25.0,
-    "duration_sec": 100.0
-  },
-  "tracking_summary": {
-    "total_faces_detected": 12450,
-    "average_confidence": 0.87,
-    "confidence_histogram": {"0.9-1.0": 8900, "0.8-0.9": 2800, ...}
-  },
-  "tracked_objects": [
-    {
-      "frame": 1,
-      "faces": [
-        {
-          "id": 0,
-          "confidence": 0.95,
-          "landmarks_2d": [[x1,y1], [x2,y2], ...],  // 2D seulement
-          "blendshapes": {"jawOpen": 0.12, "mouthSmileLeft": 0.34}
-        }
-      ]
-    }
-  ],
-  "temporal_alignment": {
-    "audio_video_sync": true,
-    "frame_drops": [],
-    "temporal_gaps": []
-  }
-}
-```
+**Algorithme détaillé** :
+1. **Extraction métadonnées** : FPS, total_frames depuis headers/metadata
+2. **Filtrage objets** : Conservation `id`, `centroid_x`, `source`, `label`, `confidence`, `bbox_*`, `active_speakers`
+3. **Résolution active_speakers** : Merge depuis `speaking_sources.audio` si manquant
+4. **Calcul expressions** : Stats moyennes/max par objet (configurable `STEP6_EXPRESSION_KEYS`)
+5. **Construction frames** : Liste `frames_analysis` avec objets filtrés
 
-### Flux de Réduction Intelligent
+**Optimisations** :
+- Skip objets sans données pertinentes
+- Calculs statistiques incrémentaux
+- Mémoire contrôlée (pas de load complet)
 
-1. **Chargement JSON bruts** : Lecture des fichiers STEP5 et STEP4
-2. **Validation structure** : Vérification cohérence frames/fps
-3. **Filtrage confidence** : Suppression des détections faible confiance
-4. **Réduction dimensions** : 3D→2D pour landmarks, filtering blendshapes
-5. **Calcul analytics** : Histogrammes confidence, stats par objet
-6. **Temporal alignment** : Synchronisation audio/vidéo, détection gaps
-7. **Écriture atomique** : Fichier temporaire puis rename pour éviter corruption
-8. **Métadonnées enrichies** : Informations de processing et qualité
+#### `_compute_tracking_analytics(reduced_tracking)` (Complexité F)
+**Rôle** : Calcule statistiques agrégées sur tracking pour diagnostics qualité.
 
-## Utilisation Rapide
+**Métriques calculées** :
+- **Histogramme confiance** : Buckets (0-0.25, 0.25-0.5, etc.)
+- **Stats objets** : Nombre total, par frame, durée vie, densité
+- **Stats labels** : Distribution classes détectées
+- **Stats spatiales** : Centroides moyens, variances bbox
 
-### Lancement Automatique
+**Algorithme** :
+1. **Indexation frames** : Map frame_num → objets pour accès O(1)
+2. **Calculs temporels** : Durée vie objets, transitions frames
+3. **Agrégations statistiques** : Moyennes/variances par label
+4. **Histogrammes** : Distribution valeurs confiance/tailles
 
-```bash
-# Via l'interface web
-# Clique sur "Étape 6 : Réduction JSON" dans l'interface
+## Gestion Erreurs
 
-# Via API
-curl -X POST http://localhost:5000/run/STEP6
+### Schémas JSON incompatibles
+- **Comportement** : Skip fichier, log warning, continuation
+- **Validation** : `_is_raw_tracking_schema()` / `_is_reduced_tracking_schema()`
 
-# Dans une séquence complète
-const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6'];
-await apiService.runCustomSequence(steps);
-```
+### Données manquantes/corrompues
+- **Comportement** : Fallbacks gracieux, valeurs par défaut
+- **Logging** : Warnings non-bloquants
 
-### Exécution Manuelle (Debug)
+### Échecs écriture
+- **Comportement** : Atomic writes avec cleanup temp files
+- **Récupération** : os.replace() préserve intégrité
 
-```bash
-# Activation environnement principal
-source env/bin/activate
+## Optimisations Performance
 
-# Exécution depuis projets_extraits
-cd projets_extraits
-python ../workflow_scripts/step6/json_reducer.py
+### Indexation objets
+- Map frame→objets pour accès rapide
+- Calculs statistiques en une passe
 
-# Monitoring des logs
-tail -f logs/step6/json_reducer_*.log
-```
+### Traitement batch
+- Scan récursif dossiers projets
+- Progress logging pour monitoring
 
-### Résultat Attendu
+### Réduction mémoire
+- Filtrage objets en streaming
+- Libération références après traitement
 
-```
-# Avant réduction (STEP5)
-video1_tracking.json    # 250 MB (landmarks + blendshapes complets)
-video1_audio.json       # 15 MB (timeline complète)
+## Trade-offs
 
-# Après réduction (STEP6)
-video1_tracking.json    # 12 MB (-95% avec analytics)
-video1_audio.json       # 2 MB (-87% essentiel uniquement)
-```
+### ❌ Réduction agressive vs ❌ Fidélité données
+- **Choix** : Conservation ciblée (centroids, speakers, expressions)
+- **Coût** : Perte données détaillées (blendshapes complets)
+- **Bénéfice** : JSON 10x plus petits, parsing AE rapide
+
+### ❌ Calculs lourds vs ❌ Métriques utiles
+- **Choix** : Analytics optionnels (flag `STEP6_INCLUDE_TRACKING_ANALYTICS`)
+- **Coût** : Overhead computationnel pour diagnostics
+- **Bénéfice** : Insights qualité tracking sans outils externes
+
+### ❌ Complexité logique vs ❌ Maintenabilité
+- **Choix** : Logique centralisée dans fonctions complexes
+- **Coût** : Tests difficiles, edge cases nombreux
+- **Bénéfice** : Pipeline robuste, évolutif
+
+## Golden Rule
+**Les JSON réduits doivent rester compatibles STEP7** : modifications schéma nécessitent tests régression complets et mise à jour scripts consommateurs.
 
 ## Configuration Essentielle
 
@@ -151,206 +129,6 @@ TRACKING_ANALYTICS_CONFIG = {
     'include_object_stats': True,
     'include_temporal_alignment': True
 }
-```
-
-## Formats de Données
-
-### JSON Tracking Réduit
-
-```json
-{
-  "video_filename": "video1.mp4",
-  "total_frames": 2500,
-  "fps": 25.0,
-  "tracking_analytics": {
-    "confidence_histogram": {
-      "0.0-0.1": 45,
-      "0.9-1.0": 1245
-    },
-    "object_stats": {
-      "total_objects": 2,
-      "avg_confidence": 0.87,
-      "detection_rate": 0.92
-    },
-    "temporal_alignment": {
-      "audio_video_mismatch": false,
-      "sync_offset_frames": 0
-    }
-  },
-  "expression_summary": {
-    "jawOpen": {"min": 0.0, "max": 0.45, "avg": 0.12, "active_frames": 847},
-    "mouthSmileLeft": {"min": 0.0, "max": 0.78, "avg": 0.23, "active_frames": 623}
-  },
-  "tracked_objects": [
-    {
-      "frame": 1,
-      "objects": [
-        {
-          "id": "person_1",
-          "confidence": 0.95,
-          "centroid_x": 320.5,
-          "centroid_y": 240.2,
-          "bbox_width": 120,
-          "bbox_height": 150,
-          "source": "tracking",
-          "label": "person",
-          "active_speakers": ["SPEAKER_00"]
-        }
-      ]
-    }
-  ]
-}
-```
-
-### JSON Audio Réduit
-
-```json
-{
-  "video_filename": "video1.mp4",
-  "total_frames": 2500,
-  "fps": 25.0,
-  "frames_analysis": [
-    {
-      "frame": 1,
-      "audio_info": {
-        "is_speech_present": true,
-        "num_distinct_speakers_audio": 1,
-        "active_speaker_labels": ["SPEAKER_00"],
-        "timecode_sec": 0.0
-      }
-    }
-  ]
-}
-```
-
-## Analytics et Enrichissement
-
-### Tracking Analytics
-
-```python
-# Histogramme confidence
-confidence_histogram = {
-    "0.0-0.1": 45,      # Faible confiance
-    "0.1-0.2": 123,     # Moyenne-basse
-    "0.8-0.9": 890,     # Haute confiance
-    "0.9-1.0": 1245     # Très haute confiance
-}
-
-# Statistiques par objet
-object_stats = {
-    "total_objects": 2,
-    "avg_confidence": 0.87,
-    "detection_rate": 0.92,
-    "frames_with_objects": 2300
-}
-```
-
-### Expression Summary
-
-```python
-# Résumé par blendshape
-expression_summary = {
-    "jawOpen": {
-        "min": 0.0,
-        "max": 0.45,
-        "avg": 0.12,
-        "active_frames": 847,  # Frames où valeur > 0.01
-        "dominant_threshold": 0.1
-    },
-    "mouthSmileLeft": {
-        "min": 0.0,
-        "max": 0.78,
-        "avg": 0.23,
-        "active_frames": 623
-    }
-}
-```
-
-### Alignement Temporel
-
-```python
-# Détection désynchronisations
-temporal_alignment = {
-    "audio_video_mismatch": False,  # True si décalage détecté
-    "sync_offset_frames": 0,         # Décalage en frames
-    "audio_duration_sec": 100.0,
-    "video_duration_sec": 100.0,
-    "fps_mismatch": False
-}
-```
-
-## Trade-offs par Mode de Réduction
-
-| Mode STEP5 | Taille originale | Taille réduite | Réduction | Quand l'utiliser |
-|------------|-----------------|---------------|-----------|-----------------|
-| **Verbose** | 250MB | 65MB | 74% | Debug, développement |
-| **Optimisé** | 45MB | 12MB | 95% | Production, After Effects |
-
-## Trade-offs par Enrichissement
-
-| Option | Taille ajoutée | Valeur | Risques | Quand l'utiliser |
-|--------|----------------|-------|---------|-----------------|
-| **Analytics** | +1MB | Métriques confidence | Surcharge si inutile | Post-production avancée |
-| **Expression Summary** | +0.5MB | Stats blendshapes | Calculs supplémentaires | Animation 3D |
-| **Alignement Temporel** | +0.1MB | Sync audio/vidéo | Complexité | Contenus synchronisés |
-
-## Analogie : Bibliothèque vs Index
-
-Pense à la réduction comme une **bibliothèque** vs son **index**. Les **données brutes STEP5** sont la bibliothèque complète : tous les livres (landmarks, blendshapes) sur des étagères immenses. Le **JSON réduit STEP6** est l'index : il ne contient que les références essentielles (centroids, confidence) plus des analytics (histogrammes, résumés) qui te permettent de trouver instantanément ce dont tu as besoin.
-
-## Monitoring et Logs
-
-### Structure des Logs
-
-```
-logs/step6/
-└── json_reducer_20240120_143022.log
-```
-
-### Exemple de Logs
-
-```
-2024-01-20 14:30:22 - INFO - Processing project: projet_camille_001 (1/3)
-2024-01-20 14:30:23 - INFO - Loading tracking data: video1_tracking.json (250MB)
-2024-01-20 14:30:24 - INFO - Computing tracking analytics...
-2024-01-20 14:30:25 - INFO - Computing expression summary...
-2024-01-20 14:30:26 - INFO - Compression: 250MB -> 12MB (95.2% reduction)
-2024-01-20 14:30:27 - INFO - Successfully wrote video1_tracking.json
-2024-01-20 14:30:28 - INFO - Audio reduction: 15MB -> 2MB (86.7% reduction)
-```
-
-### Métriques Clés
-
-```python
-# Statistiques de traitement
-logging.info(f"Compression: {original_size}MB -> {reduced_size}MB ({ratio:.1%} reduction)")
-logging.info(f"Projects processed: {success_count}/{total_count}")
-logging.info(f"Total space saved: {space_saved_mb}MB")
-```
-
-## Dépendances et Prérequis
-
-### Environnement Principal
-
-```bash
-# Activation environnement principal
-source env/bin/activate
-
-# Dépendances minimales (Python standard)
-# json, os, pathlib, logging
-# Aucune dépendance externe requise
-```
-
-### Prérequis Fichiers
-
-```bash
-# Structure attendue
-projets_extraits/
-├── projet_camille_001/
-│   └── docs/
-│       ├── video1.mp4
-│       ├── video1_tracking.json    # Généré par STEP5
-│       └── video1_audio.json        # Généré par STEP4
 ```
 
 ## Résolution de Problèmes
@@ -519,29 +297,5 @@ for (var i = 0; i < trackingData.tracked_objects.length; i++) {
         // Pas de landmarks volumineux à traiter
     }
 }
-```
-
-## Pièges Courants et Solutions
-
-### Piège #1 : Fichiers toujours volumineux
-**Solution** : Vérifier `STEP5_EXPORT_VERBOSE_FIELDS=0` dans l'environnement STEP5.
-
-### Piège #2 : Analytics manquants
-**Solution** : Activer `STEP6_INCLUDE_TRACKING_ANALYTICS=1` et `STEP6_INCLUDE_EXPRESSION_SUMMARY=1`.
-
-### Piège #3 : Alignement audio/vidéo incorrect
-**Solution** : Vérifier les logs `temporal_alignment` et ajuster si nécessaire.
-
-### Piège #4 : Perte de données essentielles
-**Solution** : Le système préserve toujours les champs requis (id, centroid_x, bbox_width/height, confidence).
-
-### Piège #5 : Fichiers temporaires résiduels
-**Solution** : Écriture atomique avec nettoyage automatique des fichiers `.tmp`.
-
-L'étape 6 transforme les données brutes de tracking en un format optimisé et enrichi, réduisant drastiquement la taille des fichiers tout en ajoutant des analytics précieux pour la post-production. Les scripts After Effects peuvent maintenant charger et traiter les données instantanément.
-
----
-
-## Golden Rule
-
-**Réduis avant d'enrichir ; sinon tu obtiens des fichiers volumineux avec des données inutiles qui ralentissent After Effects.**
+```</content>
+<parameter name="path">/home/kidpixel/workflow_mediapipe/docs/workflow/pipeline/step6-json-reduction.md

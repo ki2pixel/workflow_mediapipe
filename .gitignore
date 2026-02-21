@@ -63,3 +63,22 @@ Thumbs.db
 
 # archives
 archives
+
+# Logs
+logs
+yarn-debug.log*
+dev-debug.log
+# Dependency directories
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+tasks.json
+tasks/ 

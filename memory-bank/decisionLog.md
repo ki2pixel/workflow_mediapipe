@@ -12,7 +12,15 @@ Cette section contient le résumé des décisions majeures de 2025. Pour les dé
 
 ## Février 2026
 
-- [2026-02-12 02:37:00] **Mistral Fine-Tuning Project — Phase 1 Completion** : Décision de finaliser Phase 1 avec 40/40 exemples Architecture Knowledge. Approche itérative validée comme efficace : méthodologie séquentielle avec `run_command`, focus qualité par exemple, documentation continue. Impact : Dataset technique de haute qualité prêt pour fine-tuning Mistral. Prochaines étapes : Phase 2 Pipeline Operations (35 exemples).
+- [2026-02-21 22:15:00] **Évaluation Patterns Services — Maintien Singleton vs DI** : Évaluation architecturale des patterns d'injection de dépendances dans les services. Décision de maintenir le pattern singleton actuel (`get_workflow_state()`) plutôt que refactorer vers injection de dépendances comme initialement documenté. Justification : pattern singleton fonctionnel et établi dans toute la codebase, refactoring majeur risqué pour bénéfice limité, focus sur testabilité via context managers existants. Impact : mise à jour documentation `codingstandards.md` pour refléter patterns réels. Pas de changement code requis.
+  - **Raison** : Évaluation des trade-offs entre patterns documentés et patterns implémentés.
+  - **Analyse** : Pattern singleton actuel fonctionne bien, refactoring vers DI nécessiterait changements massifs, risque élevé pour gain modéré en testabilité.
+  - **Décision** : Maintenir status quo, corriger documentation pour refléter réalité.
+  - **Impact** : Alignement documentation/code, pas de disruption développement.
+  - **Raison** : Audit périodique nécessaire pour maintenir l'alignement entre documentation et implémentation dans un projet évolutif.
+  - **Implémentation** : Analyse systématique des 7 phases avec outils MCP (fast-filesystem, task-master-ai, sequentialthinking). Vérification patterns services, environnements, documentation, composants frontend et tests.
+  - **Écarts identifiés** : (1) Services utilisent singleton pattern (get_workflow_state()) au lieu de DI comme documenté, (2) Environnements spécialisés référencés dans code mais envs/ vide, (3) Références documentation valides mais chemins alternatifs existants.
+  - **Impact** : Documentation plus cohérente, meilleures pratiques de développement, réduction dette technique documentaire.
   - **Raison** : Phase 1 complète avec succès les 40 exemples Architecture Knowledge selon la stratégie définie (40% du dataset total).
   - **Implémentation** : 23 exemples supplémentaires ajoutés via approche itérative (FilesystemService, WorkflowService, etc.), documentation enrichie de la méthodologie efficace utilisée.
   - **Impact** : Base solide pour le modèle Mistral spécialisé, méthodologie éprouvée pour les phases suivantes, dataset JSONL validé et prêt pour entraînement.

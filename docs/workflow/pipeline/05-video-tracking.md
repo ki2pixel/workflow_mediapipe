@@ -596,6 +596,36 @@ L'étape 5 transforme les vidéos en données faciales 3D précises avec une arc
 
 ---
 
-## Golden Rule
+## Fonctions `process_video_worker.py` (Complexité F/E)
 
-**Choisis ton moteur avant de lancer ; sinon tu gaspilles des ressources GPU avec MediaPipe ou tu manques de précision avec InsightFace.**
+**Rôle** : Worker multiprocessing pour traitement vidéo frame-by-frame avec MediaPipe, gérant chunking adaptatif et export JSON dense.
+
+### `main()` (Complexité F)
+**Algorithme détaillé** :
+1. **Initialisation** : Parsing args, validation GPU/CPU, chargement modèles
+2. **Chunking adaptatif** : Calcul taille chunks basée mémoire/CPU disponible
+3. **Multiprocessing** : Création pool workers (1-15 selon config)
+4. **Distribution travail** : Assignation chunks aux workers avec overlap
+5. **Collecte résultats** : Merge outputs, gestion erreurs partielles
+6. **Export atomique** : JSON avec métriques profiling et progression
+
+**Optimisations** :
+- Chunking adaptatif (25-100 frames/chunk)
+- Profiling toutes les 20 frames
+- Gestion mémoire GPU/CPU
+- Export parallélisé avec locks
+
+### `FrameProcessor.process_frame()` (Complexité E)
+**Traitement frame-by-frame** :
+1. **Conversion RGB** : OpenCV pour MediaPipe
+2. **Détection visages** : MediaPipe FaceLandmarker
+3. **Extraction landmarks** : 478 points 3D + head pose
+4. **Calcul blendshapes** : 52 coefficients ARKit (throttling configurable)
+5. **Structuration données** : Format STEP6-compatible avec métriques
+
+**Gestion erreurs** :
+- Skip frames corrompus
+- Fallbacks modèles
+- Logging détaillé pour debug
+
+**Trade-offs** : Multiprocessing offre parallélisation vs overhead synchronisation.

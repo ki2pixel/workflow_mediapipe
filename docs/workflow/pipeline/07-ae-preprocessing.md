@@ -618,6 +618,41 @@ L'étape 7 transforme les données de tracking en un format parfaitement optimis
 
 ---
 
-## Golden Rule
+## Fonction `_analyze_layer()` (Complexité F)
 
-**Indexe avant d'utiliser ; sinon tu perds le bénéfice de performance et tu rends After Effects inutilisable avec des JSON volumineux.**
+**Rôle** : Analyse un calque AE pour calculer statistiques objets trackés sur une plage temporelle, avec scaling vidéo et confirmation audio.
+
+**Algorithme détaillé** :
+1. **Validation plages** : `in_frame`/`out_frame`, calcul plage temporelle
+2. **Scaling vidéo** : Ajustement frame rate si vidéo ≠ AE (ex: 25fps → 30fps)
+3. **Indexation objets** : Collecte par `obj_id` avec métriques frame-by-frame
+4. **Confirmation audio** : Vérification chevauchement speakers si `source == face_landmarker`
+5. **Calculs statistiques** : Moyennes confidence/position, surfaces bbox, scores présence
+6. **Sélection meilleurs** : Hiérarchie audio > face > person > fallback
+
+**Optimisations** :
+- Mapping frame efficace avec scaling
+- Agrégation incrémentale statistiques
+- Filtrage objets pertinents (face_landmarker/person)
+- Gestion edge cases (frames manquants, données invalides)
+
+### Mode Analyzer
+Le mode analyzer utilise `_analyze_layer` pour déléguer calculs lourds à Python :
+
+```javascript
+// Manifest AE → Python
+var manifest = {
+  layers: [{id: "1", in_frame: 100, out_frame: 200}],
+  json_path: "docs/video1_ae.json"
+};
+
+// Python calcule et retourne
+var result = {
+  "1": {
+    best_face: {center_x: 150, center_y: 200, avg_confidence: 0.85},
+    stats: {presence_score: 85, audio_confirm: 12}
+  }
+};
+```
+
+**Trade-offs** : Délégation Python offre précision/complexité vs overhead appel système.

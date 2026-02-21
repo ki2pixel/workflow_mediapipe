@@ -1,54 +1,107 @@
-# Lemonfox Audio Service - Analyse Audio Temps Réel
+# Lemonfox Audio Service Documentation
 
-**TL;DR** : Service d'analyse audio qui appelle l'API Lemonfox pour la transcription et la diarisation, avec fallback Pyannote et support embeddings locuteurs optionnels.
+## TL;DR
+Le Lemonfox Audio Service orchestre l'analyse audio via l'API Lemonfox pour STEP4, générant des JSON compatibles STEP5/STEP6 avec transcription, diarization locuteurs, et embeddings optionnels Pyannote.
 
-## Le Problème : Analyse Audio Complexité Variable
+## Contexte Métier
+STEP4 transforme les vidéos en données audio structurées : transcription texte, timestamps mots/phrases, identification locuteurs, et embeddings vectoriels pour analyses avancées (clustering, reconnaissance).
 
-Tu dois analyser l'audio de tes vidéos pour identifier qui parle quand, mais les modèles locaux (Pyannote) sont lents et les APIs externes sont complexes à intégrer. Tu as besoin d'une solution qui combine la vitesse des APIs avec la fiabilité du fallback local, tout en gérant les erreurs réseau et les quotas.
+## Architecture Service
 
-## Notre Solution : Service Hybride avec Fallback Intelligent
+### Flux de données
+1. **Validation** : Chemins projet/vidéo sécurisés
+2. **Extraction** : Durée vidéo via ffprobe
+3. **Préparation** : Upload artifact (transcodage si nécessaire)
+4. **API Call** : Transcription Lemonfox avec paramètres
+5. **Traitement** : Construction timeline frames + embeddings
+6. **Sortie** : JSON atomique `{video_stem}_audio.json`
 
-Nous utilisons `LemonfoxAudioService` comme interface unifiée qui orchestre l'API Lemonfox (rapide) avec Pyannote (fallback). Le service gère automatiquement les timeouts, les erreurs réseau, et produit des JSON structurés compatibles avec STEP5 et STEP6.
+### Fonctions Clés
 
-### ❌ Appel API direct (anti-pattern)
-```python
-# Approche fragile - pas de fallback, pas de gestion d'erreurs
-import requests
+#### `_compute_speaker_embeddings_from_audio()` (Complexité F)
+**Rôle** : Calcule les embeddings vectoriels des locuteurs via Pyannote pour analyse sémantique avancée.
 
-def transcribe_audio(audio_file):
-    response = requests.post("https://api.lemonfox.ai/v1/transcribe", files={
-        "file": open(audio_file, "rb")
-    })
-    return response.json()  # Crash si réseau down
-```
+**Algorithme détaillé** :
+1. **Filtrage segments** : Validation durée (>0.5s), mapping labels (`SPEAKER_00`)
+2. **Chargement modèle** : Pyannote embedding avec token HF, GPU si disponible
+3. **Extraction audio** : ffmpeg vers WAV temporaire (16kHz mono)
+4. **Inférence vectorielle** : Par segment locuteur, moyenne temporelle, normalisation L2
+5. **Agrégation** : Moyenne segments par locuteur (max 10 segments), arrondi précision 4 décimales
 
-### ✅ Service avec fallback (pattern recommandé)
-```python
-# Approche robuste - retry, fallback, gestion d'erreurs
-class LemonfoxAudioService:
-    def __init__(self, api_key: str, fallback_enabled: bool = True):
-        self._api_key = api_key
-        self._fallback_enabled = fallback_enabled
-    
-    def process_video_with_lemonfox(self, video_path: str) -> dict:
-        try:
-            return self._call_lemonfox_api(video_path)
-        except (NetworkError, TimeoutError, QuotaExceeded) as e:
-            if self._fallback_enabled:
-                logger.warning(f"Lemonfox failed, using Pyannote: {e}")
-                return self._fallback_to_pyannote(video_path)
-            raise
-```
+**Optimisations** :
+- Tri segments par durée décroissante
+- Device CUDA/CPU automatique
+- Nettoyage temporaire `/dev/shm`
+- Gestion erreurs partielles (skip segments problématiques)
 
-### Flux d'Analyse Audio Intelligent
+#### `process_video_with_lemonfox()` (Complexité E)
+**Rôle** : Pipeline complet analyse audio d'une vidéo.
 
-1. **Extraction audio** : FFmpeg extrait WAV depuis la vidéo
-2. **Appel Lemonfox** : Transcription + diarisation via API
-3. **Validation réponse** : Vérification format et cohérence
-4. **Fallback Pyannote** : Si Lemonfox échoue, bascule automatiquement
-5. **Embeddings locuteurs** : Optionnel, vecteurs par identifiant
-6. **Timeline frame-by-frame** : Synchronisation avec 25 FPS vidéo
-7. **Export JSON** : Format standardisé pour pipeline
+**Étapes séquentielles** :
+1. **Validation chemins** : Anti-traversal, existence fichiers
+2. **Métadonnées vidéo** : ffprobe pour durée, calcul frames (25fps)
+3. **Préparation upload** : Gestion taille (transcodage si > limite), cleanup sécurisé
+4. **Configuration API** : Defaults config + paramètres utilisateur
+5. **Appel Lemonfox** : HTTP avec retry, gestion erreurs
+6. **Construction timeline** : Mapping transcription vers frames avec smoothing
+7. **Embeddings optionnels** : Intégration Pyannote si activé
+8. **Écriture JSON** : Atomique avec backup, format STEP4 standard
+
+**Gestion ressources** :
+- Cleanup upload artifacts systématique
+- Fallbacks silencieux pour embeddings
+- Atomic writes pour éviter corruption
+
+## Gestion Erreurs
+
+### Échecs API Lemonfox
+- **Comportement** : Retour erreur détaillée, pas de retry automatique
+- **Logging** : Warning avec contexte (langue, speakers)
+
+### Problèmes embeddings
+- **Comportement** : Skip silencieux, log warning, continuation pipeline
+- **Fallback** : Timeline sans embeddings (compatible STEP5/STEP6)
+
+### Erreurs écriture JSON
+- **Comportement** : Cleanup temp files, retour échec
+- **Atomicité** : os.replace() pour éviter corruption partielle
+
+## Optimisations Performance
+
+### GPU embeddings
+- Détection CUDA automatique
+- Fallback CPU si indisponible
+- Modèle `pyannote/embedding` optimisé
+
+### Smoothing parole
+- Gap filling configurable (secondes)
+- Minimum duration on/off
+- Runs consolidation efficace
+
+### Traitement streaming
+- Timeline frame-by-frame (25fps standard)
+- JSON écriture buffered
+- Mémoire contrôlée (pas de load complet)
+
+## Trade-offs
+
+### ❌ Embeddings lourds vs ❌ Fonctionnalité avancée
+- **Choix** : Calcul embeddings optionnel (flag env)
+- **Coût** : Overhead computationnel, dépendances PyTorch
+- **Bénéfice** : Analyses clustering/reconnaissance possibles
+
+### ❌ API externe vs ❌ Cohérence données
+- **Choix** : Service Lemonfox spécialisé
+- **Coût** : Dépendance réseau, coûts API
+- **Bénéfice** : Qualité transcription supérieure, diarization native
+
+### ❌ Complexité pipeline vs ❌ Robustesse
+- **Choix** : Logique centralisée dans service
+- **Coût** : Debugging difficile, tests unitaires complexes
+- **Bénéfice** : Cohérence traitement, gestion edge cases complète
+
+## Golden Rule
+**Les sorties JSON doivent rester compatibles STEP5/STEP6** : tout changement format nécessite migration des scripts consommateurs et tests de régression complets.
 
 ## Configuration Essentielle
 
@@ -85,207 +138,6 @@ lemonfox_config = {
     "timestamps": "word",        # Précision mot par mot
     "response_format": "json"
 }
-```
-
-## Architecture Technique
-
-### Service Principal
-
-```python
-class LemonfoxAudioService:
-    def __init__(self, api_key: str, filesystem: FilesystemService):
-        self._api_key = api_key
-        self._fs = filesystem
-        self._session = requests.Session()
-        self._session.timeout = 30
-    
-    def process_video_with_lemonfox(self, video_path: str) -> dict:
-        """Point d'entrée principal pour l'analyse audio."""
-        
-    def _call_lemonfox_api(self, video_path: str) -> dict:
-        """Appel à l'API Lemonfox avec retry."""
-        
-    def _fallback_to_pyannote(self, video_path: str) -> dict:
-        """Fallback local avec Pyannote."""
-        
-    def _compute_speaker_embeddings_from_audio(self, audio_path: str) -> dict:
-        """Calcul des embeddings locuteurs optionnels."""
-        
-    def _build_frame_timeline(self, transcription: dict, fps: float) -> dict:
-        """Conversion transcription vers timeline frame-by-frame."""
-```
-
-### Gestion des Erreurs
-
-```python
-# Types d'erreurs gérées
-class LemonfoxError(Exception):
-    """Base class for Lemonfox errors."""
-    
-class NetworkError(LemonfoxError):
-    """Network connectivity issues."""
-    
-class QuotaExceeded(LemonfoxError):
-    """API quota exceeded."""
-    
-class InvalidResponse(LemonfoxError):
-    """Malformed API response."""
-
-# Retry avec backoff exponentiel
-def _call_with_retry(self, func, *args, **kwargs):
-    for attempt in range(self._max_retries):
-        try:
-            return func(*args, **kwargs)
-        except NetworkError as e:
-            if attempt == self._max_retries - 1:
-                raise
-            delay = (2 ** attempt) * self._retry_delay
-            logger.warning(f"Retry {attempt + 1}/{self._max_retries} in {delay}s")
-            time.sleep(delay)
-```
-
-## Trade-offs par Approche d'Analyse
-
-| Approche | Vitesse | Fiabilité | Coût | Complexité | Quand l'utiliser |
-|----------|----------|------------|-------|------------|-----------------|
-| **Lemonfox Only** | Excellente | Moyenne | Élevé | Faible | Production stable, bon budget |
-| **Pyannote Only** | Faible | Excellente | Gratuit | Moyenne | Développement, budget limité |
-| **Hybrid Auto** | Bonne | Excellente | Variable | Élevée | Production critique |
-| **Embeddings On** | Variable | Excellente | Élevé | Très élevée | Analyse avancée |
-
-## Trade-offs par Configuration Embeddings
-
-| Embeddings | Usage CPU | Précision | Taille JSON | Cas d'usage |
-|------------|------------|------------|--------------|--------------|
-| **Désactivés** | Minimal | Standard | Optimale | Production standard |
-| **Pyannote** | Élevé | Bonne | +15% | Recherche locuteurs |
-| **Lemonfox** | Moyen | Excellente | +20% | Identification précise |
-
-## Analogie : Traducteur Interprète vs Dictionnaire
-
-Pense à l'analyse audio comme un **traducteur interprète** vs un **dictionnaire**. **Lemonfox** est l'interprète : rapide, comprend les nuances, identifie qui parle quand (diarization), mais nécessite une connexion et a un coût. **Pyannote** est le dictionnaire : fiable, toujours disponible, gratuit, mais plus lent et nécessite plus d'effort. Les **embeddings** sont comme des cartes d'identité : chaque locuteur reçoit une signature unique qui permet de le retrouver même s'il change de nom.
-
-## Formats Supportés
-
-### Audio en Entrée
-
-```python
-# Formats supportés (via FFmpeg extraction)
-AUDIO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv')
-AUDIO_FORMAT = 'wav'           # Extraction WAV 16kHz
-AUDIO_SAMPLE_RATE = 16000     # Standard pour les APIs
-AUDIO_CHANNELS = 1            # Mono pour diarization
-```
-
-### Structure de Données
-
-```json
-{
-  "video_filename": "video1.mp4",
-  "total_frames": 2500,
-  "fps": 25.0,
-  "audio_analysis": {
-    "speakers": [
-      {
-        "id": "SPEAKER_00",
-        "name": "Camille",
-        "segments": [
-          {
-            "start": 0.0,
-            "end": 5.2,
-            "text": "Bonjour, je vais vous présenter..."
-          }
-        ],
-        "embeddings": [0.12, -0.34, 0.56, ...]  // Optionnel
-      }
-    ],
-    "transcription": [
-      {
-        "frame": 1,
-        "speaker": "SPEAKER_00",
-        "text": "Bonjour",
-        "confidence": 0.95,
-        "start_time": 0.0,
-        "end_time": 0.8
-      }
-    ]
-  }
-}
-```
-
-## Performance et Optimisations
-
-### Optimisations API
-
-```python
-# Timeout configurables
-LEMONFOX_REQUEST_TIMEOUT=30      # Éviter les hangs
-LEMONFOX_CONNECT_TIMEOUT=10      # Timeout connexion
-
-# Retry intelligent
-LEMONFOX_MAX_RETRIES=3          # Tentatives maximum
-LEMONFOX_RETRY_DELAY=5           # Délai exponentiel
-LEMONFOX_BACKOFF_FACTOR=2         # Facteur backoff
-
-# Chunking pour gros fichiers
-LEMONFOX_CHUNK_SIZE_MB=25        # Découper fichiers >25MB
-```
-
-### Optimisations Fallback
-
-```python
-# Modèles Pyannote optimisés
-LEMONFOX_FALLBACK_MODEL=pyannote/speaker-diarization-3.1
-PYANNOTE_DEVICE=cpu             # Forcer CPU si GPU indisponible
-PYANNOTE_BATCH_SIZE=32           # Batch processing
-```
-
-### Optimisations Embeddings
-
-```python
-# Segmentation minimale
-AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC=0.5  # Segment minimum
-AUDIO_SPEAKER_EMBEDDINGS_MAX_SPEAKERS=10       # Limiter locuteurs
-AUDIO_SPEAKER_EMBEDDINGS_DIMENSION=192        # Dimension vecteurs
-```
-
-## Monitoring et Logs
-
-### Structure des Logs
-
-```
-logs/step4/
-├── lemonfox_api_20240120_143022.log
-├── pyannote_fallback_20240120_143022.log
-└── embeddings_computation_20240120_143022.log
-```
-
-### Exemple de Logs
-
-```
-2024-01-20 14:30:22 - INFO - Starting Lemonfox analysis for video1.mp4
-2024-01-20 14:30:23 - INFO - Extracting audio with FFmpeg: video1.mp4 -> video1.wav
-2024-01-20 14:30:25 - INFO - Calling Lemonfox API (file size: 15.2MB)
-2024-01-20 14:30:45 - INFO - Lemonfox response received: 2 speakers, 156 segments
-2024-01-20 14:30:46 - INFO - Building frame timeline: 2500 frames, 25.0 FPS
-2024-01-20 14:30:50 - INFO - Computing speaker embeddings: 2 speakers, 12 segments
-2024-01-20 14:30:55 - INFO - Successfully wrote video1_audio.json
-```
-
-### Patterns de Progression
-
-```python
-# Progression API
-logger.info(f"Calling Lemonfox API (file size: {file_size_mb:.1f}MB)")
-
-# Progression fallback
-logger.warning(f"Lemonfox failed, using Pyannote fallback: {error}")
-
-# Progression embeddings
-logger.info(f"Computing embeddings: {len(speakers)} speakers, {len(segments)} segments")
-
-# Progression timeline
-logger.info(f"Building frame timeline: {total_frames} frames, {fps:.1f} FPS")
 ```
 
 ## Résolution de Problèmes
@@ -380,8 +232,7 @@ def test_pyannote_fallback():
     service = LemonfoxAudioService(api_key="invalid_key")
     
     # Forcer l'erreur réseau
-    with mock.patch('requests.Session.post') as mock_post:
-        mock_post.side_effect = NetworkError("Connection failed")
+    with mock.patch('requests.Session.post') as NetworkError("Connection failed"):
         
         # Doit utiliser Pyannote
         result = service.process_video_with_lemonfox("test_video.mp4")
@@ -467,35 +318,5 @@ for frame_data in tracking_results:
     audio_segment = find_audio_segment(transcription, frame_num)
     frame_data['audio_speaker'] = audio_segment.get('speaker')
     frame_data['audio_text'] = audio_segment.get('text')
-```
-
-## Pièges Courants et Solutions
-
-### Piège #1 : Clé API invalide
-**Solution** : Vérifier la clé avec `curl -H "Authorization: Bearer $LEMONFOX_API_KEY" https://api.lemonfox.ai/v1/models`
-
-### Piège #2 : Fichier audio trop gros
-**Solution** : Activer le chunking avec `LEMONFOX_CHUNK_SIZE_MB=10`
-
-### Piège #3 : Fallback désactivé
-**Solution** : Toujours garder `LEMONFOX_FALLBACK_ENABLED=1` en production
-
-### Piège #4 : Embeddings sur CPU lent
-**Solution** : Désactiver embeddings ou utiliser GPU avec `PYANNOTE_DEVICE=cuda`
-
-### Piège #5 : Incohérence temps
-**Solution** : Vérifier que `fps` dans le JSON correspond à la vidéo réelle
-
-### Piège #6 : Speakers non identifiés
-**Solution** : Ajuster seuil de diarization dans les paramètres Pyannote
-
-### Piège #7 : Timeout réseau
-**Solution** : Augmenter `LEMONFOX_REQUEST_TIMEOUT` et activer retries
-
-L'étape 4 transforme l'audio brut en données structurées avec une fiabilité maximale grâce au fallback intelligent. Le service garantit que même si l'API externe échoue, l'analyse continue localement, assurant la robustesse du pipeline complet.
-
----
-
-## Golden Rule
-
-**Configure toujours le fallback ; sinon une panne réseau ou un quota dépassé arrêtera tout ton pipeline d'analyse audio.**
+```</content>
+<parameter name="path">/home/kidpixel/workflow_mediapipe/docs/workflow/services/lemonfox_audio_service.md
