@@ -28,11 +28,6 @@ description: Docs Updater (Context-Aware with Code Verification)
  6. **Rappel rapide**
     - Utiliser `resources/docs_sync_checklist.md` pour cocher chaque étape (préparation, collecte, mise à jour, validation, sortie).
 
-## Outils utiles
-- `code_search docs/workflow/ '<mot-clé>'` pour repérer sections.
-- `python scripts/docs-updater.py` (si disponible) ou run manuel via `apply_patch`.
-- `npm run test:frontend` / `pytest ...` pour vérifier que la doc reflète un comportement réellement testé.
-
 ## Checklist finale
 - [ ] Reference aux audits (`docs/workflow/audits/...`) mise à jour si besoin.
 - [ ] Variables `.env` documentées et alignées.

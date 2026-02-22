@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: 
+description: Automatic skill detection and routing matrix for workflow_mediapipe based on pattern matching and priority hierarchy
 globs: 
 ---
 
@@ -13,7 +13,7 @@ globs:
 | `bug`, `error`, `crash`, `performance`, `slow`, `optimize` | debugging-strategies | 1 |
 | `feature`, `add`, `implement`, `create`, `build` | workflow-operator | 1 |
 | `documentation`, `docs`, `README`, `guide` | documentation | 1 |
-| `tâche`, `task`, `backlog`, `planification`, `roadmap` | task-master | 1 |
+| `tâche`, `task`, `backlog`, `planification`, `roadmap` | shrimp-task-manager.md | 1 |
 | `réflexion`, `think`, `logique`, `architecture`, `analyser` | sequentialthinking | 1 |
 | `test`, `testing`, `coverage`, `pytest` | tests-suite-guardian | 2 |
 | `pipeline`, `step4`, `audio`, `lemonfox`, `pyannote` | step4-audio-orchestrator | 2 |
@@ -32,7 +32,7 @@ globs:
 
 When patterns detected, automatically load:
 ```
-read_file(".windsurf/skills/[SKILL_NAME]/SKILL.md")
+fast_read_file(".windsurf/skills/[SKILL_NAME]/SKILL.md")
 ```
 
 ## Multi-Skill Support
@@ -41,7 +41,7 @@ For complex requests, combine multiple skills based on pattern detection priorit
 
 ## Skills Usage Policy
 
-- **Local Skills** (`.windsurf/skills/`) : workflow-operator, debugging-strategies, documentation, tests-suite-guardian, step4-audio-orchestrator, step5-gpu-ops, frontend-timeline-designer, logs-overlay-conductor, pipeline-diagnostics, after-effects-scripts, after-effects-cep-panel, csv-monitoring-sme, workflow-docs-updater-plus, task-master, sequentialthinking, fast-filesystem, json-query
+- **Local Skills** (`.windsurf/skills/`) : workflow-operator, debugging-strategies, documentation, tests-suite-guardian, step4-audio-orchestrator, step5-gpu-ops, frontend-timeline-designer, logs-overlay-conductor, pipeline-diagnostics, after-effects-scripts, after-effects-cep-panel, csv-monitoring-sme, workflow-docs-updater-plus, shrimp-task-manager, sequentialthinking, fast-filesystem, json-query
 - **Global Skills** : Only if no local equivalent
 - **Detection** : Automatic via pattern matching above
 - **Priority** : Local skills first, then global fallback

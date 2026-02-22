@@ -29,7 +29,7 @@ Lancer les commandes suivantes pour ignorer les dossiers de données (ex: "Camil
     - *But* : Visualiser uniquement l'architecture logicielle (`services`, `routes`, `utils`, `workflow_scripts`).
 
 2.  **Cartographie Étendue (Fast-Filesystem)** :
-    - `fast_get_directory_tree(path="/home/kidpixel/workflow_mediapipe", max_depth=3, include_files=false, exclude_patterns=["__pycache__", "venv", "node_modules", ".git", "logs", "debug", "assets", "*_output", "*Camille*", "transnet*", "test*"])`
+    - `fast_get_directory_tree(path="/home/kidpixel/workflow_mediapipe", max_depth=3, include_files=false, exclude_patterns=["__pycache__", "venv", "node_modules", ".git", "logs", "debug", "assets", "*_output", "*Camille*", "transnet*", "test*", ".shrimp_task_manager"])`
     - *But* : Explorer récursivement la structure complète avec focus sur docs/, tests/, et sous-répertoires de scripts/.
 
 3.  **Scan des Scripts Manqués** :
@@ -51,8 +51,8 @@ Lancer les commandes suivantes pour ignorer les dossiers de données (ex: "Camil
     - **Règle** : Si Score > 10 (C), la doc DOIT expliquer la logique interne, pas juste les entrées/sorties.
 
 7.  **Analyse Patterns Large (Ripgrep)** :
-    - `advanced-search(pattern="class|def|function", path="/home/kidpixel/workflow_mediapipe", file_pattern="*.py", context=1)`
-    - `advanced-search(pattern="TODO|FIXME|HACK", path="/home/kidpixel/workflow_mediapipe", file_pattern="*.py|*.js|*.md", context=0)`
+    - `advanced-search(pattern="class|def|function", path="/home/kidpixel/workflow_mediapipe", file_pattern="*.py", context=1, exclude_patterns=[".shrimp_task_manager"])`
+    - `advanced-search(pattern="TODO|FIXME|HACK", path="/home/kidpixel/workflow_mediapipe", file_pattern="*.py|*.js|*.md", context=0, exclude_patterns=[".shrimp_task_manager"])`
     - *But* : Détecter les patterns architecturaux et marqueurs de dette technique à travers le codebase élargi.
 
 8.  **Fichiers Récemment Modifiés** :

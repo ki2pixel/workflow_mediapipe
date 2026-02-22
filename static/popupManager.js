@@ -163,7 +163,16 @@ export function showSequenceSummaryUI(results, overallSuccess, sequenceName = "S
 }
 
 export function showCustomSequenceConfirmUI() {
-    dom.customSequenceConfirmList.innerHTML = '';
+    const confirmList = typeof dom.getCustomSequenceConfirmList === 'function'
+        ? dom.getCustomSequenceConfirmList()
+        : dom.customSequenceConfirmList;
+
+    if (!confirmList) {
+        console.error('Élément DOM customSequenceConfirmList introuvable');
+        return;
+    }
+
+    confirmList.innerHTML = '';
     const selectedStepsOrder = appState.getStateProperty('selectedStepsOrder') || [];
     selectedStepsOrder.forEach((stepKey, index) => {
         const stepElement = document.getElementById(`step-${stepKey}`);
@@ -171,7 +180,10 @@ export function showCustomSequenceConfirmUI() {
         const li = document.createElement('li');
         const safeStepName = DOMUpdateUtils.escapeHtml(String(stepName ?? ''));
         li.innerHTML = `<span class="order-prefix">${index + 1}.</span> ${safeStepName}`;
-        dom.customSequenceConfirmList.appendChild(li);
+        confirmList.appendChild(li);
     });
-    openPopupUI(dom.customSequenceConfirmPopupOverlay);
+    const popupOverlay = typeof dom.getCustomSequenceConfirmPopupOverlay === 'function'
+        ? dom.getCustomSequenceConfirmPopupOverlay()
+        : dom.customSequenceConfirmPopupOverlay;
+    openPopupUI(popupOverlay);
 }

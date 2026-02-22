@@ -12,6 +12,14 @@ Cette section contient le résumé des décisions majeures de 2025. Pour les dé
 
 ## Février 2026
 
+- [2026-02-22 20:45:00] **Exclusion dossier .shrimp_task_manager du prompt docs-updater** : Application de la même exclusion au fichier `.continue/prompts/docs-updater.md` pour cohérence entre workflows et prompts.
+  - **Raison** : Maintenir la cohérence des protocoles de recherche entre les fichiers workflow et prompt équivalents.
+  - **Implémentation** : Modifications identiques dans `.continue/prompts/docs-updater.md` : ajout de `exclude_patterns=[".shrimp_task_manager"]` aux appels `advanced-search` et ajout du pattern à `fast_get_directory_tree`.
+  - **Impact** : Protocoles synchronisés, réduction du bruit dans tous les contextes d'audit documentation.
+- [2026-02-22 20:43:00] **Exclusion dossier .shrimp_task_manager du workflow docs-updater** : Ajout systématique de l'exclusion du dossier `.shrimp_task_manager` dans le protocole de recherche du workflow docs-updater pour éviter le bruit lors des audits structurels et métriques.
+  - **Raison** : Le dossier `.shrimp_task_manager` contient des données de tâches non pertinentes pour les audits de documentation, créant du bruit dans les résultats de recherche.
+  - **Implémentation** : Modifications apportées dans `.windsurf/workflows/docs-updater.md` : ajout de `exclude_patterns=[".shrimp_task_manager"]` aux deux appels `advanced-search` pour patterns architecturaux et TODO, et ajout du pattern à la liste `exclude_patterns` de `fast_get_directory_tree`.
+  - **Impact** : Protocole de recherche plus efficace et ciblé, réduction du bruit dans les audits de documentation.
 - [2026-02-21 22:15:00] **Évaluation Patterns Services — Maintien Singleton vs DI** : Évaluation architecturale des patterns d'injection de dépendances dans les services. Décision de maintenir le pattern singleton actuel (`get_workflow_state()`) plutôt que refactorer vers injection de dépendances comme initialement documenté. Justification : pattern singleton fonctionnel et établi dans toute la codebase, refactoring majeur risqué pour bénéfice limité, focus sur testabilité via context managers existants. Impact : mise à jour documentation `codingstandards.md` pour refléter patterns réels. Pas de changement code requis.
   - **Raison** : Évaluation des trade-offs entre patterns documentés et patterns implémentés.
   - **Analyse** : Pattern singleton actuel fonctionne bien, refactoring vers DI nécessiterait changements massifs, risque élevé pour gain modéré en testabilité.

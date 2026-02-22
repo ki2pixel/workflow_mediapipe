@@ -444,28 +444,7 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
     setActiveStepForLogPanelUI(stepKeyToFocus);
     return;
 
-    if (isPanelOpen && currentActiveLogStep && currentActiveLogStep !== stepKeyToFocus) {
-        console.log(`[UI] Log panel already open for ${currentActiveLogStep}, switching to ${stepKeyToFocus}.`);
-        setActiveStepForLogPanelUI(stepKeyToFocus);
-        hideNonActiveSteps(stepKeyToFocus, true);
-        fetchAndDisplayLogsForPanel(stepKeyToFocus);
-        return;
-    }
-
-    if (isPanelOpen && currentActiveLogStep === stepKeyToFocus) {
-        console.log(`[UI] Panel already open for ${stepKeyToFocus}. Refreshing its content.`);
-        fetchAndDisplayLogsForPanel(stepKeyToFocus);
-        return;
-    }
-
-    console.log(`[UI] Opening panel for ${stepKeyToFocus} (or was closed/open for null).`);
-    setActiveStepForLogPanelUI(stepKeyToFocus);
-    hideNonActiveSteps(stepKeyToFocus, true);
-    if (workflowWrapper) {
-        workflowWrapper.classList.add('logs-active');
-    }
-    openPopupUI(logsColumn);
-    fetchAndDisplayLogsForPanel(stepKeyToFocus);
+    // Code inaccessible supprimé - logique redondante ou ancienne version
 }
 
 export function closeLogPanelUI() {
