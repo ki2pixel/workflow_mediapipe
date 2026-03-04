@@ -7,7 +7,7 @@ description: Docs Updater, Standard Tools, Cloc Radon, Quality Context
 > Ce workflow harmonise la documentation en utilisant l'analyse statique standard (`cloc`, `radon`, `tree`) étendue avec fast-filesystem et ripgrep pour la précision technique et les modèles de référence pour la qualité éditoriale. Couvre désormais l'ensemble du codebase incluant docs/, et tests pour éviter les lacunes de documentation.
 
 ## 🚨 Protocoles Critiques
-1.  **Outils autorisés** : MCP fast-filesystem (`fast_read_file`, `fast_read_multiple_files`, `fast_list_directory`, `fast_get_directory_tree`, `fast_search_files`, `fast_edit_block`, `fast_write_file`, `fast_move_file`, `fast_create_directory`), MCP ripgrep (`search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `find`, `ls`).
+1.  **Outils autorisés** : MCP fast-filesystem (`fast_read_file`, `fast_read_multiple_files`, `fast_list_directory`, `fast_get_directory_tree`, `fast_search_files`, `edit_file`, `fast_write_file`, `fast_move_file`, `fast_create_directory`), MCP ripgrep (`search`, `advanced-search`, `count-matches`, `list-files`, `list-file-types`), et `run_command` limité aux audits (`tree`, `cloc`, `radon`, `find`, `ls`).
 2.  **Contexte** : Initialiser le contexte en appelant l'outil fast_read_file du serveur memory-bank pour lire UNIQUEMENT activeContext.md. Ne lire les autres fichiers de la Memory Bank que si une divergence majeure est détectée lors du diagnostic.
 3.  **Source de Vérité** : Le Code (analysé par outils) > La Documentation existante > La Mémoire.
 4.  **Sécurité Memory Bank** : Utilisez les outils fast-filesystem (fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.
@@ -86,7 +86,6 @@ Choisir le modèle approprié (inspiré des best-practices `doc-generate`) :
 ## Étape 4 — Proposition de Mise à Jour
 Générer un plan de modification avant d'appliquer :
 
-```markdown
 ## 📝 Plan de Mise à Jour Documentation
 ### Audit Métrique
 - **Cible** : `services/workflow_service.py`
@@ -97,14 +96,14 @@ Générer un plan de modification avant d'appliquer :
 - **Type** : [API | Pipeline | Architecture]
 - **Diagnostic** : [Obsolète | Incomplet | Manquant]
 - **Correction** :
-  ```markdown
+```
   [Contenu proposé respectant le standard choisi]
 ```
 
 ## Étape 5 — Application et Finalisation
-1.  **Exécution** : Après validation, utiliser `fast_edit_block` ou `fast_edit_blocks`.
+1.  **Exécution** : Après validation, utiliser `edit_file`.
 2.  **Mise à jour Memory Bank** :
-    - Mettre à jour la Memory Bank en utilisant EXCLUSIVEMENT l'outil fast_edit_block.
+    - Mettre à jour la Memory Bank en utilisant EXCLUSIVEMENT l'outil edit_file.
 
 ### Sous-protocole Rédaction — Application de documentation/SKILL.md
 
