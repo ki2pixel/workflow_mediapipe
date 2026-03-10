@@ -49,6 +49,30 @@ def _parse_csv_list(raw: Optional[str]) -> List[str]:
     return [p for p in parts if p]
 
 
+def _parse_optional_float(raw: Optional[str]) -> Optional[float]:
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except Exception:
+        return None
+
+
+def _normalize_step4_method(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    method = raw.strip().lower()
+    if method in {"pyannote", "lemonfox", "deepinfra"}:
+        return method
+    return None
+
+
+DEEPINFRA_OFFICIAL_TRANSCRIPTIONS_URL = "https://api.deepinfra.com/v1/openai/audio/transcriptions"
+
+
 @dataclass
 class Config:
     """
@@ -159,7 +183,34 @@ class Config:
     LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
     LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
 
+    STEP4_METHOD: str = os.environ.get("STEP4_METHOD", "")
     STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+
+    # DeepInfra API Configuration (STEP4 alternative)
+    DEEPINFRA_API_KEY: Optional[str] = os.environ.get("DEEPINFRA_API_KEY")
+    DEEPINFRA_BASE_URL: str = os.environ.get("DEEPINFRA_BASE_URL", "https://api.deepinfra.com")
+    DEEPINFRA_TRANSCRIPTIONS_ENDPOINT: str = os.environ.get(
+        "DEEPINFRA_TRANSCRIPTIONS_ENDPOINT",
+        "/v1/openai/audio/transcriptions",
+    )
+    DEEPINFRA_TRANSCRIPTIONS_URL: str = os.environ.get("DEEPINFRA_TRANSCRIPTIONS_URL", "")
+    DEEPINFRA_MODEL: str = os.environ.get("DEEPINFRA_MODEL", "openai/whisper-large-v3")
+    DEEPINFRA_TIMEOUT_SEC: int = int(os.environ.get("DEEPINFRA_TIMEOUT_SEC", "300"))
+    DEEPINFRA_MAX_RETRIES: int = int(os.environ.get("DEEPINFRA_MAX_RETRIES", "2"))
+    DEEPINFRA_BACKOFF_SEC: float = float(os.environ.get("DEEPINFRA_BACKOFF_SEC", "1.5"))
+    DEEPINFRA_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("DEEPINFRA_DEFAULT_LANGUAGE")
+    DEEPINFRA_DEFAULT_PROMPT: Optional[str] = os.environ.get("DEEPINFRA_DEFAULT_PROMPT")
+    DEEPINFRA_RESPONSE_FORMAT: str = os.environ.get("DEEPINFRA_RESPONSE_FORMAT", "verbose_json")
+    DEEPINFRA_TIMESTAMP_GRANULARITIES: List[str] = field(
+        default_factory=lambda: _parse_csv_list(os.environ.get("DEEPINFRA_TIMESTAMP_GRANULARITIES", "segment"))
+    )
+    DEEPINFRA_TEMPERATURE: Optional[float] = _parse_optional_float(os.environ.get("DEEPINFRA_TEMPERATURE"))
+    DEEPINFRA_FALLBACK_TO_PYANNOTE: bool = _parse_bool(
+        os.environ.get("STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE"),
+        default=True,
+    )
+    DEEPINFRA_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("DEEPINFRA_SPEECH_GAP_FILL_SEC", "0.15"))
+    DEEPINFRA_SPEECH_MIN_ON_SEC: float = float(os.environ.get("DEEPINFRA_SPEECH_MIN_ON_SEC", "0.0"))
     
     # STEP5 Object Detection Configuration
     # Model selection for fallback object detection when face detection fails (MediaPipe only)
@@ -243,9 +294,73 @@ class Config:
             self.ARCHIVES_DIR = self.BASE_PATH_SCRIPTS / 'archives'
         elif isinstance(self.ARCHIVES_DIR, str):
             self.ARCHIVES_DIR = Path(self.ARCHIVES_DIR)
+
+        self.DEEPINFRA_RESPONSE_FORMAT = (self.DEEPINFRA_RESPONSE_FORMAT or "verbose_json").strip().lower() or "verbose_json"
+        if self.DEEPINFRA_RESPONSE_FORMAT not in {"json", "verbose_json", "text", "srt", "vtt"}:
+            logger.warning(
+                "DEEPINFRA_RESPONSE_FORMAT invalide ('%s'), fallback vers 'verbose_json'.",
+                self.DEEPINFRA_RESPONSE_FORMAT,
+            )
+            self.DEEPINFRA_RESPONSE_FORMAT = "verbose_json"
+
+        if self.DEEPINFRA_TIMEOUT_SEC <= 0:
+            self.DEEPINFRA_TIMEOUT_SEC = 300
+        if self.DEEPINFRA_MAX_RETRIES < 0:
+            self.DEEPINFRA_MAX_RETRIES = 0
+        if self.DEEPINFRA_BACKOFF_SEC <= 0:
+            self.DEEPINFRA_BACKOFF_SEC = 1.5
+
+        self.DEEPINFRA_TRANSCRIPTIONS_URL = self.resolve_deepinfra_transcriptions_url()
             
         # Create necessary directories
         self._create_directories()
+
+    def resolve_step4_method(self) -> str:
+        """
+        Resolve active STEP4 method with backward compatibility.
+
+        Priority:
+          1) STEP4_METHOD when valid (pyannote|lemonfox|deepinfra)
+          2) Legacy STEP4_USE_LEMONFOX toggle
+          3) Default pyannote
+        """
+        normalized = _normalize_step4_method(getattr(self, "STEP4_METHOD", None))
+        if normalized:
+            return normalized
+        if bool(getattr(self, "STEP4_USE_LEMONFOX", False)):
+            return "lemonfox"
+        return "pyannote"
+
+    def resolve_deepinfra_transcriptions_url(self) -> str:
+        """Resolve DeepInfra transcription URL and guard against known typo endpoint variants."""
+        direct_url = (getattr(self, "DEEPINFRA_TRANSCRIPTIONS_URL", "") or "").strip()
+        if direct_url:
+            candidate = direct_url
+        else:
+            base_url = (getattr(self, "DEEPINFRA_BASE_URL", "") or "").strip().rstrip("/")
+            endpoint = (getattr(self, "DEEPINFRA_TRANSCRIPTIONS_ENDPOINT", "") or "").strip()
+            if endpoint and not endpoint.startswith("/"):
+                endpoint = f"/{endpoint}"
+            candidate = f"{base_url}{endpoint}" if base_url else endpoint
+
+        if not candidate:
+            return DEEPINFRA_OFFICIAL_TRANSCRIPTIONS_URL
+
+        if "wisper" in candidate.lower():
+            logger.warning(
+                "DEEPINFRA endpoint '%s' contient 'wisper' (typo connu). Fallback endpoint officiel.",
+                candidate,
+            )
+            return DEEPINFRA_OFFICIAL_TRANSCRIPTIONS_URL
+
+        if not candidate.startswith("http://") and not candidate.startswith("https://"):
+            logger.warning(
+                "DEEPINFRA endpoint '%s' invalide (URL absolue requise). Fallback endpoint officiel.",
+                candidate,
+            )
+            return DEEPINFRA_OFFICIAL_TRANSCRIPTIONS_URL
+
+        return candidate
     
     def _create_directories(self) -> None:
         """Create necessary directories if they don't exist."""

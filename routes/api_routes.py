@@ -13,6 +13,7 @@ from services.workflow_service import WorkflowService
 from services.performance_service import PerformanceService
 from services.filesystem_service import FilesystemService
 from services.lemonfox_audio_service import LemonfoxAudioService
+from services.deepinfra_audio_service import DeepinfraAudioService
 
 logger = logging.getLogger(__name__)
 
@@ -706,3 +707,66 @@ def lemonfox_audio_analysis():
             "status": "error",
             "error": "Internal server error"
         }), 500
+
+
+@api_bp.route('/step4/deepinfra_audio', methods=['POST'])
+@measure_api('/api/step4/deepinfra_audio')
+def deepinfra_audio_analysis():
+    """Process video audio analysis using DeepInfra OpenAI-compatible STT API."""
+    try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"status": "error", "error": "Request body must be JSON"}), 400
+
+        project_name = data.get('project_name', '').strip()
+        video_name = data.get('video_name', '').strip()
+        if not project_name:
+            return jsonify({"status": "error", "error": "project_name is required"}), 400
+        if not video_name:
+            return jsonify({"status": "error", "error": "video_name is required"}), 400
+
+        language = data.get('language')
+        prompt = data.get('prompt')
+        timestamp_granularities = data.get('timestamp_granularities')
+        response_format = data.get('response_format')
+        temperature = data.get('temperature')
+
+        if timestamp_granularities is not None and not isinstance(timestamp_granularities, list):
+            return jsonify({"status": "error", "error": "timestamp_granularities must be an array"}), 400
+        if response_format is not None and not isinstance(response_format, str):
+            return jsonify({"status": "error", "error": "response_format must be a string"}), 400
+        if temperature is not None and not isinstance(temperature, (int, float)):
+            return jsonify({"status": "error", "error": "temperature must be a number"}), 400
+
+        result = DeepinfraAudioService.process_video_with_deepinfra(
+            project_name=project_name,
+            video_name=video_name,
+            language=language,
+            prompt=prompt,
+            timestamp_granularities=timestamp_granularities,
+            response_format=response_format,
+            temperature=float(temperature) if temperature is not None else None,
+        )
+
+        if not result.success:
+            error_msg = result.error or "Unknown error"
+            if "not found" in error_msg.lower():
+                status_code = 404
+            elif "deepinfra api" in error_msg.lower():
+                status_code = 502
+            elif "not configured" in error_msg.lower():
+                status_code = 500
+            else:
+                status_code = 400
+            return jsonify({"status": "error", "error": error_msg}), status_code
+
+        return jsonify({
+            "status": "success",
+            "output_path": str(result.output_path),
+            "fps": result.fps,
+            "total_frames": result.total_frames,
+        }), 200
+
+    except Exception as e:
+        logger.error(f"DeepInfra audio analysis error: {e}", exc_info=True)
+        return jsonify({"status": "error", "error": "Internal server error"}), 500

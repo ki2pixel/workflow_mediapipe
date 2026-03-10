@@ -10,7 +10,7 @@ description: Operate and refine the unified Logs Overlay (Phases 2-4). Use when 
 - CSS : `static/css/components/logs.css`, `static/css/layout.css` (lightbox centrée, responsive, animations).
 - JS : `static/uiUpdater.js`, `static/eventHandlers.js`, `static/popupManager.js`, `static/sequenceManager.js`.
 - Tests : `tests/frontend/test_timeline_logs_phase2.mjs`.
-- Ressource : `resources/overlay_focus_playbook.md` (scénarios auto-open, focus trap, commandes npm/diagnostics).
+- Ressource : `/home/kidpixel/workflow_mediapipe/.cline/skills/logs-overlay-conductor/resources/overlay_focus_playbook.md` (scénarios auto-open, focus trap, commandes npm/diagnostics).
 
 ## Principes UX
 1. Overlay centrée (Phase 4 option A) avec focus trap complet.

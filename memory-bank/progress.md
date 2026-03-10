@@ -7,6 +7,9 @@
 ## Statut Actuel
 Aucune tâche active.
 
+### Mars 2026
+- [2026-03-04 13:56:00] **STEP4 DeepInfra + clôture session (COMPLET)** : Finalisation de l’intégration DeepInfra pour STEP4 avec compatibilité legacy (`STEP4_USE_LEMONFOX`), sélection prioritaire via `STEP4_METHOD`, garde-fou endpoint officiel (`/v1/openai/audio/transcriptions`, anti-`wisper`), service robuste (retry/backoff, écriture JSON atomique), wrapper fallback Pyannote, endpoint API dédié et couverture tests sans appels réseau (58/58 passants). Documentation pipeline STEP4 mise à jour. Session clôturée avec synchronisation Memory Bank (`activeContext.md`, `progress.md`) et retour à l’état neutre.
+
 ### Février 2026
 - [2026-02-12 02:37:00] **Mistral Fine-Tuning Project — Phase 1 Architecture Knowledge (COMPLET)** : Complétion de la Phase 1 du dataset de fine-tuning Mistral avec 40/40 exemples Architecture Knowledge. Implémentation : 23 exemples supplémentaires ajoutés (FilesystemService, WorkflowService, etc.), méthodologie itérative documentée avec `run_command`, documentation complète mise à jour dans `docs/WIP/mistral_finetuning_project.md`. Format JSONL validé, structure dataset prête pour Phase 2. Temps total : ~3 heures (recherche + génération + validation).
 - [2026-02-10 21:53:00] **Frontend — Fix bouton "Lancer Séquence Personnalisée" (COMPLET)** : Debug et correction du bug empêchant l'activation du bouton lors de la sélection de checkboxes. Root cause : mauvais accès DOM (`dom.runCustomSequenceButton` undefined au lieu d'utiliser `dom.getRunCustomSequenceButton()`). Fix appliqué dans `static/uiUpdater.js` avec utilisation correcte de `resolveElement()` + `domBatcher.scheduleUpdate()`. Nettoyage des références similaires dans `eventHandlers.js`. Tests frontend : 8/8 passent. Validation syntaxique OK.

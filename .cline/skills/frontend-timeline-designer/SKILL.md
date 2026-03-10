@@ -9,7 +9,7 @@ description: Create or adjust the Connected Timeline UI (HTML/CSS/JS) with AppSt
 - `templates/index_new.html` (structure Timeline, Logs overlay hook)
 - `static/css/{components/steps.css, layout.css, variables.css, base.css}`
 - `static/{uiUpdater.js, scrollManager.js, sequenceManager.js}`
-- Ressource annexe : `resources/timeline_design_tokens.md` (variables CSS, structure HTML, hooks JS, scénarios de test visuels).
+- Ressource annexe : `/home/kidpixel/workflow_mediapipe/.cline/skills/frontend-timeline-designer/resources/timeline_design_tokens.md` (variables CSS, structure HTML, hooks JS, scénarios de test visuels).
 
 ## Principes clés
 1. **Structure sémantique** : `<section class="workflow-pipeline">`, `.pipeline-timeline[role=list]`, `.timeline-step[role=listitem]` avec spine/nœud/connecteur.

@@ -195,7 +195,11 @@ class TestStepConfigurations:
         cmd_str = ' '.join(cmd)
         
         assert 'audio_env' in cmd_str
-        assert ('run_audio_analysis.py' in cmd_str) or ('run_audio_analysis_lemonfox.py' in cmd_str)
+        assert (
+            ('run_audio_analysis.py' in cmd_str)
+            or ('run_audio_analysis_lemonfox.py' in cmd_str)
+            or ('run_audio_analysis_deepinfra.py' in cmd_str)
+        )
     
     def test_step5_uses_tracking_env_slim(self, temp_base_path):
         """Test that STEP5 uses tracking_env_slim."""

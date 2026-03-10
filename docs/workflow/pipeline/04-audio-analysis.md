@@ -1,14 +1,14 @@
 # Analyse Audio
 
-**TL;DR** : Analyse audio avec Pyannote.audio (défaut) ou Lemonfox API (optionnel). Diarisation automatique des locuteurs avec timeline frame-précise. GPU optimisé avec fallback CPU.
+**TL;DR** : Analyse audio STEP4 avec trois méthodes compatibles : **Pyannote** (défaut), **Lemonfox** (cloud diarisation), **DeepInfra** (OpenAI-compatible STT). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP5/STEP6.
 
 ## Le Problème : Analyse Audio Manuelle Inefficace
 
 Tu dois identifier qui parle et quand dans tes vidéos, mais le faire manuellement est impossible sur des contenus longs. Tu as besoin d'une solution automatique qui distingue les locuteurs et synchronise parfaitement l'analyse audio avec les frames vidéo pour la post-production.
 
-## Notre Solution : Diarisation Intelligente avec Double Option
+## Notre Solution : Diarisation / Transcription avec Triple Option
 
-Nous utilisons Pyannote.audio 3.1, un modèle state-of-the-art pour la diarisation, avec une option Lemonfox API pour le cloud. Le système identifie automatiquement les locuteurs, crée une timeline frame par frame, et s'intègre parfaitement avec le tracking vidéo.
+Nous utilisons Pyannote.audio 3.1 (local), Lemonfox API (cloud diarisation), et DeepInfra (cloud STT OpenAI-compatible). Le système convertit chaque méthode en timeline frame par frame et conserve le même schéma JSON en sortie.
 
 ### ❌ AMP FP16 (anti-pattern)
 ```bash
@@ -92,6 +92,9 @@ projets_extraits/projet_camille_001/docs/video1_audio.json
 ### Variables d'Environnement
 
 ```bash
+# Sélection méthode STEP4 (prioritaire)
+STEP4_METHOD=pyannote          # pyannote | lemonfox | deepinfra
+
 # Profil de performance (recommandé)
 AUDIO_PROFILE=gpu_fp32          # gpu_fp32, gpu_optimized, cpu_only
 
@@ -143,7 +146,30 @@ LEMONFOX_DEFAULT_MAX_SPEAKERS=4
 LEMONFOX_SPEECH_GAP_FILL_SEC=0.15    # Comblement trous courts
 LEMONFOX_SPEECH_MIN_ON_SEC=0.0       # Durée min îlots parole
 LEMONFOX_TIMESTAMP_GRANULARITIES=word
+
+# Option DeepInfra (Cloud STT OpenAI-compatible)
+DEEPINFRA_API_KEY=votre_cle_api_ici
+DEEPINFRA_BASE_URL=https://api.deepinfra.com
+DEEPINFRA_TRANSCRIPTIONS_ENDPOINT=/v1/openai/audio/transcriptions
+DEEPINFRA_MODEL=openai/whisper-large-v3
+DEEPINFRA_RESPONSE_FORMAT=verbose_json
+DEEPINFRA_TIMESTAMP_GRANULARITIES=segment
+DEEPINFRA_TIMEOUT_SEC=300
+DEEPINFRA_MAX_RETRIES=2
+DEEPINFRA_BACKOFF_SEC=1.5
+STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 ```
+
+### Priorité de sélection STEP4
+
+1. `STEP4_METHOD` si valeur valide (`pyannote|lemonfox|deepinfra`)
+2. Fallback legacy `STEP4_USE_LEMONFOX=1` (→ Lemonfox)
+3. Sinon défaut historique Pyannote
+
+> Endpoint DeepInfra officiel appliqué avec garde-fou typo :
+> `https://api.deepinfra.com/v1/openai/audio/transcriptions`
+> 
+> Toute variante contenant `wisper` est rejetée et remplacée automatiquement.
 
 ## Trade-offs par Profil Audio
 
@@ -159,6 +185,7 @@ LEMONFOX_TIMESTAMP_GRANULARITIES=word
 |--------|----------------|------|-------------|---------|-----------------|
 | **Pyannote Local** | Totale | Gratuit | GPU requis | Installation complexe | Données sensibles, on-premise |
 | **Lemonfox Cloud** | Données externes | Par usage | Stable | Dépendance réseau | Projets ponctuels, pas de GPU |
+| **DeepInfra Cloud** | Données externes | Par usage | Stable (retry/backoff) | Dépendance réseau, pas de diarisation native | Transcription rapide compatible API OpenAI |
 | **Hybrid** | Configurable | Variable | Flexible | Complexité gestion | Environnements mixtes |
 
 ## Analogie : Studio Mixage vs Transcription Cloud
@@ -382,6 +409,22 @@ curl -H "Authorization: Bearer $LEMONFOX_API_KEY" https://api.lemonfox.ai/v1/sta
 # 1. Vérifier clé API et quota
 # 2. Désactiver Lemonfox (fallback Pyannote)
 export STEP4_USE_LEMONFOX=0
+```
+
+### DeepInfra API Erreurs
+
+```bash
+# Diagnostic endpoint résolu
+python - <<'PY'
+from config.settings import config
+print(config.resolve_deepinfra_transcriptions_url())
+PY
+
+# Solutions
+# 1. Vérifier DEEPINFRA_API_KEY
+# 2. Vérifier endpoint officiel (/v1/openai/audio/transcriptions)
+# 3. Laisser fallback actif vers Pyannote
+export STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 ```
 
 ## Tests et Validation

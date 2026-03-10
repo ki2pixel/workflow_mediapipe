@@ -112,42 +112,6 @@ sendToClient('batchProgress', {
 });
 ```
 
-### 3.3 Ponts Python Intégrés
-
-#### Auto-recentrage (STEP7 Analyzer)
-```javascript
-// host/MediaSolution.jsx
-function tryRunPythonAnalyzerForLayer(comp, layer, frameRate, videoJsonFile) {
-    const pythonCmd = getPythonExecutable();
-    const analyzerScript = getAnalyzerScript();
-    
-    const command = `${pythonCmd} "${analyzerScript}" ` +
-                   `--manifest_path "${manifestPath}" ` +
-                   `--output_path "${outputPath}" ` +
-                   `--mode analyzer`;
-    
-    const result = system.callSystem(command);
-    return parsePythonResult(result);
-}
-```
-
-#### Parsing CSV (Cuts Parser)
-```javascript
-// host/MediaSolution.jsx
-function tryRunPythonCutsParserForCsv(comp, frameRate, csvFile) {
-    const pythonCmd = getPythonExecutable();
-    const cutsScript = getCutsScript();
-    
-    const command = `${pythonCmd} "${cutsScript}" ` +
-                   `--mode cuts ` +
-                   `--manifest_path "${manifestPath}" ` +
-                   `--output_path "${outputPath}"`;
-    
-    const result = system.callSystem(command);
-    return parseCutsResult(result);
-}
-```
-
 ## 4. Installation & Déploiement
 
 ### Installation Développement (Debug)

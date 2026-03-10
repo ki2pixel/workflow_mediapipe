@@ -188,7 +188,18 @@ class WorkflowCommandsConfig:
         """
         step4_log_dir = self.logs_base_dir / "step4"
 
-        step4_script_name = "run_audio_analysis_lemonfox.py" if config.STEP4_USE_LEMONFOX else "run_audio_analysis.py"
+        resolved_method = "pyannote"
+        try:
+            resolved_method = config.resolve_step4_method()
+        except Exception:
+            resolved_method = "lemonfox" if getattr(config, "STEP4_USE_LEMONFOX", False) else "pyannote"
+
+        step4_script_by_method = {
+            "pyannote": "run_audio_analysis.py",
+            "lemonfox": "run_audio_analysis_lemonfox.py",
+            "deepinfra": "run_audio_analysis_deepinfra.py",
+        }
+        step4_script_name = step4_script_by_method.get(resolved_method, "run_audio_analysis.py")
         cmd = [
             str(config.get_venv_python("audio_env")),
             str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
