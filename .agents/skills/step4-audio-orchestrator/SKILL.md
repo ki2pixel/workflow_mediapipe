@@ -9,7 +9,7 @@ description: Operate STEP4 audio analysis (Lemonfox + Pyannote fallback). Use wh
 1. Vérifier `.env` : `AUDIO_PROFILE`, `AUDIO_PARTIAL_SUCCESS_OK`, `LEMONFOX_*`, `PYANNOTE_*`.
 2. Confirmer `audio_env/bin/python` (torch 1.12.1+cu113) et packages (`pip list | grep torch`).
 3. Inspecter `config/settings.py` pour paths (`CACHE_ROOT_DIR`, `AUDIO_MODE`).
-4. En cas de doute GPU/oom, ouvrir `/home/kidpixel/workflow_mediapipe/.agents/skills/step4-audio-orchestrator/resources/gpu_triage.md` (checklist `nvidia-smi`, scripts smoke test, actions correctives Lemonfox/Pyannote).
+4. En cas de doute GPU/oom, ouvrir `resources/gpu_triage.md` (checklist `nvidia-smi`, scripts smoke test, actions correctives Lemonfox/Pyannote).
 
 ## Exécution Standard
 ```bash

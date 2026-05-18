@@ -195,7 +195,8 @@ class Config:
     )
     DEEPINFRA_TRANSCRIPTIONS_URL: str = os.environ.get("DEEPINFRA_TRANSCRIPTIONS_URL", "")
     DEEPINFRA_MODEL: str = os.environ.get("DEEPINFRA_MODEL", "openai/whisper-large-v3")
-    DEEPINFRA_TIMEOUT_SEC: int = int(os.environ.get("DEEPINFRA_TIMEOUT_SEC", "300"))
+    DEEPINFRA_TIMEOUT_SEC: int = int(os.environ.get("DEEPINFRA_TIMEOUT_SEC", "600"))
+    DEEPINFRA_CONNECT_TIMEOUT_SEC: int = int(os.environ.get("DEEPINFRA_CONNECT_TIMEOUT_SEC", "10"))
     DEEPINFRA_MAX_RETRIES: int = int(os.environ.get("DEEPINFRA_MAX_RETRIES", "2"))
     DEEPINFRA_BACKOFF_SEC: float = float(os.environ.get("DEEPINFRA_BACKOFF_SEC", "1.5"))
     DEEPINFRA_DEFAULT_LANGUAGE: Optional[str] = os.environ.get("DEEPINFRA_DEFAULT_LANGUAGE")
@@ -304,7 +305,9 @@ class Config:
             self.DEEPINFRA_RESPONSE_FORMAT = "verbose_json"
 
         if self.DEEPINFRA_TIMEOUT_SEC <= 0:
-            self.DEEPINFRA_TIMEOUT_SEC = 300
+            self.DEEPINFRA_TIMEOUT_SEC = 600
+        if self.DEEPINFRA_CONNECT_TIMEOUT_SEC <= 0:
+            self.DEEPINFRA_CONNECT_TIMEOUT_SEC = 10
         if self.DEEPINFRA_MAX_RETRIES < 0:
             self.DEEPINFRA_MAX_RETRIES = 0
         if self.DEEPINFRA_BACKOFF_SEC <= 0:

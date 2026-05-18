@@ -1,26 +1,22 @@
 ---
-name: commit-push
 description: Commit changes to the current branch and push to remote
-type: flow
 ---
 
 # Commit & Push (Current Branch)
 
 Commits changes and pushes to remote.
 
-```mermaid
-flowchart TD
-    A([BEGIN]) --> B[Run quality checks as needed using Shell tool]
-    B --> C[Stage changes using Shell tool]
-    C --> D[Commit with message using Shell tool]
-    D --> E[Push to remote using Shell tool]
-    E --> F([END])
-```
-
 ## Prerequisites
 
 - Changed files exist
 - Remote `origin` is configured
+
+## Execution Steps (Non-Interactive)
+
+1. Run quality checks as needed (lint / test / build, etc.) using `run_command`
+2. Stage changes (`git add -A`) using `run_command`
+3. Commit (use message from argument or environment variable) using `run_command`
+4. Push (`git push -u origin <current-branch>`) using `run_command`
 
 ## Usage
 
@@ -66,8 +62,8 @@ git push -u origin "$BRANCH"
 
 ## Notes
 
-- Follow the commit message format and message generation principles in `.windsurf/rules/commit-message-format.md` using `read_text_file`.
-- Recommended to run `git status` or `git diff` to review diffs before execution using `Shell` tool.
+- Follow the commit message format and message generation principles in `.agents/rules/commit-message-format.md` using `read_text_file`.
+- Recommended to run `git status` or `git diff` to review diffs before execution using `run_command`.
 - Use `list_directory` to verify repository state before operations.
 
 **Locking Instruction:** Utilisez les outils fast-filesystem (fast_*) pour accéder aux fichiers memory-bank avec des chemins absolus.

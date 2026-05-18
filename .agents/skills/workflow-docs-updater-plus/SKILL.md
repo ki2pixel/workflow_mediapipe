@@ -26,7 +26,7 @@ description: Docs Updater (Context-Aware with Code Verification)
 5. **Memory Bank**
    - Ajouter une entrée dans `decisionLog.md` et `progress.md` si la doc reflète une décision/avancement majeur.
  6. **Rappel rapide**
-    - Utiliser `/home/kidpixel/workflow_mediapipe/.agents/skills/workflow-docs-updater-plus/resources/docs_sync_checklist.md` pour cocher chaque étape (préparation, collecte, mise à jour, validation, sortie).
+    - Utiliser `resources/docs_sync_checklist.md` pour cocher chaque étape (préparation, collecte, mise à jour, validation, sortie).
 
 ## Checklist finale
 - [ ] Reference aux audits (`docs/workflow/audits/...`) mise à jour si besoin.

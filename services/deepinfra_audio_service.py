@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -168,6 +169,32 @@ class DeepinfraAudioService:
             return None
 
     @staticmethod
+    def _extract_audio_to_temp(video_path: Path) -> Optional[Path]:
+        """Extract audio to a temporary WAV file for smaller API upload."""
+        try:
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".wav", prefix="deepinfra_audio_")
+            os.close(tmp_fd)
+            tmp_path_obj = Path(tmp_path)
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", str(video_path),
+                    "-vn", "-ac", "1", "-ar", "16000", "-f", "wav", "-acodec", "pcm_s16le",
+                    str(tmp_path_obj),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                timeout=60,
+            )
+            if tmp_path_obj.exists() and tmp_path_obj.stat().st_size > 0:
+                return tmp_path_obj
+            return None
+        except Exception as e:
+            logger.warning("ffmpeg audio extraction failed for %s: %s", video_path.name, e)
+            return None
+
+    @staticmethod
     def _build_deepinfra_url() -> str:
         resolver = getattr(config, "resolve_deepinfra_transcriptions_url", None)
         if callable(resolver):
@@ -222,99 +249,120 @@ class DeepinfraAudioService:
             for granularity in granularities:
                 data.append(("timestamp_granularities[]", str(granularity)))
 
-        timeout_sec = max(1, int(getattr(config, "DEEPINFRA_TIMEOUT_SEC", 300) or 300))
+        timeout_sec = max(1, int(getattr(config, "DEEPINFRA_TIMEOUT_SEC", 600) or 600))
         max_retries = max(0, int(getattr(config, "DEEPINFRA_MAX_RETRIES", 2) or 0))
         backoff = float(getattr(config, "DEEPINFRA_BACKOFF_SEC", 1.5) or 1.5)
 
-        for attempt in range(max_retries + 1):
-            try:
-                with open(video_path, "rb") as media_file:
-                    files = {"file": (video_path.name, media_file, "application/octet-stream")}
-                    response = requests.post(
-                        endpoint,
-                        headers=headers,
-                        data=data,
-                        files=files,
-                        timeout=timeout_sec,
-                    )
+        temp_audio_path = DeepinfraAudioService._extract_audio_to_temp(video_path)
+        media_path = temp_audio_path if temp_audio_path else video_path
+        media_name = media_path.name
 
-                if response.status_code == 200:
-                    try:
-                        payload = response.json()
-                    except Exception:
-                        return DeepinfraTranscriptionResult(
-                            success=False,
-                            segments=[],
-                            words=None,
-                            duration=None,
-                            language=None,
-                            text=None,
-                            error="DeepInfra API returned non-JSON payload",
+        video_size = video_path.stat().st_size
+        upload_size = media_path.stat().st_size
+        logger.info(
+            "DeepInfra upload: video=%s (%.2f MB) -> media=%s (%.2f MB)",
+            video_path.name,
+            video_size / (1024 * 1024),
+            media_name,
+            upload_size / (1024 * 1024),
+        )
+
+        try:
+            for attempt in range(max_retries + 1):
+                try:
+                    with open(media_path, "rb") as media_file:
+                        files = {"file": (media_name, media_file, "application/octet-stream")}
+                        response = requests.post(
+                            endpoint,
+                            headers=headers,
+                            data=data,
+                            files=files,
+                            timeout=(timeout_sec, timeout_sec),
                         )
 
+                    if response.status_code == 200:
+                        try:
+                            payload = response.json()
+                        except Exception:
+                            return DeepinfraTranscriptionResult(
+                                success=False,
+                                segments=[],
+                                words=None,
+                                duration=None,
+                                language=None,
+                                text=None,
+                                error="DeepInfra API returned non-JSON payload",
+                            )
+
+                        return DeepinfraTranscriptionResult(
+                            success=True,
+                            segments=payload.get("segments") or [],
+                            words=payload.get("words"),
+                            duration=payload.get("duration"),
+                            language=payload.get("language"),
+                            text=payload.get("text"),
+                            error=None,
+                        )
+
+                    error_message = f"DeepInfra API error: HTTP {response.status_code}"
+                    try:
+                        error_message += f" - {response.json()}"
+                    except Exception:
+                        error_message += f" - {response.text[:200]}"
+
+                    retriable = DeepinfraAudioService._is_retriable_status(response.status_code)
+                    if retriable and attempt < max_retries:
+                        sleep_sec = backoff * (2 ** attempt)
+                        logger.warning("DeepInfra retryable error (attempt %s/%s): %s", attempt + 1, max_retries + 1, error_message)
+                        time.sleep(sleep_sec)
+                        continue
+
                     return DeepinfraTranscriptionResult(
-                        success=True,
-                        segments=payload.get("segments") or [],
-                        words=payload.get("words"),
-                        duration=payload.get("duration"),
-                        language=payload.get("language"),
-                        text=payload.get("text"),
-                        error=None,
+                        success=False,
+                        segments=[],
+                        words=None,
+                        duration=None,
+                        language=None,
+                        text=None,
+                        error=error_message,
                     )
 
-                error_message = f"DeepInfra API error: HTTP {response.status_code}"
+                except requests.Timeout:
+                    if attempt < max_retries:
+                        sleep_sec = backoff * (2 ** attempt)
+                        logger.warning("DeepInfra timeout, retry in %.2fs (attempt %s/%s)", sleep_sec, attempt + 1, max_retries + 1)
+                        time.sleep(sleep_sec)
+                        continue
+                    return DeepinfraTranscriptionResult(
+                        success=False,
+                        segments=[],
+                        words=None,
+                        duration=None,
+                        language=None,
+                        text=None,
+                        error=f"DeepInfra API timeout after {timeout_sec}s",
+                    )
+                except requests.RequestException as e:
+                    if attempt < max_retries:
+                        sleep_sec = backoff * (2 ** attempt)
+                        logger.warning("DeepInfra request error, retry in %.2fs (attempt %s/%s): %s", sleep_sec, attempt + 1, max_retries + 1, e)
+                        time.sleep(sleep_sec)
+                        continue
+                    return DeepinfraTranscriptionResult(
+                        success=False,
+                        segments=[],
+                        words=None,
+                        duration=None,
+                        language=None,
+                        text=None,
+                        error=f"DeepInfra API call failed: {e}",
+                    )
+        finally:
+            if temp_audio_path:
                 try:
-                    error_message += f" - {response.json()}"
+                    temp_audio_path.unlink()
                 except Exception:
-                    error_message += f" - {response.text[:200]}"
-
-                retriable = DeepinfraAudioService._is_retriable_status(response.status_code)
-                if retriable and attempt < max_retries:
-                    sleep_sec = backoff * (2 ** attempt)
-                    logger.warning("DeepInfra retryable error (attempt %s/%s): %s", attempt + 1, max_retries + 1, error_message)
-                    time.sleep(sleep_sec)
-                    continue
-
-                return DeepinfraTranscriptionResult(
-                    success=False,
-                    segments=[],
-                    words=None,
-                    duration=None,
-                    language=None,
-                    text=None,
-                    error=error_message,
-                )
-
-            except requests.Timeout:
-                if attempt < max_retries:
-                    sleep_sec = backoff * (2 ** attempt)
-                    logger.warning("DeepInfra timeout, retry in %.2fs (attempt %s/%s)", sleep_sec, attempt + 1, max_retries + 1)
-                    time.sleep(sleep_sec)
-                    continue
-                return DeepinfraTranscriptionResult(
-                    success=False,
-                    segments=[],
-                    words=None,
-                    duration=None,
-                    language=None,
-                    text=None,
-                    error=f"DeepInfra API timeout after {timeout_sec}s",
-                )
-            except requests.RequestException as e:
-                if attempt < max_retries:
-                    sleep_sec = backoff * (2 ** attempt)
-                    logger.warning("DeepInfra request error, retry in %.2fs (attempt %s/%s): %s", sleep_sec, attempt + 1, max_retries + 1, e)
-                    time.sleep(sleep_sec)
-                    continue
-                return DeepinfraTranscriptionResult(
-                    success=False,
-                    segments=[],
-                    words=None,
-                    duration=None,
-                    language=None,
-                    text=None,
-                    error=f"DeepInfra API call failed: {e}",
-                )
+                    pass
 
         return DeepinfraTranscriptionResult(
             success=False,

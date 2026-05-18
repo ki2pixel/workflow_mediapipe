@@ -10,7 +10,7 @@ description: Checklists and scripts to validate env vars, venv availability, and
 2. Valider l'existence des venv spécialisés (`env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
 3. Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
 4. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP5 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
-5. Consulter `/home/kidpixel/workflow_mediapipe/.agents/skills/pipeline-diagnostics/resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur, y compris les vérifications STEP7/STEP8.
+5. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur, y compris les vérifications STEP7/STEP8.
 
 ## Procédure Complète
 1. **Sanity `.env`**

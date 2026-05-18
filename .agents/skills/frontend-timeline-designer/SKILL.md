@@ -9,7 +9,7 @@ description: Create or adjust the Connected Timeline UI (HTML/CSS/JS) with AppSt
 - `templates/index_new.html` (structure Timeline, Logs overlay hook)
 - `static/css/{components/steps.css, layout.css, variables.css, base.css}`
 - `static/{uiUpdater.js, scrollManager.js, sequenceManager.js}`
-- Ressource annexe : `/home/kidpixel/workflow_mediapipe/.agents/skills/frontend-timeline-designer/resources/timeline_design_tokens.md` (variables CSS, structure HTML, hooks JS, scénarios de test visuels).
+- Ressource annexe : `resources/timeline_design_tokens.md` (variables CSS, structure HTML, hooks JS, scénarios de test visuels).
 
 ## Principes clés
 1. **Structure sémantique** : `<section class="workflow-pipeline">`, `.pipeline-timeline[role=list]`, `.timeline-step[role=listitem]` avec spine/nœud/connecteur.
@@ -34,7 +34,7 @@ description: Create or adjust the Connected Timeline UI (HTML/CSS/JS) with AppSt
 ## Auto-scroll & Sequences
 - `sequenceManager.js` doit appeler `scrollToActiveStep({behavior:"smooth", scrollDelay:0})`.
 - `uiUpdater.js` contient un recentrage throttlé (700 ms) pendant les séquences → ne pas supprimer.
-- `/home/kidpixel/workflow_mediapipe/.agents/skills/csv-monitoring-sme/ressources/timeline-scroll-spacer` assure l'espace en bas (hauteur `calc(100vh - var(--topbar-height))`).
+- `timeline-scroll-spacer` assure l'espace en bas (hauteur `calc(100vh - var(--topbar-height))`).
 
 ## Logs Overlay coexistence
 - La timeline doit laisser l'espace pour l'overlay (Classes `.pipeline-wrapper` + `.timeline-scroll-spacer`).

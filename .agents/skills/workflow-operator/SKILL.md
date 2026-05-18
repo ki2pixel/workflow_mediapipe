@@ -33,7 +33,7 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 
 Ces commandes doivent être lancées depuis la racine du projet **tout en ciblant les interpréteurs situés dans `/mnt/venv_ext4/<venv>/bin/python`** (pas le Python système).
 
-> 🔎 **Raccourci** : consultez `/home/kidpixel/workflow_mediapipe/.agents/skills/workflow-operator/resources/step_command_matrix.md` pour une vue tabulaire des 8 étapes (interpréteur, commande, logs, prérequis). Gardez le fichier ouvert pendant les interventions d'astreinte.
+> 🔎 **Raccourci** : consultez `resources/step_command_matrix.md` pour une vue tabulaire des 8 étapes (interpréteur, commande, logs, prérequis). Gardez le fichier ouvert pendant les interventions d'astreinte.
 
 ### Step 1 : Extraction Sécurisée
 ```bash

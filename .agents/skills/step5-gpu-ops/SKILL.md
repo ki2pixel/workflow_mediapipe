@@ -9,7 +9,7 @@ description: Operate and debug STEP5 tracking with MediaPipe (CPU) or InsightFac
 1. Lire `.env` → vérifier `STEP5_TRACKING_ENGINE`, `STEP5_ENABLE_GPU`, `STEP5_INSIGHTFACE_*`, `STEP5_MEDIAPIPE_*`, `STEP5_BLENDSHAPES_THROTTLE_N`, `STEP5_EXPORT_VERBOSE_FIELDS`.
 2. Confirmer la présence du venv `tracking_env_slim` (CPU) et `insightface_env` (GPU).
 3. S'assurer que les modèles sont présents dans `workflow_scripts/step5/models/engines/*` (ex: `insightface`, object detectors).
-4. Utiliser `/home/kidpixel/workflow_mediapipe/.agents/skills/step5-gpu-ops/resources/engine_diagnostics.md` pour choisir le moteur, vérifier les providers ONNX, activer le profiling ou valider la densité JSON.
+4. Utiliser `resources/engine_diagnostics.md` pour choisir le moteur, vérifier les providers ONNX, activer le profiling ou valider la densité JSON.
 
 ## Lancer STEP5
 ```bash
