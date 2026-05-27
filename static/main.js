@@ -40,11 +40,7 @@ function setupLocalDownloadsToggle() {
     const btn = document.getElementById('toggle-local-downloads');
     if (!section || !btn) return;
 
-    let visible = true;
-    try {
-        const stored = localStorage.getItem('ui.localDownloadsVisible');
-        if (stored !== null) visible = stored === 'true';
-    } catch (_) {}
+    const visible = !!appState.getStateProperty('ui.localDownloadsVisible');
 
     if (visible) {
         section.style.display = '';
@@ -54,12 +50,14 @@ function setupLocalDownloadsToggle() {
 
     applyLocalDownloadsVisibility(section, btn, visible);
 
+    appState.subscribeToProperty('ui.localDownloadsVisible', (newVal) => {
+        applyLocalDownloadsVisibility(section, btn, !!newVal);
+    });
+
     btn.addEventListener('click', () => {
-        visible = !(btn.getAttribute('aria-pressed') === 'true');
-        applyLocalDownloadsVisibility(section, btn, visible);
-        try { localStorage.setItem('ui.localDownloadsVisible', String(visible)); } catch (_) {}
-        appState.setState({ ui: { localDownloadsVisible: visible } }, 'downloads_visibility_toggle');
-        if (visible) {
+        const current = !!appState.getStateProperty('ui.localDownloadsVisible');
+        appState.setState({ ui: { localDownloadsVisible: !current } }, 'downloads_visibility_toggle');
+        if (!current) {
             btn.classList.remove('downloads-toggle--alert');
             try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
         }
@@ -474,7 +472,6 @@ function setupCompactMode() {
 
     // Force compact mode as the only mode
     appState.setState({ ui: { compactMode: true } }, 'compact_forced_default');
-    try { localStorage.setItem('ui.compactMode', 'true'); } catch (_) {}
 
     // Apply immediately and keep in sync if state changes elsewhere
     applyCompactClass(wrapper, true);
@@ -503,17 +500,13 @@ function setupSystemMonitorMinimize() {
         return;
     }
 
-    // Init from storage
-    let stored = null;
-    try { stored = localStorage.getItem('ui.systemMonitorMinimized'); } catch (_) {}
-    const minimized = stored === 'true';
-    appState.setState({ ui: { systemMonitorMinimized: minimized } }, 'system_monitor_init');
+    // Init from state
+    const minimized = !!appState.getStateProperty('ui.systemMonitorMinimized');
     applySystemMonitorMinimized(widget, compactLine, minimized);
 
     // Subscribe to state changes
     appState.subscribeToProperty('ui.systemMonitorMinimized', (newVal) => {
         applySystemMonitorMinimized(widget, compactLine, !!newVal);
-        try { localStorage.setItem('ui.systemMonitorMinimized', (!!newVal).toString()); } catch (_) {}
     });
 
     // Click on button to minimize
@@ -558,16 +551,6 @@ function setupSettingsPanel() {
         return;
     }
 
-    // Init from storage (optional), then AppState
-    try {
-        const stored = localStorage.getItem('ui.settingsOpen');
-        if (stored !== null) {
-            appState.setState({ ui: { settingsOpen: stored === 'true' } }, 'settings_init_storage');
-        }
-    } catch (e) {
-        console.debug('[SETTINGS] localStorage not available', e);
-    }
-
     // Apply initial state
     const initialOpen = !!appState.getStateProperty('ui.settingsOpen');
     applySettingsPanel(panel, toggle, initialOpen);
@@ -581,7 +564,6 @@ function setupSettingsPanel() {
     toggle.addEventListener('click', () => {
         const next = !appState.getStateProperty('ui.settingsOpen');
         appState.setState({ ui: { settingsOpen: next } }, 'settings_toggle');
-        try { localStorage.setItem('ui.settingsOpen', String(next)); } catch (_) {}
     });
 }
 

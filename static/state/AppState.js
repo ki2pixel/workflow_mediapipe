@@ -1,5 +1,22 @@
 class AppState {
     constructor() {
+        this.PERSISTED_PATHS = [
+            'ui.compactMode',
+            'ui.autoOpenLogOverlay',
+            'selectedStepsOrder',
+            'ui.localDownloadsVisible',
+            'ui.systemMonitorMinimized',
+            'ui.settingsOpen'
+        ];
+
+        this.LEGACY_MIGRATIONS = {
+            'autoOpenLogOverlay': 'ui.autoOpenLogOverlay',
+            'ui.compactMode': 'ui.compactMode',
+            'ui.localDownloadsVisible': 'ui.localDownloadsVisible',
+            'ui.systemMonitorMinimized': 'ui.systemMonitorMinimized',
+            'ui.settingsOpen': 'ui.settingsOpen'
+        };
+
         this.state = {
             pollingIntervals: {},
             
@@ -8,7 +25,10 @@ class AppState {
             focusedElementBeforePopup: null,
             ui: {
                 compactMode: false,
-                autoOpenLogOverlay: true
+                autoOpenLogOverlay: true,
+                localDownloadsVisible: true,
+                systemMonitorMinimized: false,
+                settingsOpen: false
             },
             
             stepTimers: {},
@@ -34,6 +54,9 @@ class AppState {
         
         this.stateChangeCount = 0;
         this.lastStateChange = Date.now();
+        
+        // Load persisted state synchronously to ensure initial state is correct before UI renders
+        this._loadPersistedState();
         
         console.debug('[AppState] Initialized with immutable state management');
     }
@@ -69,6 +92,8 @@ class AppState {
             this.lastStateChange = Date.now();
             
             console.debug(`[AppState] State updated from ${source}:`, updates);
+            
+            this._persistStateChanges(oldState, newState);
             
             this._notifyListeners(newState, oldState, source);
         }
@@ -133,7 +158,10 @@ class AppState {
             focusedElementBeforePopup: null,
             ui: {
                 compactMode: false,
-                autoOpenLogOverlay: true
+                autoOpenLogOverlay: true,
+                localDownloadsVisible: true,
+                systemMonitorMinimized: false,
+                settingsOpen: false
             },
             stepTimers: {},
             selectedStepsOrder: [],
@@ -153,6 +181,15 @@ class AppState {
         
         this.setState(initialState, 'reset');
         console.info('[AppState] State reset to initial values');
+        
+        // When resetting, we should also clear the persisted state
+        try {
+            this.PERSISTED_PATHS.forEach(path => {
+                localStorage.removeItem(`appstate:${path}`);
+            });
+        } catch (e) {
+            console.warn('[AppState] Failed to clear persisted state on reset:', e);
+        }
     }
     
     getStats() {
@@ -267,6 +304,97 @@ class AppState {
         return path.split('.').reduce((current, key) => {
             return current && current[key] !== undefined ? current[key] : undefined;
         }, obj);
+    }
+    
+    _setPropertyByPath(obj, path, value) {
+        const keys = path.split('.');
+        let current = obj;
+        for (let i = 0; i < keys.length - 1; i++) {
+            const key = keys[i];
+            if (current[key] === undefined || current[key] === null || typeof current[key] !== 'object') {
+                current[key] = {};
+            }
+            // Ensure we create a new reference if we are deep cloning/merging
+            if (!Array.isArray(current[key])) {
+                current[key] = { ...current[key] };
+            } else {
+                current[key] = [...current[key]];
+            }
+            current = current[key];
+        }
+        current[keys[keys.length - 1]] = value;
+        return obj;
+    }
+    
+    _loadPersistedState() {
+        if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+        
+        let stateHasBeenLoaded = false;
+        
+        // Step 1: Migrate legacy keys if they exist and delete them
+        try {
+            for (const [legacyKey, appStatePath] of Object.entries(this.LEGACY_MIGRATIONS)) {
+                const storedValue = localStorage.getItem(legacyKey);
+                if (storedValue !== null) {
+                    // Try to parse if JSON, otherwise handle boolean string ('true' / 'false')
+                    let parsedValue = storedValue;
+                    if (storedValue === 'true') parsedValue = true;
+                    else if (storedValue === 'false') parsedValue = false;
+                    else {
+                        try {
+                            parsedValue = JSON.parse(storedValue);
+                        } catch (e) {
+                            // Keep as string if parsing fails
+                        }
+                    }
+                    
+                    localStorage.setItem(`appstate:${appStatePath}`, JSON.stringify(parsedValue));
+                    localStorage.removeItem(legacyKey);
+                    console.debug(`[AppState] Migrated legacy key '${legacyKey}' to 'appstate:${appStatePath}'`);
+                }
+            }
+        } catch (e) {
+            console.warn('[AppState] Failed to run migrations:', e);
+        }
+
+        // Step 2: Load explicitly persisted paths
+        this.PERSISTED_PATHS.forEach(path => {
+            try {
+                const stored = localStorage.getItem(`appstate:${path}`);
+                if (stored !== null) {
+                    const parsed = JSON.parse(stored);
+                    this.state = this._setPropertyByPath(this.state, path, parsed);
+                    stateHasBeenLoaded = true;
+                    console.debug(`[AppState] Restored ${path} from localStorage:`, parsed);
+                }
+            } catch (e) {
+                console.warn(`[AppState] Failed to restore ${path} from localStorage:`, e);
+            }
+        });
+        
+        if (stateHasBeenLoaded) {
+            console.debug('[AppState] Initial state merged with persisted preferences.');
+        }
+    }
+    
+    _persistStateChanges(oldState, newState) {
+        if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+        
+        this.PERSISTED_PATHS.forEach(path => {
+            const oldValue = this._getPropertyByPath(oldState, path);
+            const newValue = this._getPropertyByPath(newState, path);
+            
+            // Note: Deep equality check may be better here but reference change is enough
+            // since we use immutable state management
+            if (oldValue !== newValue && newValue !== undefined) {
+                try {
+                    localStorage.setItem(`appstate:${path}`, JSON.stringify(newValue));
+                    console.debug(`[AppState] Persisted ${path} to localStorage:`, newValue);
+                } catch (e) {
+                    console.warn(`[AppState] Failed to persist ${path} to localStorage:`, e);
+                }
+            }
+        });
     }
     
     _notifyListeners(newState, oldState, source) {

@@ -89,13 +89,13 @@ export function initializeEventHandlers() {
 
     const logsAutoOpenToggle = resolveElement(dom.getLogsAutoOpenToggle, dom.logsAutoOpenToggle);
     if (logsAutoOpenToggle) {
-        const savedPreference = localStorage.getItem('autoOpenLogOverlay');
-        const initialValue = savedPreference === null ? getAutoOpenLogOverlay() : savedPreference === 'true';
-        logsAutoOpenToggle.checked = initialValue;
-        setAutoOpenLogOverlay(initialValue);
+        logsAutoOpenToggle.checked = getAutoOpenLogOverlay();
+        // Subscribe to stay in sync if updated elsewhere
+        appState.subscribeToProperty('ui.autoOpenLogOverlay', (enabled) => {
+            logsAutoOpenToggle.checked = !!enabled;
+        });
         logsAutoOpenToggle.addEventListener('change', (event) => {
             const enabled = event.target.checked;
-            localStorage.setItem('autoOpenLogOverlay', enabled.toString());
             setAutoOpenLogOverlay(enabled);
             console.log(`[EVENT] Auto log overlay ${enabled ? 'enabled' : 'disabled'} by user`);
         });
@@ -234,6 +234,23 @@ export function initializeEventHandlers() {
         closeSummaryPopupButton.addEventListener('click', () => {
             closePopupUI(sequenceSummaryOverlay);
         });
+    }
+
+    // Restore custom sequence checkbox state from persisted order
+    const initialOrder = getSelectedStepsOrder();
+    if (initialOrder.length > 0) {
+        const cbArray = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+        initialOrder.forEach((stepKey, idx) => {
+            const cb = cbArray.find(checkbox => checkbox.dataset.stepKey === stepKey);
+            if (cb) {
+                cb.checked = true;
+                const stepCard = document.getElementById(`step-${stepKey}`);
+                if (stepCard) stepCard.classList.add('custom-sequence-selected');
+                const orderEl = document.getElementById(`order-${stepKey}`);
+                if (orderEl) orderEl.textContent = idx + 1;
+            }
+        });
+        ui.updateCustomSequenceButtonsUI();
     }
 
     if (dom.getSoundToggle()) {

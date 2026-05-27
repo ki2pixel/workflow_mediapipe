@@ -13,6 +13,8 @@ import { soundEvents } from './soundManager.js';
 import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
 import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
 import { openPopupUI, closePopupUI } from './popupManager.js';
+import { DOMDiff } from './utils/DOMDiff.js';
+import { workerManager } from './utils/WorkerManager.js';
 
 const STATUS_UI_MAP = {
     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
@@ -790,29 +792,37 @@ export function updateGlobalProgressUI(text, percentage, isError = false) {
     }
 }
 
-export function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
-    domBatcher.scheduleUpdate('specific-log-ui', () => {
-        const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
-        const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
-        const outputContent = resolveElement(dom.getSpecificLogOutputContentPanel, dom.specificLogOutputContentPanel);
-        const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
-        const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
-
-        if(headerText) headerText.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
-        if(pathInfo) pathInfo.textContent = path ? `(Source: ${path})` : "";
+export async function updateSpecificLogUI(logName, path, content, isError = false, errorMessage = '') {
+    try {
+        let styledContent = '';
         if (isError) {
-            if(outputContent) {
-                const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
-                outputContent.innerHTML = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
-            }
+            const escapedErrorMessage = DOMUpdateUtils.escapeHtml(errorMessage);
+            styledContent = `<span class="log-line log-error">${escapedErrorMessage}</span>`;
         } else {
-            const styledContent = parseAndStyleLogContent(content);
-            if(outputContent) outputContent.innerHTML = styledContent;
+            styledContent = await workerManager.parseLogs(content, 'specificLogPanel');
         }
-        if(specificLogContainer) specificLogContainer.style.display = 'flex';
-        if(mainLogContainer) mainLogContainer.style.display = 'none';
-        if(outputContent) outputContent.scrollTop = 0;
-    });
+
+        domBatcher.scheduleUpdate('specific-log-ui', () => {
+            const headerText = resolveElement(dom.getSpecificLogHeaderTextPanel, dom.specificLogHeaderTextPanel);
+            const pathInfo = resolveElement(dom.getSpecificLogPathInfoPanel, dom.specificLogPathInfoPanel);
+            const outputContent = resolveElement(dom.getSpecificLogOutputContentPanel, dom.specificLogOutputContentPanel);
+            const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+            const mainLogContainer = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
+
+            if(headerText) headerText.textContent = isError ? `Erreur chargement "${logName}"` : `Log Spécifique: "${logName}"`;
+            if(pathInfo) pathInfo.textContent = path ? `(Source: ${path})` : "";
+            
+            if(outputContent) {
+                outputContent.innerHTML = styledContent;
+            }
+            
+            if(specificLogContainer) specificLogContainer.style.display = 'flex';
+            if(mainLogContainer) mainLogContainer.style.display = 'none';
+            if(outputContent) outputContent.scrollTop = 0;
+        });
+    } catch (e) {
+        console.debug('[UI] Log parsing aborted/obsolete:', e.message);
+    }
 }
 
 const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
@@ -907,74 +917,80 @@ const lines = rawContent.split('\n');
     return styledLines.join('\n');
 }
 
-export function updateMainLogOutputUI(htmlContent) {
+export async function updateMainLogOutputUI(htmlContent) {
     const mainLogOutputPanel = resolveElement(dom.getMainLogOutputPanel, dom.mainLogOutputPanel);
     const mainLogContainerPanel = resolveElement(dom.getMainLogContainerPanel, dom.mainLogContainerPanel);
     const specificLogContainerPanel = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
 
-    if (mainLogOutputPanel) {
-        const styledContent = parseAndStyleLogContent(htmlContent);
-        mainLogOutputPanel.innerHTML = styledContent;
-        mainLogOutputPanel.scrollTop = mainLogOutputPanel.scrollHeight;
-    }
-
     if (mainLogContainerPanel) mainLogContainerPanel.style.display = 'flex';
     if (specificLogContainerPanel) specificLogContainerPanel.style.display = 'none';
+
+    if (mainLogOutputPanel) {
+        try {
+            const styledContent = await workerManager.parseLogs(htmlContent, 'mainLogPanel');
+            domBatcher.scheduleUpdate('main-log-output', () => {
+                mainLogOutputPanel.innerHTML = styledContent;
+                mainLogOutputPanel.scrollTop = mainLogOutputPanel.scrollHeight;
+            });
+        } catch (e) {
+            console.debug('[UI] Main log parsing aborted/obsolete:', e.message);
+        }
+    }
 }
 
 export function updateLocalDownloadsListUI(downloadsData) {
-    if (!dom.getLocalDownloadsList()) return;
-    dom.getLocalDownloadsList().innerHTML = '';
+    const listEl = dom.getLocalDownloadsList();
+    if (!listEl) return;
+    
+    let htmlContent = '';
     if (!downloadsData || downloadsData.length === 0) {
-        const li = document.createElement('li');
-        li.textContent = 'Aucune activité de téléchargement locale récente.';
-        li.classList.add('placeholder');
-        dom.getLocalDownloadsList().appendChild(li);
-        return;
+        htmlContent = '<li class="placeholder">Aucune activité de téléchargement locale récente.</li>';
+    } else {
+        const currentDownloadIds = new Set();
+        downloadsData.forEach(download => {
+            if (download.id) {
+                currentDownloadIds.add(download.id);
+                if (!previousDownloadIds.has(download.id) &&
+                    (download.status === 'pending' || download.status === 'downloading')) {
+                    console.log(`[SOUND] New CSV download detected: ${download.filename}`);
+                    soundEvents.csvDownloadInitiation();
+
+                    const filename = download.filename && download.filename !== 'Détermination en cours...'
+                        ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
+                        : 'nouveau fichier';
+                    showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
+                }
+            }
+        });
+
+        previousDownloadIds = currentDownloadIds;
+
+        downloadsData.forEach(download => {
+            const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
+            const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
+            const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
+            const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
+
+            const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
+            const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
+            let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
+            let progressText = '';
+            if (download.status === 'downloading' && typeof download.progress === 'number') {
+                progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
+            }
+            if (download.message) {
+                const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
+                const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
+                statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
+            }
+            
+            const keyAttr = download.id ? ` data-key="${DOMUpdateUtils.escapeHtml(download.id)}"` : '';
+            htmlContent += `<li class="download-status-${download.status}"${keyAttr}>${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}</li>`;
+        });
     }
 
-const currentDownloadIds = new Set();
-    downloadsData.forEach(download => {
-        if (download.id) {
-            currentDownloadIds.add(download.id);
-if (!previousDownloadIds.has(download.id) &&
-                (download.status === 'pending' || download.status === 'downloading')) {
-                console.log(`[SOUND] New CSV download detected: ${download.filename}`);
-                soundEvents.csvDownloadInitiation();
-
-const filename = download.filename && download.filename !== 'Détermination en cours...'
-                    ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
-                    : 'nouveau fichier';
-                showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
-            }
-        }
-    });
-
-previousDownloadIds = currentDownloadIds;
-
-    downloadsData.forEach(download => {
-        const li = document.createElement('li');
-        li.classList.add(`download-status-${download.status}`);
-
-        const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
-        const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
-        const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
-        const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
-
-        const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
-        const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
-        let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
-        let progressText = '';
-        if (download.status === 'downloading' && typeof download.progress === 'number') {
-            progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
-        }
-        if (download.message) {
-            const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
-            const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
-            statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
-        }
-        li.innerHTML = `${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}`;
-        dom.getLocalDownloadsList().appendChild(li);
+    domBatcher.scheduleUpdate('downloads-list-render', () => {
+        DOMDiff.morph(listEl, htmlContent);
     });
 }
 

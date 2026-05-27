@@ -1,13 +1,16 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-Aucune tâche active. Optimisation I/O pour STEP6/STEP7 (streaming JSON) complétée avec succès.
+Aucune tâche active. Workflow docs-updater exécuté avec succès pour restaurer et harmoniser le rapport d'audit frontend.
 
 ## Objectifs
 - Maintenir l'intégrité du repo.
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-05-27 19:13:12] **Persistance Sélective (AppState Middleware) (COMPLET)** : Implémentation de la recommandation de l'audit pour la persistance sélective de l'état frontend. Création d'un middleware déclaratif dans `AppState.js` avec migration automatique des anciennes clés. Refactoring complet de `main.js` et `eventHandlers.js` pour supprimer les accès directs au `localStorage` et restauration dynamique de l'UI des sélections d'étapes personnalisées. Ajout de `test_state_persistence.mjs` validé avec succès.
+- [2026-05-27 19:02:00] Implémentation du système Virtual DOM (DOM Morphing) léger via `DOMDiff.js` (O(N) diffing). Remplacement des `innerHTML` destructeurs dans la méthode `updateLocalDownloadsListUI` de `uiUpdater.js`. Ajout et passage complet des tests unitaires `tests/frontend/dom_diff.test.js` exécutés par le script `test:frontend`.
+- [2026-05-27 19:10:00] Audit complet de l'architecture frontend natif (vanilla JS). Analyse et documentation des mécanismes `AppState` (état réactif immuable), `DOMBatcher` (évitement du *layout thrashing* via `requestAnimationFrame`), `PollingManager` (boucles réseau résilientes sans fuite), `PerformanceMonitor` (télémétrie intégrée) et `ErrorHandler` (auto-guérison et pénalités exponentielles). Rapport publié dans `docs/audits/frontend_audit.md`.
 - [2026-05-27 18:52:00] Alignement complet de la documentation avec le codebase réel via le workflow `docs-updater` : documentation de `ijson` (streaming O(1) RAM) pour STEP6/STEP7 et des safeguards de démarrage sécurisé de production et de `validate_startup.py` dans le guide de sécurité.
 - [2026-05-27 18:40:00] Implémentation de la recommandation d'audit "Optimisation I/O pour STEP6/STEP7". Utilisation de `ijson` pour parser les fichiers de tracking en flux. Refonte de `json_reducer.py` et `preprocess_ae_json.py` pour un maintien de la RAM O(1).
 - [2026-05-27 18:28:00] Implémentation de la recommandation d'audit "Sécurité en Production". L'application Flask (app_new.py) et le script de validation (validate_startup.py) crashent désormais fermement en production (DEBUG=False) si des secrets/tokens par défaut (dev-*) sont configurés.
