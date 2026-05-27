@@ -33,11 +33,11 @@ for (var frame = 1; frame <= totalFrames; frame++) {
 
 ### Flux de Pré-traitement AE
 
-1. **Analyse des données** : Lecture des fichiers STEP6 (tracking + audio)
-2. **Indexation frame-précise** : Construction de `dataByFrame` pour accès direct
-3. **Enrichissement AE** : Calculs `center_x/center_y`, couleurs hexadécimales
-4. **Mode analyzer** : Support pour calculs Python délégués
-5. **Écriture atomique** : Sauvegarde sécurisée du fichier AE-ready
+1. **Analyse en flux continu (`ijson`)** : Lecture itérative progressive des fichiers réduits de STEP6 (tracking + audio) pour maintenir une consommation de RAM stable en O(1).
+2. **Indexation frame-précise** : Construction de l'index `dataByFrame` en streaming pour un accès direct instantané côté After Effects.
+3. **Enrichissement AE** : Calculs à la volée de `center_x/center_y` et injection des couleurs hexadécimales associées aux labels.
+4. **Mode analyzer** : Support de l'analyse sélective et délégations de calculs géométriques complexes.
+5. **Écriture atomique** : Sauvegarde sécurisée du fichier AE-ready (`*_ae.json`) via écriture temporaire suivie d'un renommage.
 
 ## Utilisation Rapide
 
@@ -385,9 +385,9 @@ logs/step7/
 # Activation environnement principal
 source env/bin/activate
 
-# Dépendances minimales
-# Python 3.8+ standard library
-# json, os, pathlib, logging
+# Dépendances requises
+# - Python 3.8+ standard library (json, os, pathlib, logging)
+# - ijson: requis pour le parsing streaming itératif O(1) RAM
 ```
 
 ### Prérequis Fichiers

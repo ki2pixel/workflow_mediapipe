@@ -69,11 +69,28 @@ def validate_configuration():
         if config.DEBUG:
             warnings.append("DEBUG mode is enabled")
         
-        if config.SECRET_KEY.startswith('dev-'):
-            warnings.append("Using development SECRET_KEY")
+        is_production = not config.DEBUG
         
-        if config.INTERNAL_WORKER_TOKEN.startswith('dev-'):
-            warnings.append("Using development INTERNAL_WORKER_TOKEN")
+        if config.SECRET_KEY.startswith('dev-') or config.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
+            msg = f"Insecure SECRET_KEY in production: {config.SECRET_KEY}" if is_production else "Using development SECRET_KEY"
+            if is_production:
+                issues.append(msg)
+            else:
+                warnings.append(msg)
+        
+        if config.INTERNAL_WORKER_TOKEN.startswith('dev-') or config.INTERNAL_WORKER_TOKEN == 'dev-internal-worker-token':
+            msg = f"Insecure INTERNAL_WORKER_TOKEN in production: {config.INTERNAL_WORKER_TOKEN}" if is_production else "Using development INTERNAL_WORKER_TOKEN"
+            if is_production:
+                issues.append(msg)
+            else:
+                warnings.append(msg)
+                
+        if config.RENDER_REGISTER_TOKEN.startswith('dev-') or config.RENDER_REGISTER_TOKEN == 'dev-render-register-token':
+            msg = f"Insecure RENDER_REGISTER_TOKEN in production: {config.RENDER_REGISTER_TOKEN}" if is_production else "Using development RENDER_REGISTER_TOKEN"
+            if is_production:
+                issues.append(msg)
+            else:
+                warnings.append(msg)
         
     except Exception as e:
         issues.append(f"Configuration import failed: {e}")

@@ -7,6 +7,10 @@
 ## Statut Actuel
 Aucune tâche active.
 
+### Mai 2026
+- [2026-05-27 18:52:00] **Mise à jour Documentation - ijson & Startup Security (COMPLET)** : Harmonisation de la documentation via le workflow `docs-updater`. Intégration de la transition vers `ijson` (streaming O(1) RAM) dans les guides de STEP6 et STEP7, et documentation des safeguards de sécurité de production et de `validate_startup.py` dans le guide de sécurité.
+- [2026-05-27 18:40:00] **Optimisation I/O pour STEP6/STEP7 (COMPLET)** : Implémentation d'un flux de lecture JSON asynchrone itératif (`ijson`) pour les scripts de réduction (STEP6) et de pré-traitement AE (STEP7). La consommation de la RAM passe de O(N) à O(1), résolvant la recommandation prioritaire d'architecture sur la gestion des projets très lourds. La compatibilité intégrale avec l'existant a été prouvée (17 tests passés). Walkthrough documenté.
+
 ### Mars 2026
 - [2026-03-04 13:56:00] **STEP4 DeepInfra + clôture session (COMPLET)** : Finalisation de l’intégration DeepInfra pour STEP4 avec compatibilité legacy (`STEP4_USE_LEMONFOX`), sélection prioritaire via `STEP4_METHOD`, garde-fou endpoint officiel (`/v1/openai/audio/transcriptions`, anti-`wisper`), service robuste (retry/backoff, écriture JSON atomique), wrapper fallback Pyannote, endpoint API dédié et couverture tests sans appels réseau (58/58 passants). Documentation pipeline STEP4 mise à jour. Session clôturée avec synchronisation Memory Bank (`activeContext.md`, `progress.md`) et retour à l’état neutre.
 

@@ -52,6 +52,12 @@ class SecurityConfig:
                 # Set a development default
                 self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
                 logger.warning(f"{msg} - using development default")
+        elif self.INTERNAL_WORKER_TOKEN.startswith("dev-") or self.INTERNAL_WORKER_TOKEN == "dev-internal-worker-token":
+            msg = f"INTERNAL_WORKER_COMMS_TOKEN cannot be a development/default token in production: '{self.INTERNAL_WORKER_TOKEN}'"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
 
         if not self.RENDER_REGISTER_TOKEN:
             msg = "RENDER_REGISTER_TOKEN environment variable is required"
@@ -62,6 +68,12 @@ class SecurityConfig:
                 # Set a development default
                 self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
                 logger.warning(f"{msg} - using development default")
+        elif self.RENDER_REGISTER_TOKEN.startswith("dev-") or self.RENDER_REGISTER_TOKEN == "dev-render-register-token":
+            msg = f"RENDER_REGISTER_TOKEN cannot be a development/default token in production: '{self.RENDER_REGISTER_TOKEN}'"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
 
         if errors:
             error_msg = f"Security configuration errors: {'; '.join(errors)}"

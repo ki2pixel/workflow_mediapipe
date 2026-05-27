@@ -254,6 +254,29 @@ def copy_without_permissions(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst, follow_symlinks=False)
 ```
 
+## Sécurité au Démarrage et Safeguards (Production)
+
+L'application intègre des mécanismes de verrouillage stricts pour empêcher toute exécution dans un état vulnérable. 
+
+### Diagnostic Pré-vol et Démarrage (`validate_startup.py`)
+
+Avant de démarrer le serveur Web, un script de diagnostic global (`scripts/validate_startup.py`) est exécuté pour auditer l'ensemble du système :
+- **Version Python & Environnement virtuel** : Vérification de l'isolation du runtime.
+- **Sécurité des Tokens** : Analyse statique de la configuration pour s'assurer qu'aucun token de développement par défaut n'est actif.
+- **Intégrité Services & Imports** : Vérification préventive de la chargeabilité des dépendances critiques.
+- **Fichiers Frontend** : Validation de la présence des couches DOM batching et AppState.
+
+Le script retourne un code d'erreur `1` en cas d'anomalie critique, bloquant tout démarrage automatisé dans la CI/CD ou l'orchestrateur.
+
+### Garde-Fou de Production (Verification Strict)
+
+Lors de l'initialisation de l'application Flask (`app_new.py`), le module `SecurityConfig` applique une politique de tolérance zéro en production (`DEBUG=False`) :
+- **Clés rejetées** : Tout secret ou token qui commence par le préfixe de développement `dev-` ou correspond à une clé par défaut connue (`dev-secret-key-change-in-production-12345678901234567890`, etc.).
+- **Comportement strict** : Si une telle clé vulnérable est détectée, le serveur écrit un log de niveau `CRITICAL` et s'arrête immédiatement via `sys.exit(1)`.
+- **Comportement en développement** : Lorsque `DEBUG=True`, l'application émet un log de niveau `WARNING` mais autorise l'exécution pour simplifier le développement local.
+
+---
+
 ## Configuration Essentielle
 
 ### Variables d'Environnement

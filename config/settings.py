@@ -418,6 +418,12 @@ class Config:
                 warnings.append(msg)
                 # Set development default
                 self.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
+        elif self.INTERNAL_WORKER_TOKEN.startswith("dev-") or self.INTERNAL_WORKER_TOKEN == "dev-internal-worker-token":
+            msg = f"INTERNAL_WORKER_COMMS_TOKEN cannot be a development/default token in production: '{self.INTERNAL_WORKER_TOKEN}'"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
 
         if not self.RENDER_REGISTER_TOKEN:
             msg = "RENDER_REGISTER_TOKEN environment variable is required"
@@ -427,10 +433,16 @@ class Config:
                 warnings.append(msg)
                 # Set development default
                 self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
+        elif self.RENDER_REGISTER_TOKEN.startswith("dev-") or self.RENDER_REGISTER_TOKEN == "dev-render-register-token":
+            msg = f"RENDER_REGISTER_TOKEN cannot be a development/default token in production: '{self.RENDER_REGISTER_TOKEN}'"
+            if strict:
+                errors.append(msg)
+            else:
+                warnings.append(msg)
 
         # Production security checks
-        if not self.DEBUG and self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']:
-            errors.append("FLASK_SECRET_KEY must be changed in production (DEBUG=false)")
+        if not self.DEBUG and (self.SECRET_KEY.startswith('dev-') or self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']):
+            errors.append(f"FLASK_SECRET_KEY must be a secure value and cannot start with 'dev-' in production: '{self.SECRET_KEY}'")
 
         # Webhook validation (single data source)
         if not self.WEBHOOK_JSON_URL:
@@ -572,7 +584,11 @@ class Config:
             vram_free = mem_info.free / (1024 ** 3)
             result['vram_total_gb'] = round(vram_total, 2)
             result['vram_free_gb'] = round(vram_free, 2)
-            result['cuda_version'] = os.environ.get('CUDA_VERSION') or ''
+            try:
+                cuda_v_raw = pynvml.nvmlSystemGetCudaDriverVersion()
+                result['cuda_version'] = f"{cuda_v_raw // 1000}.{(cuda_v_raw % 1000) // 10}"
+            except Exception:
+                result['cuda_version'] = os.environ.get('CUDA_VERSION') or ''
             gpu_checked = True
 
             if vram_free < 1.5:
@@ -621,7 +637,7 @@ class Config:
         
         # Check ONNXRuntime CUDA provider (requis pour InsightFace)
         try:
-            import onnxruntime as ort
+            import onnxruntime as ort  # type: ignore
             if 'CUDAExecutionProvider' in ort.get_available_providers():
                 result['onnx_cuda'] = True
         except ImportError:
@@ -670,6 +686,15 @@ class Config:
         else:
             result['reason'] = 'ONNXRuntime GPU indisponible (installer onnxruntime-gpu)'
         
+        # Fallback to torch for CUDA version if still empty
+        if not result.get('cuda_version'):
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    result['cuda_version'] = torch.version.cuda or ''
+            except Exception:
+                pass
+
         return result
     
     @staticmethod

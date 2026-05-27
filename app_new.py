@@ -168,15 +168,20 @@ else:
     APP_LOGGER.info("HF_AUTH_TOKEN environment variable found and will be used for Analyze Audio.")
 
 try:
-    security_config.validate_tokens()
+    is_strict = not config.DEBUG
+    security_config.validate_tokens(strict=is_strict)
     logger.info("Security tokens validated successfully")
     if INTERNAL_WORKER_COMMS_TOKEN_ENV:
         logger.info(f"CFG TOKEN: INTERNAL_WORKER_COMMS_TOKEN_ENV configured: '...{INTERNAL_WORKER_COMMS_TOKEN_ENV[-5:]}'")
     if RENDER_REGISTER_TOKEN_ENV:
         logger.info(f"CFG TOKEN: RENDER_REGISTER_TOKEN_ENV configured: '...{RENDER_REGISTER_TOKEN_ENV[-5:]}'")
 except ValueError as e:
-    logger.error(f"Security configuration error: {e}")
-    logger.error("Application will continue but some endpoints will be INSECURE")
+    logger.critical(f"Security configuration error: {e}")
+    if not config.DEBUG:
+        logger.critical("CRITICAL: Application cannot start in production mode with insecure or missing tokens!")
+        sys.exit(1)
+    else:
+        logger.error("Application will continue in development mode, but some endpoints will be INSECURE")
 
 workflow_commands_config = WorkflowCommandsConfig(
     base_path=BASE_PATH_SCRIPTS,
@@ -289,6 +294,10 @@ def init_app():
             csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
             csv_monitor_thread.daemon = True
             csv_monitor_thread.start()
+
+            cleanup_thread = threading.Thread(target=orphan_cleanup_service, name="OrphanCleanupService")
+            cleanup_thread.daemon = True
+            cleanup_thread.start()
 
             APP_FLASK._polling_threads_started = True
 
@@ -491,6 +500,32 @@ def csv_monitor_service():
             )
 
         time.sleep(WEBHOOK_MONITOR_INTERVAL)
+
+
+def orphan_cleanup_service():
+    """Service de nettoyage en arrière-plan (orphelins STEP8). S'exécute toutes les 12 heures."""
+    APP_LOGGER.info("CLEANUP MONITOR: Service de nettoyage continu démarré.")
+    from services.cleanup_service import CleanupService
+    
+    interval_seconds = 12 * 3600  # 12 heures
+    threshold_hours = int(os.environ.get('CLEANUP_ORPHANS_THRESHOLD_HOURS', 48))
+    
+    # Premier nettoyage au bout de 5 minutes pour ne pas ralentir le démarrage
+    time.sleep(300)
+    
+    while True:
+        try:
+            APP_LOGGER.info("CLEANUP MONITOR: Exécution périodique du nettoyage des projets orphelins.")
+            results = CleanupService.cleanup_orphan_projects(threshold_hours=threshold_hours, dry_run=False)
+            if results.get("errors"):
+                for err in results["errors"]:
+                    APP_LOGGER.error(f"CLEANUP MONITOR Error: {err}")
+            if results.get("cleaned_projects"):
+                APP_LOGGER.info(f"CLEANUP MONITOR: {len(results['cleaned_projects'])} projet(s) nettoyé(s). Espace libéré: {results['total_space_saved_human']}.")
+        except Exception as e:
+            APP_LOGGER.error(f"CLEANUP MONITOR: Erreur inattendue: {e}", exc_info=True)
+            
+        time.sleep(interval_seconds)
 
 
 def run_process_async(step_key: str):

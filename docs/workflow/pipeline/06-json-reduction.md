@@ -18,20 +18,21 @@ Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes dé
 
 ### Fonctions Clés
 
-#### `reduce_video_json(data)` (Complexité F)
-**Rôle** : Réduit JSON tracking en format After Effects-compatible.
+#### `stream_reduce_video_json(tracking_in, tracking_out, legacy_path, audio_meta)` (Complexité F)
+**Rôle** : Réduit en flux continu le JSON volumineux de tracking de STEP5 en format After Effects-compatible tout en conservant une empreinte RAM stable de O(1).
 
 **Algorithme détaillé** :
-1. **Extraction métadonnées** : FPS, total_frames depuis headers/metadata
-2. **Filtrage objets** : Conservation `id`, `centroid_x`, `source`, `label`, `confidence`, `bbox_*`, `active_speakers`
-3. **Résolution active_speakers** : Merge depuis `speaking_sources.audio` si manquant
-4. **Calcul expressions** : Stats moyennes/max par objet (configurable `STEP6_EXPRESSION_KEYS`)
-5. **Construction frames** : Liste `frames_analysis` avec objets filtrés
+1. **Parsing itératif (`ijson.parse`)** : Lecture du fichier d'entrée sous forme de flux d'événements SAX pour extraire les métadonnées (FPS, total_frames) sans charger le JSON en mémoire.
+2. **Streaming des frames (`ijson.items`)** : Parcours itératif de la liste volumineuse `frames_tracking` ou `tracked_objects` objet par objet.
+3. **Filtrage à la volée** : Pour chaque objet détecté, conservation des propriétés essentielles (`id`, `centroid_x`, `centroid_y`, `source`, `label`, `confidence`, `bbox_*`, `active_speakers`).
+4. **Résolution active_speakers** : Fusion directe à la volée avec les données de `speaking_sources.audio` extraites de `audio_meta`.
+5. **Calculs statistiques incrémentaux** : Calcul des moyennes/max des expressions (blendshapes) par objet sans conserver l'historique complet en RAM.
+6. **Écriture streaming** : Écriture progressive des frames réduites dans un fichier temporaire.
 
 **Optimisations** :
-- Skip objets sans données pertinentes
-- Calculs statistiques incrémentaux
-- Mémoire contrôlée (pas de load complet)
+- **Consommation RAM O(1)** : L'utilisation d'`ijson` maintient une mémoire tampon constante, indépendamment de la durée de la vidéo ou du nombre d'objets détectés.
+- **Skip sélectif** : Ignore instantanément les blendshapes non requis pour économiser les I/O disque.
+- **Écriture atomique** : Remplacement sécurisé via `os.replace` après écriture complète du fichier temporaire.
 
 #### `_compute_tracking_analytics(reduced_tracking)` (Complexité F)
 **Rôle** : Calcule statistiques agrégées sur tracking pour diagnostics qualité.
@@ -73,8 +74,8 @@ Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes dé
 - Progress logging pour monitoring
 
 ### Réduction mémoire
-- Filtrage objets en streaming
-- Libération références après traitement
+- **Streaming itératif (`ijson`)** : Utilisation du parseur `ijson` pour lire et filtrer les données frame par frame en flux continu; la RAM reste en O(1) même sur des tracking de plusieurs centaines de mégaoctets; évite les crashs par manque de mémoire (OOM) fréquents sur les architectures traditionnelles.
+- **Libération immédiate** : Les références aux anciens dictionnaires de frames sont immédiatement éliminées pour permettre le ramasse-miettes (GC) régulier.
 
 ## Trade-offs
 

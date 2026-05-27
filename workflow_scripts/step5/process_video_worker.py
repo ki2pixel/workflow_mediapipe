@@ -111,84 +111,137 @@ class FrameProcessor:
         self._max_width = _parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_WIDTH"))
         self._blendshapes_cache = {}
 
+    def _preprocess_frame(self, frame):
+        """Resize frame if needed and convert BGR to MediaPipe Image format."""
+        orig_h, orig_w = frame.shape[:2]
+        work_frame = frame
+        scale_to_original = 1.0
+        if self._max_width is not None and orig_w > self._max_width:
+            scale_factor = float(self._max_width) / float(orig_w)
+            work_h = max(1, int(orig_h * scale_factor))
+            work_frame = cv2.resize(frame, (int(self._max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
+            scale_to_original = float(orig_w) / float(work_frame.shape[1])
+
+        if self._enable_profiling:
+            with self.lock:
+                self._profiling_stats["frame_count"] += 1
+
+        t_to_rgb = time.perf_counter() if self._enable_profiling else 0.0
+        mp_image = mp.Image(
+            image_format=mp.ImageFormat.SRGB,
+            data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
+        )
+        if self._enable_profiling:
+            with self.lock:
+                self._profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
+
+        return mp_image, scale_to_original, orig_w, orig_h
+
+    def _extract_face_detections(self, face_result, orig_w, orig_h, frame_idx):
+        """Extract face detection coordinates and blendshapes with throttling and caching."""
+        detections = []
+        if not face_result.face_landmarks:
+            return detections
+
+        for i, landmarks in enumerate(face_result.face_landmarks):
+            t_post = time.perf_counter() if self._enable_profiling else 0.0
+            x_coords = [lm.x * orig_w for lm in landmarks]
+            y_coords = [lm.y * orig_h for lm in landmarks]
+            bbox = (
+                int(min(x_coords)), int(min(y_coords)),
+                int(max(x_coords) - min(x_coords)),
+                int(max(y_coords) - min(y_coords))
+            )
+            centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
+            det = {
+                "bbox": bbox,
+                "centroid": centroid,
+                "source_detector": "face_landmarker",
+                "label": "face"
+            }
+            if face_result.face_blendshapes:
+                raw_blendshapes = {
+                    cat.category_name: cat.score
+                    for cat in face_result.face_blendshapes[i]
+                }
+                scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, self._jaw_open_scale)
+
+                current_frame_num = frame_idx + 1
+                should_update_blendshapes = (self._blendshapes_throttle_n <= 1) or ((current_frame_num % self._blendshapes_throttle_n) == 0)
+                object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
+                with self.lock:
+                    if should_update_blendshapes or object_id not in self._blendshapes_cache:
+                        self._blendshapes_cache[object_id] = scaled_blendshapes
+                        det["blendshapes"] = scaled_blendshapes
+                    else:
+                        det["blendshapes"] = self._blendshapes_cache.get(object_id)
+            detections.append(det)
+
+            if self._enable_profiling:
+                with self.lock:
+                    self._profiling_stats["post_total"] += time.perf_counter() - t_post
+        return detections
+
+    def _extract_object_detections(self, mp_image, timestamp_ms, scale_to_original, frame_idx):
+        """Extract object detection fallback coordinates if face landmark detection failed."""
+        detections = []
+        try:
+            object_result = self.object_detector.detect_for_video(mp_image, timestamp_ms)
+
+            if object_result.detections:
+                for detection in object_result.detections:
+                    bbox = detection.bounding_box
+                    x_min = int(bbox.origin_x)
+                    y_min = int(bbox.origin_y)
+                    width = int(bbox.width)
+                    height = int(bbox.height)
+
+                    if scale_to_original != 1.0:
+                        x_min = int(max(0, x_min * scale_to_original))
+                        y_min = int(max(0, y_min * scale_to_original))
+                        width = int(max(0, width * scale_to_original))
+                        height = int(max(0, height * scale_to_original))
+
+                    centroid = (x_min + width // 2, y_min + height // 2)
+
+                    best_category = detection.categories[0] if detection.categories else None
+                    label = best_category.category_name if best_category else "object"
+                    confidence = best_category.score if best_category else 0.0
+
+                    det = {
+                        "bbox": (x_min, y_min, width, height),
+                        "centroid": centroid,
+                        "source_detector": "object_detector",
+                        "label": label,
+                        "confidence": confidence,
+                        "blendshapes": None,
+                        "is_speaking": None
+                    }
+                    detections.append(det)
+        except Exception as e:
+            logging.warning(f"Object detection failed for frame {frame_idx + 1}: {e}")
+        return detections
+
     def process_frame(self, frame_data):
         """Process a single frame and return detection results."""
         frame, frame_idx, timestamp_ms = frame_data
 
         try:
-            orig_h, orig_w = frame.shape[:2]
-            work_frame = frame
-            scale_to_original = 1.0
-            if self._max_width is not None and orig_w > self._max_width:
-                scale_factor = float(self._max_width) / float(orig_w)
-                work_h = max(1, int(orig_h * scale_factor))
-                work_frame = cv2.resize(frame, (int(self._max_width), int(work_h)), interpolation=cv2.INTER_LINEAR)
-                scale_to_original = float(orig_w) / float(work_frame.shape[1])
+            # 1. Pre-process frame (resize and BGR to RGB conversion)
+            mp_image, scale_to_original, orig_w, orig_h = self._preprocess_frame(frame)
 
-            if self._enable_profiling:
-                with self.lock:
-                    self._profiling_stats["frame_count"] += 1
-
-            t_to_rgb = time.perf_counter() if self._enable_profiling else 0.0
-            mp_image = mp.Image(
-                image_format=mp.ImageFormat.SRGB,
-                data=cv2.cvtColor(work_frame, cv2.COLOR_BGR2RGB)
-            )
-            if self._enable_profiling:
-                with self.lock:
-                    self._profiling_stats["to_rgb_total"] += time.perf_counter() - t_to_rgb
-
-            current_detections = []
-            face_detected = False
-
-            # Try face detection first
+            # 2. Extract face landmark detection
             t_detect = time.perf_counter() if self._enable_profiling else 0.0
             face_result = self.landmarker.detect_for_video(mp_image, timestamp_ms)
             if self._enable_profiling:
                 with self.lock:
                     self._profiling_stats["detect_total"] += time.perf_counter() - t_detect
 
-            if face_result.face_landmarks:
-                face_detected = True
+            # 3. Post-process face detections
+            current_detections = self._extract_face_detections(face_result, orig_w, orig_h, frame_idx)
+            face_detected = len(current_detections) > 0
 
-                for i, landmarks in enumerate(face_result.face_landmarks):
-                    t_post = time.perf_counter() if self._enable_profiling else 0.0
-                    x_coords = [lm.x * orig_w for lm in landmarks]
-                    y_coords = [lm.y * orig_h for lm in landmarks]
-                    bbox = (
-                        int(min(x_coords)), int(min(y_coords)),
-                        int(max(x_coords) - min(x_coords)),
-                        int(max(y_coords) - min(y_coords))
-                    )
-                    centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
-                    det = {
-                        "bbox": bbox,
-                        "centroid": centroid,
-                        "source_detector": "face_landmarker",
-                        "label": "face"
-                    }
-                    if face_result.face_blendshapes:
-                        raw_blendshapes = {
-                            cat.category_name: cat.score
-                            for cat in face_result.face_blendshapes[i]
-                        }
-                        scaled_blendshapes = _apply_jawopen_scale(raw_blendshapes, self._jaw_open_scale)
-
-                        current_frame_num = frame_idx + 1
-                        should_update_blendshapes = (self._blendshapes_throttle_n <= 1) or ((current_frame_num % self._blendshapes_throttle_n) == 0)
-                        object_id = f"{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}"
-                        with self.lock:
-                            if should_update_blendshapes or object_id not in self._blendshapes_cache:
-                                self._blendshapes_cache[object_id] = scaled_blendshapes
-                                det["blendshapes"] = scaled_blendshapes
-                            else:
-                                det["blendshapes"] = self._blendshapes_cache.get(object_id)
-                    current_detections.append(det)
-
-                    if self._enable_profiling:
-                        with self.lock:
-                            self._profiling_stats["post_total"] += time.perf_counter() - t_post
-
+            # 4. Profiling stats update & logs
             if self._enable_profiling:
                 with self.lock:
                     fc = int(self._profiling_stats.get("frame_count", 0) or 0)
@@ -204,43 +257,11 @@ class FrameProcessor:
                             post_ms,
                         )
 
-            # Use object detection fallback if no faces detected
+            # 5. Fallback object detection
             if not face_detected and getattr(self.args, 'enable_object_detection', False):
-                try:
-                    object_result = self.object_detector.detect_for_video(mp_image, timestamp_ms)
-
-                    if object_result.detections:
-                        for detection in object_result.detections:
-                            bbox = detection.bounding_box
-                            x_min = int(bbox.origin_x)
-                            y_min = int(bbox.origin_y)
-                            width = int(bbox.width)
-                            height = int(bbox.height)
-
-                            if scale_to_original != 1.0:
-                                x_min = int(max(0, x_min * scale_to_original))
-                                y_min = int(max(0, y_min * scale_to_original))
-                                width = int(max(0, width * scale_to_original))
-                                height = int(max(0, height * scale_to_original))
-
-                            centroid = (x_min + width // 2, y_min + height // 2)
-
-                            best_category = detection.categories[0] if detection.categories else None
-                            label = best_category.category_name if best_category else "object"
-                            confidence = best_category.score if best_category else 0.0
-
-                            det = {
-                                "bbox": (x_min, y_min, width, height),
-                                "centroid": centroid,
-                                "source_detector": "object_detector",
-                                "label": label,
-                                "confidence": confidence,
-                                "blendshapes": None,
-                                "is_speaking": None
-                            }
-                            current_detections.append(det)
-                except Exception as e:
-                    logging.warning(f"Object detection failed for frame {frame_idx + 1}: {e}")
+                current_detections = self._extract_object_detections(
+                    mp_image, timestamp_ms, scale_to_original, frame_idx
+                )
 
             return {
                 'frame_idx': frame_idx,
@@ -381,7 +402,7 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
         })
 
     # Calculate final statistics
-    face_detection_rate = (face_detection_success_count / frames_processed * 100) if frames_processed > 0 else 0
+    face_detection_rate = (face_detection_success_count / max(1, frames_processed) * 100) if frames_processed > 0 else 0
     processing_time = time.time() - processing_start_time
 
     logging.info("Multi-threaded processing summary:")
@@ -389,7 +410,7 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
     logging.info(f"  Frames with faces: {face_detection_success_count}")
     logging.info(f"  Face detection success rate: {face_detection_rate:.2f}%")
     logging.info(f"  Processing time: {processing_time:.2f} seconds")
-    logging.info(f"  Average FPS: {frames_processed / processing_time:.2f}")
+    logging.info(f"  Average FPS: {frames_processed / max(0.001, processing_time):.2f}")
     logging.info(f"  Object detection fallback used: {getattr(args, 'enable_object_detection', False)}")
     logging.info(f"  Total frames exported: {len(final_output['frames'])}")
 
@@ -946,7 +967,7 @@ def main(args):
                                 print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
 
                         # Log processing summary for sequential processing
-                        face_success_rate = face_detection_success_count / frames_processed if frames_processed > 0 else 0
+                        face_success_rate = face_detection_success_count / max(1, frames_processed) if frames_processed > 0 else 0
                         logging.info(f"Processing summary:")
                         logging.info(f"  Total frames processed: {frames_processed}")
                         logging.info(f"  Frames with faces: {face_detection_success_count}")
