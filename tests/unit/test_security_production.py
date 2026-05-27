@@ -22,7 +22,6 @@ class TestProductionSecurity:
 
     def test_security_config_strict_rejects_dev_tokens(self):
         self.security_config.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-        self.security_config.RENDER_REGISTER_TOKEN = "dev-render-register-token"
         
         with pytest.raises(ValueError) as exc:
             self.security_config.validate_tokens(strict=True)
@@ -31,7 +30,6 @@ class TestProductionSecurity:
 
     def test_security_config_non_strict_allows_dev_tokens(self):
         self.security_config.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-        self.security_config.RENDER_REGISTER_TOKEN = "dev-render-register-token"
         
         # Should not raise exception
         result = self.security_config.validate_tokens(strict=False)
@@ -41,7 +39,6 @@ class TestProductionSecurity:
         self.config.DEBUG = False
         self.config.SECRET_KEY = "dev-key-change-in-production"
         self.config.INTERNAL_WORKER_TOKEN = "secure-token-1"
-        self.config.RENDER_REGISTER_TOKEN = "secure-token-2"
         
         with pytest.raises(ValueError) as exc:
             self.config.validate(strict=True)
@@ -52,7 +49,6 @@ class TestProductionSecurity:
         self.config.DEBUG = False
         self.config.SECRET_KEY = "secure-secret-key"
         self.config.INTERNAL_WORKER_TOKEN = "dev-internal-worker-token"
-        self.config.RENDER_REGISTER_TOKEN = "secure-token-2"
         
         with pytest.raises(ValueError) as exc:
             self.config.validate(strict=True)
@@ -63,7 +59,6 @@ class TestProductionSecurity:
         self.config.DEBUG = False
         self.config.SECRET_KEY = "secure-secret-key"
         self.config.INTERNAL_WORKER_TOKEN = "secure-internal-token"
-        self.config.RENDER_REGISTER_TOKEN = "secure-render-token"
         
         # Ensure the mock paths are correctly handled for the boolean check in validate
         with mock.patch("pathlib.Path.exists", return_value=True):

@@ -33,7 +33,7 @@ except ImportError:
     logger.warning("python-dotenv not available; relying on environment variables only")
 
 from config.settings import config
-from config.security import SecurityConfig, require_internal_worker_token, require_render_register_token
+from config.security import SecurityConfig, require_internal_worker_token
 from config.workflow_commands import WorkflowCommandsConfig
 
 from routes.api_routes import api_bp
@@ -101,11 +101,7 @@ HF_AUTH_TOKEN_ENV = os.environ.get("HF_AUTH_TOKEN")
 
 security_config = SecurityConfig()
 
-RENDER_APP_CALLBACK_URL_ENV = os.environ.get("RENDER_APP_CALLBACK_URL")
-RENDER_APP_CALLBACK_TOKEN_ENV = os.environ.get("RENDER_APP_CALLBACK_TOKEN")
-RENDER_REGISTER_URL_ENDPOINT_ENV = os.environ.get("RENDER_REGISTER_URL_ENDPOINT")
 
-RENDER_REGISTER_TOKEN_ENV = security_config.RENDER_REGISTER_TOKEN
 INTERNAL_WORKER_COMMS_TOKEN_ENV = security_config.INTERNAL_WORKER_TOKEN
 
 WEBHOOK_MONITOR_INTERVAL = config.WEBHOOK_MONITOR_INTERVAL
@@ -173,8 +169,7 @@ try:
     logger.info("Security tokens validated successfully")
     if INTERNAL_WORKER_COMMS_TOKEN_ENV:
         logger.info(f"CFG TOKEN: INTERNAL_WORKER_COMMS_TOKEN_ENV configured: '...{INTERNAL_WORKER_COMMS_TOKEN_ENV[-5:]}'")
-    if RENDER_REGISTER_TOKEN_ENV:
-        logger.info(f"CFG TOKEN: RENDER_REGISTER_TOKEN_ENV configured: '...{RENDER_REGISTER_TOKEN_ENV[-5:]}'")
+
 except ValueError as e:
     logger.critical(f"Security configuration error: {e}")
     if not config.DEBUG:
@@ -279,18 +274,11 @@ def init_app():
         else:
             APP_LOGGER.info("INTERNAL_WORKER_COMMS_TOKEN configuré correctement.")
 
-        if not RENDER_REGISTER_TOKEN_ENV:
-            APP_LOGGER.warning("RENDER_REGISTER_TOKEN non défini. Fonctionnalités de rendu INSECURES.")
-        else:
-            APP_LOGGER.info("RENDER_REGISTER_TOKEN configuré correctement.")
+
 
         initialize_services()
 
         if not getattr(APP_FLASK, "_polling_threads_started", False):
-            remote_poll_thread = threading.Thread(target=poll_remote_trigger, name="RemoteWorkflowPoller")
-            remote_poll_thread.daemon = True
-            remote_poll_thread.start()
-
             csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
             csv_monitor_thread.daemon = True
             csv_monitor_thread.start()
@@ -308,19 +296,7 @@ def init_app():
 
 initialize_services()
 
-REMOTE_TRIGGER_URL = os.environ.get('REMOTE_TRIGGER_URL', "https://render-signal-server.onrender.com/api/check_trigger")
-REMOTE_POLLING_INTERVAL = int(os.environ.get('REMOTE_POLLING_INTERVAL', "15"))
 
-REMOTE_SEQUENCE_STEP_KEYS = [
-    "STEP1",
-    "STEP2",
-    "STEP3",
-    "STEP4",
-    "STEP5",
-    "STEP6",
-    "STEP7",
-    "STEP8",
-]
 
 if PYNVML_AVAILABLE:
     atexit.register(pynvml.nvmlShutdown)
@@ -899,58 +875,7 @@ def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="C
             workflow_state.complete_sequence(success=False, message="Séquence terminée de façon inattendue", sequence_type=sequence_type)
         APP_LOGGER.info(f"{sequence_type.upper()} SEQUENCE: Séquence terminée.")
 
-def run_full_sequence_from_remote():
-    """Launch full sequence from remote trigger.
-    
-    Migrated to use WorkflowState for sequence management.
-    """
-    APP_LOGGER.info("REMOTE TRIGGER: Demande de lancement de la séquence complète reçue.")
-    
-    if workflow_state.is_sequence_running():
-        APP_LOGGER.warning("REMOTE TRIGGER: Séquence complète non lancée, une autre séquence est déjà en cours.")
-        return
-    
-    seq_thread = threading.Thread(target=execute_step_sequence_worker, args=(list(REMOTE_SEQUENCE_STEP_KEYS), "Remote"))
-    seq_thread.daemon = True
-    seq_thread.start()
 
-def poll_remote_trigger():
-    """Poll remote trigger URL for pending commands.
-    
-    Migrated to use WorkflowState for sequence status checking.
-    """
-    APP_LOGGER.info(f"REMOTE POLLER: Démarré. Interrogation de {REMOTE_TRIGGER_URL} toutes les {REMOTE_POLLING_INTERVAL}s.")
-    
-    while True:
-        time.sleep(REMOTE_POLLING_INTERVAL)
-        
-        if workflow_state.is_sequence_running():
-            APP_LOGGER.debug("REMOTE POLLER: Une séquence est marquée comme en cours, attente.")
-            continue
-        
-        if workflow_state.is_any_step_running():
-            APP_LOGGER.debug("REMOTE POLLER: Une étape individuelle est active. Attente.")
-            continue
-        
-        try:
-            APP_LOGGER.debug(f"REMOTE POLLER: Vérification de {REMOTE_TRIGGER_URL}.")
-            response = requests.get(REMOTE_TRIGGER_URL, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get('command_pending'):
-                APP_LOGGER.info(f"REMOTE POLLER: Commande reçue! Payload: {data.get('payload')}")
-                
-                if not workflow_state.is_sequence_running():
-                    run_full_sequence_from_remote()
-                else:
-                    APP_LOGGER.warning("REMOTE POLLER: Signal reçu, mais une séquence est déjà en cours.")
-            else:
-                APP_LOGGER.debug("REMOTE POLLER: Aucune commande en attente.")
-        except requests.exceptions.RequestException as e:
-            APP_LOGGER.warning(f"REMOTE POLLER: Erreur communication {REMOTE_TRIGGER_URL}: {e}")
-        except Exception as e_poll:
-            APP_LOGGER.error(f"REMOTE POLLER: Erreur inattendue: {e_poll}", exc_info=True)
 
 @APP_FLASK.route('/test-slideshow-fixes')
 def test_slideshow_fixes():
@@ -976,115 +901,7 @@ def favicon():
     APP_LOGGER.debug("Favicon requested - returning 204 No Content")
     return '', 204
 
-def get_current_workflow_status_summary():
-    """Get comprehensive workflow status summary including CSV downloads.
-    
-    Migrated to use WorkflowState for all state access.
-    """
-    overall_status_code_val = "idle"
-    overall_status_text_display_val = "Prêt et en attente."
-    current_step_name_val = None
-    progress_current_val = 0
-    progress_total_val = 0
-    active_step_key_found = None
-    
-    is_sequence_globally_active = workflow_state.is_sequence_running()
-    
-    if is_sequence_globally_active:
-        sequence_outcome = workflow_state.get_sequence_outcome()
-        active_sequence_type = sequence_outcome.get("type", "Inconnue") if sequence_outcome.get("status", "").startswith("running_") else "Inconnue"
-        
-        for step_key_seq in REMOTE_SEQUENCE_STEP_KEYS:
-            step_status = workflow_state.get_step_status(step_key_seq)
-            if step_status in ['running', 'starting']:
-                active_step_key_found = step_key_seq
-                overall_status_code_val = f"sequence_running_{active_sequence_type.lower()}"
-                break
-    
-    if not active_step_key_found:
-        all_steps_info = workflow_state.get_all_steps_info()
-        for step_key_ind, info_ind in all_steps_info.items():
-            if info_ind['status'] in ['running', 'starting']:
-                active_step_key_found = step_key_ind
-                overall_status_code_val = f"step_running_{step_key_ind}"
-                break
-    
-    if active_step_key_found:
-        active_step_info = workflow_state.get_step_info(active_step_key_found)
-        active_step_config = workflow_commands_config.get_step_config(active_step_key_found)
-        current_step_name_val = active_step_config['display_name'] if active_step_config else 'Étape inconnue'
-        progress_current_val = active_step_info['progress_current']
-        progress_total_val = active_step_info['progress_total']
-        
-        if overall_status_code_val.startswith("sequence_running"):
-            seq_type_disp = overall_status_code_val.split("_")[-1].capitalize()
-            overall_status_text_display_val = f"Séquence {seq_type_disp} - En cours: {current_step_name_val}"
-        elif overall_status_code_val.startswith("step_running"):
-            overall_status_text_display_val = f"En cours: {current_step_name_val}"
-    else:
-        sequence_outcome = workflow_state.get_sequence_outcome()
-        if sequence_outcome and sequence_outcome.get("timestamp"):
-            last_seq_time_str = sequence_outcome["timestamp"]
-            if last_seq_time_str.endswith('Z'):
-                last_seq_time_str = last_seq_time_str[:-1] + '+00:00'
-            try:
-                last_seq_dt = datetime.fromisoformat(last_seq_time_str)
-                if last_seq_dt.tzinfo is None:
-                    last_seq_dt = last_seq_dt.replace(tzinfo=timezone.utc)
-                time_since_last_seq = datetime.now(timezone.utc) - last_seq_dt
-                
-                if time_since_last_seq < timedelta(hours=1):
-                    seq_type_display = sequence_outcome.get('type', 'N/A')
-                    if sequence_outcome.get("status") == "success":
-                        overall_status_code_val = "completed_success_recent"
-                        overall_status_text_display_val = f"Terminé avec succès (Séquence {seq_type_display})"
-                        current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
-                    elif sequence_outcome.get("status") == "error":
-                        overall_status_code_val = "completed_error_recent"
-                        overall_status_text_display_val = f"Terminé avec erreur(s) (Séquence {seq_type_display})"
-                        current_step_name_val = sequence_outcome.get("message", "Détails non disponibles.")
-                    elif sequence_outcome.get("status", "").startswith("running_"):
-                        seq_type_running = sequence_outcome.get("type", "N/A")
-                        overall_status_code_val = f"sequence_starting_{seq_type_running.lower()}"
-                        overall_status_text_display_val = f"Démarrage Séquence {seq_type_running}..."
-                else:
-                    overall_status_code_val = "idle_after_completion"
-                    overall_status_text_display_val = "Prêt (dernière opération terminée il y a >1h)."
-            except ValueError as e_ts:
-                APP_LOGGER.warning(f"Error parsing sequence outcome timestamp '{sequence_outcome['timestamp']}': {e_ts}")
-                overall_status_code_val = "idle_parse_error"
-                overall_status_text_display_val = "Prêt (erreur parsing dernier statut)."
-        else:
-            overall_status_code_val = "idle_initial"
-            overall_status_text_display_val = "Prêt et en attente (jamais exécuté)."
 
-    active_list_csv = workflow_state.get_active_csv_downloads_list()
-    kept_list_csv = workflow_state.get_kept_csv_downloads_list()
-
-    all_csv_downloads_intermediate = active_list_csv + kept_list_csv
-    all_csv_downloads_intermediate.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
-
-    recent_downloads_summary_val = []
-    for item_csv in all_csv_downloads_intermediate[:5]:
-        recent_downloads_summary_val.append({
-            "filename": item_csv.get('filename', 'N/A'),
-            "status": item_csv.get('status', 'N/A'),
-            "timestamp": item_csv.get('display_timestamp', 'N/A'),
-            "csv_timestamp": item_csv.get('csv_timestamp', 'N/A')
-        })
-    status_text_detail_val = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-
-    return {
-        "overall_status_code": overall_status_code_val,
-        "overall_status_text_display": overall_status_text_display_val,
-        "current_step_name": current_step_name_val,
-        "status_text_detail": status_text_detail_val,
-        "progress_current": progress_current_val,
-        "progress_total": progress_total_val,
-        "recent_downloads": recent_downloads_summary_val,
-        "last_updated_utc": datetime.now(timezone.utc).isoformat(),
-        "last_sequence_summary": workflow_state.get_sequence_outcome()
-    }
 
 
 if __name__ == '__main__':

@@ -85,12 +85,7 @@ def validate_configuration():
             else:
                 warnings.append(msg)
                 
-        if config.RENDER_REGISTER_TOKEN.startswith('dev-') or config.RENDER_REGISTER_TOKEN == 'dev-render-register-token':
-            msg = f"Insecure RENDER_REGISTER_TOKEN in production: {config.RENDER_REGISTER_TOKEN}" if is_production else "Using development RENDER_REGISTER_TOKEN"
-            if is_production:
-                issues.append(msg)
-            else:
-                warnings.append(msg)
+
         
     except Exception as e:
         issues.append(f"Configuration import failed: {e}")

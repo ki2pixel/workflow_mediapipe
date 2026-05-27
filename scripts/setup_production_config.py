@@ -22,7 +22,7 @@ def create_production_env():
     # Generate secure tokens
     flask_secret = generate_secure_token(64)
     internal_token = generate_secure_token(64)
-    render_token = generate_secure_token(64)
+
     
     # Production configuration
     production_config = f"""# Flask Application Configuration (PRODUCTION)
@@ -31,7 +31,7 @@ DEBUG=false
 
 # Security Tokens (CHANGE THESE IN PRODUCTION)
 INTERNAL_WORKER_COMMS_TOKEN={internal_token}
-RENDER_REGISTER_TOKEN={render_token}
+
 
 # Performance Configuration
 ENABLE_GPU_MONITORING=true
@@ -84,8 +84,7 @@ def validate_production_config():
     
     required_vars = [
         'FLASK_SECRET_KEY',
-        'INTERNAL_WORKER_COMMS_TOKEN', 
-        'RENDER_REGISTER_TOKEN'
+        'INTERNAL_WORKER_COMMS_TOKEN'
     ]
     
     missing_vars = []

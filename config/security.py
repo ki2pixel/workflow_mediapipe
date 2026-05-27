@@ -25,7 +25,6 @@ class SecurityConfig:
     def __init__(self):
         """Initialize security configuration from environment variables."""
         self.INTERNAL_WORKER_TOKEN = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
-        self.RENDER_REGISTER_TOKEN = os.environ.get('RENDER_REGISTER_TOKEN')
         
     def validate_tokens(self, strict: bool = True) -> bool:
         """
@@ -59,21 +58,7 @@ class SecurityConfig:
             else:
                 warnings.append(msg)
 
-        if not self.RENDER_REGISTER_TOKEN:
-            msg = "RENDER_REGISTER_TOKEN environment variable is required"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-                # Set a development default
-                self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
-                logger.warning(f"{msg} - using development default")
-        elif self.RENDER_REGISTER_TOKEN.startswith("dev-") or self.RENDER_REGISTER_TOKEN == "dev-render-register-token":
-            msg = f"RENDER_REGISTER_TOKEN cannot be a development/default token in production: '{self.RENDER_REGISTER_TOKEN}'"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
+
 
         if errors:
             error_msg = f"Security configuration errors: {'; '.join(errors)}"
@@ -137,40 +122,7 @@ def require_internal_worker_token(func):
     return wrapper
 
 
-def require_render_register_token(func):
-    """
-    Decorator for endpoints requiring render registration authentication.
-    
-    Validates the X-Render-Token header against the configured
-    RENDER_REGISTER_TOKEN.
-    
-    Args:
-        func: Flask route function to protect
-        
-    Returns:
-        Decorated function with token validation
-    """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        security_config = SecurityConfig()
-        
-        if not security_config.RENDER_REGISTER_TOKEN:
-            logger.error("Render register token not configured")
-            return jsonify({"error": "Authentication not configured"}), 500
-        
-        received_token = request.headers.get('X-Render-Token')
-        if not received_token:
-            logger.warning("Missing X-Render-Token header in request")
-            return jsonify({"error": "Missing authentication token"}), 401
-            
-        if received_token != security_config.RENDER_REGISTER_TOKEN:
-            logger.warning(f"Invalid render token received from {request.remote_addr}")
-            return jsonify({"error": "Invalid authentication token"}), 401
-        
-        logger.debug("Render register token validated successfully")
-        return func(*args, **kwargs)
-    
-    return wrapper
+
 
 
 def validate_file_path(file_path: str, allowed_base_paths: list) -> bool:

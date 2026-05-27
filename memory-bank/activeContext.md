@@ -1,13 +1,14 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-Aucune tâche active. Workflow docs-updater exécuté avec succès pour restaurer et harmoniser le rapport d'audit frontend.
+Nettoyage des artefacts et variables de configuration obsolètes RENDER_* et REMOTE_* accompli avec succès.
 
 ## Objectifs
 - Maintenir l'intégrité du repo.
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-05-27 19:27:00] **Nettoyage des variables obsolètes (RENDER_*) (COMPLET)** : Suppression complète de `RENDER_REGISTER_TOKEN`, `RENDER_APP_CALLBACK_URL`, `RENDER_APP_CALLBACK_TOKEN`, `RENDER_REGISTER_URL_ENDPOINT`, `REMOTE_TRIGGER_URL`, `REMOTE_POLLING_INTERVAL` et du poller distant inutilisé (`RemoteWorkflowPoller`). Tous les tests unitaires et d'intégration ont été mis à jour et validés avec succès.
 - [2026-05-27 19:13:12] **Persistance Sélective (AppState Middleware) (COMPLET)** : Implémentation de la recommandation de l'audit pour la persistance sélective de l'état frontend. Création d'un middleware déclaratif dans `AppState.js` avec migration automatique des anciennes clés. Refactoring complet de `main.js` et `eventHandlers.js` pour supprimer les accès directs au `localStorage` et restauration dynamique de l'UI des sélections d'étapes personnalisées. Ajout de `test_state_persistence.mjs` validé avec succès.
 - [2026-05-27 19:02:00] Implémentation du système Virtual DOM (DOM Morphing) léger via `DOMDiff.js` (O(N) diffing). Remplacement des `innerHTML` destructeurs dans la méthode `updateLocalDownloadsListUI` de `uiUpdater.js`. Ajout et passage complet des tests unitaires `tests/frontend/dom_diff.test.js` exécutés par le script `test:frontend`.
 - [2026-05-27 19:10:00] Audit complet de l'architecture frontend natif (vanilla JS). Analyse et documentation des mécanismes `AppState` (état réactif immuable), `DOMBatcher` (évitement du *layout thrashing* via `requestAnimationFrame`), `PollingManager` (boucles réseau résilientes sans fuite), `PerformanceMonitor` (télémétrie intégrée) et `ErrorHandler` (auto-guérison et pénalités exponentielles). Rapport publié dans `docs/audits/frontend_audit.md`.
@@ -17,7 +18,7 @@ Aucune tâche active. Workflow docs-updater exécuté avec succès pour restaure
 - [2026-05-27 18:08:00] Validation (commit) et publication (push) du nettoyage des fichiers non suivis/obsolètes et de l'ajout du rapport d'audit d'architecture.
 - [2026-03-13 18:29:00] Rollback Git vers commit 11482b2 ("docs: Replace Kaggle/Google Colab docs with Lightning AI documentation") suite à problème avec la feature STEP5 remote Lightning.
 - [2026-03-13 18:29:00] Suppression des fichiers non suivis : services/step5_remote_lightning_service.py, tests associés, et répertoire .shrimp_task_manager/.
-- [2026-03-13 18:27:00] Clôture du chantier STEP5 remote Lightning après implémentation, tests, mise à jour de la documentation pipeline et synchronisation complète de la Memory Bank (avant rollback).
+- [2026-03-13 18:27:00] Clôture du chantier STEP5 remote Lightning après implémentement, tests, mise à jour de la documentation pipeline et synchronisation complète de la Memory Bank (avant rollback).
 
 ## Questions Ouvertes
 - Évaluer si la feature STEP5 remote Lightning doit être réimplémentée ou abandonnée.

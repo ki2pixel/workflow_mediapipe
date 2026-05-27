@@ -322,47 +322,7 @@ class TestWorkflowServiceSequenceOperations:
             mock_process.terminate.assert_called_once()
 
 
-class TestWorkflowServiceStatusSummary:
-    """Test get_current_workflow_status_summary."""
-    
-    def test_status_summary_without_app_state(self):
-        """Test status summary handles missing workflow state."""
-        with patch('services.workflow_service.get_workflow_state', return_value=None):
-            result = WorkflowService.get_current_workflow_status_summary()
-            
-            assert result['is_sequence_running'] is False
-            assert 'error' in result
-    
-    def test_status_summary_success(self):
-        """Test successful status summary."""
-        mock_workflow_state = build_workflow_state(
-            is_sequence_running=False,
-            all_steps_info={
-                'STEP1': {
-                    'status': 'completed',
-                    'progress_current': 10,
-                    'progress_total': 10,
-                    'return_code': 0
-                },
-                'STEP2': {
-                    'status': 'idle',
-                    'progress_current': 0,
-                    'progress_total': 0,
-                    'return_code': None
-                }
-            },
-            sequence_outcome={'status': 'success'}
-        )
-        
-        with patched_workflow_state(mock_workflow_state):
-            result = WorkflowService.get_current_workflow_status_summary()
-            
-            assert result['is_sequence_running'] is False
-            assert len(result['steps']) == 2
-            assert result['steps']['STEP1']['status'] == 'completed'
-            assert result['steps']['STEP2']['status'] == 'idle'
-            assert result['last_sequence_outcome']['status'] == 'success'
-            assert 'timestamp' in result
+
 
 
 class TestWorkflowServiceCreateTrackingTempFile:

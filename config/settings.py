@@ -90,7 +90,6 @@ class Config:
     
     # Security Tokens (loaded from environment)
     INTERNAL_WORKER_TOKEN: Optional[str] = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
-    RENDER_REGISTER_TOKEN: Optional[str] = os.environ.get('RENDER_REGISTER_TOKEN')
     
     # Webhook JSON Source (single data source for monitoring)
     WEBHOOK_JSON_URL: str = os.environ.get(
@@ -425,20 +424,7 @@ class Config:
             else:
                 warnings.append(msg)
 
-        if not self.RENDER_REGISTER_TOKEN:
-            msg = "RENDER_REGISTER_TOKEN environment variable is required"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
-                # Set development default
-                self.RENDER_REGISTER_TOKEN = "dev-render-register-token"
-        elif self.RENDER_REGISTER_TOKEN.startswith("dev-") or self.RENDER_REGISTER_TOKEN == "dev-render-register-token":
-            msg = f"RENDER_REGISTER_TOKEN cannot be a development/default token in production: '{self.RENDER_REGISTER_TOKEN}'"
-            if strict:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
+
 
         # Production security checks
         if not self.DEBUG and (self.SECRET_KEY.startswith('dev-') or self.SECRET_KEY in ['dev-key-change-in-production', 'dev-secret-key-change-in-production-12345678901234567890']):

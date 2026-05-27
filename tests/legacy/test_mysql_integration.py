@@ -33,7 +33,6 @@ test_env = {
     'MYSQL_POOL_SIZE': '5',
     'MYSQL_MONITOR_INTERVAL': '15',
     'INTERNAL_WORKER_COMMS_TOKEN': 'test-token',
-    'RENDER_REGISTER_TOKEN': 'test-token',
     'FLASK_SECRET_KEY': 'test-secret-key',
     'DEBUG': 'true'
 }

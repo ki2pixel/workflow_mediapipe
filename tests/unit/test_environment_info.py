@@ -29,5 +29,5 @@ def test_get_environment_info_structure_and_safety():
 
     flags = info["config_flags"]
     assert isinstance(flags, dict)
-    forbidden_keys = {"AIRTABLE_ACCESS_TOKEN", "FLASK_SECRET_KEY", "INTERNAL_WORKER_COMMS_TOKEN", "RENDER_REGISTER_TOKEN"}
+    forbidden_keys = {"AIRTABLE_ACCESS_TOKEN", "FLASK_SECRET_KEY", "INTERNAL_WORKER_COMMS_TOKEN"}
     assert forbidden_keys.isdisjoint(set(flags.keys()))

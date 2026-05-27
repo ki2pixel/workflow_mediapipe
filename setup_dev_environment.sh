@@ -172,11 +172,6 @@ FLASK_SECRET_KEY=change-this-in-production
 
 # Worker Communication Tokens (change these!)
 INTERNAL_WORKER_COMMS_TOKEN=your-secure-token-here
-RENDER_REGISTER_TOKEN=your-render-token-here
-
-# Remote Service Configuration
-REMOTE_TRIGGER_URL=https://render-signal-server.onrender.com/api/check_trigger
-REMOTE_POLLING_INTERVAL=15
 
 # Logging Configuration
 LOGS_BASE_DIR=./logs

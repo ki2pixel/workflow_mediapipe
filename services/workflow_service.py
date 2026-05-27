@@ -471,54 +471,7 @@ class WorkflowService:
             "message": f"Sequence stopped. Stopped steps: {', '.join(stopped_steps) if stopped_steps else 'none'}"
         }
     
-    @staticmethod
-    def get_current_workflow_status_summary() -> Dict[str, Any]:
-        """
-        Get workflow status summary for remote servers.
 
-        Returns:
-            Workflow status summary
-        """
-        workflow_state = WorkflowService._get_workflow_state()
-        if not workflow_state:
-            return {
-                "is_sequence_running": False,
-                "steps": {},
-                "last_sequence_outcome": {"status": "unknown"},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "error": "Unable to access workflow state"
-            }
-
-        try:
-                    
-            sequence_running = workflow_state.is_sequence_running()
-
-                        
-            steps_summary = {}
-            all_steps_info = workflow_state.get_all_steps_info()
-            for step_key, info in all_steps_info.items():
-                steps_summary[step_key] = {
-                    "status": info['status'],
-                    "progress_current": info['progress_current'],
-                    "progress_total": info['progress_total'],
-                    "return_code": info['return_code']
-                }
-
-            return {
-                "is_sequence_running": sequence_running,
-                "steps": steps_summary,
-                "last_sequence_outcome": workflow_state.get_sequence_outcome(),
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        except Exception as e:
-            logger.error(f"Error getting workflow status summary: {e}")
-            return {
-                "is_sequence_running": False,
-                "steps": {},
-                "last_sequence_outcome": {"status": "error"},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "error": f"Failed to get status: {str(e)}"
-            }
     
     @staticmethod
     def prepare_step_execution(step_key: str, process_info: Dict, commands_config: Dict) -> Tuple[List[str], str]:

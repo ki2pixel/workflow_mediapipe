@@ -7,7 +7,7 @@ import logging
 import time
 from functools import wraps
 from flask import Blueprint, jsonify, request
-from config.security import require_internal_worker_token, require_render_register_token
+from config.security import require_internal_worker_token
 from services.monitoring_service import MonitoringService
 from services.workflow_service import WorkflowService
 from services.performance_service import PerformanceService
@@ -204,27 +204,7 @@ def api_ping():
     return jsonify({"status": "pong", "worker_type": "ubuntu_new"}), 200
 
 
-@api_bp.route('/get_remote_status_summary', methods=['GET'])
-@measure_api('/api/get_remote_status_summary')
-@require_internal_worker_token
-def api_get_remote_status_summary():
-    """
-    Get workflow status summary for remote servers.
-    Requires internal worker token authentication.
 
-    Returns:
-        JSON response with comprehensive workflow status
-
-    Status Codes:
-        200: Success
-        401: Unauthorized
-        500: Server error
-    """
-    try:
-        return jsonify(WorkflowService.get_current_workflow_status_summary())
-    except Exception as e:
-        logger.error(f"Remote status summary error: {e}")
-        return jsonify({"error": "Unable to retrieve status summary"}), 500
 
 
 @api_bp.route('/performance/metrics')
