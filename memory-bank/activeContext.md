@@ -1,13 +1,15 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-Nettoyage des artefacts et variables de configuration obsolètes RENDER_* et REMOTE_* accompli avec succès.
+Nettoyage des variables obsolètes Vultr dans le .env accompli avec succès.
 
 ## Objectifs
 - Maintenir l'intégrité du repo.
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-05-29 13:42:00] **Correction Bug Rendu DOMDiff (COMPLET)** : Résolution du bug de rendu de la liste de téléchargements locaux qui arrêtait le polling du frontend et empêchait l'apparition de la popup de workflow. Correction du passage direct des éléments `<li>` à `DOMDiff.morph` par le clonage du `<ul>` conteneur en amont.
+- [2026-05-27 19:39:00] **Nettoyage configuration Vultr .env (COMPLET)** : Suppression complète de toutes les variables d'environnement Vultr obsolètes (sections `# STEP5 — Cloud Vultr` et `# STEP5 — Container Runtime`) devenues inutiles suite à l'abandon et à la non-fusion de la feature cloud dans la branche main.
 - [2026-05-27 19:27:00] **Nettoyage des variables obsolètes (RENDER_*) (COMPLET)** : Suppression complète de `RENDER_REGISTER_TOKEN`, `RENDER_APP_CALLBACK_URL`, `RENDER_APP_CALLBACK_TOKEN`, `RENDER_REGISTER_URL_ENDPOINT`, `REMOTE_TRIGGER_URL`, `REMOTE_POLLING_INTERVAL` et du poller distant inutilisé (`RemoteWorkflowPoller`). Tous les tests unitaires et d'intégration ont été mis à jour et validés avec succès.
 - [2026-05-27 19:13:12] **Persistance Sélective (AppState Middleware) (COMPLET)** : Implémentation de la recommandation de l'audit pour la persistance sélective de l'état frontend. Création d'un middleware déclaratif dans `AppState.js` avec migration automatique des anciennes clés. Refactoring complet de `main.js` et `eventHandlers.js` pour supprimer les accès directs au `localStorage` et restauration dynamique de l'UI des sélections d'étapes personnalisées. Ajout de `test_state_persistence.mjs` validé avec succès.
 - [2026-05-27 19:02:00] Implémentation du système Virtual DOM (DOM Morphing) léger via `DOMDiff.js` (O(N) diffing). Remplacement des `innerHTML` destructeurs dans la méthode `updateLocalDownloadsListUI` de `uiUpdater.js`. Ajout et passage complet des tests unitaires `tests/frontend/dom_diff.test.js` exécutés par le script `test:frontend`.

@@ -990,7 +990,9 @@ export function updateLocalDownloadsListUI(downloadsData) {
     }
 
     domBatcher.scheduleUpdate('downloads-list-render', () => {
-        DOMDiff.morph(listEl, htmlContent);
+        const wrapper = listEl.cloneNode(false);
+        wrapper.innerHTML = htmlContent;
+        DOMDiff.morph(listEl, wrapper);
     });
 }
 
