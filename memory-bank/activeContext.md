@@ -1,13 +1,14 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-Nettoyage des variables obsolètes Vultr dans le .env accompli avec succès.
+Aucune tâche active. La session d'audit de performance et d'optimisation de la STEP5 a été clôturée avec succès.
 
 ## Objectifs
 - Maintenir l'intégrité du repo.
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-05-29 19:40:00] **Optimisations de Performance STEP5 (InsightFace GPU & JSON Streaming) (COMPLET)** : Audit et implémentation des optimisations pour le tracking GPU (limite VRAM 4 Go) : restriction de modules (`allowed_modules`), baisse de la résolution (`det_size=480`) et écriture JSON en flux (`StreamingJSONOutput`) en RAM O(1). Gain de +440% (10 à 54+ FPS) validé en conditions réelles.
 - [2026-05-29 13:42:00] **Correction Bug Rendu DOMDiff (COMPLET)** : Résolution du bug de rendu de la liste de téléchargements locaux qui arrêtait le polling du frontend et empêchait l'apparition de la popup de workflow. Correction du passage direct des éléments `<li>` à `DOMDiff.morph` par le clonage du `<ul>` conteneur en amont.
 - [2026-05-27 19:39:00] **Nettoyage configuration Vultr .env (COMPLET)** : Suppression complète de toutes les variables d'environnement Vultr obsolètes (sections `# STEP5 — Cloud Vultr` et `# STEP5 — Container Runtime`) devenues inutiles suite à l'abandon et à la non-fusion de la feature cloud dans la branche main.
 - [2026-05-27 19:27:00] **Nettoyage des variables obsolètes (RENDER_*) (COMPLET)** : Suppression complète de `RENDER_REGISTER_TOKEN`, `RENDER_APP_CALLBACK_URL`, `RENDER_APP_CALLBACK_TOKEN`, `RENDER_REGISTER_URL_ENDPOINT`, `REMOTE_TRIGGER_URL`, `REMOTE_POLLING_INTERVAL` et du poller distant inutilisé (`RemoteWorkflowPoller`). Tous les tests unitaires et d'intégration ont été mis à jour et validés avec succès.

@@ -176,7 +176,13 @@ class InsightFaceEngine:
         if ctx_id < 0:
             ctx_id = 0
 
-        providers = ["CUDAExecutionProvider"]
+        provider_options = [{
+            "device_id": ctx_id,
+            "arena_extend_strategy": "kSameAsRequested",
+            "gpu_mem_limit": int(2.5 * 1024 * 1024 * 1024),
+            "cudnn_conv_algo_search": "HEURISTIC",
+        }]
+        providers = [("CUDAExecutionProvider", provider_options[0])]
         insightface_root_raw = os.environ.get("INSIGHTFACE_HOME", "").strip()
         insightface_root = str(Path(insightface_root_raw or "~/.insightface").expanduser())
 

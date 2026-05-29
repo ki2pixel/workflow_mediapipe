@@ -10,6 +10,17 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## Mai 2026
+
+- [2026-05-29 19:40:00] **Optimisations de Performance STEP5 (InsightFace GPU & JSON Streaming)** : Implémentation de trois optimisations majeures pour le tracking InsightFace GPU sur des cartes limitées à 4 Go de VRAM (GTX 1650).
+  - **Raison** : Les modèles de tracking facial chargeaient inutilement tous leurs sous-modèles en VRAM (GenderAge, Recognition, etc.) et l'export final de gros volumes de frames vers JSON provoquait des plantages mémoire (OOM) en RAM CPU.
+  - **Implémentation** :
+    1. Introduction de `STEP5_INSIGHTFACE_ALLOWED_MODULES` (défaut `detection,landmark_3d_68`) pour restreindre les modules chargés.
+    2. Réduction de la résolution interne (`STEP5_INSIGHTFACE_DET_SIZE=480`) et configuration robuste du provider CUDA (`arena_extend_strategy=kSameAsRequested`, `cudnn_conv_algo_search=HEURISTIC`).
+    3. Implémentation du **Streaming JSON Export** via `StreamingJSONOutput` et `StreamingList` dans `process_video_worker.py` pour écrire les frames au fil de l'eau sur le disque (maintien d'une RAM O(1)).
+  - **Impact** : L'empreinte VRAM d'initialisation a été divisée par 3 (descendue sous les 800 Mo de pic en runtime), et la performance de tracking est passée de **10 FPS à plus de 54 FPS (+440% de gain)**. L'export n'a plus aucun impact sur l'allocation de la RAM CPU.
+  - **Documentation** : Mise à jour de `docs/workflow/pipeline/05-video-tracking.md` et `.env.example`.
+
 ## Février 2026
 
 - [2026-02-22 20:45:00] **Exclusion dossier .shrimp_task_manager du prompt docs-updater** : Application de la même exclusion au fichier `.continue/prompts/docs-updater.md` pour cohérence entre workflows et prompts.

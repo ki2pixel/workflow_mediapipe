@@ -111,6 +111,11 @@ STEP5_ENABLE_GPU=0                  # 1 pour activer GPU InsightFace
 STEP5_GPU_ENGINES=insightface        # Moteurs GPU autorisés
 STEP5_GPU_FALLBACK_AUTO=1           # Bascule CPU auto si GPU échoue
 
+# Configuration VRAM InsightFace (Optionnel)
+STEP5_INSIGHTFACE_ALLOWED_MODULES=detection,landmark_3d_68 # Modules requis (défaut)
+STEP5_INSIGHTFACE_DET_SIZE=480      # Résolution interne (480 ou 640)
+STEP5_INSIGHTFACE_MAX_WIDTH=1280    # Largeur max avant downscale
+
 # Performance CPU (MediaPipe)
 TRACKING_CPU_WORKERS=15              # Workers MediaPipe (défaut)
 STEP5_BLENDSHAPES_THROTTLE_N=2       # Calcul blendshapes toutes les N frames
@@ -291,9 +296,11 @@ STEP5_ENABLE_PROFILING=1  # Logs toutes les 20 frames
 # GPU validation
 STEP5_GPU_FALLBACK_AUTO=1  # Bascule CPU auto si GPU échoue
 
-# Memory management
-# ONNX Runtime GPU avec VRAM monitoring
-# CUDA paths discovery automatique
+# Memory management & VRAM Optimizations (Ex: pour GPU 4 Go)
+# ONNX Runtime GPU avec VRAM monitoring dynamique
+STEP5_INSIGHTFACE_ALLOWED_MODULES=detection,landmark_3d_68  # Restreint le chargement de modèles inutiles
+STEP5_INSIGHTFACE_DET_SIZE=480  # Réduit l'empreinte mémoire d'inférence
+STEP5_INSIGHTFACE_MAX_WIDTH=1280  # Limite la taille des frames analysées
 ```
 
 ### Export Optimizations
@@ -307,6 +314,8 @@ STEP5_BLENDSHAPES_PROFILE=full    # Tous les 52 coefficients
 STEP5_BLENDSHAPES_PROFILE=mouth   # Uniquement bouche
 STEP5_BLENDSHAPES_PROFILE=none    # Désactive blendshapes
 ```
+
+> **Streaming JSON Export** : Le pipeline utilise désormais un objet `StreamingJSONOutput`. Au lieu d'accumuler toutes les frames en mémoire et de générer un pic massif de RAM lors de l'export final, les données sont écrites frame par frame en *stream* sur le disque. La complexité mémoire (RAM) est strictement constante **O(1)**, ce qui élimine définitivement les plantages OOM sur les très longues vidéos (>1 heure).
 
 ## Monitoring et Logs
 

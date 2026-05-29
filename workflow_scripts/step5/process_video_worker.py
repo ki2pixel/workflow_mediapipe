@@ -13,6 +13,50 @@ from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
 from face_engines import create_face_engine
 from object_detector_registry import ObjectDetectorRegistry
 
+class StreamingList:
+    def __init__(self, file_obj):
+        self.file_obj = file_obj
+        self.first = True
+        self.count = 0
+        self.file_obj.write("[\n")
+        
+    def append(self, item):
+        if not self.first:
+            self.file_obj.write(",\n")
+        else:
+            self.first = False
+        frame_json = json.dumps(item, ensure_ascii=False)
+        self.file_obj.write("    " + frame_json)
+        self.count += 1
+        self.file_obj.flush()
+        
+    def __len__(self):
+        return self.count
+
+class StreamingJSONOutput:
+    def __init__(self, output_path, metadata):
+        self.output_path = output_path
+        self.file_obj = open(self.output_path, 'w', encoding='utf-8')
+        self.file_obj.write("{\n  \"metadata\": ")
+        json.dump(metadata, self.file_obj, indent=2, ensure_ascii=False)
+        self.file_obj.write(",\n  \"frames\": ")
+        self.frames_list = StreamingList(self.file_obj)
+        
+    def __getitem__(self, key):
+        if key == "frames":
+            return self.frames_list
+        raise KeyError(key)
+
+    def add_frame(self, frame_dict):
+        self.frames_list.append(frame_dict)
+
+    def __len__(self):
+        return len(self.frames_list)
+
+    def close(self):
+        self.file_obj.write("\n  ]\n}\n")
+        self.file_obj.close()
+
 mp = None
 
 
@@ -292,14 +336,12 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
     # Get video metadata
     fps = video_capture.get(cv2.CAP_PROP_FPS)
 
-    final_output = {
-        "metadata": {
-            "video_path": args.video_file_path,
-            "total_frames": total_frames,
-            "fps": fps
-        },
-        "frames": []
-    }
+    output_path = Path(args.video_file_path).with_suffix('.json')
+    final_output = StreamingJSONOutput(output_path, {
+        "video_path": args.video_file_path,
+        "total_frames": total_frames,
+        "fps": fps
+    })
 
     # Performance tracking
     face_detection_success_count = 0
@@ -396,7 +438,7 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
         )
 
         # Add to final output
-        final_output["frames"].append({
+        final_output.add_frame({
             "frame": frame_idx + 1,
             "tracked_objects": tracked_for_frame if tracked_for_frame else []
         })
@@ -412,7 +454,7 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
     logging.info(f"  Processing time: {processing_time:.2f} seconds")
     logging.info(f"  Average FPS: {frames_processed / max(0.001, processing_time):.2f}")
     logging.info(f"  Object detection fallback used: {getattr(args, 'enable_object_detection', False)}")
-    logging.info(f"  Total frames exported: {len(final_output['frames'])}")
+    logging.info(f"  Total frames exported: {len(final_output)}")
 
     return final_output
 
@@ -503,15 +545,13 @@ def main(args):
                         mp_module = None
                         ObjectDetector = None
 
-                final_output = {
-                    "metadata": {
-                        "video_path": args.video_file_path,
-                        "total_frames": total_frames,
-                        "fps": fps,
-                        "tracking_engine": engine_name,
-                    },
-                    "frames": [],
-                }
+                output_path = Path(args.video_file_path).with_suffix('.json')
+                final_output = StreamingJSONOutput(output_path, {
+                    "video_path": args.video_file_path,
+                    "total_frames": total_frames,
+                    "fps": fps,
+                    "tracking_engine": engine_name,
+                })
 
                 tracked_objects, next_id_counter = {}, {'value': 0}
 
@@ -692,7 +732,7 @@ def main(args):
                             enhanced_speaking_detector=enhanced_speaking_detector,
                             current_frame_num=frame_idx_out + 1,
                         )
-                        final_output["frames"].append(
+                        final_output.add_frame(
                             {
                                 "frame": frame_idx_out + 1,
                                 "tracked_objects": tracked_for_frame if tracked_for_frame else [],
@@ -716,7 +756,7 @@ def main(args):
                                 enhanced_speaking_detector=enhanced_speaking_detector,
                                 current_frame_num=fill_idx + 1,
                             )
-                            final_output["frames"].append(
+                            final_output.add_frame(
                                 {
                                     "frame": fill_idx + 1,
                                     "tracked_objects": tracked_for_frame if tracked_for_frame else [],
@@ -734,15 +774,9 @@ def main(args):
             logging.error(f"Error processing video {args.video_file_path} with OpenCV engine: {e}")
             raise
 
-        output_path = Path(args.video_file_path).with_suffix('.json')
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(final_output, f, indent=2, ensure_ascii=False)
-            logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
-            print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
-        except Exception as e:
-            logging.error(f"Failed to save output file {output_path}: {e}")
-            raise
+        final_output.close()
+        logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
+        print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
         return
 
     mp_module = _ensure_mediapipe_loaded(required=True)
@@ -813,14 +847,12 @@ def main(args):
                 with FaceLandmarker.create_from_options(face_options) as landmarker, \
                      ObjectDetector.create_from_options(object_options) as object_detector:
 
-                    final_output = {
-                        "metadata": {
-                            "video_path": args.video_file_path,
-                            "total_frames": total_frames,
-                            "fps": fps
-                        },
-                        "frames": []
-                    }
+                    output_path = Path(args.video_file_path).with_suffix('.json')
+                    final_output = StreamingJSONOutput(output_path, {
+                        "video_path": args.video_file_path,
+                        "total_frames": total_frames,
+                        "fps": fps,
+                    })
                     tracked_objects, next_id_counter = {}, {'value': 0}
 
                     # Fallback tracking variables
