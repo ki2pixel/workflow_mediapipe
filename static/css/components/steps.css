@@ -381,9 +381,6 @@
     font-size: 0.85em;
     color: var(--text-secondary);
     white-space: pre-line;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-height: 3.6em;
     line-height: 1.2em;
 }
 .workflow-wrapper.compact-mode:not(.logs-active) .progress-text-step {

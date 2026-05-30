@@ -215,6 +215,10 @@ fast_read_multiple_files target.py --lines 100-120  # Risque d'erreur
 
 ## Integration patterns
 
+### Avec Memory Bank Protocol
+- **Accès Strict** : Utilisez EXCLUSIVEMENT les outils `fast_read_file`, `edit_file`, `fast_write_file` avec des chemins absolus pour accéder aux fichiers de `memory-bank/`.
+- **Interdiction Formelle** : NE JAMAIS lire l'intégralité du répertoire `memory-bank/` ni lire d'autres fichiers de mémoire si la tâche est triviale.
+
 ### Avec Sequential Thinking
 
 Utilise `sequentialthinking_tools` pour valider la logique des modifications avant édition.

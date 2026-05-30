@@ -31,6 +31,7 @@ description: Maintain and execute the backend/frontend test suites with environm
 - **Imports** : préférer `from app_new import create_app` (éviter `app`).
 - **Focus frontend** : `tests/frontend/test_focus_trap.mjs` exige focus trap actif dans `popupManager.js`.
 - **Logs overlay** : `test_timeline_logs_phase2.mjs` doit être up-to-date après changements UI.
+- **Sécurité Production** : Vérifier que les tests couvrent le script `validate_startup.py` et assurent le crash de l'application Flask en production (`DEBUG=False`) si des secrets `dev-*` sont utilisés.
 
 ## Diagnostic rapide
 - Échecs massifs PyTest → vérifier versions `numpy` vs `tensorflow`. Recontraindre via `pip install -r requirements-dev.txt`.

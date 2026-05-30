@@ -15,9 +15,11 @@ description: Create or adjust the Connected Timeline UI (HTML/CSS/JS) with AppSt
 1. **Structure sémantique** : `<section class="workflow-pipeline">`, `.pipeline-timeline[role=list]`, `.timeline-step[role=listitem]` avec spine/nœud/connecteur.
 2. **Compatibilité JS** : Conserver IDs (`#step-{{ step_key }}`) et classes (`.step`, `.run-button`, `.specific-log-button`).
 3. **AppState immuable** : Toute mise à jour via `AppState.setState()`. Les consommateurs utilisent `subscribeToProperty`.
-4. **DOMBatcher** : `DOMBatcher.scheduleUpdate()` pour chaque mutation DOM.
-5. **Accessibility** : `aria-live="polite"` pour statuts, support `prefers-reduced-motion`.
-6. **Auto-scroll** : Utiliser `scrollManager.scrollToActiveStep()` qui calcule `calculateOptimalScrollPosition()` (respect topbar fixe). Pas de `scrollIntoView()` brut.
+4. **DOMBatcher & Sécurité** : `DOMBatcher.scheduleUpdate()` pour chaque mutation DOM. Jamais d'`innerHTML` sans `DOMUpdateUtils.escapeHtml()`.
+5. **DOMDiff** : Toujours envelopper les listes dynamiques (ex: `<li>`) dans un conteneur (`<ul>`) avant d'appliquer `DOMDiff.morph` pour éviter la casse du polling.
+6. **Polling** : Utiliser exclusivement `PollingManager`. Les `setInterval` isolés et le remote polling sont formellement interdits.
+7. **Accessibility** : `aria-live="polite"` pour statuts, support `prefers-reduced-motion`.
+8. **Auto-scroll** : Utiliser `scrollManager.scrollToActiveStep()` qui calcule `calculateOptimalScrollPosition()` (respect topbar fixe). Pas de `scrollIntoView()` brut.
 
 ## Workflow Modifs Timeline
 1. **Analyser le besoin** (phase, layout, state).

@@ -61,6 +61,7 @@ alwaysApply: true
 ### Frontend
 - `AppState.setState()` reste immuable (diff superficiel, aucun `state` muté).
 - DOM : `DOMBatcher.scheduleUpdate()` + `DOMUpdateUtils.escapeHtml()` (pas d'`innerHTML` non échappé).
+- **DOMDiff** : Toujours envelopper les listes dynamiques (ex: `<li>`) dans un conteneur (`<ul>`) avant d'appliquer `DOMDiff.morph` pour éviter la casse du polling.
 - Polling : `PollingManager` uniquement, bannir les `setInterval` isolés.
 - Composants clés : Logs Overlay (focus trap, sync timeline, fermeture auto), Timeline connectée (badges d'état dynamiques, auto-scroll structurel) et FromSmash/téléchargements externes en lecture seule.
 
@@ -106,7 +107,7 @@ domBatcher.scheduleUpdate(() => {
 - `subscribeToProperty(['steps', stepKey, 'status'])` pour mettre à jour badges Timeline.
 - `PollingManager` met à jour `WorkflowState` → `AppState` via actions spécifiques (jamais de dispatch global).
 
-## Pipeline STEP4, STEP5 & STEP7
+## Pipeline STEP4, STEP5, STEP6 & STEP7
 ### STEP4 Audio (audio_env)
 - Extraction audio via `ffmpeg` preset TV, analyse `Lemonfox` (avec smoothing) + fallback Pyannote.
 - Profil imposé `AUDIO_PROFILE=gpu_fp32` (AMP désactivé) pour éviter divergences GPU/CPU.
@@ -120,19 +121,26 @@ domBatcher.scheduleUpdate(() => {
 - **Règles d’export** : JSON dense frame-by-frame, `tracked_objects` vide si aucune détection.
 - **Optimisations** : Warmup `cap.read()`, chunking adaptatif interne.
 - **GPU** : Réservé strictement à InsightFace (ONNX Runtime). MediaPipe tourne toujours sur CPU.
+- **Export Streaming O(1)** : L'utilisation de `StreamingJSONOutput` est obligatoire pour l'export. Les données doivent être écrites frame par frame en flux continu sur le disque pour éviter les OOM.
+
+### STEP6 Réduction JSON (env)
+- **Objectif** : Agréger le tracking brut en éliminant les redondances et les bruits.
+- **Optimisation O(1)** : L'utilisation de la bibliothèque `ijson` est obligatoire pour lire itérativement (en streaming) les gros fichiers JSON sans les charger entièrement en RAM.
 
 ### STEP7 Pré-traitement AE (env)
 - **Objectif** : Optimiser les données JSON pour After Effects en pré-traitant les sorties STEP6.
 - **Entrée** : Fichiers `*_tracking.json` (sortie STEP6) et JSON audio associés.
+- **Streaming itératif** : Utiliser `ijson` pour le parsing O(1) de l'entrée.
 - **Sortie** : Fichiers `*_ae.json` optimisés pour AE avec structures pré-indexées.
 - **Patterns** : Utiliser les patterns de progression définis dans `WorkflowCommandsConfig._get_step7_config()`.
 - **After Effects Integration** : Le script AE `Analyse-Écart-X...jsx` priorise les `*_ae.json` avec fallback sur STEP6/STEP5.
 
-## Quality & Testing
+## Quality, Testing & Security
 - **Tests unitaires** : `tests/unit/` pour services isolés. Utiliser context managers `patched_workflow_state()` et `patched_commands_config()` depuis les tests unitaires.
 - **Tests intégration** : `tests/integration/` couvrent routes + WorkflowService.
 - **Tests frontend** : Node/ESM (`npm run test:frontend`) pour DOMBatcher, Logs Overlay, Timeline, focus trap, log safety.
 - **CI/Test env** : exécuter depuis `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour bloquer les téléchargements réseau.
+- **Sécurité au Démarrage** : Le script `validate_startup.py` est obligatoire avant le lancement Web. En production (`DEBUG=False`), l'application Flask et le script de validation doivent impérativement crasher si des secrets de type `dev-*` sont détectés.
 - Skips conditionnels autorisés pour STEP3/STEP5 quand dépendances spécialisées manquent, mais documenter les limitations.
 
 ## Process & Tooling
@@ -175,6 +183,8 @@ domBatcher.scheduleUpdate(() => {
 - Démarrer des polls via `setInterval` dispersé (utiliser `PollingManager`).
 - Hardcoder des chemins (`/mnt/cache`) ou des commandes.
 - Tenter d'activer le GPU sur MediaPipe (non supporté dans cette stack).
+- Charger entièrement de gros fichiers JSON en RAM avec `json.load()` (utiliser `ijson` au lieu).
+- Tenter de réimplémenter des architectures cloud ou pollers distants (ex: Vultr, Lightning) ; le pipeline reste strictement local/on-premise.
 
 ## Notes finales
 - Maintenir ce document <12 000 caractères. Réviser après toute évolution majeure.

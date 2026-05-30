@@ -7,8 +7,11 @@
 ## Statut Actuel
 Aucune tâche active.
 
-### Mai 2026
+##### Statut Actuel
+
+- [2026-05-30 15:55:00] **Audit et Mise à Jour des Coding Standards (COMPLET)** : Mise à jour du fichier `.agents/rules/codingstandards.md` pour y refléter les récents changements d'architecture : streaming JSON O(1) (`ijson`, `StreamingJSONOutput`), sécurité de production, correctifs `DOMDiff` et retrait des dépendances Cloud.
 - [2026-05-29 19:40:00] **Audit de Performance et Optimisation STEP5 (InsightFace GPU) (COMPLET)** : Audit complet des goulots d'étranglement InsightFace sur GPU 4 Go (GTX 1650). Implémentation de la restriction de modules, baisse de la résolution interne (det_size=480), et mise en place de l'export streaming JSON O(1) RAM. Résultat : vitesse accrue de 10 à 54+ FPS (+440%), réduction de VRAM sous les 800 Mo, et élimination complète des OOM sur CPU. Documentation pipeline et variables d'environnement actualisées.
+- [2026-05-29 20:54:55] **Correction UI STEP5 (COMPLET)** : Suppression de la limite de lignes (`max-height` et `ellipsis`) sur `.progress-text-step` dans `steps.css` pour afficher correctement la liste complète des vidéos en cours de traitement.
 - [2026-05-29 13:42:00] **Correction Bug Rendu DOMDiff (COMPLET)** : Résolution du bug de rendu de la liste de téléchargements locaux qui arrêtait le polling du frontend et empêchait l'apparition de la popup de workflow. Correction du passage direct des éléments `<li>` à `DOMDiff.morph` par le clonage du `<ul>` conteneur en amont.
 - [2026-05-27 19:39:00] **Nettoyage configuration Vultr .env (COMPLET)** : Suppression complète de toutes les variables d'environnement Vultr obsolètes (sections `# STEP5 — Cloud Vultr` et `# STEP5 — Container Runtime`) devenues inutiles suite à l'abandon et à la non-fusion de la feature cloud dans la branche main.
 - [2026-05-27 19:27:00] **Nettoyage des variables obsolètes (RENDER_*) (COMPLET)** : Suppression complète de `RENDER_REGISTER_TOKEN`, `RENDER_APP_CALLBACK_URL`, `RENDER_APP_CALLBACK_TOKEN`, `RENDER_REGISTER_URL_ENDPOINT`, `REMOTE_TRIGGER_URL`, `REMOTE_POLLING_INTERVAL` et du poller distant inutilisé (`RemoteWorkflowPoller`). Tous les tests unitaires et d'intégration ont été mis à jour et validés avec succès.

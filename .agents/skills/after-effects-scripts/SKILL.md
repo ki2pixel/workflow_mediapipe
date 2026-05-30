@@ -67,9 +67,9 @@ PYTHON_EXECUTABLE=python3          # Chemin Python pour system.callSystem()
 1. **Détection automatique** : Le script cherche par ordre :
    - `*_tracking.json` (STEP6 - prioritaire, stable)
    - `*.json` (STEP5 - fallback streaming si massif)
-2. **Parsing optimisé** : 
-   - STEP6 : Lecture directe (JSON léger)
-   - STEP5 : Streaming `readln()` + buffer (évite crashs mémoire)
+2. **Parsing optimisé O(1) RAM** : 
+   - Backend Python (STEP6/STEP7) : L'utilisation de la bibliothèque `ijson` est OBLIGATOIRE pour parser les fichiers JSON itérativement sans les charger entièrement en mémoire (`json.load()` interdit).
+   - Scripts AE : Lecture directe pour STEP6 (léger), ou Streaming `readln()` + buffer pour STEP5 (évite crashs mémoire).
 3. **Application** : Recentrage automatique sur les calques sélectionnés
 4. **Logs** : Vérifier la console AE pour les métriques `[PY]` et analytics
 

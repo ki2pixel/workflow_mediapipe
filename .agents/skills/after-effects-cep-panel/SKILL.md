@@ -247,7 +247,7 @@ $.writeln("Python result: " + pythonResult);
 - **Validation des entrées** côté client et host
 - **Gestion erreurs** robuste avec try/catch
 - **Async operations** pour les traitements longs
-- **Memory management** : éviter leaks dans les boucles
+- **Memory management** : éviter leaks dans les boucles. Pour les ponts Python (backend), parser les gros JSON itérativement avec `ijson` (O(1) RAM, `json.load()` interdit).
 
 ### UX/UI Guidelines
 - **Thème cohérent** avec interface AE (sombre)

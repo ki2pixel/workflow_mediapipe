@@ -57,9 +57,11 @@ audio_env/bin/python workflow_scripts/step4/run_audio_analysis_lemonfox.py --log
 ```
 
 ### Step 5 : Tracking (Standard: CPU MediaPipe via tracking_env_slim, GPU InsightFace-only)
-**Standard CPU** : Mode MediaPipe par défaut via `tracking_env_slim` avec multiprocessing (15 workers) et fallback object detector optionnel.
+**Standard CPU** : Mode MediaPipe par défaut via `tracking_env_slim` avec multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
 **GPU InsightFace** : Mode GPU exclusivement pour InsightFace (`STEP5_ENABLE_GPU=1`, `STEP5_TRACKING_ENGINE=insightface`) via `insightface_env`.
-**Process** : Warmup `cap.read()`, chunking adaptatif interne, JSON dense (`tracked_objects: []` si vide).
+**Modèles Interdits** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar. Lightning et Vultr sont abandonnés.
+**Process** : Warmup `cap.read()`, chunking adaptatif interne.
+**Export JSON** : Obligation absolue d'utiliser `StreamingJSONOutput` pour écrire en streaming (O(1) RAM).
 
 ```bash
 # Mode CPU standard (MediaPipe) - via tracking_env_slim
@@ -116,6 +118,7 @@ Pour diagnostiquer un état incohérent :
 3. **Tracking** : Si le tracking plante, vérifier que `config.settings.py` charge bien les modèles depuis le `InsightFaceEngine` (factory `create_face_engine()`) et non des chemins en dur. Confirmer que `STEP5_TRACKING_ENGINE` est vide (MediaPipe via `tracking_env_slim`) ou `insightface` (GPU via `insightface_env`).
 4. **Scripts** : Les subprocess doivent utiliser `utils.resource_manager` pour la gestion des verrous et ressources.
 5. **Tests** : Environnement de test `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour CI.
+6. **Sécurité Démarrage** : Le script `validate_startup.py` est obligatoire. En mode `DEBUG=False`, l'application Flask crashe si des secrets par défaut (`dev-*`) sont détectés.
 
 ## 4. Frontend & UX Rappels (Standards §3)
 

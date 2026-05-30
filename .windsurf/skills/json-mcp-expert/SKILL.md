@@ -139,6 +139,8 @@ json_query_jsonpath massive_i18n.json "$.fr.common.buttons[*]"
 json_query_search_keys massive_i18n.json "fr.common"
 ```
 
+De plus, pour le traitement backend Python (ex: STEP6/STEP7), l'utilisation de `ijson` est OBLIGATOIRE pour un parsing en streaming O(1) RAM. Le chargement via `json.load()` est strictement interdit pour les fichiers de tracking volumineux.
+
 ### JSONPath syntax errors
 
 ```bash

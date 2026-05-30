@@ -86,12 +86,15 @@ Shrimp Task Manager génère automatiquement des priorités basées sur :
 - Risque technique
 - Effort estimé
 
-### Integration avec Memory Bank
+### Integration avec Memory Bank Protocol
 
-Utilise `fast_read_file` pour charger le contexte avant analyse :
+Conformément au Memory Bank Protocol (MCP-Optimized) :
+- N'utilisez **JAMAIS** de lecture globale du dossier `memory-bank/`.
+- Utilisez **EXCLUSIVEMENT** l'outil `fast_read_file` avec un chemin absolu pour charger le contexte (`activeContext.md`) avant analyse. Ne lisez pas `productContext.md` ou `systemPatterns.md` sauf si la tâche l'exige spécifiquement.
+
 ```bash
-# Charger le contexte actif
-fast_read_file path="/absolute/path/to/activeContext.md"
+# Charger le contexte actif chirurgicalement
+fast_read_file path="/home/kidpixel/workflow_mediapipe/memory-bank/activeContext.md"
 
 # Lancer l'analyse
 analyze_task(summary="Contexte chargé", initialConcept="Solution", previousAnalysis="")

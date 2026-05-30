@@ -29,8 +29,9 @@ STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python 
 2. **LD_LIBRARY_PATH** : confirmé via logs `run_tracking_manager.py` (helper `_collect_cuda_lib_paths` + `_apply_ld_library_path`).
 3. **Multiprocessing** : `--cpu_internal_workers` ≤ nombre de cœurs disponibles. Vérifier `TRACKING_CPU_WORKERS` côté manager.
 4. **Profiling** : activer `STEP5_ENABLE_PROFILING=1` pour logs `[PROFILING] frame ...` toutes les 20 frames.
-5. **MediaPipe CPU** : utilise `tracking_env_slim` (allégé), multiprocessing via `process_video_worker_multiprocessing.py` et fallback object detector optionnel.
-6. **Export JSON** : JSON dense (frames 1..N). `tracked_objects` vide si aucune détection.
+5. **MediaPipe CPU** : utilise `tracking_env_slim` (allégé), multiprocessing obligatoire via `process_video_worker_multiprocessing.py` (`TRACKING_CPU_WORKERS`).
+6. **Modèles Interdits** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar sont strictement interdits. Le pipeline cloud (Lightning/Vultr) est abandonné.
+7. **Export JSON** : L'utilisation de `StreamingJSONOutput` est obligatoire pour écrire le JSON en flux O(1) RAM. `tracked_objects` vide si aucune détection.
 
 ## Résolution des incidents
 - **Crash InsightFace FileExistsError** : supprimer/renommer le dossier modèle `~/.insightface/models/antelopev2` (ou laisser le helper `quarantine_model_dir()` dans `InsightFaceEngine` le faire) puis relancer.
