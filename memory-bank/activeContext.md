@@ -1,13 +1,15 @@
 # Contexte Actif (Active Context)
 
-## Tâche en Cours
-Aucune tâche active. L'optimisation de la gestion mémoire (VRAM/RAM) pour Pyannote (STEP4) a été clôturée avec succès.
+3: ## Tâche en Cours
+Aucune tâche active. L'audit et l'optimisation de l'Étape 3 (Analyse des transitions) ont été achevés avec succès avec l'implémentation de l'I/O asynchrone, du pruning de RAM O(1), et de l'inférence par lot sur GPU dans `run_transnet.py`. L'Étape 2 (Conversion) avait été optimisée précédemment.
 
 ## Objectifs
 - Maintenir l'intégrité du repo.
 - Préparer pour le développement futur.
 
-## Décisions Récentes
+10: ## Décisions Récentes
+- [2026-06-02 19:37:00] **Audit et Optimisation de la STEP5 (COMPLET)** : Implémentation du multiprocessing CPU dans `process_video_worker_multiprocessing.py`. Remplacement de la mise en mémoire globale par un buffer de réordonnancement `frame_buffer` couplé à `StreamingJSONOutput` pour garantir une écriture JSON séquentielle en streaming O(1) RAM. Ajout de `cv2.setNumThreads(0)` pour éliminer la contention entre OpenCV et ProcessPoolExecutor.
+- [2026-06-02 19:06:00] **Audit et Optimisation de la STEP2 (COMPLET)** : Refonte complète de `convert_videos.py` remplaçant l'architecture à deux passes (conversion puis compression) par une architecture parallèle en passe unique. Intégration du décodage matériel `-hwaccel cuda`, parallélisation de `ffprobe`, et jusqu'à 3 sessions NVENC (Workers) simultanées. Le processus inclut désormais une analyse audio amont pour un encodage robuste et un fallback CPU.
 - [2026-06-02 18:38:00] **Correction de la Segmentation Fault (SIGSEGV) STEP4 (COMPLET)** : Activation forcée de l'isolation GPU (`AUDIO_GPU_ISOLATION=1`) pour tous les profils GPU (y compris `gpu_fp32`) dans `.env`, `app_new.py` et `run_audio_analysis.py`. Cette modification résout le crash -11 survenant lors du traitement séquentiel en forçant le nettoyage de l'état CUDA/PyTorch à chaque nouvelle vidéo via l'exécution en sous-processus séparé.
 - [2026-06-02 18:22:00] **Optimisation Pyannote Diarization (STEP4) (COMPLET)** : Résolution des fuites de mémoire VRAM/RAM dans `run_audio_analysis.py`. Ajout d'un cache global pour le chargement "lazy" des modèles d'embeddings (1 seule instance chargée). Enrobage de l'inférence d'embeddings dans `torch.inference_mode()`. Implémentation de l'isolation par sous-processus GPU (`AUDIO_GPU_ISOLATION=1`) qui lance l'analyse de chaque vidéo dans un sous-processus dédié, garantissant la libération totale de la VRAM après chaque fichier. Ajout de nettoyages explicites et configuration optimisée de `PYTORCH_CUDA_ALLOC_CONF`.
 - [2026-06-02 17:45:00] **Compatibilité Pyannote.audio 4.x (DiarizeOutput) (COMPLET)** : Résolution de l'AttributeError `'DiarizeOutput' object has no attribute 'itertracks'` survenu lors de l'exécution de la STEP4 avec pyannote. Détection et extraction dynamiques de l'objet `Annotation` (`speaker_diarization`) si l'objet retourné par le pipeline est un conteneur `DiarizeOutput` (pyannote.audio 4.x+), préservant la compatibilité avec les versions 3.x/2.x.

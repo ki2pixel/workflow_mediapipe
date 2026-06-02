@@ -7,7 +7,11 @@
 ## Statut Actuel
 Aucune tâche active.
 
-##### Statut Actuel
+- [2026-06-02 19:37:00] **Audit et Optimisation de la STEP5 (COMPLET)** : Audit complet du multiprocessing MediaPipe sur CPU. Refonte de `workflow_scripts/step5/process_video_worker_multiprocessing.py` pour implémenter un buffer de réordonnancement asynchrone des chunks IPC et l'intégration de `StreamingJSONOutput`. Ces optimisations transforment l'empreinte mémoire d'un O(N) catastrophique en O(1) constant, tout en prévenant le thread thrashing via `cv2.setNumThreads(0)`.
+
+- [2026-06-02 19:15:00] **Audit et Optimisation de la STEP3 (COMPLET)** : Refonte de `workflow_scripts/step3/run_transnet.py` pour implémenter la lecture vidéo asynchrone (Threading + Queue), gérer dynamiquement la liste des frames (pruning glissant pour maintenir la RAM en O(1)) et traiter l'inférence GPU par lots (Batch Size de 16). Ces optimisations résolvent le bottleneck I/O et la fuite mémoire, permettant un traitement continu et beaucoup plus rapide.
+
+- [2026-06-02 19:06:00] **Audit et Optimisation de la STEP2 (COMPLET)** : Refonte de `workflow_scripts/step2/convert_videos.py` remplaçant l'architecture séquentielle à deux passes par un traitement parallèle en passe unique combinée. Implémentation du décodage matériel via `-hwaccel cuda`, parallélisation initiale via `ffprobe` et allocation jusqu'à 3 workers GPU simultanés pour NVENC. Intégration d'un audit prédictif des flux audio pour éviter le coûteux "fail & retry" et ajout d'un fallback CPU automatique sur `libx264` en cas de saturation de la VRAM.
 
 - [2026-06-02 18:38:00] **Correction de la Segmentation Fault (SIGSEGV) STEP4 (COMPLET)** : Activation forcée de l'isolation GPU (`AUDIO_GPU_ISOLATION=1`) pour tous les profils GPU (y compris `gpu_fp32`) dans `.env`, `app_new.py` et `run_audio_analysis.py`. Cette modification résout le crash -11 survenant lors du traitement séquentiel en forçant le nettoyage de l'état CUDA/PyTorch à chaque nouvelle vidéo via l'exécution en sous-processus séparé.
 

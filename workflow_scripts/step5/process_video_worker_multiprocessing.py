@@ -98,6 +98,12 @@ def init_worker_process(models_dir, args_dict):
     """
     global landmarker_global, object_detector_global
     
+    # Disable OpenCV's internal multithreading to avoid thread thrashing with ProcessPoolExecutor
+    try:
+        cv2.setNumThreads(0)
+    except Exception:
+        pass
+        
     worker_pid = os.getpid()
     engine_name = args_dict.get('tracking_engine', '')
     engine_norm = (str(engine_name).strip().lower() if engine_name else "")
@@ -493,8 +499,60 @@ def process_video_multiprocessing(args, video_capture, total_frames):
     
     logging.info(f"Created {len(chunks)} chunks for processing (chunk_size={chunk_size})")
     
+    from process_video_worker import StreamingJSONOutput
+    output_path = Path(args.video_file_path).with_suffix('.json')
+    final_output = StreamingJSONOutput(output_path, {
+        "video_path": args.video_file_path,
+        "total_frames": total_frames,
+        "fps": fps
+    })
+
+    # Initialize enhanced speaking detector
+    enhanced_speaking_detector = None
+    try:
+        enhanced_speaking_detector = EnhancedSpeakingDetector(
+            video_path=args.video_file_path,
+            jaw_threshold=args.speaking_detection_jaw_open_threshold
+        )
+        logging.info("Enhanced speaking detection initialized")
+    except Exception as e:
+        logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
+
+    tracked_objects = {}
+    next_id_counter = {'value': 0}
+    frame_buffer = {}
+    next_frame_to_process = 0
+    missing_frame_count = 0
+    first_missing_frame = None
+
+    def process_available_frames():
+        nonlocal next_frame_to_process, missing_frame_count, first_missing_frame
+        while next_frame_to_process in frame_buffer:
+            result = frame_buffer.pop(next_frame_to_process)
+            
+            if result is None:
+                missing_frame_count += 1
+                if first_missing_frame is None:
+                    first_missing_frame = next_frame_to_process
+                detections = []
+            else:
+                detections = result.get('detections', [])
+                
+            tracked_for_frame = apply_tracking_and_management(
+                tracked_objects, detections, next_id_counter,
+                args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
+                args.speaking_detection_jaw_open_threshold,
+                enhanced_speaking_detector=enhanced_speaking_detector,
+                current_frame_num=next_frame_to_process + 1
+            )
+            
+            final_output.add_frame({
+                "frame": next_frame_to_process + 1,
+                "tracked_objects": tracked_for_frame if tracked_for_frame else []
+            })
+            next_frame_to_process += 1
+
     # Process chunks using multiprocessing
-    all_results = {}
     face_detection_count = 0
     processing_start_time = time.time()
     
@@ -513,15 +571,22 @@ def process_video_multiprocessing(args, video_capture, total_frames):
         progress_every = max(1, len(chunks) // 10)
         for future in as_completed(future_to_chunk):
             chunk = future_to_chunk[future]
+            chunk_start, chunk_end, _, _ = chunk
             try:
                 chunk_results = future.result()
                 
                 # Store results by frame index
                 for result in chunk_results:
-                    all_results[result['frame_idx']] = result
+                    frame_buffer[result['frame_idx']] = result
                     if result['face_detected']:
                         face_detection_count += 1
                 
+                # Ensure all frames in chunk are present in buffer (fill missing with None)
+                for f_idx in range(chunk_start, chunk_end + 1):
+                    if f_idx not in frame_buffer and f_idx >= next_frame_to_process:
+                        frame_buffer[f_idx] = None
+                        
+                process_available_frames()
                 completed_chunks += 1
                 
                 # Progress logging (throttled)
@@ -535,55 +600,15 @@ def process_video_multiprocessing(args, video_capture, total_frames):
             except Exception as e:
                 logging.error(f"Chunk processing failed: {e}")
     
-    logging.info("Multiprocessing complete, applying sequential tracking...")
+    logging.info("Multiprocessing complete.")
+
+    # Process any remaining frames just in case
+    for f_idx in range(next_frame_to_process, total_frames):
+        if f_idx not in frame_buffer:
+            frame_buffer[f_idx] = None
+    process_available_frames()
     
-    # Apply tracking sequentially (must be sequential for consistency)
-    tracked_objects = {}
-    next_id_counter = {'value': 0}
-    final_output = {
-        "metadata": {
-            "video_path": args.video_file_path,
-            "total_frames": total_frames,
-            "fps": fps
-        },
-        "frames": []
-    }
-    
-    # Initialize enhanced speaking detector
-    enhanced_speaking_detector = None
-    try:
-        enhanced_speaking_detector = EnhancedSpeakingDetector(
-            video_path=args.video_file_path,
-            jaw_threshold=args.speaking_detection_jaw_open_threshold
-        )
-        logging.info("Enhanced speaking detection initialized")
-    except Exception as e:
-        logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
-    
-    missing_frame_count = 0
-    first_missing_frame = None
-    for frame_idx in range(total_frames):
-        result = all_results.get(frame_idx)
-        if result is None:
-            missing_frame_count += 1
-            if first_missing_frame is None:
-                first_missing_frame = frame_idx
-            detections = []
-        else:
-            detections = result.get('detections', [])
-        
-        tracked_for_frame = apply_tracking_and_management(
-            tracked_objects, detections, next_id_counter,
-            args.mp_max_distance_tracking, args.mp_frames_unseen_deregister,
-            args.speaking_detection_jaw_open_threshold,
-            enhanced_speaking_detector=enhanced_speaking_detector,
-            current_frame_num=frame_idx + 1
-        )
-        
-        final_output["frames"].append({
-            "frame": frame_idx + 1,
-            "tracked_objects": tracked_for_frame if tracked_for_frame else []
-        })
+    final_output.close()
 
     if missing_frame_count > 0:
         logging.warning(
@@ -597,14 +622,12 @@ def process_video_multiprocessing(args, video_capture, total_frames):
     
     logging.info("Multiprocessing summary:")
     logging.info(f"  Total frames expected: {total_frames}")
-    logging.info(f"  Total frames with detection results: {len(all_results)}")
+    logging.info(f"  Total frames with detection results: {total_frames - missing_frame_count}")
     logging.info(f"  Frames with faces: {face_detection_count}")
     logging.info(f"  Face detection success rate: {face_detection_rate:.2f}%")
     logging.info(f"  Processing time: {processing_time:.2f} seconds")
-    logging.info(f"  Average FPS: {total_frames / processing_time:.2f}")
-    logging.info(f"  Total frames exported: {len(final_output['frames'])}")
-    
-    return final_output
+    logging.info(f"  Average FPS: {total_frames / max(0.001, processing_time):.2f}")
+    logging.info(f"  Total frames exported: {total_frames}")
 
 
 def main(args):
@@ -628,7 +651,7 @@ def main(args):
                                  getattr(args, 'mp_num_workers_internal', 1) > 1)
             
             if use_multiprocessing:
-                final_output = process_video_multiprocessing(args, video_capture, total_frames)
+                process_video_multiprocessing(args, video_capture, total_frames)
             else:
                 # Fallback to sequential processing (existing implementation)
                 logging.info("Using sequential processing (fallback)")
@@ -639,16 +662,8 @@ def main(args):
         logging.error(f"Error processing video {args.video_file_path}: {e}")
         raise
     
-    # Save output
-    output_path = Path(args.video_file_path).with_suffix('.json')
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(final_output, f, indent=2, ensure_ascii=False)
-        logging.info(f"Processing complete. JSON saved: {output_path.name}")
-        print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
-    except Exception as e:
-        logging.error(f"Failed to save output file {output_path}: {e}")
-        raise
+    logging.info("Processing complete. JSON output saved incrementally.")
+    print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
 
 
 if __name__ == "__main__":
