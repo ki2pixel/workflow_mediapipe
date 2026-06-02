@@ -45,4 +45,4 @@ STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python 
 - `memory-bank/systemPatterns.md` (sections STEP5 Tracking, Profiling & GPU Support).
 - `docs/workflow/pipeline/STEP5_SUIVI_VIDEO.md` pour les tableaux moteurs/env vars.
 
-**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.

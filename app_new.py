@@ -588,6 +588,7 @@ def run_process_async(step_key: str):
             try:
                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
                 process_env["AUDIO_PARTIAL_SUCCESS_OK"] = "1"
+                process_env["AUDIO_GPU_ISOLATION"] = os.environ.get("AUDIO_GPU_ISOLATION", "1")
             except Exception as _e:
                 APP_LOGGER.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
 

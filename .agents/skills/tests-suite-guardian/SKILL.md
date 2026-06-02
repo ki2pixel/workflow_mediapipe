@@ -42,4 +42,4 @@ description: Maintain and execute the backend/frontend test suites with environm
 - `memory-bank/progress.md` (sections Maintenance Tests Backend, Skips conditionnels, ajout tests frontend).
 - `docs/workflow/ops/testing-strategy.md` pour la cartographie complète.
 
-**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.

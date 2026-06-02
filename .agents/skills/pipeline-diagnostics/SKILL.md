@@ -40,4 +40,4 @@ description: Checklists and scripts to validate env vars, venv availability, and
 - `codingstandards.md` (rappel : utiliser les venv spécialisés).
 - `memory-bank/productContext.md` (section Pipeline de Traitement) pour cartographier les étapes.
 
-**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.

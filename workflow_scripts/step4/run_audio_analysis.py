@@ -41,6 +41,10 @@ DEFAULT_FPS = 25
 
 LOG_DIR_PATH = None
 
+# Cache global pour le Lazy Loading des modèles d'embeddings (optimisation VRAM)
+_GLOBAL_EMBEDDING_MODEL = None
+_GLOBAL_INFERENCE = None
+
 
 def _load_optimal_tv_config() -> dict:
     try:
@@ -246,7 +250,8 @@ def _run_diarization_and_extract_segments(diarization_pipeline, wav_path: Path, 
                     diarization = diarization_pipeline(str(wav_path), **diarization_kwargs)
                 else:
                     raise
-    segments = [(t.start, t.end, spk) for t, _, spk in diarization.itertracks(yield_label=True)]
+    annotation = diarization.speaker_diarization if hasattr(diarization, "speaker_diarization") else diarization
+    segments = [(t.start, t.end, spk) for t, _, spk in annotation.itertracks(yield_label=True)]
     del diarization
     return segments
 
@@ -260,7 +265,8 @@ def _apply_audio_profile_from_env() -> None:
         os.environ["AUDIO_DISABLE_GPU"] = "0"
         os.environ["AUDIO_ENABLE_AMP"] = "1"
         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
-        logging.info("AUDIO_PROFILE=gpu_optimized appliqué (AMP=1, batch_size=1)")
+        os.environ.setdefault("AUDIO_GPU_ISOLATION", "1")
+        logging.info("AUDIO_PROFILE=gpu_optimized appliqué (AMP=1, batch_size=1, isolation GPU activée par défaut)")
         logging.warning("ATTENTION: AMP peut réduire significativement la qualité de diarisation (faux négatifs).")
         return
 
@@ -268,14 +274,16 @@ def _apply_audio_profile_from_env() -> None:
         os.environ["AUDIO_DISABLE_GPU"] = "0"
         os.environ["AUDIO_ENABLE_AMP"] = "0"
         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
-        logging.info("AUDIO_PROFILE=gpu_fp32 appliqué (AMP=0, batch_size=1, FP32 pur - cohérence CPU)")
+        os.environ.setdefault("AUDIO_GPU_ISOLATION", "1")
+        logging.info("AUDIO_PROFILE=gpu_fp32 appliqué (AMP=0, batch_size=1, FP32 pur - cohérence CPU, isolation GPU activée)")
         return
 
     if profile == "gpu_no_amp":
         os.environ["AUDIO_DISABLE_GPU"] = "0"
         os.environ["AUDIO_ENABLE_AMP"] = "0"
         os.environ["AUDIO_PYANNOTE_BATCH_SIZE"] = "1"
-        logging.info("AUDIO_PROFILE=gpu_no_amp appliqué (AMP=0, batch_size=1)")
+        os.environ.setdefault("AUDIO_GPU_ISOLATION", "1")
+        logging.info("AUDIO_PROFILE=gpu_no_amp appliqué (AMP=0, batch_size=1, isolation GPU activée)")
         return
 
     if profile == "cpu_only":
@@ -382,6 +390,7 @@ def _compute_speaker_embeddings_from_wav(
     hf_token: str,
     device: str,
 ) -> dict:
+    global _GLOBAL_EMBEDDING_MODEL, _GLOBAL_INFERENCE
     if not segments:
         return {}
 
@@ -396,23 +405,27 @@ def _compute_speaker_embeddings_from_wav(
     min_segment_sec = _get_speaker_embeddings_min_segment_sec()
     max_segments = _get_speaker_embeddings_max_segments_per_speaker()
 
-    try:
-        model = _load_pyannote_embedding_model(model_id, hf_token)
-    except Exception as e:
-        logging.warning(f"speaker embeddings: impossible de charger le modèle '{model_id}': {e}")
-        return {}
+    if _GLOBAL_EMBEDDING_MODEL is None:
+        try:
+            model = _load_pyannote_embedding_model(model_id, hf_token)
+            try:
+                if hasattr(model, "to"):
+                    model.to(torch.device(device))
+            except Exception:
+                pass
+            _GLOBAL_EMBEDDING_MODEL = model
+        except Exception as e:
+            logging.warning(f"speaker embeddings: impossible de charger le modèle '{model_id}': {e}")
+            return {}
 
-    try:
-        if hasattr(model, "to"):
-            model.to(torch.device(device))
-    except Exception:
-        pass
+    if _GLOBAL_INFERENCE is None:
+        try:
+            _GLOBAL_INFERENCE = Inference(_GLOBAL_EMBEDDING_MODEL, window="whole")
+        except Exception as e:
+            logging.warning(f"speaker embeddings: Inference init échouée: {e}")
+            return {}
 
-    try:
-        inference = Inference(model, window="whole")
-    except Exception as e:
-        logging.warning(f"speaker embeddings: Inference init échouée: {e}")
-        return {}
+    inference = _GLOBAL_INFERENCE
 
     by_speaker: dict[str, list[tuple[float, float, float]]] = {}
     for start_sec, end_sec, speaker_label in segments:
@@ -448,7 +461,8 @@ def _compute_speaker_embeddings_from_wav(
 
         for start_f, end_f, _dur in speaker_segments:
             try:
-                emb = inference.crop(dev_file, Segment(start_f, end_f))
+                with torch.inference_mode():
+                    emb = inference.crop(dev_file, Segment(start_f, end_f))
             except Exception:
                 continue
 
@@ -576,6 +590,9 @@ def analyze_audio_file(video_path, diarization_pipeline, hf_token, device: str):
                 except Exception as e:
                     logging.warning(f"speaker embeddings: erreur inattendue (ignorée): {e}")
 
+            # Nettoyage mémoire après l'extraction des embeddings
+            _cleanup_cuda_memory()
+
             audio_timeline = {}
             max_frame_seen = 0
             for start_sec, end_sec, speaker_label in (segments or []):
@@ -663,6 +680,7 @@ def main():
     parser.add_argument("--disable_gpu", action="store_true", help="Forcer l'utilisation CPU")
     parser.add_argument("--cpu_diarize_wav", type=str, help="Mode interne: diarisation CPU-only d'un WAV")
     parser.add_argument("--cpu_diarize_out", type=str, help="Mode interne: sortie JSON segments")
+    parser.add_argument("--analyze_single_video", type=str, help="Mode interne: analyse isolée d'une seule vidéo")
     args = parser.parse_args()
 
     log_dir_path = Path(args.log_dir)
@@ -678,8 +696,51 @@ def main():
 
     _apply_audio_profile_from_env()
 
+    if args.analyze_single_video:
+        os.environ["AUDIO_GPU_ISOLATION"] = "0"
+    isolate_gpu = os.getenv("AUDIO_GPU_ISOLATION", "0") == "1"
+
+    if isolate_gpu:
+        videos = find_videos_for_audio_analysis()
+        total_videos = len(videos)
+        logging.info(f"TOTAL_AUDIO_TO_ANALYZE: {total_videos} (GPU ISOLATION MODE)")
+        if total_videos == 0:
+            logging.info("Aucune nouvelle vidéo à analyser.")
+            return
+
+        successful_count = 0
+        for i, video_path in enumerate(videos):
+            logging.info(f"ANALYZING_AUDIO: {i + 1}/{total_videos}: {video_path.name} (Subprocess)")
+            cmd = [
+                sys.executable, str(Path(__file__).resolve()),
+                "--log_dir", str(LOG_DIR_PATH),
+                "--analyze_single_video", str(video_path)
+            ]
+            if args.hf_auth_token:
+                cmd.extend(["--hf_auth_token", args.hf_auth_token])
+            if args.disable_gpu:
+                cmd.append("--disable_gpu")
+            
+            try:
+                subprocess.run(cmd, check=True)
+                successful_count += 1
+            except subprocess.CalledProcessError as e:
+                logging.error(f"Echec du sous-processus GPU pour {video_path.name}")
+        
+        logging.info("--- Analyse audio terminée (Mode Isolé) ---")
+        logging.info(f"Résumé: {successful_count}/{total_videos} analyse(s) réussie(s).")
+        if successful_count < total_videos:
+            allow_partial = os.getenv("AUDIO_PARTIAL_SUCCESS_OK", "0") == "1"
+            if allow_partial and successful_count > 0:
+                logging.warning(
+                    f"Partial success autorisé: {successful_count}/{total_videos} analyses ont réussi. Code de sortie 0."
+                )
+                return
+            sys.exit(1)
+        return
+
     try:
-        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:32")
+        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True,max_split_size_mb:32")
 
         env_disable_gpu = os.getenv("AUDIO_DISABLE_GPU", "0") == "1"
         use_cuda = torch.cuda.is_available() and not env_disable_gpu and not args.disable_gpu
@@ -820,9 +881,10 @@ def main():
                     else:
                         raise
             
+            annotation = diarization.speaker_diarization if hasattr(diarization, "speaker_diarization") else diarization
             segments = [
                 {"start": float(t.start), "end": float(t.end), "speaker": str(spk)}
-                for t, _, spk in diarization.itertracks(yield_label=True)
+                for t, _, spk in annotation.itertracks(yield_label=True)
             ]
             logging.info(f"CPU subprocess: {len(segments)} segment(s) extrait(s)")
             with open(out_path, "w", encoding="utf-8") as f:
@@ -855,9 +917,10 @@ def main():
         logging.critical(f"Erreur lors du chargement de la pipeline Pyannote: {e}")
         sys.exit(1)
 
-    videos = find_videos_for_audio_analysis()
+    videos = [Path(args.analyze_single_video)] if args.analyze_single_video else find_videos_for_audio_analysis()
     total_videos = len(videos)
-    logging.info(f"TOTAL_AUDIO_TO_ANALYZE: {total_videos}")
+    if not args.analyze_single_video:
+        logging.info(f"TOTAL_AUDIO_TO_ANALYZE: {total_videos}")
 
     if total_videos == 0:
         logging.info("Aucune nouvelle vidéo à analyser.")

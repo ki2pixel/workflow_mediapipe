@@ -9,6 +9,12 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 ## Historique synthétique (avant 2025-10-08)
 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
+## Juin 2026
+
+- [2026-06-02 17:45:00] **Compatibilité Pyannote.audio 4.x (DiarizeOutput) (COMPLET)** : Résolution de l'AttributeError `'DiarizeOutput' object has no attribute 'itertracks'` survenu lors de l'exécution de la STEP4 avec pyannote.
+  - **Raison** : Les versions récentes de `pyannote.audio` (4.x+) retournent un objet conteneur `DiarizeOutput` au lieu de l'objet `Annotation` historique, rompant la compatibilité avec l'appel direct de `.itertracks()`.
+  - **Implémentation** : Modification de `run_audio_analysis.py` (à la fois dans la fonction d'extraction principale et dans le mode subprocess CPU fallback) pour détecter la présence de l'attribut `speaker_diarization` et en extraire l'objet `Annotation` sous-jacent, tout en conservant une compatibilité totale avec les versions antérieures 3.x/2.x.
+  - **Validation** : Les tests unitaires (24 tests passés sur le module STEP4) confirment l'absence de régression.
 
 ## Mai 2026
 

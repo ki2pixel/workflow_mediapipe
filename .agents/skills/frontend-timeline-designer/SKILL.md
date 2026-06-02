@@ -45,4 +45,4 @@ description: Create or adjust the Connected Timeline UI (HTML/CSS/JS) with AppSt
 ## Références
 - `memory-bank/progress.md` (entrées Timeline Connectée Phases 1‑3).
 
-**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.

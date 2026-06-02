@@ -1,16 +1,4 @@
 ---
-trigger: always_on
-description: 
-globs: 
----
-
----
-trigger: always_on
-description: 
-globs: 
----
-
----
 description: Workflow MediaPipe v4.x mandatory coding standards for all files
 alwaysApply: true
 ---
@@ -24,14 +12,15 @@ alwaysApply: true
 2. [Project Structure](#project-structure)
 3. [Code Style](#code-style)
 4. [Core Patterns](#core-patterns)
-5. [Pipeline STEP4, STEP5 & STEP7](#pipeline-step4--step5--step7)
-6. [Quality & Testing](#quality--testing)
-7. [Process & Tooling](#process--tooling)
-8. [Common Tasks](#common-tasks)
-9. [Anti-Patterns](#anti-patterns)
+5. [Pipeline STEP4, STEP5, STEP6 & STEP7](#pipeline-step4-step5-step6--step7)
+6. [After Effects & CEP (ExtendScript ES3)](#after-effects--cep-extendscript-es3)
+7. [Quality & Testing](#quality--testing)
+8. [Process & Tooling](#process--tooling)
+9. [Common Tasks](#common-tasks)
+10. [Anti-Patterns](#anti-patterns)
 
 ## Tech Stack
-- **Backend** : Flask services Python 3.10 (venv `/mnt/venv_ext4/env`), logique métier confinée à `services/`.
+- **Backend** : Flask services Python 3.10 (venv `/mnt/venv_ext4/env`), logique métier confinée à `services/`.
 - **Frontend** : JS natif (`static/`, `templates/`) avec `DOMBatcher` + `AppState`; aucun framework SPA.
 - **Config** : `.env` → `config/settings.py` → `WorkflowCommandsConfig`, jamais de secrets en dur.
 - **Environnements spécialisés** :
@@ -89,7 +78,7 @@ def run_step(step_key: str):
     return jsonify({"status": "queued"})
 ```
 - Validation d’entrée avant d’appeler un service.
-- Journaliser via `PerformanceService` (décorateur) et retourner uniquement JSON sérialisable.
+- Journaliser via `PerformanceService` (décorateur) et retourner JSON sérialisable.
 
 ### Frontend Updates
 ```javascript
@@ -101,62 +90,63 @@ domBatcher.scheduleUpdate(() => {
   el.textContent = DOMUpdateUtils.escapeHtml(message);
 });
 ```
-- Toujours échapper avant insertion; préférer `textContent`. Les boutons Step/Logs doivent vérifier AppState (ex: `getAutoOpenLogOverlay`).
+- Toujours échapper avant insertion; préférer `textContent`. Les boutons Step/Logs vérifient AppState.
 
 ### State Sync (AppState ↔ DOM)
-- `subscribeToProperty(['steps', stepKey, 'status'])` pour mettre à jour badges Timeline.
-- `PollingManager` met à jour `WorkflowState` → `AppState` via actions spécifiques (jamais de dispatch global).
+- `subscribeToProperty(['steps', stepKey, 'status'])` pour badges Timeline.
+- `PollingManager` met à jour `WorkflowState` → `AppState` (jamais de dispatch global).
 
 ## Pipeline STEP4, STEP5, STEP6 & STEP7
 ### STEP4 Audio (audio_env)
-- Extraction audio via `ffmpeg` preset TV, analyse `Lemonfox` (avec smoothing) + fallback Pyannote.
-- Profil imposé `AUDIO_PROFILE=gpu_fp32` (AMP désactivé) pour éviter divergences GPU/CPU.
+- Extraction via `ffmpeg` preset TV, analyse `Lemonfox` (smoothing) + fallback Pyannote.
+- `AUDIO_PROFILE=gpu_fp32` (AMP désactivé) pour éviter divergences GPU/CPU.
 - Import dynamique `services/lemonfox_audio_service.py` via `importlib` pour isoler Flask.
 
 ### STEP5 Tracking (tracking_env_slim / insightface_env)
 - **Architecture Simplifiée** (Decision 2026-02-03) :
-  1. **MediaPipe** (Défaut, CPU) : Utilise `tracking_env_slim`. Multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
-  2. **InsightFace** (Optionnel, GPU) : Utilise `insightface_env`. Activé uniquement si `STEP5_ENABLE_GPU=1`.
-- **Interdit** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar sont supprimés.
-- **Règles d’export** : JSON dense frame-by-frame, `tracked_objects` vide si aucune détection.
-- **Optimisations** : Warmup `cap.read()`, chunking adaptatif interne.
-- **GPU** : Réservé strictement à InsightFace (ONNX Runtime). MediaPipe tourne toujours sur CPU.
-- **Export Streaming O(1)** : L'utilisation de `StreamingJSONOutput` est obligatoire pour l'export. Les données doivent être écrites frame par frame en flux continu sur le disque pour éviter les OOM.
+  1. **MediaPipe** (Défaut, CPU) : `tracking_env_slim`. Multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
+  2. **InsightFace** (Optionnel, GPU) : `insightface_env`. Activé si `STEP5_ENABLE_GPU=1`.
+- **Interdit** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar supprimés.
+- **Export Streaming O(1)** : L'utilisation de `StreamingJSONOutput` est obligatoire pour l'export (écriture continue).
 
 ### STEP6 Réduction JSON (env)
-- **Objectif** : Agréger le tracking brut en éliminant les redondances et les bruits.
-- **Optimisation O(1)** : L'utilisation de la bibliothèque `ijson` est obligatoire pour lire itérativement (en streaming) les gros fichiers JSON sans les charger entièrement en RAM.
+- **Optimisation O(1)** : Utilisation de `ijson` obligatoire pour lire itérativement les gros JSON.
 
 ### STEP7 Pré-traitement AE (env)
-- **Objectif** : Optimiser les données JSON pour After Effects en pré-traitant les sorties STEP6.
-- **Entrée** : Fichiers `*_tracking.json` (sortie STEP6) et JSON audio associés.
-- **Streaming itératif** : Utiliser `ijson` pour le parsing O(1) de l'entrée.
-- **Sortie** : Fichiers `*_ae.json` optimisés pour AE avec structures pré-indexées.
-- **Patterns** : Utiliser les patterns de progression définis dans `WorkflowCommandsConfig._get_step7_config()`.
-- **After Effects Integration** : Le script AE `Analyse-Écart-X...jsx` priorise les `*_ae.json` avec fallback sur STEP6/STEP5.
+- **Entrée/Sortie** : Lit `*_tracking.json` via `ijson` -> génère `*_ae.json` optimisés pour AE.
+- **After Effects Integration** : Script AE `Analyse-Écart-X...jsx` priorise les `*_ae.json`.
+
+## After Effects & CEP (ExtendScript ES3)
+- **Contraintes Moteur ES3 (.jsx)** : L'environnement AE ExtendScript est limité à ECMAScript 3. 
+  - **Interdit** : `const`, `let`, fonctions fléchées `=>`, `map()`, `filter()`, `forEach()`, template literals.
+  - **Obligatoire** : Déclarer avec `var`, utiliser des boucles `for` classiques, inclure un polyfill `JSON2` pour le parsing.
+  - **Memory Management** : Encapsuler systématiquement les scripts dans des IIFE `(function() { ... })();` pour éviter les fuites globales.
+- **Sécurité `system.callSystem()` (Ponts Python)** : Les appels shell vers Python doivent être ultra-sécurisés.
+  - Bannir la concaténation brute (ex: `callSystem("python script.py " + userInput)`).
+  - Nettoyer systématiquement les chemins Windows et valider les arguments contre l'injection de commandes shell.
+- **Performance Batching AE** : Toute mutation de la timeline (calques, keyframes) doit être groupée :
+  - Utiliser `app.beginUndoGroup("Action");` ... `app.endUndoGroup();`.
+  - Désactiver le rafraîchissement d'interface superflu pendant les exécutions de scripts batchs.
+- **Contrats d'Échange CEP/ExtendScript** : 
+  - Formats JSON stricts et unifiés (`{ "status": "ok", "data": ... }`).
+  - Standardisation des erreurs préfixées : `[JS] Error: ...` ou `[PY] Error: ...` pour simplifier le debugging.
 
 ## Quality, Testing & Security
-- **Tests unitaires** : `tests/unit/` pour services isolés. Utiliser context managers `patched_workflow_state()` et `patched_commands_config()` depuis les tests unitaires.
-- **Tests intégration** : `tests/integration/` couvrent routes + WorkflowService.
-- **Tests frontend** : Node/ESM (`npm run test:frontend`) pour DOMBatcher, Logs Overlay, Timeline, focus trap, log safety.
-- **CI/Test env** : exécuter depuis `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour bloquer les téléchargements réseau.
-- **Sécurité au Démarrage** : Le script `validate_startup.py` est obligatoire avant le lancement Web. En production (`DEBUG=False`), l'application Flask et le script de validation doivent impérativement crasher si des secrets de type `dev-*` sont détectés.
-- Skips conditionnels autorisés pour STEP3/STEP5 quand dépendances spécialisées manquent, mais documenter les limitations.
+- **Tests** : `tests/unit/` (context managers `patched_workflow_state()`), `tests/integration/`, et `npm run test:frontend` (DOMBatcher, Logs Overlay).
+- **CI/Test env** : Exécuter depuis `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true`.
+- **Sécurité au Démarrage** : `validate_startup.py` obligatoire. En production (`DEBUG=False`), crash immédiat si secrets `dev-*` détectés.
 
 ## Process & Tooling
-
 ### Mises à jour de la Documentation
-- Toute création ou modification de documentation (README, docs/, guides Markdown) **doit** appliquer la méthodologie définie dans `.agents/skills/documentation/SKILL.md` (TL;DR en premier, ouverture problem-first, blocs ❌/✅, trade-offs, Golden Rule). Considérer ce fichier skill comme la checklist obligatoire avant toute rédaction.
+- Appliquer méthodologie `.agents/skills/documentation/SKILL.md` (TL;DR, problem-first, trade-offs).
 - Git : Conventional Commits (`feat(step5): ...`, `fix(filesystem): ...`).
-- Documentation : chaque changement majeur doit mettre à jour `docs/workflow/` (guide pipeline, audits, security notes).
-- Scripts : lancer les étapes via `WorkflowCommandsConfig` uniquement; pas d’invocation directe des scripts sans passer par `utils.resource_manager`.
-- Monitoring : webhook JSON unique, `CSVService` normalise les URLs et écrit dans SQLite (`download_history.sqlite3`).
-- Historique : migrations via script dédié (`scripts/migrate_download_history_to_sqlite.py`).
+- Mettre à jour `docs/workflow/` pour tout changement majeur.
+- Monitoring : webhook JSON unique, `CSVService` écrit dans SQLite (`download_history.sqlite3`).
 
 ### Politique d’utilisation des Skills
 1. **Priorité locale absolue** : Toujours invoquer la skill workspace `workflow-operator` avant toute autre.
 2. **Debugging systématique** : Charger `.agents/skills/debugging-strategies/SKILL.md` pour bug/crash.
-3. **Catalogue local** : Utiliser `.continue/rules/pipeline-diagnostics`, `.continue/rules/step5-gpu-ops`, `.continue/rules/frontend-timeline-designer`, `.continue/rules/after-effects-scripts`, `.continue/rules/after-effects-cep-panel`, `.continue/rules/logs-overlay-conductor`, `.continue/rules/workflow-docs-updater-plus`, `.continue/rules/csv-monitoring-sme`, `.continue/rules/debugging-strategies`, `.continue/rules/step4-audio-orchestrator`, `.continue/rules/tests-suite-guardian`, `.continue/rules/workflow-operator`, `.continue/rules/documentation`, `.continue/rules/fast-filesystem-ops.md`, `.continue/rules/json-mcp-expert.md`, `.continue/rules/sequentialthinking-logic.md`, `.continue/rules/shrimp-task-manager.md` selon la tâche.
+3. **Catalogue local** : Utiliser les skills locales de `.agents/skills/` (pipeline-diagnostics, step5-gpu-ops, after-effects-scripts, etc.) selon la tâche.
 4. **Fallback contrôlé** : Skills globales uniquement si aucune skill locale ne couvre le besoin.
 5. **Hiérarchie** : `workflow-operator` > Skills locales > Règles ce doc > Docs > Skills globales.
 
@@ -165,27 +155,20 @@ domBatcher.scheduleUpdate(() => {
 1. Créer `services/<name>_service.py` avec dépendances injectées.
 2. Enregistrer dans `WorkflowService` ou route dédiée.
 3. Ajouter tests unitaires isolés (fixtures `mock_workflow_state`).
-4. Documenter la responsabilité dans `docs/workflow/features/`.
 
 ### Configuration Moteurs STEP5
 - **MediaPipe** : Ajuster `TRACKING_CPU_WORKERS` dans `.env` selon cœurs disponibles.
 - **InsightFace** : Vérifier `STEP5_ENABLE_GPU=1` et la présence des modèles dans `~/.insightface/`. Ne jamais modifier le code pour hardcoder un chemin.
 
-### Mettre à jour l’overlay logs frontend
-1. Modifier `static/css/components/logs.css` pour le style.
-2. Adapter `static/uiUpdater.js` pour alimenter header/timer.
-3. Synchroniser AppState (`logPanel.isOpen`) + Timeline pour éviter overlap.
-
 ## Anti-Patterns
 - Placer du métier dans un blueprint Flask ou manipuler `WorkflowState` sans verrou.
-- Accéder au DOM avec `document.getElementById` dès l’import (utiliser getters lazy).
-- Utiliser `innerHTML` sans `DOMUpdateUtils.escapeHtml`.
+- Accéder au DOM avec `document.getElementById` dès l'import. Utiliser `innerHTML` sans `DOMUpdateUtils.escapeHtml`.
 - Démarrer des polls via `setInterval` dispersé (utiliser `PollingManager`).
 - Hardcoder des chemins (`/mnt/cache`) ou des commandes.
-- Tenter d'activer le GPU sur MediaPipe (non supporté dans cette stack).
-- Charger entièrement de gros fichiers JSON en RAM avec `json.load()` (utiliser `ijson` au lieu).
-- Tenter de réimplémenter des architectures cloud ou pollers distants (ex: Vultr, Lightning) ; le pipeline reste strictement local/on-premise.
+- Tenter d'activer le GPU sur MediaPipe (non supporté).
+- Charger entièrement de gros JSON en RAM avec `json.load()` (utiliser `ijson` au lieu).
+- JS moderne (ES6+) dans ExtendScript (.jsx) ou appels `callSystem()` non échappés.
 
 ## Notes finales
-- Maintenir ce document <12 000 caractères. Réviser après toute évolution majeure.
+- Maintenir ce document <12 000 caractères. Réviser après toute évolution majeure.
 - Pour toute question, consulter les audits récents (`docs/workflow/audits/`).

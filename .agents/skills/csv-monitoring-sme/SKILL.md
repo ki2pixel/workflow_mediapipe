@@ -47,4 +47,4 @@ python scripts/migrate_download_history_to_sqlite.py \
 - `docs/workflow/services/csv-service.md` pour procédures complètes.
 - `resources/sqlite_triage_commands.md` pour copier/coller les requêtes SQLite et le script Python de synthèse.
 
-**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.
