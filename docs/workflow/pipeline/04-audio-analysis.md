@@ -1,6 +1,6 @@
 # Analyse Audio
 
-**TL;DR** : Analyse audio STEP4 avec trois méthodes compatibles : **Pyannote** (défaut), **Lemonfox** (cloud diarisation), **DeepInfra** (OpenAI-compatible STT). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP5/STEP6.
+**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Trois méthodes compatibles : **Pyannote** (défaut), **Lemonfox** (cloud diarisation), **DeepInfra** (OpenAI-compatible STT). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP5/STEP6.
 
 ## Le Problème : Analyse Audio Manuelle Inefficace
 
@@ -98,7 +98,8 @@ STEP4_METHOD=pyannote          # pyannote | lemonfox | deepinfra
 # Profil de performance (recommandé)
 AUDIO_PROFILE=gpu_fp32          # gpu_fp32, gpu_optimized, cpu_only
 
-# GPU/CPU
+# GPU/CPU et Isolation
+AUDIO_GPU_ISOLATION=1             # Requis : Isolation GPU en sous-processus
 AUDIO_DISABLE_GPU=0              # 1 pour forcer CPU
 AUDIO_CPU_WORKERS=4             # Threads CPU si GPU désactivé
 
@@ -127,6 +128,13 @@ PYANNOTE_BATCH_SIZE=1                  # Taille batch GPU
   }
 }
 ```
+
+### Isolation GPU et Stabilité
+
+Le pipeline impose `AUDIO_GPU_ISOLATION=1` pour exécuter l'analyse Pyannote dans un sous-processus isolé. Cela prévient catégoriquement :
+- Les crashs `SIGSEGV` liés à la libération de la VRAM
+- Les fuites de mémoire PyTorch dans le processus parent
+- Les conflits de contexte CUDA avec les étapes suivantes
 
 ### Option Lemonfox (Cloud)
 

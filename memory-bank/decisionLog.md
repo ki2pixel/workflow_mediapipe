@@ -11,6 +11,11 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 Cette section contient le résumé des décisions majeures de 2025. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 ## Juin 2026
 
+- [2026-06-02 19:47:00] **Alignement de la Documentation Technique** : Décision de synchroniser l'ensemble de la documentation (`docs/workflow/`) avec les implémentations asynchrones et l'architecture O(1) RAM du pipeline (STEP2-STEP5), et le mécanisme de crash strict au démarrage en production.
+  - **Raison** : Les récents audits et refactorisations (multiprocessing MediaPipe, TransNetV2 asynchrone, NVENC passe unique, isolation GPU Pyannote) avaient créé un décalage critique entre le comportement réel (optimisé pour O(1) RAM et sécurité stricte) et la documentation de référence, risquant de biaiser les prochains développements ou diagnostics.
+  - **Implémentation** : Mise à jour des guides `02-conversion.md`, `03-scene-detection.md`, `04-audio-analysis.md`, `05-video-tracking.md` et `security.md` en appliquant les normes éditoriales de `documentation/SKILL.md`.
+  - **Impact** : La documentation reflète désormais avec précision l'état optimal et sécurisé de l'architecture, éliminant la dette technique documentaire sur les étapes centrales du pipeline.
+
 - [2026-06-02 19:15:00] **Optimisations de Performance STEP3 (I/O Asynchrone & Batching)** : Implémentation du décodage FFmpeg asynchrone, du pruning mémoire O(1), et du batching GPU (taille 16).
   - **Raison** : La STEP3 était limitée par un traitement image par image synchrone, entraînant une sous-utilisation sévère du GPU et une accumulation exponentielle en RAM (fuite mémoire).
   - **Implémentation** : Refonte de la fonction `detect_scenes_with_pytorch` dans `run_transnet.py`. Déploiement d'un `threading.Thread` avec `queue.Queue` pour bufferiser les frames issues de FFmpeg. Modification du buffer `frames` pour utiliser un slice dynamique (pruning) limitant l'empreinte mémoire RAM à la taille du batch. Utilisation de `np.stack` pour traiter 16 frames à la fois via le modèle TransNetV2.

@@ -12,7 +12,7 @@ alwaysApply: true
 2. [Project Structure](#project-structure)
 3. [Code Style](#code-style)
 4. [Core Patterns](#core-patterns)
-5. [Pipeline STEP4, STEP5, STEP6 & STEP7](#pipeline-step4-step5-step6--step7)
+5. [Pipeline (STEP2, STEP4, STEP5, STEP6 & STEP7)](#pipeline-step2-step4-step5-step6--step7)
 6. [After Effects & CEP (ExtendScript ES3)](#after-effects--cep-extendscript-es3)
 7. [Quality & Testing](#quality--testing)
 8. [Process & Tooling](#process--tooling)
@@ -23,6 +23,7 @@ alwaysApply: true
 - **Backend** : Flask services Python 3.10 (venv `/mnt/venv_ext4/env`), logique métier confinée à `services/`.
 - **Frontend** : JS natif (`static/`, `templates/`) avec `DOMBatcher` + `AppState`; aucun framework SPA.
 - **Config** : `.env` → `config/settings.py` → `WorkflowCommandsConfig`, jamais de secrets en dur.
+- **Data Management** : Streaming JSON omniprésent (`ijson`, `StreamingJSONOutput`) pour garantir une empreinte RAM O(1).
 - **Environnements spécialisés** :
   - `transnet_env/` : Découpage scènes (PyTorch/TensorFlow).
   - `audio_env/` : Analyse audio (Whisper/Lemonfox).
@@ -96,15 +97,20 @@ domBatcher.scheduleUpdate(() => {
 - `subscribeToProperty(['steps', stepKey, 'status'])` pour badges Timeline.
 - `PollingManager` met à jour `WorkflowState` → `AppState` (jamais de dispatch global).
 
-## Pipeline STEP4, STEP5, STEP6 & STEP7
+## Pipeline (STEP2, STEP4, STEP5, STEP6 & STEP7)
+### STEP2 Conversion
+- **Transcodage Parallèle** : Architecture en passe unique via GPU NVENC (jusqu'à 3 workers) avec parallélisation `ffprobe`.
+- **Robustesse** : Analyse audio prédictive et fallback CPU automatique (`libx264`).
+
 ### STEP4 Audio (audio_env)
 - Extraction via `ffmpeg` preset TV, analyse `Lemonfox` (smoothing) + fallback Pyannote.
 - `AUDIO_PROFILE=gpu_fp32` (AMP désactivé) pour éviter divergences GPU/CPU.
+- **Isolation GPU** : `AUDIO_GPU_ISOLATION=1` requis. Exécution en sous-processus (`--analyze_single_video`) pour prévenir les fuites VRAM/PyTorch et crash SIGSEGV.
 - Import dynamique `services/lemonfox_audio_service.py` via `importlib` pour isoler Flask.
 
 ### STEP5 Tracking (tracking_env_slim / insightface_env)
 - **Architecture Simplifiée** (Decision 2026-02-03) :
-  1. **MediaPipe** (Défaut, CPU) : `tracking_env_slim`. Multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
+  1. **MediaPipe** (Défaut, CPU) : `tracking_env_slim`. Multiprocessing obligatoire (`TRACKING_CPU_WORKERS`) combiné à `cv2.setNumThreads(0)` pour éviter la contention CPU. Utilisation d'un `frame_buffer` asynchrone.
   2. **InsightFace** (Optionnel, GPU) : `insightface_env`. Activé si `STEP5_ENABLE_GPU=1`.
 - **Interdit** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar supprimés.
 - **Export Streaming O(1)** : L'utilisation de `StreamingJSONOutput` est obligatoire pour l'export (écriture continue).
@@ -166,8 +172,9 @@ domBatcher.scheduleUpdate(() => {
 - Démarrer des polls via `setInterval` dispersé (utiliser `PollingManager`).
 - Hardcoder des chemins (`/mnt/cache`) ou des commandes.
 - Tenter d'activer le GPU sur MediaPipe (non supporté).
-- Charger entièrement de gros JSON en RAM avec `json.load()` (utiliser `ijson` au lieu).
+- Charger entièrement de gros JSON en RAM avec `json.load()` (utiliser `ijson` et `StreamingJSONOutput` pour un export O(1) RAM).
 - JS moderne (ES6+) dans ExtendScript (.jsx) ou appels `callSystem()` non échappés.
+- Lancer l'application en production (`DEBUG=False`) avec des secrets/tokens par défaut (`dev-*`).
 
 ## Notes finales
 - Maintenir ce document <12 000 caractères. Réviser après toute évolution majeure.

@@ -1,6 +1,6 @@
 # Tracking Vidéo
 
-**TL;DR** : Détection faciale avec MediaPipe (CPU multiprocessing) ou InsightFace (GPU unique). 478 landmarks + 52 blendshapes ARKit par frame. Architecture simplifiée : pas d'OpenCV/EOS/YuNet depuis v4.3.
+**TL;DR** : Détection faciale optimisée. Multiprocessing MediaPipe CPU avec `cv2.setNumThreads(0)` pour éliminer la contention, buffer asynchrone, et export obligatoire via `StreamingJSONOutput` (O(1) RAM). Mode GPU optionnel via InsightFace. 478 landmarks + 52 blendshapes ARKit par frame. Architecture simplifiée : pas d'OpenCV/EOS/YuNet depuis v4.3.
 
 ## Le Problème : Tracking Manuel Impossible
 
@@ -171,6 +171,8 @@ STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 - 478 landmarks faciaux
 - 52 blendshapes ARKit
 - 15 workers multiprocessing
+- `cv2.setNumThreads(0)` forcé pour éliminer la contention CPU entre processus
+- Buffer asynchrone et export `StreamingJSONOutput` pour une consommation RAM constante O(1)
 - CPU-only (jamais de GPU même si activé)
 - Throttling blendshapes configurable
 

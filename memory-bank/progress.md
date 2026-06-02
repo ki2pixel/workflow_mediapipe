@@ -7,6 +7,10 @@
 ## Statut Actuel
 Aucune tâche active.
 
+- [2026-06-02 19:47:00] **Mise à Jour de la Documentation Technique (COMPLET)** : Alignement des guides du pipeline (`docs/workflow/pipeline/`) et de la sécurité (`docs/workflow/ops/security.md`) avec les optimisations récentes de l'architecture : architecture parallèle passe unique (STEP2), décodage asynchrone et batching O(1) RAM (STEP3), isolation GPU en sous-processus (STEP4), multiprocessing CPU O(1) RAM avec `cv2.setNumThreads(0)` (STEP5) et vérifications strictes via `validate_startup.py` (Production).
+
+- [2026-06-02 19:41:00] **Audit et Mise à Jour des Coding Standards (COMPLET)** : Mise à jour du fichier `.agents/rules/codingstandards.md` pour y refléter les récents changements d'architecture : multiprocessing CPU O(1) avec `cv2.setNumThreads(0)`, transcodage passe unique STEP2, isolation GPU CUDA STEP4 en sous-processus et sauvegardes de démarrage strictes pour la production.
+
 - [2026-06-02 19:37:00] **Audit et Optimisation de la STEP5 (COMPLET)** : Audit complet du multiprocessing MediaPipe sur CPU. Refonte de `workflow_scripts/step5/process_video_worker_multiprocessing.py` pour implémenter un buffer de réordonnancement asynchrone des chunks IPC et l'intégration de `StreamingJSONOutput`. Ces optimisations transforment l'empreinte mémoire d'un O(N) catastrophique en O(1) constant, tout en prévenant le thread thrashing via `cv2.setNumThreads(0)`.
 
 - [2026-06-02 19:15:00] **Audit et Optimisation de la STEP3 (COMPLET)** : Refonte de `workflow_scripts/step3/run_transnet.py` pour implémenter la lecture vidéo asynchrone (Threading + Queue), gérer dynamiquement la liste des frames (pruning glissant pour maintenir la RAM en O(1)) et traiter l'inférence GPU par lots (Batch Size de 16). Ces optimisations résolvent le bottleneck I/O et la fuite mémoire, permettant un traitement continu et beaucoup plus rapide.

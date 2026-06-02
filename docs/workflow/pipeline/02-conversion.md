@@ -1,6 +1,6 @@
 # Conversion Vidéo
 
-**TL;DR** : Normalise toutes les vidéos à 25 FPS avec accélération GPU NVIDIA. Réduit jusqu'à 70% la taille des fichiers tout en préservant la qualité. Fallback CPU automatique si GPU indisponible.
+**TL;DR** : Architecture parallèle en passe unique avec décodage matériel CUDA/NVENC, ffprobe parallélisé et fallback CPU automatique pour normaliser les vidéos à 25 FPS. Réduit jusqu'à 70% la taille des fichiers tout en préservant la qualité.
 
 ## Le Problème : Framerates Incohérents
 
@@ -33,9 +33,9 @@ def convert_video_intelligently(video_path):
 ### Flux de Conversion Intelligent
 
 1. **Découverte** : Scan de `projets_extraits/*/docs/` pour les vidéos
-2. **Analyse** : Extraction du framerate actuel via FFprobe
+2. **Analyse Parallélisée** : Extraction du framerate via ffprobe parallélisé sur toutes les vidéos
 3. **Filtrage** : Conversion uniquement si |fps_actuel - 25.0| > 0.1
-4. **GPU prioritaire** : Utilisation de `h264_nvenc` si disponible
+4. **Passe Unique GPU** : Encodage/décodage matériel CUDA/NVENC en passe unique si disponible
 5. **Audio intelligent** : Copie directe, puis ré-encodage AAC si nécessaire
 6. **Remplacement atomique** : Fichier temporaire puis déplacement final
 

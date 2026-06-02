@@ -1,6 +1,6 @@
 # Détection de Scènes
 
-**TL;DR** : Analyse automatique des vidéos avec TransNetV2 pour identifier les changements de scène. Sortie CSV standardisée avec timecodes et numéros de frames. GPU NVIDIA optimisé avec fallback CPU.
+**TL;DR** : Analyse automatique des vidéos avec TransNetV2. Décodage asynchrone FFmpeg (Threading + Queue), pruning glissant de la RAM (O(1) constant) et batching GPU (taille 16) pour une performance maximale avec fallback CPU. Sortie CSV standardisée.
 
 ## Le Problème : Segmentation Manuelle Fastidieuse
 
@@ -36,8 +36,8 @@ def detect_scenes_adaptive(video, base_threshold=0.5):
 
 ### Flux de Détection Intelligente
 
-1. **Extraction frames** : Conversion vidéo en frames RGB 48x27 via FFmpeg streaming
-2. **Analyse par batches** : Traitement optimisé avec overlap pour stabilité
+1. **Décodage asynchrone** : Lecture FFmpeg via Threading + Queue pour éviter le blocage I/O
+2. **Pruning glissant** : Gestion mémoire RAM O(1) constant avec batching GPU (taille 16)
 3. **Prédiction IA** : TransNetV2 calcule les probabilités de transition
 4. **Seuillage** : Application du seuil pour détecter les vraies transitions
 5. **Segmentation** : Création des scènes avec timecodes et frames
