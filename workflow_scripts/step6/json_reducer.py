@@ -8,6 +8,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import ijson
 
+# Constants (Magic Strings)
+KEY_FRAMES_ANALYSIS = "frames_analysis"
+KEY_TRACKED_OBJECTS = "tracked_objects"
+KEY_ACTIVE_SPEAKERS = "active_speakers"
+KEY_CONFIDENCE = "confidence"
+KEY_SOURCE = "source"
+KEY_LABEL = "label"
+KEY_BBOX_WIDTH = "bbox_width"
+KEY_BBOX_HEIGHT = "bbox_height"
+KEY_CENTROID_X = "centroid_x"
+KEY_TOTAL_FRAMES = "total_frames"
+KEY_FPS = "fps"
+
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -18,11 +32,11 @@ TRACKING_SUFFIX = "_tracking.json"
 _ENRICHMENT_SAMPLE_MAX_FRAMES = 50
 _ENRICHMENT_SAMPLE_MAX_OBJECTS_PER_FRAME = 20
 _TRACKING_ENRICH_FIELDS = (
-    "confidence",
-    "bbox_width",
-    "bbox_height",
-    "source",
-    "label",
+    KEY_CONFIDENCE,
+    KEY_BBOX_WIDTH,
+    KEY_BBOX_HEIGHT,
+    KEY_SOURCE,
+    KEY_LABEL,
 )
 
 _CONFIDENCE_HISTOGRAM_BUCKETS = (
@@ -38,8 +52,8 @@ def _extract_top_level_metadata(data: Dict[str, Any]) -> Tuple[Optional[float], 
     fps = None
     total_frames = None
 
-    raw_fps = data.get("fps")
-    raw_total = data.get("total_frames")
+    raw_fps = data.get(KEY_FPS)
+    raw_total = data.get(KEY_TOTAL_FRAMES)
     if raw_fps is not None:
         try:
             fps = float(raw_fps)
@@ -53,14 +67,14 @@ def _extract_top_level_metadata(data: Dict[str, Any]) -> Tuple[Optional[float], 
 
     meta = data.get("metadata")
     if isinstance(meta, dict):
-        if fps is None and meta.get("fps") is not None:
+        if fps is None and meta.get(KEY_FPS) is not None:
             try:
-                fps = float(meta.get("fps"))
+                fps = float(meta.get(KEY_FPS))
             except Exception:
                 fps = None
-        if total_frames is None and meta.get("total_frames") is not None:
+        if total_frames is None and meta.get(KEY_TOTAL_FRAMES) is not None:
             try:
-                total_frames = int(meta.get("total_frames"))
+                total_frames = int(meta.get(KEY_TOTAL_FRAMES))
             except Exception:
                 total_frames = None
 
@@ -75,13 +89,13 @@ def _extract_metadata_streaming(file_path: Path) -> Tuple[Optional[float], Optio
         with open(file_path, 'rb') as f:
             parser = ijson.parse(f, use_float=True)
             for prefix, event, value in parser:
-                if event == 'start_array' and prefix in ('frames', 'frames_analysis'):
+                if event == 'start_array' and prefix in ('frames', KEY_FRAMES_ANALYSIS):
                     array_key = prefix
                     break
                 
-                if prefix == 'fps' and event in ('number', 'integer'):
+                if prefix == KEY_FPS and event in ('number', 'integer'):
                     fps = float(value)
-                elif prefix == 'total_frames' and event == 'integer':
+                elif prefix == KEY_TOTAL_FRAMES and event == 'integer':
                     total_frames = int(value)
                 elif prefix == 'metadata.fps' and event in ('number', 'integer'):
                     fps = float(value)
@@ -101,7 +115,7 @@ def _write_json_atomically(path: Path, payload: Dict[str, Any]) -> None:
 
 
 def _is_reduced_tracking_schema(data: Dict[str, Any]) -> bool:
-    frames = data.get("frames_analysis")
+    frames = data.get(KEY_FRAMES_ANALYSIS)
     return isinstance(frames, list)
 
 
@@ -144,7 +158,7 @@ class TrackingAnalyticsBuilder:
         self.objects_stats: Dict[str, Dict[str, Any]] = {}
 
     def add_frame(self, frame: Dict[str, Any]):
-        tracked = frame.get("tracked_objects")
+        tracked = frame.get(KEY_TRACKED_OBJECTS)
         if not isinstance(tracked, list) or not tracked:
             return
             
@@ -162,13 +176,13 @@ class TrackingAnalyticsBuilder:
                     "presence_frames": 0, "confidence_sum": 0.0, "confidence_count": 0,
                     "bbox_surface_sum": 0.0, "bbox_surface_count": 0,
                     "centroid_x_min": None, "centroid_x_max": None,
-                    "source": obj.get("source"), "label": obj.get("label")
+                    KEY_SOURCE: obj.get(KEY_SOURCE), KEY_LABEL: obj.get(KEY_LABEL)
                 }
                 self.objects_stats[obj_id] = stats
                 
             stats["presence_frames"] += 1
             
-            conf = obj.get("confidence")
+            conf = obj.get(KEY_CONFIDENCE)
             if conf is not None:
                 try:
                     conf_f = float(conf)
@@ -182,8 +196,8 @@ class TrackingAnalyticsBuilder:
                             break
                 except Exception: pass
                 
-            bbox_w = obj.get("bbox_width")
-            bbox_h = obj.get("bbox_height")
+            bbox_w = obj.get(KEY_BBOX_WIDTH)
+            bbox_h = obj.get(KEY_BBOX_HEIGHT)
             if bbox_w is not None and bbox_h is not None:
                 try:
                     surface = max(0.0, float(bbox_w)) * max(0.0, float(bbox_h))
@@ -191,7 +205,7 @@ class TrackingAnalyticsBuilder:
                     stats["bbox_surface_count"] += 1
                 except Exception: pass
                 
-            cx = obj.get("centroid_x")
+            cx = obj.get(KEY_CENTROID_X)
             if cx is not None:
                 try:
                     cx_f = float(cx)
@@ -218,8 +232,8 @@ class TrackingAnalyticsBuilder:
             
             obj_out = {
                 "presence_frames": presence_frames,
-                "source": stats.get("source"),
-                "label": stats.get("label"),
+                KEY_SOURCE: stats.get(KEY_SOURCE),
+                KEY_LABEL: stats.get(KEY_LABEL),
             }
             if presence_ratio is not None: obj_out["presence_ratio"] = round(presence_ratio, 4)
             if avg_conf is not None: obj_out["avg_confidence"] = round(avg_conf, 4)
@@ -246,6 +260,57 @@ class TrackingAnalyticsBuilder:
         }
 
 
+def _process_tracked_object(obj, legacy_frame, expression_summary_enabled, expression_keys, expression_stats):
+    obj_id = obj.get("id")
+    legacy_obj = legacy_frame.get(obj_id) if legacy_frame else None
+    
+    new_obj = {
+        "id": obj_id,
+        KEY_CENTROID_X: obj.get(KEY_CENTROID_X),
+        KEY_SOURCE: obj.get(KEY_SOURCE),
+        KEY_LABEL: obj.get(KEY_LABEL),
+        KEY_CONFIDENCE: obj.get(KEY_CONFIDENCE),
+        KEY_ACTIVE_SPEAKERS: []
+    }
+    
+    bbox_w = obj.get(KEY_BBOX_WIDTH)
+    bbox_h = obj.get(KEY_BBOX_HEIGHT)
+    if bbox_w is not None and bbox_h is not None:
+        new_obj[KEY_BBOX_WIDTH] = bbox_w
+        new_obj[KEY_BBOX_HEIGHT] = bbox_h
+        
+    if isinstance(obj.get(KEY_ACTIVE_SPEAKERS), list):
+        new_obj[KEY_ACTIVE_SPEAKERS] = obj.get(KEY_ACTIVE_SPEAKERS) or []
+    if (obj.get("speaking_sources") and isinstance(obj["speaking_sources"], dict) and 
+        obj["speaking_sources"].get("audio") and isinstance(obj["speaking_sources"]["audio"], dict)):
+        new_obj[KEY_ACTIVE_SPEAKERS] = obj["speaking_sources"]["audio"].get(KEY_ACTIVE_SPEAKERS, [])
+        
+    if legacy_obj:
+        for k in _TRACKING_ENRICH_FIELDS:
+            if new_obj.get(k) is None and legacy_obj.get(k) is not None:
+                new_obj[k] = legacy_obj[k]
+        if not new_obj[KEY_ACTIVE_SPEAKERS] and legacy_obj.get(KEY_ACTIVE_SPEAKERS):
+            new_obj[KEY_ACTIVE_SPEAKERS] = legacy_obj[KEY_ACTIVE_SPEAKERS]
+            
+    if expression_summary_enabled:
+        blend = obj.get("blendshapes")
+        if isinstance(obj_id, str) and obj_id and isinstance(blend, dict) and blend:
+            stats = expression_stats.get(obj_id)
+            if stats is None:
+                stats = {"count": 0, "sum": {}, "max": {}}
+                expression_stats[obj_id] = stats
+            stats["count"] += 1
+            
+            for key in expression_keys:
+                if key in blend:
+                    try:
+                        val = float(blend[key])
+                        stats["sum"][key] = stats["sum"].get(key, 0.0) + val
+                        stats["max"][key] = max(stats["max"].get(key, val), val)
+                    except Exception: pass
+                    
+    return new_obj
+
 def stream_reduce_video_json(
     input_path: Path, 
     output_path: Path,
@@ -271,12 +336,12 @@ def stream_reduce_video_json(
         try:
             with open(legacy_tracking_path, 'r', encoding='utf-8') as lf:
                 legacy_data = json.load(lf)
-                lf_frames = legacy_data.get("frames_analysis") or legacy_data.get("frames") or []
+                lf_frames = legacy_data.get(KEY_FRAMES_ANALYSIS) or legacy_data.get("frames") or []
                 for f in lf_frames:
                     if isinstance(f, dict) and "frame" in f:
                         try:
                             f_i = int(f["frame"])
-                            legacy_index[f_i] = {obj.get("id"): obj for obj in f.get("tracked_objects", []) if isinstance(obj, dict) and obj.get("id")}
+                            legacy_index[f_i] = {obj.get("id"): obj for obj in f.get(KEY_TRACKED_OBJECTS, []) if isinstance(obj, dict) and obj.get("id")}
                         except Exception: pass
         except Exception as e:
             logger.warning(f"Erreur de lecture legacy_tracking {legacy_tracking_path}: {e}")
@@ -286,7 +351,7 @@ def stream_reduce_video_json(
     frames_count = 0
     
     with open(input_path, 'rb') as f_in, open(tmp_path, 'w', encoding='utf-8') as f_out:
-        f_out.write('{\n  "frames_analysis": [\n')
+        f_out.write('{\n  KEY_FRAMES_ANALYSIS: [\n')
         
         items = ijson.items(f_in, f"{array_key}.item", use_float=True)
         first = True
@@ -302,57 +367,9 @@ def stream_reduce_video_json(
                 
             legacy_frame = legacy_index.get(frame_i) if frame_i is not None else None
             
-            if "tracked_objects" in frame and frame["tracked_objects"] is not None:
-                for obj in frame["tracked_objects"]:
-                    obj_id = obj.get("id")
-                    legacy_obj = legacy_frame.get(obj_id) if legacy_frame else None
-                    
-                    new_obj = {
-                        "id": obj_id,
-                        "centroid_x": obj.get("centroid_x"),
-                        "source": obj.get("source"),
-                        "label": obj.get("label"),
-                        "confidence": obj.get("confidence"),
-                        "active_speakers": []
-                    }
-                    
-                    bbox_w = obj.get("bbox_width")
-                    bbox_h = obj.get("bbox_height")
-                    if bbox_w is not None and bbox_h is not None:
-                        new_obj["bbox_width"] = bbox_w
-                        new_obj["bbox_height"] = bbox_h
-                        
-                    if isinstance(obj.get("active_speakers"), list):
-                        new_obj["active_speakers"] = obj.get("active_speakers") or []
-                    if (obj.get("speaking_sources") and isinstance(obj["speaking_sources"], dict) and 
-                        obj["speaking_sources"].get("audio") and isinstance(obj["speaking_sources"]["audio"], dict)):
-                        new_obj["active_speakers"] = obj["speaking_sources"]["audio"].get("active_speakers", [])
-                        
-                    # Enrich from legacy if needed
-                    if legacy_obj:
-                        for k in _TRACKING_ENRICH_FIELDS:
-                            if new_obj.get(k) is None and legacy_obj.get(k) is not None:
-                                new_obj[k] = legacy_obj[k]
-                        if not new_obj["active_speakers"] and legacy_obj.get("active_speakers"):
-                            new_obj["active_speakers"] = legacy_obj["active_speakers"]
-                            
-                    if expression_summary_enabled:
-                        blend = obj.get("blendshapes")
-                        if isinstance(obj_id, str) and obj_id and isinstance(blend, dict) and blend:
-                            stats = expression_stats.get(obj_id)
-                            if stats is None:
-                                stats = {"count": 0, "sum": {}, "max": {}}
-                                expression_stats[obj_id] = stats
-                            stats["count"] += 1
-                            
-                            for key in expression_keys:
-                                if key in blend:
-                                    try:
-                                        val = float(blend[key])
-                                        stats["sum"][key] = stats["sum"].get(key, 0.0) + val
-                                        stats["max"][key] = max(stats["max"].get(key, val), val)
-                                    except Exception: pass
-                                    
+            if KEY_TRACKED_OBJECTS in frame and frame[KEY_TRACKED_OBJECTS] is not None:
+                for obj in frame[KEY_TRACKED_OBJECTS]:
+                    new_obj = _process_tracked_object(obj, legacy_frame, expression_summary_enabled, expression_keys, expression_stats)
                     new_tracked_objects.append(new_obj)
                     
             if frame_i is not None:
@@ -360,7 +377,7 @@ def stream_reduce_video_json(
                 
             reduced_frame = {
                 "frame": frame_num,
-                "tracked_objects": new_tracked_objects
+                KEY_TRACKED_OBJECTS: new_tracked_objects
             }
             
             if analytics_builder:
@@ -379,9 +396,9 @@ def stream_reduce_video_json(
             total_frames = max_frame_seen
             
         if fps is not None:
-            f_out.write(f',\n  "fps": {fps}')
+            f_out.write(f',\n  KEY_FPS: {fps}')
         if total_frames is not None:
-            f_out.write(f',\n  "total_frames": {total_frames}')
+            f_out.write(f',\n  KEY_TOTAL_FRAMES: {total_frames}')
             
         if expression_summary_enabled and expression_stats:
             summary_objects = {}
@@ -402,7 +419,7 @@ def stream_reduce_video_json(
             json.dump(analytics, f_out, indent=4, ensure_ascii=False)
             
         if audio_metadata:
-            temporal = _compute_temporal_alignment({"fps": fps, "total_frames": total_frames}, audio_metadata)
+            temporal = _compute_temporal_alignment({KEY_FPS: fps, KEY_TOTAL_FRAMES: total_frames}, audio_metadata)
             if temporal:
                 f_out.write(',\n  "temporal_alignment": ')
                 json.dump(temporal, f_out, indent=4, ensure_ascii=False)
@@ -410,13 +427,13 @@ def stream_reduce_video_json(
         f_out.write('\n}\n')
         
     os.replace(tmp_path, output_path)
-    return {"fps": fps, "total_frames": total_frames}
+    return {KEY_FPS: fps, KEY_TOTAL_FRAMES: total_frames}
 
 
 def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # Maintained for unit tests / fallback compatibility
     fps, total_frames = _extract_top_level_metadata(data)
-    frames_in = data.get("frames") if _is_raw_tracking_schema(data) else data.get("frames_analysis")
+    frames_in = data.get("frames") if _is_raw_tracking_schema(data) else data.get(KEY_FRAMES_ANALYSIS)
     if frames_in is None: return None
     
     new_frames_data = []
@@ -428,49 +445,20 @@ def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     
     for frame in frames_in or []:
         new_tracked_objects = []
-        if "tracked_objects" in frame and frame["tracked_objects"] is not None:
-            for obj in frame["tracked_objects"]:
-                new_obj = {
-                    "id": obj.get("id"), "centroid_x": obj.get("centroid_x"),
-                    "source": obj.get("source"), "label": obj.get("label"),
-                    "confidence": obj.get("confidence"), "active_speakers": []
-                }
-                bbox_w, bbox_h = obj.get("bbox_width"), obj.get("bbox_height")
-                if bbox_w is not None and bbox_h is not None:
-                    new_obj["bbox_width"], new_obj["bbox_height"] = bbox_w, bbox_h
-                if isinstance(obj.get("active_speakers"), list):
-                    new_obj["active_speakers"] = obj.get("active_speakers") or []
-                if (obj.get("speaking_sources") and isinstance(obj["speaking_sources"], dict) and 
-                    obj["speaking_sources"].get("audio") and isinstance(obj["speaking_sources"]["audio"], dict)):
-                    new_obj["active_speakers"] = obj["speaking_sources"]["audio"].get("active_speakers", [])
-                    
-                if expression_summary_enabled:
-                    obj_id = obj.get("id")
-                    blend = obj.get("blendshapes")
-                    if isinstance(obj_id, str) and obj_id and isinstance(blend, dict) and blend:
-                        stats = expression_stats.get(obj_id)
-                        if stats is None:
-                            stats = {"count": 0, "sum": {}, "max": {}}
-                            expression_stats[obj_id] = stats
-                        stats["count"] += 1
-                        for key in expression_keys:
-                            if key in blend:
-                                try:
-                                    val = float(blend[key])
-                                    stats["sum"][key] = stats["sum"].get(key, 0.0) + val
-                                    stats["max"][key] = max(stats["max"].get(key, val), val)
-                                except Exception: pass
+        if KEY_TRACKED_OBJECTS in frame and frame[KEY_TRACKED_OBJECTS] is not None:
+            for obj in frame[KEY_TRACKED_OBJECTS]:
+                new_obj = _process_tracked_object(obj, None, expression_summary_enabled, expression_keys, expression_stats)
                 new_tracked_objects.append(new_obj)
         frame_num = frame.get("frame")
         try:
             if frame_num is not None: max_frame_seen = max(max_frame_seen, int(frame_num))
         except Exception: pass
-        new_frames_data.append({"frame": frame_num, "tracked_objects": new_tracked_objects})
+        new_frames_data.append({"frame": frame_num, KEY_TRACKED_OBJECTS: new_tracked_objects})
         
     if total_frames is None and max_frame_seen > 0: total_frames = max_frame_seen
-    out = {"frames_analysis": new_frames_data}
-    if fps is not None: out["fps"] = fps
-    if total_frames is not None: out["total_frames"] = total_frames
+    out = {KEY_FRAMES_ANALYSIS: new_frames_data}
+    if fps is not None: out[KEY_FPS] = fps
+    if total_frames is not None: out[KEY_TOTAL_FRAMES] = total_frames
     
     if expression_summary_enabled and expression_stats:
         summary_objects = {}
@@ -488,10 +476,10 @@ def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def _compute_tracking_analytics(reduced_tracking: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # Maintained for unit tests / fallback compatibility
-    frames = reduced_tracking.get("frames_analysis")
+    frames = reduced_tracking.get(KEY_FRAMES_ANALYSIS)
     if not isinstance(frames, list) or not frames: return None
     
-    total_frames_raw = reduced_tracking.get("total_frames")
+    total_frames_raw = reduced_tracking.get(KEY_TOTAL_FRAMES)
     try:
         total_frames = int(total_frames_raw) if total_frames_raw is not None else None
     except Exception: total_frames = None
@@ -510,13 +498,13 @@ def _compute_tracking_analytics(reduced_tracking: Dict[str, Any]) -> Optional[Di
     return builder.build(total_frames, len(frames))
 
 def reduce_audio_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    if "frames_analysis" not in data: return None
+    if KEY_FRAMES_ANALYSIS not in data: return None
     fps, total_frames = _extract_top_level_metadata(data)
     new_frames_analysis = []
     speaker_frame_counts = {}
     max_frame_seen = 0
     
-    for frame_data in data["frames_analysis"]:
+    for frame_data in data[KEY_FRAMES_ANALYSIS]:
         if "audio_info" in frame_data and frame_data["audio_info"] is not None:
             new_audio_info = {
                 "is_speech_present": frame_data["audio_info"].get("is_speech_present", False),
@@ -536,9 +524,9 @@ def reduce_audio_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                         speaker_frame_counts[label] = speaker_frame_counts.get(label, 0) + 1
                         
     if total_frames is None and max_frame_seen > 0: total_frames = max_frame_seen
-    out = {"frames_analysis": new_frames_analysis}
-    if fps is not None: out["fps"] = fps
-    if total_frames is not None: out["total_frames"] = total_frames
+    out = {KEY_FRAMES_ANALYSIS: new_frames_analysis}
+    if fps is not None: out[KEY_FPS] = fps
+    if total_frames is not None: out[KEY_TOTAL_FRAMES] = total_frames
     if speaker_frame_counts:
         out["speaker_stats"] = {
             "unique_speakers": sorted(list(speaker_frame_counts.keys())),
@@ -575,7 +563,7 @@ def stream_reduce_audio_json(input_path: Path, output_path: Path) -> Optional[Di
     except Exception: pass
     
     with open(input_path, 'rb') as f_in, open(tmp_path, 'w', encoding='utf-8') as f_out:
-        f_out.write('{\n  "frames_analysis": [\n')
+        f_out.write('{\n  KEY_FRAMES_ANALYSIS: [\n')
         
         items = ijson.items(f_in, f"{array_key}.item", use_float=True)
         first = True
@@ -612,9 +600,9 @@ def stream_reduce_audio_json(input_path: Path, output_path: Path) -> Optional[Di
             total_frames = max_frame_seen
             
         if fps is not None:
-            f_out.write(f',\n  "fps": {fps}')
+            f_out.write(f',\n  KEY_FPS: {fps}')
         if total_frames is not None:
-            f_out.write(f',\n  "total_frames": {total_frames}')
+            f_out.write(f',\n  KEY_TOTAL_FRAMES: {total_frames}')
             
         if speaker_frame_counts:
             f_out.write(',\n  "speaker_stats": ')
@@ -630,7 +618,7 @@ def stream_reduce_audio_json(input_path: Path, output_path: Path) -> Optional[Di
         f_out.write('\n}\n')
         
     os.replace(tmp_path, output_path)
-    return {"fps": fps, "total_frames": total_frames}
+    return {KEY_FPS: fps, KEY_TOTAL_FRAMES: total_frames}
 
 
 def _compute_temporal_alignment(
@@ -640,10 +628,10 @@ def _compute_temporal_alignment(
     if not reduced_audio:
         return None
 
-    v_total = reduced_tracking.get("total_frames")
-    a_total = reduced_audio.get("total_frames")
-    v_fps = reduced_tracking.get("fps")
-    a_fps = reduced_audio.get("fps")
+    v_total = reduced_tracking.get(KEY_TOTAL_FRAMES)
+    a_total = reduced_audio.get(KEY_TOTAL_FRAMES)
+    v_fps = reduced_tracking.get(KEY_FPS)
+    a_fps = reduced_audio.get(KEY_FPS)
 
     try:
         v_total_i = int(v_total) if v_total is not None else None
@@ -709,7 +697,7 @@ def _reduced_tracking_needs_enrichment_streaming(input_path: Path) -> bool:
                 if i >= _ENRICHMENT_SAMPLE_MAX_FRAMES:
                     break
                 if isinstance(frame, dict):
-                    tracked = frame.get("tracked_objects")
+                    tracked = frame.get(KEY_TRACKED_OBJECTS)
                     if isinstance(tracked, list):
                         for obj in tracked[:_ENRICHMENT_SAMPLE_MAX_OBJECTS_PER_FRAME]:
                             if isinstance(obj, dict):
@@ -721,14 +709,14 @@ def _reduced_tracking_needs_enrichment_streaming(input_path: Path) -> bool:
     return False
 
 def _reduced_tracking_needs_enrichment(reduced_tracking: Dict[str, Any]) -> bool:
-    frames = reduced_tracking.get("frames_analysis")
+    frames = reduced_tracking.get(KEY_FRAMES_ANALYSIS)
     if not isinstance(frames, list) or not frames:
         return False
 
     sampled_frames = frames[:_ENRICHMENT_SAMPLE_MAX_FRAMES]
     for frame in sampled_frames:
         if not isinstance(frame, dict): continue
-        tracked = frame.get("tracked_objects")
+        tracked = frame.get(KEY_TRACKED_OBJECTS)
         if not isinstance(tracked, list) or not tracked: continue
         sampled_objs = tracked[:_ENRICHMENT_SAMPLE_MAX_OBJECTS_PER_FRAME]
         for obj in sampled_objs:
@@ -739,7 +727,7 @@ def _reduced_tracking_needs_enrichment(reduced_tracking: Dict[str, Any]) -> bool
     return False
 
 def _index_reduced_tracking_by_frame_and_id(reduced_tracking: Dict[str, Any]) -> Dict[int, Dict[str, Dict[str, Any]]]:
-    frames = reduced_tracking.get("frames_analysis")
+    frames = reduced_tracking.get(KEY_FRAMES_ANALYSIS)
     if not isinstance(frames, list):
         return {}
     index: Dict[int, Dict[str, Dict[str, Any]]] = {}
@@ -748,7 +736,7 @@ def _index_reduced_tracking_by_frame_and_id(reduced_tracking: Dict[str, Any]) ->
         frame_num = frame.get("frame")
         try: frame_i = int(frame_num)
         except Exception: continue
-        tracked = frame.get("tracked_objects")
+        tracked = frame.get(KEY_TRACKED_OBJECTS)
         if not isinstance(tracked, list): continue
         frame_map: Dict[str, Dict[str, Any]] = {}
         for obj in tracked:
@@ -765,7 +753,7 @@ def _merge_reduced_tracking(
     supplemental_tracking: Dict[str, Any],
 ) -> Dict[str, Any]:
     supplemental_index = _index_reduced_tracking_by_frame_and_id(supplemental_tracking)
-    frames = base_tracking.get("frames_analysis")
+    frames = base_tracking.get(KEY_FRAMES_ANALYSIS)
     if not isinstance(frames, list) or not supplemental_index:
         return base_tracking
 
@@ -776,7 +764,7 @@ def _merge_reduced_tracking(
         except Exception: continue
         supp_frame = supplemental_index.get(frame_i)
         if not supp_frame: continue
-        tracked = frame.get("tracked_objects")
+        tracked = frame.get(KEY_TRACKED_OBJECTS)
         if not isinstance(tracked, list): continue
 
         for obj in tracked:
@@ -791,25 +779,25 @@ def _merge_reduced_tracking(
                     if supp_obj.get(key) is not None:
                         obj[key] = supp_obj.get(key)
 
-            base_speakers = obj.get("active_speakers")
-            supp_speakers = supp_obj.get("active_speakers")
+            base_speakers = obj.get(KEY_ACTIVE_SPEAKERS)
+            supp_speakers = supp_obj.get(KEY_ACTIVE_SPEAKERS)
             if (base_speakers is None or base_speakers == []) and isinstance(supp_speakers, list) and supp_speakers:
-                obj["active_speakers"] = supp_speakers
+                obj[KEY_ACTIVE_SPEAKERS] = supp_speakers
 
-    base_total = base_tracking.get("total_frames")
-    supp_total = supplemental_tracking.get("total_frames")
+    base_total = base_tracking.get(KEY_TOTAL_FRAMES)
+    supp_total = supplemental_tracking.get(KEY_TOTAL_FRAMES)
     try: base_total_i = int(base_total) if base_total is not None else None
     except Exception: base_total_i = None
     try: supp_total_i = int(supp_total) if supp_total is not None else None
     except Exception: supp_total_i = None
 
     if base_total_i is None and supp_total_i is not None:
-        base_tracking["total_frames"] = supp_total_i
+        base_tracking[KEY_TOTAL_FRAMES] = supp_total_i
     elif base_total_i is not None and supp_total_i is not None:
-        base_tracking["total_frames"] = max(base_total_i, supp_total_i)
+        base_tracking[KEY_TOTAL_FRAMES] = max(base_total_i, supp_total_i)
 
-    if base_tracking.get("fps") is None and supplemental_tracking.get("fps") is not None:
-        base_tracking["fps"] = supplemental_tracking.get("fps")
+    if base_tracking.get(KEY_FPS) is None and supplemental_tracking.get(KEY_FPS) is not None:
+        base_tracking[KEY_FPS] = supplemental_tracking.get(KEY_FPS)
 
     return base_tracking
 

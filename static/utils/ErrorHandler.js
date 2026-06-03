@@ -246,8 +246,8 @@ class ErrorHandler {
             clearTimeout(existingTimeout);
         }
         
-        if (typeof window.showNotification === 'function') {
-            window.showNotification(message, type, 5000);
+        if (typeof globalThis.showNotification === 'function') {
+            globalThis.showNotification(message, type, 5000);
         } else {
             console.warn('showNotification function not available');
         }
@@ -290,7 +290,7 @@ class ErrorHandler {
             }
         });
         
-        window.dispatchEvent(event);
+        globalThis.dispatchEvent(event);
     }
 
     /**
@@ -316,12 +316,12 @@ class ErrorHandler {
      * @private
      */
     _bindGlobalErrorHandlers() {
-        window.addEventListener('unhandledrejection', (event) => {
+        globalThis.addEventListener('unhandledrejection', (event) => {
             console.error('Unhandled promise rejection:', event.reason);
             this.handleApiError('unhandled-promise', event.reason);
         });
         
-        window.addEventListener('error', (event) => {
+        globalThis.addEventListener('error', (event) => {
             console.error('Global JavaScript error:', event.error);
             this._addToHistory({
                 type: 'javascript',
@@ -342,4 +342,4 @@ const errorHandler = new ErrorHandler();
 export { ErrorHandler, errorHandler };
 
 // Also make available globally for legacy code
-window.errorHandler = errorHandler;
+globalThis.errorHandler = errorHandler;

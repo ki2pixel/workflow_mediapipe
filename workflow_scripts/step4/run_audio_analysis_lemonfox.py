@@ -101,7 +101,7 @@ def main() -> int:
     try:
         lemonfox_service = _import_lemonfox_audio_service()
     except Exception as e:
-        logging.error(f"Impossible d'importer LemonfoxAudioService: {e}")
+        logging.exception(f"Impossible d'importer LemonfoxAudioService: {e}")
         return _run_pyannote_fallback(log_dir)
 
     videos_to_process = _find_videos_for_audio_analysis(work_dir)
@@ -117,7 +117,7 @@ def main() -> int:
         try:
             project_name, video_name = _resolve_project_and_video_name(work_dir, video_path)
         except Exception as e:
-            logging.error(f"Erreur résolution projet/vidéo pour {video_path}: {e}")
+            logging.exception(f"Erreur résolution projet/vidéo pour {video_path}: {e}")
             return _run_pyannote_fallback(log_dir)
 
         try:
@@ -144,7 +144,7 @@ def main() -> int:
             logging.info(f"Succès: analyse audio terminée pour {video_path.name}")
 
         except Exception as e:
-            logging.error(f"Erreur inattendue Lemonfox pour {video_path.name}: {e}", exc_info=True)
+            logging.exception(f"Erreur inattendue Lemonfox pour {video_path.name}: {e}")
             return _run_pyannote_fallback(log_dir)
 
     return 0

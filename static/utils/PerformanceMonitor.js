@@ -89,7 +89,7 @@ class PerformanceMonitor {
         if (document.readyState === 'complete') {
             this.recordPageLoadMetrics();
         } else {
-            window.addEventListener('load', () => {
+            globalThis.addEventListener('load', () => {
                 this.recordPageLoadMetrics();
             });
         }
@@ -138,9 +138,9 @@ class PerformanceMonitor {
      * Monitor API calls by wrapping fetch.
      */
     monitorApiCalls() {
-        const originalFetch = window.fetch;
+        const originalFetch = globalThis.fetch;
         
-        window.fetch = async (...args) => {
+        globalThis.fetch = async (...args) => {
             const startTime = performance.now();
             const url = args[0];
             
@@ -198,7 +198,7 @@ class PerformanceMonitor {
      * Monitor DOM updates using MutationObserver.
      */
     monitorDomUpdates() {
-        if (!window.MutationObserver) return;
+        if (!globalThis.MutationObserver) return;
         
         const observer = new MutationObserver((mutations) => {
             const updateCount = mutations.length;
@@ -311,7 +311,7 @@ class PerformanceMonitor {
      * Monitor long tasks using PerformanceObserver.
      */
     monitorLongTasks() {
-        if (!window.PerformanceObserver) return;
+        if (!globalThis.PerformanceObserver) return;
         
         try {
             const observer = new PerformanceObserver((list) => {
@@ -528,13 +528,13 @@ if (document.readyState === 'loading') {
 }
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => {
+globalThis.addEventListener('beforeunload', () => {
     performanceMonitor.destroy();
 });
 
 // Development helpers
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    window.performanceMonitor = performanceMonitor; // Expose for debugging
+if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
+    globalThis.performanceMonitor = performanceMonitor; // Expose for debugging
 }
 
 export default performanceMonitor;

@@ -5,7 +5,7 @@ import { initializeEventHandlers } from './eventHandlers.js';
 import { POLLING_INTERVAL } from './constants.js';
 import { showNotification } from './utils.js';
 
-window.showNotification = showNotification;
+globalThis.showNotification = showNotification;
 import { showSequenceSummaryUI } from './popupManager.js';
 import { scrollToStepImmediate } from './scrollManager.js';
 
@@ -23,7 +23,7 @@ import { fetchWithLoadingState } from './apiService.js';
 
 // import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
 
-window.addEventListener('unhandledrejection', (event) => {
+globalThis.addEventListener('unhandledrejection', (event) => {
     console.error('[MAIN] Unhandled promise rejection:', event.reason);
 
     // Check if this is the specific browser extension error we're trying to fix
@@ -127,8 +127,8 @@ function updateDownloadsToggleAlert(downloads) {
         btn.classList.add('downloads-toggle--alert');
         try {
             const alerted = localStorage.getItem('ui.localDownloadsAlertedOnce') === 'true';
-            if (!alerted && typeof window.showNotification === 'function') {
-                window.showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
+            if (!alerted && typeof globalThis.showNotification === 'function') {
+                globalThis.showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
                 localStorage.setItem('ui.localDownloadsAlertedOnce', 'true');
             }
         } catch (_) {}
@@ -138,7 +138,7 @@ function updateDownloadsToggleAlert(downloads) {
     }
 }
 
-window.addEventListener('error', (event) => {
+globalThis.addEventListener('error', (event) => {
     console.error('[MAIN] Uncaught error:', event.error);
     errorHandler.handleApiError('uncaught-error', event.error);
 });
@@ -175,7 +175,7 @@ const SYSTEM_MONITOR_POLLING_INTERVAL = 5000;
 
 
 function initializeStateManagement() {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
         appState.subscribe((newState, oldState, source) => {
             console.debug(`[StateManagement] State changed from ${source}:`, {
                 changes: findStateChanges(oldState, newState),

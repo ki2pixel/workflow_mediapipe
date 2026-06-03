@@ -123,7 +123,7 @@ def _extract_audio_ffmpeg(input_video: Path, output_wav: Path) -> bool:
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
     except subprocess.CalledProcessError as e:
-        logging.error(f"ffmpeg extraction audio a échoué pour {input_video.name}: {e}")
+        logging.exception(f"ffmpeg extraction audio a échoué pour {input_video.name}: {e}")
         return False
 
 
@@ -669,7 +669,7 @@ def analyze_audio_file(video_path, diarization_pipeline, hf_token, device: str):
             return True
 
     except Exception as e:
-        logging.error(f"Erreur inattendue lors de l'analyse de {video_path.name}: {e}", exc_info=True)
+        logging.exception(f"Erreur inattendue lors de l'analyse de {video_path.name}: {e}")
         return False
 
 

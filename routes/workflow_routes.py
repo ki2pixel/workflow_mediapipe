@@ -54,7 +54,7 @@ def measure_api(endpoint_name: str):
     return decorator
 
 
-@workflow_bp.route('/')
+@workflow_bp.route('/', methods=['GET'])
 def index():
     """
     Main application page.
@@ -242,7 +242,7 @@ def stop_step(step_key):
         }), 500
 
 
-@workflow_bp.route('/get_specific_log_test/<step_key>/<int:log_index>')
+@workflow_bp.route('/get_specific_log_test/<step_key>/<int:log_index>', methods=['GET'])
 def get_specific_log_test(step_key, log_index):
     """
     Test version of get specific log that bypasses cache service.
@@ -257,7 +257,7 @@ def get_specific_log_test(step_key, log_index):
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
-@workflow_bp.route('/get_specific_log/<step_key>/<int:log_index>')
+@workflow_bp.route('/get_specific_log/<step_key>/<int:log_index>', methods=['GET'])
 def get_specific_log(step_key, log_index):
     """
     Get specific log file content for a step.
@@ -287,7 +287,7 @@ def get_specific_log(step_key, log_index):
         return jsonify({"error": "Unable to retrieve log content"}), 500
 
 
-@workflow_bp.route('/sound-design/<filename>')
+@workflow_bp.route('/sound-design/<filename>', methods=['GET'])
 def serve_sound_file(filename):
     """
     Serve sound files from the sound-design directory.
@@ -310,7 +310,7 @@ def serve_sound_file(filename):
         return jsonify({"error": "Sound file not found"}), 404
 
 
-@workflow_bp.route('/test-sound')
+@workflow_bp.route('/test-sound', methods=['GET'])
 def test_sound():
     """
     Serve the sound test page.
@@ -329,7 +329,7 @@ def test_sound():
         return jsonify({"error": "Test sound page not found"}), 404
 
 
-@workflow_bp.route('/sequence/status')
+@workflow_bp.route('/sequence/status', methods=['GET'])
 @measure_api('/workflow/sequence/status')
 def sequence_status():
     """
@@ -430,7 +430,7 @@ def cancel_step(step_key):
 
 # Additional workflow routes that were moved from app_new.py
 # Note: Duplicate routes removed to prevent conflicts
-@workflow_bp.route('/sound-design/<filename>')
+@workflow_bp.route('/sound-design/<filename>', methods=['GET'])
 def serve_sound_file_blueprint(filename):
     """
     Serve sound files from the sound-design directory (moved from app_new.py).
@@ -453,7 +453,7 @@ def serve_sound_file_blueprint(filename):
         return jsonify({"error": "Sound file not found"}), 404
 
 
-@workflow_bp.route('/test-sound')
+@workflow_bp.route('/test-sound', methods=['GET'])
 def test_sound_blueprint():
     """
     Serve the sound test page (moved from app_new.py).

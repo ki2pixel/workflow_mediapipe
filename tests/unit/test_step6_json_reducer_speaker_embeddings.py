@@ -1,3 +1,4 @@
+import pytest
 import importlib.util
 import json
 import sys
@@ -52,7 +53,7 @@ def test_reduce_audio_json_preserves_speaker_embeddings():
 
     # // Then: speaker_embeddings is preserved in the reduced output
     assert reduced is not None
-    assert reduced.get("fps") == 25.0
+    assert reduced.get("fps") == pytest.approx(25.0)
     assert reduced.get("total_frames") == 1
     assert "speaker_embeddings" in reduced
     assert reduced["speaker_embeddings"] == raw["speaker_embeddings"]

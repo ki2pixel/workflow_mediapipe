@@ -399,7 +399,7 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
         )
         return p
     except Exception as e:
-        logging.error(f"ERREUR LANCEMENT de {video_name}: {e}")
+        logging.exception(f"ERREUR LANCEMENT de {video_name}: {e}")
         return None
 
 
@@ -532,11 +532,11 @@ def main():
                             f"GPU validation passed: VRAM {gpu_status['vram_free_gb']:.1f} Go free, CUDA {gpu_status.get('cuda_version', 'N/A')}"
                         )
                 except ImportError as e:
-                    logging.error(f"Failed to import config.settings: {e}")
+                    logging.exception(f"Failed to import config.settings: {e}")
                     args.disable_gpu = True
                     engine_supports_gpu = False
                 except Exception as e:
-                    logging.error(f"GPU validation failed: {e}")
+                    logging.exception(f"GPU validation failed: {e}")
                     args.disable_gpu = True
                     engine_supports_gpu = False
             else:

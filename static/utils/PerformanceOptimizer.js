@@ -339,13 +339,13 @@ class PerformanceOptimizer {
 export const performanceOptimizer = new PerformanceOptimizer();
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => {
+globalThis.addEventListener('beforeunload', () => {
     performanceOptimizer.destroy();
 });
 
 // Development helpers
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    window.performanceOptimizer = performanceOptimizer; // Expose for debugging
+if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
+    globalThis.performanceOptimizer = performanceOptimizer; // Expose for debugging
     
     // Log performance stats periodically in development
     setInterval(() => {

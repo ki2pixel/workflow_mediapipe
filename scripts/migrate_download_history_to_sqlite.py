@@ -80,10 +80,9 @@ def migrate_download_history(legacy_path: Path, dry_run: bool) -> Tuple[int, int
         ts = item.get('timestamp') or ''
         normalized.append((url, ts))
 
-    if dry_run:
-        return len(entries), len(normalized)
-
-    download_history_repository.upsert_many(normalized)
+    if not dry_run:
+        download_history_repository.upsert_many(normalized)
+        
     return len(entries), len(normalized)
 
 

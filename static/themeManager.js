@@ -112,7 +112,7 @@ class ThemeManager {
         }
 
         // Dispatch custom event for other components
-        window.dispatchEvent(new CustomEvent('themeChanged', {
+        globalThis.dispatchEvent(new CustomEvent('themeChanged', {
             detail: { theme: themeId, themeName: THEMES[themeId].name }
         }));
         
@@ -180,4 +180,4 @@ const themeManager = new ThemeManager();
 export { themeManager, THEMES };
 
 // Also expose globally for non-module scripts
-window.themeManager = themeManager;
+globalThis.themeManager = themeManager;

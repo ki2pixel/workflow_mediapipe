@@ -6,7 +6,7 @@ class WorkerManager {
         this.worker = null;
         this.callbacks = new Map();
         this.nextRequestId = 1;
-        this.isSupported = typeof window !== 'undefined' && typeof window.Worker !== 'undefined';
+        this.isSupported = typeof globalThis !== 'undefined' && typeof globalThis.Worker !== 'undefined';
         
         // Track the latest request ID for specific channels to handle race conditions
         this.latestRequestForChannel = new Map();

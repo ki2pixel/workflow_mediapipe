@@ -27,8 +27,8 @@ function isElementInViewport(element) {
     if (!element) return false;
     
     const rect = element.getBoundingClientRect();
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+    const windowHeight = globalThis.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = globalThis.innerWidth || document.documentElement.clientWidth;
     
     return (
         rect.top >= 0 &&
@@ -47,8 +47,8 @@ function isElementPartiallyVisible(element) {
     if (!element) return false;
     
     const rect = element.getBoundingClientRect();
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+    const windowHeight = globalThis.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = globalThis.innerWidth || document.documentElement.clientWidth;
     
     return (
         rect.bottom > 0 &&
@@ -67,8 +67,8 @@ function calculateOptimalScrollPosition(element) {
     if (!element) return 0;
     
     const rect = element.getBoundingClientRect();
-    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const currentScrollTop = globalThis.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = globalThis.innerHeight || document.documentElement.clientHeight;
     
     // Zone visible effective : topbar + margin inférieure
     const effectiveViewportHeight = windowHeight - SCROLL_CONFIG.topbarHeight - SCROLL_CONFIG.bottomMargin;
@@ -129,7 +129,7 @@ function scrollToElement(element, options = {}) {
 
     const behavior = config.behavior === 'smooth' ? 'smooth' : 'auto';
     const targetScrollTop = calculateOptimalScrollPosition(element);
-    window.scrollTo({
+    globalThis.scrollTo({
         top: targetScrollTop,
         behavior
     });
@@ -205,11 +205,11 @@ export function scrollToStepForced(stepKey, options = {}) {
         
         console.log(`[SCROLL] Applied scrollIntoView with block: center`);
         
-        // Backup : forcer avec window.scrollTo si scrollIntoView ne fonctionne pas
+        // Backup : forcer avec globalThis.scrollTo si scrollIntoView ne fonctionne pas
         setTimeout(() => {
             const rect = stepElement.getBoundingClientRect();
-            const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+            const currentScrollTop = globalThis.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = globalThis.innerHeight || document.documentElement.clientHeight;
             
             // Calcul simple : centrer l'élément dans le viewport
             const elementCenter = rect.top + currentScrollTop + (rect.height / 2);
@@ -225,7 +225,7 @@ export function scrollToStepForced(stepKey, options = {}) {
                 targetScrollTop
             });
             
-            window.scrollTo({
+            globalThis.scrollTo({
                 top: Math.max(0, targetScrollTop),
                 behavior: 'instant' // instant pour le backup
             });
@@ -236,7 +236,7 @@ export function scrollToStepForced(stepKey, options = {}) {
         
         // Fallback manuel
         const optimalScrollTop = calculateOptimalScrollPosition(stepElement);
-        window.scrollTo({
+        globalThis.scrollTo({
             top: optimalScrollTop,
             behavior: config.behavior
         });
@@ -326,8 +326,8 @@ export function scrollToStepUltraAggressive(stepKey, options = {}) {
     // Forcer un second scroll immédiat après
     setTimeout(() => {
         const rect = stepElement.getBoundingClientRect();
-        const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-        const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const windowHeight = globalThis.innerHeight || document.documentElement.clientHeight;
+        const currentScrollTop = globalThis.pageYOffset || document.documentElement.scrollTop;
         
         // Calcul ultra-simple : centrer parfaitement
         const elementCenter = rect.top + currentScrollTop + (rect.height / 2);
@@ -342,7 +342,7 @@ export function scrollToStepUltraAggressive(stepKey, options = {}) {
             targetScrollTop
         });
         
-        window.scrollTo({
+        globalThis.scrollTo({
             top: Math.max(0, targetScrollTop),
             behavior: 'instant'
         });
@@ -370,8 +370,8 @@ export function scrollToStepAbsolute(stepKey, options = {}) {
     
     // Forcer un scroll absolu en calculant la position exacte
     const rect = stepElement.getBoundingClientRect();
-    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const currentScrollTop = globalThis.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = globalThis.innerHeight || document.documentElement.clientHeight;
     
     // Calcul absolu : centrer l'élément parfaitement au milieu du viewport
     const elementAbsoluteTop = rect.top + currentScrollTop;
@@ -390,14 +390,14 @@ export function scrollToStepAbsolute(stepKey, options = {}) {
     });
     
     // Appliquer le scroll absolu instantané
-    window.scrollTo({
+    globalThis.scrollTo({
         top: Math.max(0, absoluteScrollTop),
         behavior: 'instant'
     });
     
     // Forcer un second scroll après un court delay pour contrer toute animation CSS
     setTimeout(() => {
-        window.scrollTo({
+        globalThis.scrollTo({
             top: Math.max(0, absoluteScrollTop),
             behavior: 'instant'
         });

@@ -78,6 +78,12 @@ function parseAndStyleLogContent(rawContent) {
 
 // Listen for messages from the main thread
 self.addEventListener('message', (e) => {
+    // Sécurité: vérifier l'origine du message
+    if (e.origin && e.origin !== self.location.origin) {
+        console.warn("[parseWorker] Message ignoré: origine non autorisée", e.origin);
+        return;
+    }
+
     const { id, type, payload } = e.data;
     
     try {

@@ -17,7 +17,7 @@ export const PROCESS_INFO_CLIENT = new Proxy({}, {
     },
     getOwnPropertyDescriptor(_target, prop) {
         const root = appState.getStateProperty('processInfo') || {};
-        if (Object.prototype.hasOwnProperty.call(root, prop)) {
+        if (Object.hasOwn(root, prop)) {
             return { enumerable: true, configurable: true };
         }
         return undefined;

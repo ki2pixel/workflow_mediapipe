@@ -52,7 +52,7 @@ def test_reduce_video_json_raw_schema_extracts_fields_and_metadata():
 
     # Then: frames_analysis contains only AE-required fields + fps/total_frames
     assert reduced is not None
-    assert reduced.get("fps") == 25.0
+    assert reduced.get("fps") == pytest.approx(25.0)
     assert reduced.get("total_frames") == 2
 
     frames = reduced.get("frames_analysis")
@@ -63,10 +63,10 @@ def test_reduce_video_json_raw_schema_extracts_fields_and_metadata():
     assert isinstance(tracked, list) and len(tracked) == 1
     obj = tracked[0]
     assert obj.get("id") == "face_1"
-    assert obj.get("centroid_x") == 123.4
+    assert obj.get("centroid_x") == pytest.approx(123.4)
     assert obj.get("source") == "face_landmarker"
     assert obj.get("label") == "face"
-    assert obj.get("confidence") == 0.87
+    assert obj.get("confidence") == pytest.approx(0.87)
     assert obj.get("bbox_width") == 50
     assert obj.get("bbox_height") == 60
     assert obj.get("active_speakers") == ["spkA"]
@@ -111,7 +111,7 @@ def test_reduce_audio_json_keeps_minimal_fields_and_timecode():
 
     # Then: output keeps only expected audio fields and preserves timecode_sec
     assert reduced is not None
-    assert reduced.get("fps") == 25.0
+    assert reduced.get("fps") == pytest.approx(25.0)
     assert reduced.get("total_frames") == 1
 
     frames = reduced.get("frames_analysis")
@@ -290,7 +290,7 @@ def test_process_directory_enriches_reduced_tracking_from_legacy_when_needed(tmp
     tracked = frames[0].get("tracked_objects")
     assert isinstance(tracked, list) and len(tracked) == 1
     obj = tracked[0]
-    assert obj.get("confidence") == 0.91
+    assert obj.get("confidence") == pytest.approx(0.91)
     assert obj.get("bbox_width") == 10
     assert obj.get("bbox_height") == 20
     assert obj.get("active_speakers") == ["S1"]
@@ -336,8 +336,8 @@ def test_reduce_video_json_can_emit_expression_summary_when_enabled(monkeypatch)
     face_summary = objects.get("face_1")
     assert isinstance(face_summary, dict)
     assert face_summary.get("count") == 1
-    assert face_summary.get("mean") == {"jawOpen": 0.12, "mouthSmileLeft": 0.3}
-    assert face_summary.get("max") == {"jawOpen": 0.12, "mouthSmileLeft": 0.3}
+    assert face_summary.get("mean") == pytest.approx({"jawOpen": 0.12, "mouthSmileLeft": 0.3})
+    assert face_summary.get("max") == pytest.approx({"jawOpen": 0.12, "mouthSmileLeft": 0.3})
 
 
 def test_process_directory_without_audio_does_not_crash(tmp_path: Path):

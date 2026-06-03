@@ -388,7 +388,7 @@ def finalize_project(project_dir):
         return True
 
     except Exception as e:
-        logging.error(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}", exc_info=True)
+        logging.exception(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}")
         return False
 
 

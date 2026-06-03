@@ -148,7 +148,7 @@ def init_worker_process(models_dir, args_dict):
             )
             logging.info(f"[WORKER-{worker_pid}] Using object detector: {object_detector_model_name} at {object_model_path}")
         except (ValueError, FileNotFoundError) as e:
-            logging.error(f"[WORKER-{worker_pid}] Failed to resolve object detector model: {e}")
+            logging.exception(f"[WORKER-{worker_pid}] Failed to resolve object detector model: {e}")
             raise
 
         env_max_faces = _parse_optional_positive_int(args_dict.get('mediapipe_max_faces'))
@@ -178,7 +178,7 @@ def init_worker_process(models_dir, args_dict):
         logging.info(f"[WORKER-{worker_pid}] Initialization complete")
         
     except Exception as e:
-        logging.error(f"[WORKER-{worker_pid}] Initialization failed: {e}")
+        logging.exception(f"[WORKER-{worker_pid}] Initialization failed: {e}")
         landmarker_global = None
         object_detector_global = None
 
@@ -598,7 +598,7 @@ def process_video_multiprocessing(args, video_capture, total_frames):
                     logging.info(f"Multiprocessing: {completed_chunks}/{len(chunks)} chunks ({progress_percent:.1f}%) - {fps_rate:.1f} fps (chunk_size={chunk_size})")
                     
             except Exception as e:
-                logging.error(f"Chunk processing failed: {e}")
+                logging.exception(f"Chunk processing failed: {e}")
     
     logging.info("Multiprocessing complete.")
 
@@ -659,7 +659,7 @@ def main(args):
                 return False
                 
     except Exception as e:
-        logging.error(f"Error processing video {args.video_file_path}: {e}")
+        logging.exception(f"Error processing video {args.video_file_path}: {e}")
         raise
     
     logging.info("Processing complete. JSON output saved incrementally.")
@@ -698,5 +698,5 @@ if __name__ == "__main__":
         main(args)
         sys.exit(0)
     except Exception as e:
-        logging.error(f"Critical error in worker: {e}", exc_info=True)
+        logging.exception(f"Critical error in worker: {e}")
         sys.exit(1)

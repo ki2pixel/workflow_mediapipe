@@ -294,7 +294,7 @@ def detect_scenes_with_pytorch(video_path, model, device, threshold=0.5):
         return detected_scenes
 
     except Exception as e:
-        logging.error(f"Erreur lors de la détection de scènes pour {video_path.name}: {e}", exc_info=True)
+        logging.exception(f"Erreur lors de la détection de scènes pour {video_path.name}: {e}")
         return None
 
 
@@ -355,7 +355,7 @@ def main():
                 file_cfg = json.load(f)
             logging.info(f"Configuration chargée depuis: {config_path}")
         except Exception as e:
-            logging.error(f"Impossible de charger le fichier de configuration {config_path}: {e}")
+            logging.exception(f"Impossible de charger le fichier de configuration {config_path}: {e}")
 
     # Fusion des configurations
     effective_cfg = dict(defaults)
@@ -490,7 +490,7 @@ def _load_model_for_cfg(device, weights_path, use_torchscript=False):
         model.to(device)
     except RuntimeError as e:
         if "CUDA" in str(e):
-            logging.error(f"Erreur CUDA lors du chargement du modèle: {e}")
+            logging.exception(f"Erreur CUDA lors du chargement du modèle: {e}")
             logging.warning("Tentative de fallback sur CPU...")
             try:
                 # Fallback CPU
@@ -505,10 +505,10 @@ def _load_model_for_cfg(device, weights_path, use_torchscript=False):
                 logging.error(f"Échec du fallback CPU: {cpu_err}")
                 return None
         else:
-            logging.error(f"Erreur lors du chargement du modèle: {e}", exc_info=True)
+            logging.exception(f"Erreur lors du chargement du modèle: {e}")
             return None
     except Exception as e:
-        logging.error(f"Erreur inattendue lors du chargement du modèle: {e}", exc_info=True)
+        logging.exception(f"Erreur inattendue lors du chargement du modèle: {e}")
         return None
 
     if device.type == 'cuda':
@@ -659,7 +659,7 @@ def _process_single_video(idx, total, video_path_str, cfg, weights_path_str):
         logging.info(f"Succès: {output_csv_path.name} créé avec {len(scenes)} scènes.")
         return True
     except Exception as e:
-        logging.error(f"Erreur worker pour {video_path_str}: {e}", exc_info=True)
+        logging.exception(f"Erreur worker pour {video_path_str}: {e}")
         return False
 
 

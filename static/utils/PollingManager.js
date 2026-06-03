@@ -276,11 +276,11 @@ class PollingManager {
      * @private
      */
     _bindCleanupEvents() {
-        window.addEventListener('beforeunload', () => {
+        globalThis.addEventListener('beforeunload', () => {
             this.destroy();
         });
 
-        window.addEventListener('pagehide', () => {
+        globalThis.addEventListener('pagehide', () => {
             this.destroy();
         });
 
@@ -305,7 +305,7 @@ class PollingManager {
             }
         });
         
-        window.dispatchEvent(event);
+        globalThis.dispatchEvent(event);
     }
 }
 
@@ -315,4 +315,4 @@ const pollingManager = new PollingManager();
 // Export for use in other modules
 export { PollingManager, pollingManager };
 
-window.pollingManager = pollingManager;
+globalThis.pollingManager = pollingManager;

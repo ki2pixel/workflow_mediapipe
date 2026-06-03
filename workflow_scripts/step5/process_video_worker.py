@@ -5,6 +5,16 @@ import threading, queue, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+# Constants (Magic Strings)
+KEY_TRACKED_OBJECTS = "tracked_objects"
+KEY_OBJECT_DETECTOR = "object_detector"
+KEY_CONFIDENCE = "confidence"
+KEY_SOURCE_DETECTOR = "source_detector"
+KEY_BLENDSHAPES = "blendshapes"
+KEY_BBOX = "bbox"
+KEY_CENTROID = "centroid"
+
+
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 from utils.tracking_optimizations import apply_tracking_and_management
 from utils.resource_manager import safe_video_processing, get_video_metadata, resource_tracker
@@ -198,9 +208,9 @@ class FrameProcessor:
             )
             centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
             det = {
-                "bbox": bbox,
-                "centroid": centroid,
-                "source_detector": "face_landmarker",
+                KEY_BBOX: bbox,
+                KEY_CENTROID: centroid,
+                KEY_SOURCE_DETECTOR: "face_landmarker",
                 "label": "face"
             }
             if face_result.face_blendshapes:
@@ -216,9 +226,9 @@ class FrameProcessor:
                 with self.lock:
                     if should_update_blendshapes or object_id not in self._blendshapes_cache:
                         self._blendshapes_cache[object_id] = scaled_blendshapes
-                        det["blendshapes"] = scaled_blendshapes
+                        det[KEY_BLENDSHAPES] = scaled_blendshapes
                     else:
-                        det["blendshapes"] = self._blendshapes_cache.get(object_id)
+                        det[KEY_BLENDSHAPES] = self._blendshapes_cache.get(object_id)
             detections.append(det)
 
             if self._enable_profiling:
@@ -253,12 +263,12 @@ class FrameProcessor:
                     confidence = best_category.score if best_category else 0.0
 
                     det = {
-                        "bbox": (x_min, y_min, width, height),
-                        "centroid": centroid,
-                        "source_detector": "object_detector",
+                        KEY_BBOX: (x_min, y_min, width, height),
+                        KEY_CENTROID: centroid,
+                        KEY_SOURCE_DETECTOR: KEY_OBJECT_DETECTOR,
                         "label": label,
-                        "confidence": confidence,
-                        "blendshapes": None,
+                        KEY_CONFIDENCE: confidence,
+                        KEY_BLENDSHAPES: None,
                         "is_speaking": None
                     }
                     detections.append(det)
@@ -315,7 +325,7 @@ class FrameProcessor:
             }
 
         except Exception as e:
-            logging.error(f"Error processing frame {frame_idx + 1}: {e}")
+            logging.exception(f"Error processing frame {frame_idx + 1}: {e}")
             return {
                 'frame_idx': frame_idx,
                 'detections': [],
@@ -378,7 +388,7 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
                     print(f"[Progression]|{int(progress_percent)}|{frames_processed}|{total_frames}", flush=True)
                     logging.info(f"MT workers: {frames_processed}/{total_frames} ({progress_percent:.1f}%) - {fps_now:.1f} fps")
             except Exception as e:
-                logging.error(f"Frame {idx} processing failed: {e}")
+                logging.exception(f"Frame {idx} processing failed: {e}")
                 with results_lock:
                     results[idx] = {
                         'frame_idx': idx,
@@ -440,7 +450,7 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
         # Add to final output
         final_output.add_frame({
             "frame": frame_idx + 1,
-            "tracked_objects": tracked_for_frame if tracked_for_frame else []
+            KEY_TRACKED_OBJECTS: tracked_for_frame if tracked_for_frame else []
         })
 
     # Calculate final statistics
@@ -459,157 +469,205 @@ def process_video_multithreaded(args, video_capture, landmarker, object_detector
     return final_output
 
 
-def main(args):
-    """Traite une vidéo de manière séquentielle (un seul thread)."""
-    worker_type = "GPU" if args.use_gpu else "CPU"
-    logging.info(f"Démarrage du traitement séquentiel {worker_type} pour: {Path(args.video_file_path).name}")
-    logging.info(f"LD_LIBRARY_PATH (worker) = {os.environ.get('LD_LIBRARY_PATH', '')}")
-    logging.info(f"INSIGHTFACE_HOME (worker) = {os.environ.get('INSIGHTFACE_HOME', '')}")
+def _run_face_engine(args, face_engine, engine_name):
+    logging.info(f"Using face engine: {engine_name}")
+    try:
+        with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
+            fps = video_capture.get(cv2.CAP_PROP_FPS)
+            total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    engine_name = getattr(args, 'tracking_engine', None)
-    use_gpu_flag = bool(getattr(args, 'use_gpu', False))
-    face_engine = None
-    if engine_name:
-        try:
-            face_engine = create_face_engine(engine_name, use_gpu=use_gpu_flag)
-        except Exception as e:
-            logging.exception(f"Failed to initialize tracking engine '{engine_name}': {e}")
-            sys.exit(1)
-
-    final_output = None
-    total_frames = 0
-
-    if face_engine is not None:
-        logging.info(f"Using face engine: {engine_name}")
-        try:
-            with safe_video_processing(args.video_file_path) as (video_capture, temp_manager):
-                fps = video_capture.get(cv2.CAP_PROP_FPS)
-                total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-
-                object_detector = None
-                object_options = None
-                mp_module = None
-                ObjectDetector = None
-                object_detection_workers = max(1, int(getattr(args, 'mp_num_workers_internal', 1) or 1))
-                if args.use_gpu and getattr(args, 'enable_object_detection', False):
-                    logging.info(
-                        "Object detection fallback workers (GPU face engine mode): %s",
-                        object_detection_workers,
-                    )
-                if getattr(args, 'enable_object_detection', False):
-                    try:
-                        mp_module = _ensure_mediapipe_loaded(required=False)
-                        if mp_module is None:
-                            raise RuntimeError("mediapipe is not available (lazy import failed)")
-
-                        BaseOptions = mp_module.tasks.BaseOptions
-                        VisionRunningMode = mp_module.tasks.vision.RunningMode
-                        ObjectDetector = mp_module.tasks.vision.ObjectDetector
-                        ObjectDetectorOptions = mp_module.tasks.vision.ObjectDetectorOptions
-
-                        delegate = BaseOptions.Delegate.CPU
-                        models_dir = Path(args.models_dir)
-                        object_detector_model_name = (
-                            getattr(args, 'object_detector_model', None)
-                            or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2')
-                        )
-                        object_detector_model_path = (
-                            getattr(args, 'object_detector_model_path', None)
-                            or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
-                        )
-                        object_model_path = ObjectDetectorRegistry.resolve_model_path(
-                            model_name=object_detector_model_name,
-                            models_dir=models_dir,
-                            override_path=object_detector_model_path,
-                        )
-                        logging.info(
-                            f"Using object detector (face_engine mode): {object_detector_model_name} at {object_model_path}"
-                        )
-                        object_options = ObjectDetectorOptions(
-                            base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
-                            running_mode=VisionRunningMode.IMAGE,
-                            max_results=getattr(args, 'object_max_results', 5),
-                            score_threshold=getattr(args, 'object_score_threshold', 0.4),
-                        )
-                        object_detector = ObjectDetector.create_from_options(object_options)
-                        if object_detection_workers > 1:
-                            logging.info(
-                                "Object detection fallback: using one MediaPipe ObjectDetector instance per thread (IMAGE mode)."
-                            )
-                    except Exception as e:
-                        logging.warning(
-                            f"Failed to initialize object detector (face_engine mode); continuing without it: {e}"
-                        )
-                        object_detector = None
-                        object_options = None
-                        mp_module = None
-                        ObjectDetector = None
-
-                output_path = Path(args.video_file_path).with_suffix('.json')
-                final_output = StreamingJSONOutput(output_path, {
-                    "video_path": args.video_file_path,
-                    "total_frames": total_frames,
-                    "fps": fps,
-                    "tracking_engine": engine_name,
-                })
-
-                tracked_objects, next_id_counter = {}, {'value': 0}
-
-                resource_id = resource_tracker.register_resource(
-                    video_capture, 'video_capture', f"Processing {Path(args.video_file_path).name}"
+            object_detector = None
+            object_options = None
+            mp_module = None
+            ObjectDetector = None
+            object_detection_workers = max(1, int(getattr(args, 'mp_num_workers_internal', 1) or 1))
+            if args.use_gpu and getattr(args, 'enable_object_detection', False):
+                logging.info(
+                    "Object detection fallback workers (GPU face engine mode): %s",
+                    object_detection_workers,
                 )
-
+            if getattr(args, 'enable_object_detection', False):
                 try:
-                    enhanced_speaking_detector = None
-                    if getattr(args, 'speaking_detection_enabled', True):
+                    mp_module = _ensure_mediapipe_loaded(required=False)
+                    if mp_module is None:
+                        raise RuntimeError("mediapipe is not available (lazy import failed)")
+
+                    BaseOptions = mp_module.tasks.BaseOptions
+                    VisionRunningMode = mp_module.tasks.vision.RunningMode
+                    ObjectDetector = mp_module.tasks.vision.ObjectDetector
+                    ObjectDetectorOptions = mp_module.tasks.vision.ObjectDetectorOptions
+
+                    delegate = BaseOptions.Delegate.CPU
+                    models_dir = Path(args.models_dir)
+                    object_detector_model_name = (
+                        getattr(args, 'object_detector_model', None)
+                        or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2')
+                    )
+                    object_detector_model_path = (
+                        getattr(args, 'object_detector_model_path', None)
+                        or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+                    )
+                    object_model_path = ObjectDetectorRegistry.resolve_model_path(
+                        model_name=object_detector_model_name,
+                        models_dir=models_dir,
+                        override_path=object_detector_model_path,
+                    )
+                    logging.info(
+                        f"Using object detector (face_engine mode): {object_detector_model_name} at {object_model_path}"
+                    )
+                    object_options = ObjectDetectorOptions(
+                        base_options=BaseOptions(model_asset_path=str(object_model_path), delegate=delegate),
+                        running_mode=VisionRunningMode.IMAGE,
+                        max_results=getattr(args, 'object_max_results', 5),
+                        score_threshold=getattr(args, 'object_score_threshold', 0.4),
+                    )
+                    object_detector = ObjectDetector.create_from_options(object_options)
+                    if object_detection_workers > 1:
+                        logging.info(
+                            "Object detection fallback: using one MediaPipe ObjectDetector instance per thread (IMAGE mode)."
+                        )
+                except Exception as e:
+                    logging.warning(
+                        f"Failed to initialize object detector (face_engine mode); continuing without it: {e}"
+                    )
+                    object_detector = None
+                    object_options = None
+                    mp_module = None
+                    ObjectDetector = None
+
+            output_path = Path(args.video_file_path).with_suffix('.json')
+            final_output = StreamingJSONOutput(output_path, {
+                "video_path": args.video_file_path,
+                "total_frames": total_frames,
+                "fps": fps,
+                "tracking_engine": engine_name,
+            })
+
+            tracked_objects, next_id_counter = {}, {'value': 0}
+
+            resource_id = resource_tracker.register_resource(
+                video_capture, 'video_capture', f"Processing {Path(args.video_file_path).name}"
+            )
+
+            try:
+                enhanced_speaking_detector = None
+                if getattr(args, 'speaking_detection_enabled', True):
+                    try:
+                        enhanced_speaking_detector = EnhancedSpeakingDetector(
+                            video_path=args.video_file_path,
+                            jaw_threshold=args.speaking_detection_jaw_open_threshold,
+                        )
+                        logging.info("Enhanced speaking detection initialized successfully")
+                    except Exception as e:
+                        logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
+                        enhanced_speaking_detector = None
+
+                object_tasks = None
+                object_results = {}
+                object_results_lock = threading.Lock()
+                object_worker_threads = []
+
+                def _object_worker_loop(worker_id: int):
+                    thread_object_detector = None
+                    if object_options is not None and ObjectDetector is not None:
                         try:
-                            enhanced_speaking_detector = EnhancedSpeakingDetector(
-                                video_path=args.video_file_path,
-                                jaw_threshold=args.speaking_detection_jaw_open_threshold,
-                            )
-                            logging.info("Enhanced speaking detection initialized successfully")
+                            thread_object_detector = ObjectDetector.create_from_options(object_options)
                         except Exception as e:
-                            logging.warning(f"Failed to initialize enhanced speaking detector: {e}")
-                            enhanced_speaking_detector = None
-
-                    object_tasks = None
-                    object_results = {}
-                    object_results_lock = threading.Lock()
-                    object_worker_threads = []
-
-                    def _object_worker_loop(worker_id: int):
-                        thread_object_detector = None
-                        if object_options is not None and ObjectDetector is not None:
+                            logging.warning(
+                                "Object detection failed to initialize detector for worker %s (face_engine mode): %s",
+                                worker_id,
+                                e,
+                            )
+                            thread_object_detector = None
+                    while True:
+                        task = object_tasks.get() if object_tasks is not None else None
+                        if task is None:
                             try:
-                                thread_object_detector = ObjectDetector.create_from_options(object_options)
-                            except Exception as e:
-                                logging.warning(
-                                    "Object detection failed to initialize detector for worker %s (face_engine mode): %s",
-                                    worker_id,
-                                    e,
-                                )
-                                thread_object_detector = None
-                        while True:
-                            task = object_tasks.get() if object_tasks is not None else None
-                            if task is None:
-                                try:
-                                    if thread_object_detector is not None and hasattr(thread_object_detector, 'close'):
-                                        thread_object_detector.close()
-                                except Exception:
-                                    pass
-                                if object_tasks is not None:
-                                    object_tasks.task_done()
-                                break
-                            frame_local, frame_idx_local, timestamp_ms_local = task
+                                if thread_object_detector is not None and hasattr(thread_object_detector, 'close'):
+                                    thread_object_detector.close()
+                            except Exception:
+                                pass
+                            if object_tasks is not None:
+                                object_tasks.task_done()
+                            break
+                        frame_local, frame_idx_local, timestamp_ms_local = task
+                        try:
+                            if mp_module is None or thread_object_detector is None:
+                                raise RuntimeError("object detector is not available for object detection fallback")
+                            mp_image = mp_module.Image(
+                                image_format=mp_module.ImageFormat.SRGB,
+                                data=cv2.cvtColor(frame_local, cv2.COLOR_BGR2RGB)
+                            )
+                            object_result = thread_object_detector.detect(mp_image)
+                            detections_out = []
+                            if object_result.detections:
+                                for detection in object_result.detections:
+                                    bbox = detection.bounding_box
+                                    x_min = int(bbox.origin_x)
+                                    y_min = int(bbox.origin_y)
+                                    width = int(bbox.width)
+                                    height = int(bbox.height)
+                                    centroid = (x_min + width // 2, y_min + height // 2)
+                                    best_category = detection.categories[0] if detection.categories else None
+                                    label = best_category.category_name if best_category else "object"
+                                    confidence = best_category.score if best_category else 0.0
+                                    detections_out.append(
+                                        {
+                                            KEY_BBOX: (x_min, y_min, width, height),
+                                            KEY_CENTROID: centroid,
+                                            KEY_SOURCE_DETECTOR: KEY_OBJECT_DETECTOR,
+                                            "label": label,
+                                            KEY_CONFIDENCE: confidence,
+                                            KEY_BLENDSHAPES: None,
+                                            "is_speaking": None,
+                                        }
+                                    )
+                            with object_results_lock:
+                                object_results[frame_idx_local] = detections_out
+                        except Exception as e:
+                            logging.warning(
+                                f"Object detection failed for frame {frame_idx_local + 1} (face_engine mode): {e}"
+                            )
+                            with object_results_lock:
+                                object_results[frame_idx_local] = []
+                        finally:
+                            del frame_local
+                            object_tasks.task_done()
+
+                enable_object_fallback = bool(getattr(args, 'enable_object_detection', False))
+                enable_object_threads = bool(object_detector is not None and object_detection_workers > 1 and enable_object_fallback)
+                if enable_object_threads:
+                    object_tasks = queue.Queue(maxsize=max(1, object_detection_workers) * 2)
+                    for i in range(int(object_detection_workers)):
+                        t = threading.Thread(target=_object_worker_loop, args=(i,), daemon=True)
+                        object_worker_threads.append(t)
+                        t.start()
+
+                frame_idx = 0
+                frame_detections = {}
+                while video_capture.isOpened():
+                    ret, frame = video_capture.read()
+                    if not ret:
+                        break
+
+                    current_detections = face_engine.detect(frame)
+                    frame_idx += 1
+                    if frame_idx % 50 == 0:
+                        progress_percent = int((frame_idx / total_frames) * 90) if total_frames else 0
+                        print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
+
+                    if (not current_detections) and object_detector is not None and enable_object_fallback:
+                        if enable_object_threads and object_tasks is not None:
+                            object_tasks.put((frame, frame_idx - 1, None))
+                        else:
                             try:
-                                if mp_module is None or thread_object_detector is None:
-                                    raise RuntimeError("object detector is not available for object detection fallback")
+                                if mp_module is None:
+                                    raise RuntimeError("mediapipe is not available for object detection fallback")
                                 mp_image = mp_module.Image(
                                     image_format=mp_module.ImageFormat.SRGB,
-                                    data=cv2.cvtColor(frame_local, cv2.COLOR_BGR2RGB)
+                                    data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                                 )
-                                object_result = thread_object_detector.detect(mp_image)
-                                detections_out = []
+                                object_result = object_detector.detect(mp_image)
                                 if object_result.detections:
                                     for detection in object_result.detections:
                                         bbox = detection.bounding_box
@@ -621,164 +679,99 @@ def main(args):
                                         best_category = detection.categories[0] if detection.categories else None
                                         label = best_category.category_name if best_category else "object"
                                         confidence = best_category.score if best_category else 0.0
-                                        detections_out.append(
+                                        current_detections.append(
                                             {
-                                                "bbox": (x_min, y_min, width, height),
-                                                "centroid": centroid,
-                                                "source_detector": "object_detector",
+                                                KEY_BBOX: (x_min, y_min, width, height),
+                                                KEY_CENTROID: centroid,
+                                                KEY_SOURCE_DETECTOR: KEY_OBJECT_DETECTOR,
                                                 "label": label,
-                                                "confidence": confidence,
-                                                "blendshapes": None,
+                                                KEY_CONFIDENCE: confidence,
+                                                KEY_BLENDSHAPES: None,
                                                 "is_speaking": None,
                                             }
                                         )
-                                with object_results_lock:
-                                    object_results[frame_idx_local] = detections_out
                             except Exception as e:
                                 logging.warning(
-                                    f"Object detection failed for frame {frame_idx_local + 1} (face_engine mode): {e}"
+                                    f"Object detection failed for frame {frame_idx} (face_engine mode): {e}"
                                 )
-                                with object_results_lock:
-                                    object_results[frame_idx_local] = []
-                            finally:
-                                del frame_local
-                                object_tasks.task_done()
 
-                    enable_object_fallback = bool(getattr(args, 'enable_object_detection', False))
-                    enable_object_threads = bool(object_detector is not None and object_detection_workers > 1 and enable_object_fallback)
-                    if enable_object_threads:
-                        object_tasks = queue.Queue(maxsize=max(1, object_detection_workers) * 2)
-                        for i in range(int(object_detection_workers)):
-                            t = threading.Thread(target=_object_worker_loop, args=(i,), daemon=True)
-                            object_worker_threads.append(t)
-                            t.start()
+                    frame_detections[frame_idx - 1] = list(current_detections)
+                    del frame
 
-                    frame_idx = 0
-                    frame_detections = {}
-                    while video_capture.isOpened():
-                        ret, frame = video_capture.read()
-                        if not ret:
-                            break
+                if enable_object_threads and object_tasks is not None:
+                    object_tasks.join()
+                    for _ in object_worker_threads:
+                        object_tasks.put(None)
+                    object_tasks.join()
+                    for t in object_worker_threads:
+                        t.join(timeout=1)
 
-                        current_detections = face_engine.detect(frame)
-                        frame_idx += 1
-                        if frame_idx % 50 == 0:
-                            progress_percent = int((frame_idx / total_frames) * 90) if total_frames else 0
-                            print(f"[Progression]|{progress_percent}|{frame_idx}|{total_frames}", flush=True)
+                for frame_idx_out in range(total_frames):
+                    current_detections = frame_detections.get(frame_idx_out, [])
+                    if (not current_detections) and object_detector is not None and enable_object_fallback:
+                        with object_results_lock:
+                            current_detections = list(object_results.get(frame_idx_out, []))
 
-                        if (not current_detections) and object_detector is not None and enable_object_fallback:
-                            if enable_object_threads and object_tasks is not None:
-                                object_tasks.put((frame, frame_idx - 1, None))
-                            else:
-                                try:
-                                    if mp_module is None:
-                                        raise RuntimeError("mediapipe is not available for object detection fallback")
-                                    mp_image = mp_module.Image(
-                                        image_format=mp_module.ImageFormat.SRGB,
-                                        data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                                    )
-                                    object_result = object_detector.detect(mp_image)
-                                    if object_result.detections:
-                                        for detection in object_result.detections:
-                                            bbox = detection.bounding_box
-                                            x_min = int(bbox.origin_x)
-                                            y_min = int(bbox.origin_y)
-                                            width = int(bbox.width)
-                                            height = int(bbox.height)
-                                            centroid = (x_min + width // 2, y_min + height // 2)
-                                            best_category = detection.categories[0] if detection.categories else None
-                                            label = best_category.category_name if best_category else "object"
-                                            confidence = best_category.score if best_category else 0.0
-                                            current_detections.append(
-                                                {
-                                                    "bbox": (x_min, y_min, width, height),
-                                                    "centroid": centroid,
-                                                    "source_detector": "object_detector",
-                                                    "label": label,
-                                                    "confidence": confidence,
-                                                    "blendshapes": None,
-                                                    "is_speaking": None,
-                                                }
-                                            )
-                                except Exception as e:
-                                    logging.warning(
-                                        f"Object detection failed for frame {frame_idx} (face_engine mode): {e}"
-                                    )
+                    tracked_for_frame = apply_tracking_and_management(
+                        tracked_objects,
+                        current_detections,
+                        next_id_counter,
+                        args.mp_max_distance_tracking,
+                        args.mp_frames_unseen_deregister,
+                        args.speaking_detection_jaw_open_threshold,
+                        enhanced_speaking_detector=enhanced_speaking_detector,
+                        current_frame_num=frame_idx_out + 1,
+                    )
+                    final_output.add_frame(
+                        {
+                            "frame": frame_idx_out + 1,
+                            KEY_TRACKED_OBJECTS: tracked_for_frame if tracked_for_frame else [],
+                        }
+                    )
+                    if (frame_idx_out + 1) % 50 == 0:
+                        progress_percent = 90 + int(((frame_idx_out + 1) / total_frames) * 10) if total_frames else 100
+                        print(f"[Progression]|{progress_percent}|{frame_idx_out + 1}|{total_frames}", flush=True)
 
-                        frame_detections[frame_idx - 1] = list(current_detections)
-                        del frame
+                frame_idx = total_frames
 
-                    if enable_object_threads and object_tasks is not None:
-                        object_tasks.join()
-                        for _ in object_worker_threads:
-                            object_tasks.put(None)
-                        object_tasks.join()
-                        for t in object_worker_threads:
-                            t.join(timeout=1)
-
-                    for frame_idx_out in range(total_frames):
-                        current_detections = frame_detections.get(frame_idx_out, [])
-                        if (not current_detections) and object_detector is not None and enable_object_fallback:
-                            with object_results_lock:
-                                current_detections = list(object_results.get(frame_idx_out, []))
-
+                if total_frames and frame_idx < total_frames:
+                    for fill_idx in range(frame_idx, total_frames):
                         tracked_for_frame = apply_tracking_and_management(
                             tracked_objects,
-                            current_detections,
+                            [],
                             next_id_counter,
                             args.mp_max_distance_tracking,
                             args.mp_frames_unseen_deregister,
                             args.speaking_detection_jaw_open_threshold,
                             enhanced_speaking_detector=enhanced_speaking_detector,
-                            current_frame_num=frame_idx_out + 1,
+                            current_frame_num=fill_idx + 1,
                         )
                         final_output.add_frame(
                             {
-                                "frame": frame_idx_out + 1,
-                                "tracked_objects": tracked_for_frame if tracked_for_frame else [],
+                                "frame": fill_idx + 1,
+                                KEY_TRACKED_OBJECTS: tracked_for_frame if tracked_for_frame else [],
                             }
                         )
-                        if (frame_idx_out + 1) % 50 == 0:
-                            progress_percent = 90 + int(((frame_idx_out + 1) / total_frames) * 10) if total_frames else 100
-                            print(f"[Progression]|{progress_percent}|{frame_idx_out + 1}|{total_frames}", flush=True)
+            finally:
+                try:
+                    if object_detector is not None and hasattr(object_detector, 'close'):
+                        object_detector.close()
+                except Exception:
+                    pass
+                resource_tracker.unregister_resource(resource_id)
 
-                    frame_idx = total_frames
+    except Exception as e:
+        logging.exception(f"Error processing video {args.video_file_path} with OpenCV engine: {e}")
+        raise
 
-                    if total_frames and frame_idx < total_frames:
-                        for fill_idx in range(frame_idx, total_frames):
-                            tracked_for_frame = apply_tracking_and_management(
-                                tracked_objects,
-                                [],
-                                next_id_counter,
-                                args.mp_max_distance_tracking,
-                                args.mp_frames_unseen_deregister,
-                                args.speaking_detection_jaw_open_threshold,
-                                enhanced_speaking_detector=enhanced_speaking_detector,
-                                current_frame_num=fill_idx + 1,
-                            )
-                            final_output.add_frame(
-                                {
-                                    "frame": fill_idx + 1,
-                                    "tracked_objects": tracked_for_frame if tracked_for_frame else [],
-                                }
-                            )
-                finally:
-                    try:
-                        if object_detector is not None and hasattr(object_detector, 'close'):
-                            object_detector.close()
-                    except Exception:
-                        pass
-                    resource_tracker.unregister_resource(resource_id)
+    final_output.close()
+    logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
+    print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
+    return
 
-        except Exception as e:
-            logging.error(f"Error processing video {args.video_file_path} with OpenCV engine: {e}")
-            raise
 
-        final_output.close()
-        logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
-        print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
-        return
 
+def _run_mediapipe_engine(args):
     mp_module = _ensure_mediapipe_loaded(required=True)
     BaseOptions = mp_module.tasks.BaseOptions
     VisionRunningMode = mp_module.tasks.vision.RunningMode
@@ -809,7 +802,7 @@ def main(args):
         )
         logging.info(f"Using object detector: {object_detector_model_name} at {object_model_path}")
     except (ValueError, FileNotFoundError) as e:
-        logging.error(f"Failed to resolve object detector model: {e}")
+        logging.exception(f"Failed to resolve object detector model: {e}")
         sys.exit(1)
 
     face_options = FaceLandmarkerOptions(
@@ -923,13 +916,13 @@ def main(args):
                                     )
                                     centroid = (int(np.mean(x_coords)), int(np.mean(y_coords)))
                                     det = {
-                                        "bbox": bbox,
-                                        "centroid": centroid,
-                                        "source_detector": "face_landmarker",
+                                        KEY_BBOX: bbox,
+                                        KEY_CENTROID: centroid,
+                                        KEY_SOURCE_DETECTOR: "face_landmarker",
                                         "label": "face"
                                     }
                                     if face_result.face_blendshapes:
-                                        det["blendshapes"] = {
+                                        det[KEY_BLENDSHAPES] = {
                                             cat.category_name: cat.score
                                             for cat in face_result.face_blendshapes[i]
                                         }
@@ -966,12 +959,12 @@ def main(args):
                                             confidence = best_category.score if best_category else 0.0
 
                                             det = {
-                                                "bbox": (x_min, y_min, width, height),
-                                                "centroid": centroid,
-                                                "source_detector": "object_detector",
+                                                KEY_BBOX: (x_min, y_min, width, height),
+                                                KEY_CENTROID: centroid,
+                                                KEY_SOURCE_DETECTOR: KEY_OBJECT_DETECTOR,
                                                 "label": label,
-                                                "confidence": confidence,
-                                                "blendshapes": None,  # Not applicable for objects
+                                                KEY_CONFIDENCE: confidence,
+                                                KEY_BLENDSHAPES: None,  # Not applicable for objects
                                                 "is_speaking": None   # Not applicable for objects
                                             }
                                             current_detections.append(det)
@@ -990,7 +983,7 @@ def main(args):
                             # Even if no objects are tracked, we include the frame with empty tracked_objects
                             final_output["frames"].append({
                                 "frame": frame_idx + 1,
-                                "tracked_objects": tracked_for_frame if tracked_for_frame else []
+                                KEY_TRACKED_OBJECTS: tracked_for_frame if tracked_for_frame else []
                             })
 
                             frame_idx += 1
@@ -1012,7 +1005,7 @@ def main(args):
                 resource_tracker.unregister_resource(resource_id)
 
     except Exception as e:
-        logging.error(f"Error processing video {args.video_file_path}: {e}")
+        logging.exception(f"Error processing video {args.video_file_path}: {e}")
         raise
 
     # Save output with proper error handling
@@ -1023,8 +1016,37 @@ def main(args):
         logging.info(f"Traitement terminé. JSON sauvegardé: {output_path.name}")
         print(f"[Progression]|100|{total_frames}|{total_frames}", flush=True)
     except Exception as e:
-        logging.error(f"Failed to save output file {output_path}: {e}")
+        logging.exception(f"Failed to save output file {output_path}: {e}")
         raise
+
+
+
+
+def main(args):
+    """Traite une vidéo de manière séquentielle (un seul thread)."""
+    worker_type = "GPU" if args.use_gpu else "CPU"
+    logging.info(f"Démarrage du traitement séquentiel {worker_type} pour: {Path(args.video_file_path).name}")
+    logging.info(f"LD_LIBRARY_PATH (worker) = {os.environ.get('LD_LIBRARY_PATH', '')}")
+    logging.info(f"INSIGHTFACE_HOME (worker) = {os.environ.get('INSIGHTFACE_HOME', '')}")
+
+    engine_name = getattr(args, 'tracking_engine', None)
+    use_gpu_flag = bool(getattr(args, 'use_gpu', False))
+    face_engine = None
+    if engine_name:
+        try:
+            face_engine = create_face_engine(engine_name, use_gpu=use_gpu_flag)
+        except Exception as e:
+            logging.exception(f"Failed to initialize tracking engine '{engine_name}': {e}")
+            sys.exit(1)
+
+    final_output = None
+    total_frames = 0
+
+    if face_engine is not None:
+        logging.info(f"Using face engine: {engine_name}")
+        _run_face_engine(args, face_engine, engine_name)
+    else:
+        _run_mediapipe_engine(args)
 
 
 if __name__ == "__main__":
@@ -1060,5 +1082,5 @@ if __name__ == "__main__":
         main(args)
         sys.exit(0)
     except Exception as e:
-        logging.error(f"Erreur critique dans le worker: {e}", exc_info=True)
+        logging.exception(f"Erreur critique dans le worker: {e}")
         sys.exit(1)

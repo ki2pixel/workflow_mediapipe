@@ -16,6 +16,8 @@ import { openPopupUI, closePopupUI } from './popupManager.js';
 import { DOMDiff } from './utils/DOMDiff.js';
 import { workerManager } from './utils/WorkerManager.js';
 
+let _stepDetailsPanelModulePromise = null;
+
 const STATUS_UI_MAP = {
     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
     starting: { label: 'Préparation', badgeClass: 'status-running', chipClass: 'state-running', icon: '⚙️' },
@@ -122,7 +124,7 @@ function setStepTimer(stepKey, timerData, source = 'setStepTimer') {
 
 function deleteStepTimer(stepKey) {
     const timers = getStepTimers();
-    if (!timers || !Object.prototype.hasOwnProperty.call(timers, stepKey)) return;
+    if (!timers || !Object.hasOwn(timers, stepKey)) return;
     const { [stepKey]: _removed, ...remaining } = timers;
     appState.setState({ stepTimers: remaining }, 'deleteStepTimer');
 }

@@ -166,6 +166,7 @@ def _compute_speaker_embeddings_from_audio(
 
     tmp_dir_root = "/dev/shm" if os.path.isdir("/dev/shm") else None
     with tempfile.TemporaryDirectory(dir=tmp_dir_root) as tmp_dir:
+        os.chmod(tmp_dir, 0o700)
         wav_path = Path(tmp_dir) / f"{input_media.stem}_embeddings.wav"
         if not _extract_audio_ffmpeg(input_media, wav_path):
             return {}

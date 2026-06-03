@@ -137,7 +137,7 @@ def analyze_video(video_path: Path):
             'error': None
         }
     except Exception as e:
-        logging.error(f"Impossible d'analyser {video_path.name}: {e}")
+        logging.exception(f"Impossible d'analyser {video_path.name}: {e}")
         return {
             'path': video_path,
             'fps': None,

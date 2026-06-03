@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import math
 import os
 import sys
 from datetime import datetime
@@ -369,11 +370,11 @@ def _analyze_layer(
                 ) if best_audio_face else -1.0
                 if (audio_confirm > max_audio_face_confirm or
                    (audio_confirm == max_audio_face_confirm and presence_score > current_best_score) or
-                   (audio_confirm == max_audio_face_confirm and presence_score == current_best_score and float(obj["avg_bbox_surface"]) > max_audio_face_bbox)):
+                   (audio_confirm == max_audio_face_confirm and math.isclose(presence_score, current_best_score, abs_tol=1e-9) and float(obj["avg_bbox_surface"]) > max_audio_face_bbox)):
                     best_audio_face = obj
                     max_audio_face_confirm = audio_confirm
                     max_audio_face_bbox = float(obj["avg_bbox_surface"])
-            if presence_score > max_face_presence or (presence_score == max_face_presence and float(obj["avg_bbox_surface"]) > max_face_bbox):
+            if presence_score > max_face_presence or (math.isclose(presence_score, max_face_presence, abs_tol=1e-9) and float(obj["avg_bbox_surface"]) > max_face_bbox):
                 best_face = obj
                 max_face_presence = presence_score
                 max_face_bbox = float(obj["avg_bbox_surface"])

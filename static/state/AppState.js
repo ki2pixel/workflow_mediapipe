@@ -233,7 +233,7 @@ class AppState {
 
         const cloned = {};
         for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            if (Object.hasOwn(obj, key)) {
                 cloned[key] = this._deepClone(obj[key]);
             }
         }
@@ -244,7 +244,7 @@ class AppState {
         const result = this._deepClone(target);
         
         for (const key in source) {
-            if (source.hasOwnProperty(key)) {
+            if (Object.hasOwn(source, key)) {
                 if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
                     result[key] = this._mergeDeep(result[key] || {}, source[key]);
                 } else {
@@ -289,7 +289,7 @@ class AppState {
         }
 
         for (const key of aKeys) {
-            if (!Object.prototype.hasOwnProperty.call(b, key)) {
+            if (!Object.hasOwn(b, key)) {
                 return false;
             }
             if (!this._areValuesEqual(a[key], b[key], visited)) {
@@ -410,12 +410,12 @@ class AppState {
 
 export const appState = new AppState();
 
-window.addEventListener('beforeunload', () => {
+globalThis.addEventListener('beforeunload', () => {
     appState.destroy();
 });
 
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    window.appState = appState;
+if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
+    globalThis.appState = appState;
     
     appState.subscribe((newState, oldState, source) => {
         console.debug(`[AppState] Change from ${source}:`, {

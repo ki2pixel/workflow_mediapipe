@@ -331,7 +331,7 @@ function openExternalLink(download, { isFromSmash = false, isSwissTransfer = fal
         if (hiddenA && hiddenA.href) {
             hiddenA.click();
         } else {
-            window.open(safeUrl, '_blank', 'noopener');
+            globalThis.open(safeUrl, '_blank', 'noopener');
         }
 
         const provider = isFromSmash ? 'FromSmash' : (isSwissTransfer ? 'SwissTransfer' : 'externe');
@@ -365,7 +365,7 @@ function openSwissTransferLink(download) {
         if (hiddenA && hiddenA.href) {
             hiddenA.click();
         } else {
-            window.open(safeUrl, '_blank', 'noopener');
+            globalThis.open(safeUrl, '_blank', 'noopener');
         }
 
         showNotification("Ouverture du lien SwissTransfer dans un nouvel onglet...", 'success');

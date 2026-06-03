@@ -50,7 +50,7 @@ def measure_api(endpoint_name: str):
         return wrapper
     return decorator
 
-@api_bp.route('/system_monitor')
+@api_bp.route('/system_monitor', methods=['GET'])
 @measure_api('/api/system_monitor')
 def system_monitor():
     """
@@ -83,7 +83,7 @@ def system_monitor():
         return jsonify({"error": "Unable to retrieve system information"}), 500
 
 
-@api_bp.route('/system/diagnostics')
+@api_bp.route('/system/diagnostics', methods=['GET'])
 @measure_api('/api/system/diagnostics')
 def system_diagnostics():
     """
@@ -111,7 +111,7 @@ def system_diagnostics():
         return jsonify({"error": "Unable to retrieve diagnostics"}), 500
 
 
-@api_bp.route('/step_status/<step_key>')
+@api_bp.route('/step_status/<step_key>', methods=['GET'])
 @measure_api('/api/step_status')
 def step_status(step_key):
     """
@@ -148,7 +148,7 @@ def step_status(step_key):
         return jsonify({"error": "Unable to retrieve step status"}), 500
 
 
-@api_bp.route('/csv_monitor_status')
+@api_bp.route('/csv_monitor_status', methods=['GET'])
 @measure_api('/api/csv_monitor_status')
 def csv_monitor_status():
     """
@@ -207,7 +207,7 @@ def api_ping():
 
 
 
-@api_bp.route('/performance/metrics')
+@api_bp.route('/performance/metrics', methods=['GET'])
 @measure_api('/api/performance/metrics')
 def performance_metrics():
     """
@@ -260,7 +260,7 @@ def reset_performance_metrics():
         return jsonify({"error": "Unable to reset performance metrics"}), 500
 
 
-@api_bp.route('/cache/stats')
+@api_bp.route('/cache/stats', methods=['GET'])
 @measure_api('/api/cache/stats')
 def cache_stats():
     """
@@ -413,7 +413,7 @@ def clear_cache():
 
 
 
-@api_bp.route('/csv_downloads_status')
+@api_bp.route('/csv_downloads_status', methods=['GET'])
 def get_csv_downloads_status():
     """
     Get CSV downloads status.
@@ -461,7 +461,7 @@ def get_csv_downloads_status():
 
 
 
-@api_bp.route('/stats/dashboard')
+@api_bp.route('/stats/dashboard', methods=['GET'])
 @measure_api('/api/stats/dashboard')
 def stats_dashboard():
     """
@@ -496,7 +496,7 @@ def stats_dashboard():
         return jsonify({"error": "Unable to retrieve dashboard statistics"}), 500
 
 
-@api_bp.route('/stats/history')
+@api_bp.route('/stats/history', methods=['GET'])
 @measure_api('/api/stats/history')
 def stats_history():
     """

@@ -143,12 +143,12 @@ export async function cancelStepAPI(stepKey) {
 
     try {
         const cancelUrl = `/cancel/${stepKey}`;
-        const fullUrl = new URL(cancelUrl, window.location.origin).href;
+        const fullUrl = new URL(cancelUrl, globalThis.location.origin).href;
         console.log(`[CANCEL DEBUG] Attempting to cancel ${stepKey}:`);
         console.log(`  - Relative URL: ${cancelUrl}`);
         console.log(`  - Full URL: ${fullUrl}`);
-        console.log(`  - Current origin: ${window.location.origin}`);
-        console.log(`  - Current port: ${window.location.port}`);
+        console.log(`  - Current origin: ${globalThis.location.origin}`);
+        console.log(`  - Current port: ${globalThis.location.port}`);
 
         const cancelButton = document.querySelector(`.cancel-button[data-step="${stepKey}"]`);
         const data = await fetchWithLoadingState(cancelUrl, { method: 'POST' }, cancelButton);

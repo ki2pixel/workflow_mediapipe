@@ -323,7 +323,7 @@ class DOMUpdateUtils {
 export const domBatcher = new DOMUpdateBatcher();
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => {
+globalThis.addEventListener('beforeunload', () => {
     domBatcher.destroy();
 });
 
@@ -331,8 +331,8 @@ window.addEventListener('beforeunload', () => {
 export { DOMUpdateUtils };
 
 // Development helpers
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-window.domBatcher = domBatcher;
+if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
+globalThis.domBatcher = domBatcher;
     
     const originalFlush = domBatcher.flushUpdates;
     domBatcher.flushUpdates = function() {

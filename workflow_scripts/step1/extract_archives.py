@@ -53,7 +53,7 @@ def get_processed_archives():
         with open(PROCESSED_ARCHIVES_FILE, 'r', encoding='utf-8') as f:
             return {line.strip() for line in f if line.strip()}
     except Exception as e:
-        logging.error(f"Erreur lecture du fichier des archives traitées: {e}")
+        logging.exception(f"Erreur lecture du fichier des archives traitées: {e}")
         return set()
 
 
@@ -95,14 +95,14 @@ def reset_processed_archives_if_needed(now: datetime | None = None) -> bool:
                 shutil.copy2(PROCESSED_ARCHIVES_FILE, backup_name)
                 logging.info(f"Réinitialisation mensuelle: sauvegarde créée '{backup_name.name}'.")
             except Exception as e:
-                logging.error(f"Échec de sauvegarde avant réinitialisation: {e}")
+                logging.exception(f"Échec de sauvegarde avant réinitialisation: {e}")
 
             try:
                 with open(PROCESSED_ARCHIVES_FILE, 'w', encoding='utf-8'):
                     pass
                 logging.info("Réinitialisation mensuelle: fichier 'processed_archives.txt' vidé.")
             except Exception as e:
-                logging.error(f"Impossible de vider le fichier processed_archives.txt: {e}")
+                logging.exception(f"Impossible de vider le fichier processed_archives.txt: {e}")
         else:
             logging.info("Réinitialisation mensuelle: aucun contenu existant à sauvegarder.")
 
@@ -110,12 +110,12 @@ def reset_processed_archives_if_needed(now: datetime | None = None) -> bool:
             PROCESSED_ARCHIVES_RESET_MARKER.write_text(current_month, encoding='utf-8')
             logging.info(f"Marqueur de réinitialisation mis à jour pour le mois: {current_month}")
         except Exception as e:
-            logging.error(f"Impossible d'écrire le marqueur de réinitialisation: {e}")
+            logging.exception(f"Impossible d'écrire le marqueur de réinitialisation: {e}")
 
         return True
 
     except Exception as e:
-        logging.error(f"Erreur inattendue lors de la réinitialisation mensuelle: {e}")
+        logging.exception(f"Erreur inattendue lors de la réinitialisation mensuelle: {e}")
         return False
 
 
@@ -125,7 +125,7 @@ def mark_archive_as_processed(archive_path):
         with open(PROCESSED_ARCHIVES_FILE, 'a', encoding='utf-8') as f:
             f.write(f"{archive_path}\n")
     except Exception as e:
-        logging.error(f"Erreur d'écriture dans le fichier des archives traitées: {e}")
+        logging.exception(f"Erreur d'écriture dans le fichier des archives traitées: {e}")
 
 
 def get_project_folder_name(archive_filename_str):
@@ -247,13 +247,13 @@ def secure_extract_zip(zip_path, temp_extract_dir, sanitizer):
                     with zip_ref.open(member_info) as source, open(final_path, 'wb') as target:
                         shutil.copyfileobj(source, target)
                 except Exception as e:
-                    logging.error(f"Failed to extract ZIP member '{original_path}': {e}")
+                    logging.exception(f"Failed to extract ZIP member '{original_path}': {e}")
                     continue
 
         return True, security_issues_count
 
     except Exception as e:
-        logging.error(f"Error during secure ZIP extraction: {e}")
+        logging.exception(f"Error during secure ZIP extraction: {e}")
         return False, security_issues_count
 
 
@@ -300,13 +300,13 @@ def secure_extract_rar(rar_path, temp_extract_dir, sanitizer):
                     with rar_ref.open(member_info) as source, open(final_path, 'wb') as target:
                         shutil.copyfileobj(source, target)
                 except Exception as e:
-                    logging.error(f"Failed to extract RAR member '{original_path}': {e}")
+                    logging.exception(f"Failed to extract RAR member '{original_path}': {e}")
                     continue
 
         return True, security_issues_count
 
     except Exception as e:
-        logging.error(f"Error during secure RAR extraction: {e}")
+        logging.exception(f"Error during secure RAR extraction: {e}")
         return False, security_issues_count
 
 
@@ -359,13 +359,13 @@ def secure_extract_tar(tar_path, temp_extract_dir, sanitizer):
                         if source:  # extractfile can return None for some members
                             shutil.copyfileobj(source, target)
                 except Exception as e:
-                    logging.error(f"Failed to extract TAR member '{original_path}': {e}")
+                    logging.exception(f"Failed to extract TAR member '{original_path}': {e}")
                     continue
 
         return True, security_issues_count
 
     except Exception as e:
-        logging.error(f"Error during secure TAR extraction: {e}")
+        logging.exception(f"Error during secure TAR extraction: {e}")
         return False, security_issues_count
 
 
@@ -454,10 +454,10 @@ def extract_archive(archive_path, destination_base_dir):
         return True
 
     except (zipfile.BadZipFile, rarfile.BadRarFile, tarfile.ReadError) as e:
-        logging.error(f"Erreur: Fichier archive corrompu ou invalide - {archive_path.name}: {e}")
+        logging.exception(f"Erreur: Fichier archive corrompu ou invalide - {archive_path.name}: {e}")
         return False
     except Exception as e:
-        logging.error(f"Erreur inattendue lors de l'extraction de {archive_path.name}: {e}")
+        logging.exception(f"Erreur inattendue lors de l'extraction de {archive_path.name}: {e}")
         return False
     finally:
         # 5. Nettoyer le dossier temporaire
@@ -508,7 +508,7 @@ def main():
         else:
             logging.info("Aucune réinitialisation mensuelle nécessaire.")
     except Exception as e:
-        logging.error(f"Échec de la vérification de réinitialisation mensuelle: {e}")
+        logging.exception(f"Échec de la vérification de réinitialisation mensuelle: {e}")
 
     archives = find_archives_to_process(source_archives_dir)
     total_to_process = len(archives)
@@ -533,7 +533,7 @@ def main():
                     archive.unlink()
                     logging.info(f"Archive source '{archive.name}' supprimée avec succès.")
                 except Exception as e:
-                    logging.error(f"Impossible de supprimer l'archive source '{archive.name}': {e}")
+                    logging.exception(f"Impossible de supprimer l'archive source '{archive.name}': {e}")
         else:
             logging.error(f"L'extraction de '{archive.name}' a échoué. Voir les logs précédents.")
 
