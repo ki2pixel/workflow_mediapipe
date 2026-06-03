@@ -7,6 +7,8 @@
 ## Statut Actuel
 Aucune tâche active.
 
+- [2026-06-03 15:05:00] **Benchmarking et Optimisation VRAM STEP3 (COMPLET)** : Modification de `run_transnet.py` pour supporter un paramètre CLI `--batch_size`. Création et exécution du script `scratch/benchmark_step3.py` évaluant les performances selon diverses valeurs de batch_size, mixed_precision, torchscript, et ffmpeg_threads. Identification de la configuration optimale pour les GPU limités à 4 Go (`batch_size=8`, `mixed_precision=true`, `ffmpeg_threads=1`). Les résultats ont été validés par les tests existants et intégrés dans `docs/workflow/pipeline/03-scene-detection.md` et `config/step3_transnet.json`.
+
 - [2026-06-02 19:47:00] **Mise à Jour de la Documentation Technique (COMPLET)** : Alignement des guides du pipeline (`docs/workflow/pipeline/`) et de la sécurité (`docs/workflow/ops/security.md`) avec les optimisations récentes de l'architecture : architecture parallèle passe unique (STEP2), décodage asynchrone et batching O(1) RAM (STEP3), isolation GPU en sous-processus (STEP4), multiprocessing CPU O(1) RAM avec `cv2.setNumThreads(0)` (STEP5) et vérifications strictes via `validate_startup.py` (Production).
 
 - [2026-06-02 19:41:00] **Audit et Mise à Jour des Coding Standards (COMPLET)** : Mise à jour du fichier `.agents/rules/codingstandards.md` pour y refléter les récents changements d'architecture : multiprocessing CPU O(1) avec `cv2.setNumThreads(0)`, transcodage passe unique STEP2, isolation GPU CUDA STEP4 en sous-processus et sauvegardes de démarrage strictes pour la production.

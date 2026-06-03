@@ -128,8 +128,6 @@ def detect_scenes_with_pytorch(video_path, model, device, threshold=0.5):
         total_frames_read = 0
         frames_eof = False
 
-        BATCH_SIZE = 16  # Optimal pour GPU/CPU
-
         with torch.inference_mode():
             
             def get_more_frames(needed):
@@ -313,6 +311,7 @@ def main():
     parser.add_argument("--padding", type=int, default=None, help="Padding au début/fin (frames). Défaut: 25")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default=None, help="Sélection du device. Défaut: auto")
     parser.add_argument("--ffmpeg_threads", type=int, default=None, help="Nombre de threads FFmpeg (0 = auto)")
+    parser.add_argument("--batch_size", type=int, default=None, help="Taille de lot pour l'inférence. Défaut: 16")
     parser.add_argument("--mixed_precision", action="store_true", help="Active l'AMP (CUDA seulement)")
     parser.add_argument("--num_workers", type=int, default=None, help="Nombre de workers parallèles (1 par défaut, 1 forcé en CUDA)")
     parser.add_argument("--torchscript", action="store_true", help="Active TorchScript (expérimental)")
@@ -333,6 +332,7 @@ def main():
         "mixed_precision": False,
         "amp_dtype": "float16",
         "num_workers": 1,
+        "batch_size": 16,
         "torchscript": False,
         "warmup": True,
         "warmup_batches": 1,
@@ -374,6 +374,8 @@ def main():
         effective_cfg["device"] = args.device
     if args.ffmpeg_threads is not None:
         effective_cfg["ffmpeg_threads"] = int(args.ffmpeg_threads)
+    if args.batch_size is not None:
+        effective_cfg["batch_size"] = int(args.batch_size)
     # mixed_precision: le flag CLI l'active si présent, sinon on garde config/défaut
     if args.mixed_precision:
         effective_cfg["mixed_precision"] = True
@@ -389,10 +391,11 @@ def main():
         effective_cfg["torchscript_auto_fallback"] = True
 
     # Propager les hyperparamètres globaux (utilisés dans detect_scenes_with_pytorch)
-    global WINDOW_SIZE, WINDOW_STRIDE, PADDING_FRAMES, FFMPEG_THREADS, USE_AMP, AMP_DTYPE
+    global WINDOW_SIZE, WINDOW_STRIDE, PADDING_FRAMES, FFMPEG_THREADS, USE_AMP, AMP_DTYPE, BATCH_SIZE
     WINDOW_SIZE = int(effective_cfg["window"])
     WINDOW_STRIDE = int(effective_cfg["stride"])
     PADDING_FRAMES = int(effective_cfg["padding"])
+    BATCH_SIZE = int(effective_cfg["batch_size"])
     FFMPEG_THREADS = int(effective_cfg["ffmpeg_threads"]) if effective_cfg["ffmpeg_threads"] is not None else 0
     USE_AMP = bool(effective_cfg["mixed_precision"])
     # Convertir amp_dtype string en torch.dtype
@@ -406,7 +409,7 @@ def main():
         "CONFIG_EFFECTIVE: "
         f"threshold={effective_cfg['threshold']}, window={WINDOW_SIZE}, stride={WINDOW_STRIDE}, padding={PADDING_FRAMES}, "
         f"device={effective_cfg['device']}, ffmpeg_threads={FFMPEG_THREADS}, mixed_precision={USE_AMP}, amp_dtype={effective_cfg['amp_dtype']}, "
-        f"num_workers={effective_cfg['num_workers']}, torchscript={effective_cfg['torchscript']}, warmup={effective_cfg['warmup']}, warmup_batches={effective_cfg['warmup_batches']}, "
+        f"num_workers={effective_cfg['num_workers']}, batch_size={BATCH_SIZE}, torchscript={effective_cfg['torchscript']}, warmup={effective_cfg['warmup']}, warmup_batches={effective_cfg['warmup_batches']}, "
         f"torchscript_auto_fallback={effective_cfg['torchscript_auto_fallback']}"
     )
 
@@ -445,6 +448,11 @@ def main():
         with mp.Pool(processes=effective_cfg["num_workers"]) as pool:
             for i, ok in enumerate(pool.imap_unordered(_pool_worker_wrapper, tasks), start=1):
                 successful_count += 1 if ok else 0
+
+    if torch.cuda.is_available():
+        max_vram = torch.cuda.max_memory_allocated() / (1024 ** 2)
+        logging.info(f"MAX_VRAM_MB: {max_vram:.2f}")
+        print(f"MAX_VRAM_MB: {max_vram:.2f}")
 
     logging.info(f"--- Analyse terminée. {successful_count}/{total_videos} réussie(s). ---")
     if successful_count < total_videos:
@@ -546,10 +554,11 @@ def _process_single_video(idx, total, video_path_str, cfg, weights_path_str):
     try:
         video_path = Path(video_path_str)
         # Propager globals dans le worker
-        global WINDOW_SIZE, WINDOW_STRIDE, PADDING_FRAMES, FFMPEG_THREADS, USE_AMP, AMP_DTYPE
+        global WINDOW_SIZE, WINDOW_STRIDE, PADDING_FRAMES, FFMPEG_THREADS, USE_AMP, AMP_DTYPE, BATCH_SIZE
         WINDOW_SIZE = int(cfg["window"])
         WINDOW_STRIDE = int(cfg["stride"])
         PADDING_FRAMES = int(cfg["padding"])
+        BATCH_SIZE = int(cfg["batch_size"])
         FFMPEG_THREADS = int(cfg["ffmpeg_threads"]) if cfg["ffmpeg_threads"] is not None else 0
         USE_AMP = bool(cfg["mixed_precision"])
         AMP_DTYPE = torch.bfloat16 if cfg.get("amp_dtype") == "bfloat16" else torch.float16

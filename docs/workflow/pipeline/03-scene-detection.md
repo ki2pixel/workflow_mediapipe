@@ -102,7 +102,7 @@ STEP3_PADDING=25
 
 # Device et performance
 STEP3_DEVICE=auto           # auto, cuda, cpu
-STEP3_BATCH_SIZE=1          # GPU: 1 worker max
+STEP3_BATCH_SIZE=8          # GPU: 8 pour VRAM 4Go
 STEP3_NUM_WORKERS=1        # Multi-vidéos (CPU only)
 
 # Optimisations PyTorch
@@ -120,8 +120,8 @@ STEP3_TORCHSCRIPT=true
   "stride": 50,
   "padding": 25,
   "device": "auto",
-  "batch_size": 1,
-  "ffmpeg_threads": 4,
+  "batch_size": 8,
+  "ffmpeg_threads": 1,
   "mixed_precision": true,
   "amp_dtype": "float16",
   "num_workers": 1,
@@ -142,7 +142,7 @@ STEP3_TORCHSCRIPT=true
   "stride": 50,
   "padding": 25,
   "device": "auto",
-  "batch_size": 1
+  "batch_size": 8
 }
 ```
 
@@ -192,6 +192,18 @@ No,Timecode In,Timecode Out,Frame In,Frame Out
 | **GPU CUDA** | 5-10× plus rapide | 2-4GB | OOM sur vidéos longues | Production, GPU disponible |
 | **CPU** | Lent mais stable | 0GB | Timeout sur longues vidéos | Développement, laptop |
 | **Hybrid** | Auto-fallback | Variable | Complexité configuration | Environnements mixtes |
+
+## Benchmarks d'Optimisation VRAM (GPU 4 Go)
+
+Afin d'évaluer de manière réaliste les optimisations sur un volume complet de production (6 vidéos), une campagne de benchmarking a été réalisée. 
+
+| Batch | AMP | TorchScript | FFmpeg | Time (s) | Max VRAM (MB) | Statut |
+|-------|-----|-------------|--------|----------|---------------|--------|
+| 16    | False| False       | 0      | 135.06   | 2719.53       | OK     |
+| 16    | True | False       | 1      | 137.55   | 2720.59       | OK     |
+| 8     | True | False       | 1      | 90.42    | 1673.23       | OK     |
+
+**Conclusion** : Par rapport à un temps de traitement historique d'environ 4 minutes sur ces 6 vidéos, la configuration optimale (`batch_size=8`, `mixed_precision=true`, `ffmpeg_threads=1`) abat le travail en **1m 30s** (gain de ~62%), tout en utilisant seulement **1.6 Go de VRAM** au lieu de 2.7 Go pour le lot de 16, la rendant extrêmement robuste pour les configurations à mémoire restreinte (4 Go).
 
 ## Analogie : Monteur Cinéma
 
