@@ -5,6 +5,7 @@ from config.settings import config
 
 
 def test_step4_command_uses_original_script_when_toggle_disabled(monkeypatch):
+    monkeypatch.setattr(config, "STEP4_METHOD", "", raising=False)
     monkeypatch.setattr(config, "STEP4_USE_LEMONFOX", False)
     cfg = WorkflowCommandsConfig()
     step4 = cfg.get_step_config("STEP4")
@@ -14,6 +15,7 @@ def test_step4_command_uses_original_script_when_toggle_disabled(monkeypatch):
 
 
 def test_step4_command_uses_lemonfox_wrapper_when_toggle_enabled(monkeypatch):
+    monkeypatch.setattr(config, "STEP4_METHOD", "", raising=False)
     monkeypatch.setattr(config, "STEP4_USE_LEMONFOX", True)
     cfg = WorkflowCommandsConfig()
     step4 = cfg.get_step_config("STEP4")

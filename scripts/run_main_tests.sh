@@ -15,8 +15,14 @@ export DRY_RUN_DOWNLOADS=true
 EXCLUDE_TESTS=(
     "tests/unit/test_step3_transnet.py"
     "tests/unit/test_step5_export_verbose_fields.py"
+    "tests/unit/test_step5_face_engines.py"
+    "tests/unit/test_step5_gpu_logs.py"
+    "tests/unit/test_step5_gpu_support.py"
+    "tests/unit/test_step5_insightface_engine.py"
+    "tests/unit/test_step5_insightface_gpu_only.py"
     "tests/unit/test_step5_yunet_pyfeat_optimizations.py"
     "tests/unit/test_tracking_optimizations_blendshapes_filter.py"
+    "tests/integration/test_step5_json_formats.py"
 )
 
 # Construire la commande pytest avec les exclusions

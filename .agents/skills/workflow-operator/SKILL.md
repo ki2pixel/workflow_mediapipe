@@ -15,11 +15,11 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 | :--- | :--- | :--- | :--- |
 | **STEP 1** (Extract) | `step1/` | `env/` | `FilesystemService` |
 | **STEP 2** (Convert) | `step2/` | `env/` | `ffmpeg` (via subprocess) |
-| **STEP 3** (TransNet) | `step3/` | `transnet_env/` | `WorkflowService` |
+| **STEP 3** (TransNet) | `step3/` | `transnet_env/` | `WorkflowService` (Async I/O, GPU Batch Inference) |
 | **STEP 4** (Audio) | `step4/` | `audio_env/` | `LemonfoxAudioService` |
 | **STEP 5** (Tracking) | `step5/` | `tracking_env_slim/` (CPU) / `insightface_env/` (GPU) | `InsightFaceEngine (GPU-only) + factory` |
-| **STEP 6** (Reducer) | `step6/` | `env/` | N/A |
-| **STEP 7** (AE Preprocess) | `step7/` | `env/` | N/A |
+| **STEP 6** (Reducer) | `step6/` | `env/` | Streaming `ijson` (RAM O(1)) via `json_reducer.py` |
+| **STEP 7** (AE Preprocess) | `step7/` | `env/` | Streaming `ijson` (RAM O(1)) via `preprocess_ae_json.py` |
 | **STEP 8** (Finalize) | `step8/` | `env/` | `ResultsArchiver` |
 
 **Chemins des Venvs (interpréteurs montés sous `/mnt/venv_ext4`) :**
@@ -123,7 +123,7 @@ Pour diagnostiquer un état incohérent :
 ## 4. Frontend & UX Rappels (Standards §3)
 
 Si vous intervenez sur l'interface ou devez valider un comportement UI :
-- **DOM** : Les mises à jour doivent passer par `DOMBatcher.scheduleUpdate()`. Jamais d'insertion directe `innerHTML` sans échappement.
+- **DOM** : Les mises à jour doivent passer par `DOMBatcher.scheduleUpdate()`. Jamais d'insertion directe `innerHTML` sans échappement. Le JS respecte la norme ES11 (complexité cognitive réduite).
 - **Sécurité** : Toujours échapper avec `DOMUpdateUtils.escapeHtml()` avant toute insertion dynamique (Anti-XSS).
 - **Polling** : Utiliser le `PollingManager` centralisé (backoff adaptatif) pour les requêtes périodiques.
 - **Composants** : 

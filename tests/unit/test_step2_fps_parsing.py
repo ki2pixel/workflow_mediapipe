@@ -19,6 +19,7 @@ def test_parse_ffprobe_fps_prefers_counts_over_nominal_rates():
     payload = {
         "streams": [
             {
+                "codec_type": "video",
                 "avg_frame_rate": "25/1",
                 "r_frame_rate": "25/1",
                 "nb_frames": "2318",
@@ -33,17 +34,18 @@ def test_parse_ffprobe_fps_prefers_counts_over_nominal_rates():
 
 def test_parse_ffprobe_fps_falls_back_to_avg_rate():
     module = _load_convert_videos_module()
-    payload = {"streams": [{"avg_frame_rate": "25/1", "r_frame_rate": "50/1"}]}
+    payload = {"streams": [{"codec_type": "video", "avg_frame_rate": "25/1", "r_frame_rate": "50/1"}]}
     fps = module._parse_ffprobe_fps(payload)
     assert fps == 25.0
 
 
-def test_get_video_framerate_uses_ffprobe_json(monkeypatch, tmp_path):
+def test_analyze_video_uses_ffprobe_json(monkeypatch, tmp_path):
     module = _load_convert_videos_module()
 
     fake_payload = {
         "streams": [
             {
+                "codec_type": "video",
                 "avg_frame_rate": "0/0",
                 "r_frame_rate": "25/1",
                 "nb_frames": "2318",
@@ -60,6 +62,8 @@ def test_get_video_framerate_uses_ffprobe_json(monkeypatch, tmp_path):
     video_path = tmp_path / "video.mp4"
     video_path.write_bytes(b"")
 
-    fps = module.get_video_framerate(video_path)
+    info = module.analyze_video(video_path)
+    assert info is not None
+    fps = info["fps"]
     assert fps is not None
     assert 12.6 < fps < 12.8

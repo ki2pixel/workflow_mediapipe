@@ -47,29 +47,31 @@ def test_step5_workers_load(workers_count):
 tests/
 ├── unit/                    # Services isolés
 │   ├── test_workflow_service.py
-│   ├── test_csv_service.py
-│   ├── test_step5_mp_seek_warmup.py
+│   ├── test_csv_service_url_normalization.py
+│   ├── test_step5_insightface_engine.py
 │   └── test_lemonfox_audio_service.py
 ├── integration/               # Workflows complets
 │   ├── test_workflow_integration.py
 │   ├── test_download_integration.py
-│   └── test_lemonfox_wrapper.py
+│   ├── test_lemonfox_api_endpoint.py
+│   └── test_deepinfra_api_endpoint.py
 ├── frontend/                  # Frontend ESM/Node
 │   ├── test_dom_batcher_performance.mjs
 │   ├── test_focus_trap.mjs
 │   └── test_log_safety.mjs
-└── validation/               # Validation configuration
-│   ├── test_mysql_credentials.py
-│   └── test_config_settings.py
+└── legacy/                    # Intégrations MySQL dépréciées
+    ├── test_mysql_service.py
+    ├── test_mysql_validation.py
+    └── test_mysql_integration.py
 ```
 
 ## Tests Prioritaires (Basé sur Radon Analysis)
 
 ### STEP5 Workers (Score F)
 
-**Complexité critique** : `process_video_worker.py` et `run_tracking_manager.py`
+**Complexité critique**: `process_video_worker.py` et `run_tracking_manager.py`
 
-**Tests requis** :
+**Tests requis**:
 - Tests de charge avec workers multiples
 - Tests de timeout et recovery
 - Tests GPU/CPU fallback
@@ -77,12 +79,12 @@ tests/
 - Tests de concurrence multi-threading
 
 ```python
-# tests/unit/test_step5_mp_seek_warmup.py
-def test_step5_mp_seek_warmup():
-    """Test de non-régression vérifiant le warmup OpenCV."""
-    # Vérifie que read() est appelé avant set(CAP_PROP_POS_FRAMES)
-    # Test avec multiprocessing
-    # Validation du warmup OpenCV
+# tests/unit/test_step5_gpu_support.py
+def test_insightface_requires_gpu_flag():
+    """Vérifie que l'initialisation du moteur InsightFace requiert le flag GPU."""
+    # Instanciation de l'Engine Factory
+    # Validation du comportement sans support CUDA
+    # Levée d'exception attendue
 ```
 
 ### CSV Service (Score F)
@@ -156,12 +158,12 @@ def test_workflow_integration():
 ### Tests STEP5 Spécifiques
 
 ```python
-# tests/unit/test_step5_mp_seek_warmup.py
-def test_step5_mp_seek_warmup():
-    """Test de non-régression warmup OpenCV."""
-    # Vérifie que read() est appelé avant set(CAP_PROP_POS_FRAMES)
-    # Test avec multiprocessing
-    # Validation du warmup OpenCV
+# tests/unit/test_step5_face_engines.py
+def test_create_face_engine_insightface_requires_gpu_flag():
+    """Vérifie que l'initialisation d'InsightFace requiert explicitement le flag GPU."""
+    # Test de la factory face engine
+    # Appels avec et sans GPU
+    # Validation de l'isolation du runtime ONNX
 ```
 
 ## Tests Frontend (ESM/Node)
@@ -256,11 +258,11 @@ pytest --benchmark tests/unit/test_step5_performance.py
 ### Scripts Spécifiques
 
 ```bash
-# Tests STEP5 workers
-python -m pytest tests/unit/test_step5_mp_seek_warmup.py -v
+# Tests STEP5
+python -m pytest tests/unit/test_step5_face_engines.py -v
 
 # Tests CSV service
-python -m pytest tests/unit/test_csv_service.py -v
+python -m pytest tests/unit/test_csv_service_url_normalization.py -v
 
 # Tests Lemonfox
 python -m pytest tests/unit/test_lemonfox_audio_service.py -v
@@ -270,9 +272,9 @@ python -m pytest tests/unit/test_lemonfox_audio_service.py -v
 
 ### Métriques Récentes
 
-- **Total tests** : 173
-- **Passants** : 154 (89%)
-- **Nouveaux tests** : 122 (100% ✅)
+- **Total tests**: 380
+- **Passants**: 350+ (93%+)
+- **Nouveaux tests**: 120+ (100% ✅)
 
 ### Optimisations Tests
 
@@ -289,12 +291,12 @@ addopts = -v --tb=short
 ### Tests de Charge
 
 ```python
-# Tests STEP5 workers avec charge
-def test_step5_workers_load():
-    """Test performance avec workers multiples."""
-    # Simulation de charge avec 15 workers
-    # Validation de la gestion mémoire
-    # Mesure les temps de réponse
+# tests/integration/test_workflow_integration.py
+def test_step5_concurrency_and_workers():
+    """Valide la concurrence des workers STEP5."""
+    # Simulation de charge avec configurations de workers dynamiques
+    # Monitoring de l'occupation CPU/VRAM
+    # Validation de la robustesse sous charge
 ```
 
 ## Bonnes Pratiques

@@ -23,7 +23,7 @@ description: Operate and refine the unified Logs Overlay (Phases 2-4). Use when 
 2. **Styles** : utiliser variables `--panel-bg`, `--motion-duration-*`. Mobile friendly (`max-width: 640px`, `height: min(90vh, 720px)`).
 3. **State** : `AppState.setState({ logPanel: { isOpen: true, source: 'auto' } })`. Pas de mutation directe.
 4. **Focus** : `popupManager` gère focus trap/restauration. Ajouter nouveaux éléments aux hooks existants.
-5. **Sécurité & DOM** : Toujours utiliser `DOMUpdateUtils.escapeHtml()` avant d'insérer du contenu dans l'overlay. Jamais d'`innerHTML` direct.
+5. **Sécurité & DOM** : Toujours utiliser `DOMUpdateUtils.escapeHtml()` avant d'insérer du contenu dans l'overlay. Jamais d'`innerHTML` direct. Le code doit respecter les standards ES11 (complexité réduite, résorption SonarCloud).
 6. **Polling** : Les requêtes périodiques liées aux logs doivent passer par `PollingManager` exclusivement. Le remote polling est interdit.
 7. **Auto-open toggle** : stocker dans `localStorage` (`AUTO_OPEN_LOGS_PREF`). `Settings` checkbox synchronisée via `eventHandlers.js` + `uiUpdater.js`.
 8. **Tests** : `npm run test:frontend` doit réussir (`test_timeline_logs_phase2.mjs` vérifie header/boutons/auto-open).

@@ -7,7 +7,10 @@ description: Maintain and execute the backend/frontend test suites with environm
 
 ## Portée
 - Backends : `pytest`, scripts `run_step3_tests.sh`, `run_step5_tests.sh`, `run_main_tests.sh`, `run_step7_tests.sh`, `run_step8_tests.sh`.
-- Frontend : `npm run test:frontend` (Node/ESM tests : DOMBatcher, logs overlay, focus trap).
+  - `tests/unit/` : Services isolés (Mocks `conftest.py` standardisés).
+  - `tests/integration/` : Routes + `PerformanceService`.
+  - `tests/legacy/` : Composants dépréciés (ex: `MySQLService`, anciens tests `CSVService`). Les imports historiques pointent vers `services.deprecated.mysql_service`.
+  - `tests/frontend/` : Node/ESM pour DOMBatcher/Utils (respect strict de la norme JS ES11).
 - Guides : `tests/fixtures`, `conftest.py`, `diagnose_tests.sh`, `fix_backend_tests.sh`, `validate_tests.sh`.
 - Ressource annexe : `resources/test_execution_matrix.md` (qui résume commandes, environnements, prérequis, checklist pré-run).
 - Nouveautés STEP7/8 : 28 tests WorkflowCommandsConfig + 2 tests finalisation STEP8 intégrés à la suite principale.

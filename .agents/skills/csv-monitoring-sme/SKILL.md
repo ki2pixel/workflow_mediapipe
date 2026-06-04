@@ -5,6 +5,9 @@ description: Manage CSVService monitoring, download_history SQLite, and Dropbox-
 
 # CSV Monitoring SME
 
+> [!NOTE]
+> **MySQL Déprécié (Legacy)** : MySQL n'est plus utilisé pour le suivi. Toute la logique opérationnelle s'appuie désormais strictement sur SQLite (`download_history.sqlite3`).
+
 ## Préparation
 1. Lire `.env` : `DOWNLOAD_HISTORY_DB_PATH`, `DRY_RUN_DOWNLOADS`, `CSV_MONITORING_INTERVAL`, URLs webhook.
 2. Vérifier la présence de `download_history.sqlite3` et des scripts `scripts/migrate_download_history_to_sqlite.py`.

@@ -15,10 +15,11 @@ description: Checklists and scripts to validate env vars, venv availability, and
 ## Procédure Complète
 1. **Sanity `.env`**
    - Charger via `python3 config/settings.py --print` (si script dispo) ou `python - <<'PY'` pour inspecter `config.settings.config`.
-   - Contrôler : chemins cache, flags `DRY_RUN_DOWNLOADS`, `STEP5_ENABLE_GPU`, `AUDIO_PROFILE`, URLs webhook. (Note: les variables Vultr et Lightning doivent être supprimées).
+   - Contrôler : chemins cache, flags `DRY_RUN_DOWNLOADS`, `STEP5_ENABLE_GPU`, `AUDIO_PROFILE`, URLs webhook. (Note: les variables Vultr et Lightning doivent être supprimées). Vérifier la configuration de taille de batch pour la STEP3 GPU si applicable.
 2. **Venv Readiness**
    - `ls env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env_slim/bin/python insightface_env/bin/python`.
    - `python -V` dans chaque venv (ex: `env/bin/python -V`).
+   - Vérifier la présence de `ijson` dans l'environnement de base (`env/`) pour garantir l'exécution de STEP6/7 en O(1) RAM.
    - Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
 3. **Hardware & Drivers**
    - `nvidia-smi` (GPU dispo, driver version ≥ 515).

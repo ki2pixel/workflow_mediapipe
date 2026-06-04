@@ -7,18 +7,20 @@ from types import ModuleType
 
 def setup_tmp_base(tmp_path):
     os.environ['BASE_PATH_SCRIPTS_ENV'] = str(tmp_path)
-    # Clean module cache for a fresh config and service import
-    for mod in ['config.settings', 'services.csv_service']:
+    # Clean module cache for a fresh config, repo, and service import
+    for mod in ['config.settings', 'services.download_history_repository', 'services.csv_service']:
         if mod in sys.modules:
             del sys.modules[mod]
     settings = importlib.import_module('config.settings')
     importlib.reload(settings)
+    repo = importlib.import_module('services.download_history_repository')
+    importlib.reload(repo)
     csv_service = importlib.import_module('services.csv_service')
     importlib.reload(csv_service)
     return settings, csv_service
 
 
-def test_monitor_does_not_retrigger_for_normalized_duplicate(tmp_path):
+def test_monitor_does_not_retrigger_for_normalized_duplicate(tmp_path, monkeypatch):
     settings, csv_service = setup_tmp_base(tmp_path)
 
     canonical = 'https://www.dropbox.com/scl/fo/tokenABC/Folder?dl=1&rlkey=KEY'
@@ -43,6 +45,9 @@ def test_monitor_does_not_retrigger_for_normalized_duplicate(tmp_path):
     dummy.execute_csv_download_worker = execute_csv_download_worker
     dummy.fetch_csv_data = fetch_csv_data
     sys.modules['app_new'] = dummy
+
+    # Mock Webhook fetch records to prevent real network requests
+    monkeypatch.setattr(csv_service, "webhook_fetch_records", fetch_csv_data)
 
     try:
         # Sanity: history contains exactly one URL (normalized by service on read)

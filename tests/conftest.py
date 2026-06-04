@@ -3,6 +3,17 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock
 import pytest
+from dotenv import load_dotenv
+
+# Ensure project root is on sys.path for 'config' and 'services' imports
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Load .env file at the very beginning to ensure config and tests use correct environments
+_env_path = PROJECT_ROOT / '.env'
+if _env_path.exists():
+    load_dotenv(_env_path)
 
 
 def pytest_addoption(parser):
@@ -12,12 +23,6 @@ def pytest_addoption(parser):
         default=None,
         help="Path to a STEP5 worker GPU log to validate (optional).",
     )
-
-
-# Ensure project root is on sys.path for 'config' and 'services' imports
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def pytest_sessionstart(session):

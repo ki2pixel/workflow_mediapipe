@@ -351,7 +351,7 @@ def stream_reduce_video_json(
     frames_count = 0
     
     with open(input_path, 'rb') as f_in, open(tmp_path, 'w', encoding='utf-8') as f_out:
-        f_out.write('{\n  KEY_FRAMES_ANALYSIS: [\n')
+        f_out.write(f'{{\n  "{KEY_FRAMES_ANALYSIS}": [\n')
         
         items = ijson.items(f_in, f"{array_key}.item", use_float=True)
         first = True
@@ -396,9 +396,9 @@ def stream_reduce_video_json(
             total_frames = max_frame_seen
             
         if fps is not None:
-            f_out.write(f',\n  KEY_FPS: {fps}')
+            f_out.write(f',\n  "{KEY_FPS}": {fps}')
         if total_frames is not None:
-            f_out.write(f',\n  KEY_TOTAL_FRAMES: {total_frames}')
+            f_out.write(f',\n  "{KEY_TOTAL_FRAMES}": {total_frames}')
             
         if expression_summary_enabled and expression_stats:
             summary_objects = {}
@@ -563,7 +563,7 @@ def stream_reduce_audio_json(input_path: Path, output_path: Path) -> Optional[Di
     except Exception: pass
     
     with open(input_path, 'rb') as f_in, open(tmp_path, 'w', encoding='utf-8') as f_out:
-        f_out.write('{\n  KEY_FRAMES_ANALYSIS: [\n')
+        f_out.write(f'{{\n  "{KEY_FRAMES_ANALYSIS}": [\n')
         
         items = ijson.items(f_in, f"{array_key}.item", use_float=True)
         first = True
@@ -600,9 +600,9 @@ def stream_reduce_audio_json(input_path: Path, output_path: Path) -> Optional[Di
             total_frames = max_frame_seen
             
         if fps is not None:
-            f_out.write(f',\n  KEY_FPS: {fps}')
+            f_out.write(f',\n  "{KEY_FPS}": {fps}')
         if total_frames is not None:
-            f_out.write(f',\n  KEY_TOTAL_FRAMES: {total_frames}')
+            f_out.write(f',\n  "{KEY_TOTAL_FRAMES}": {total_frames}')
             
         if speaker_frame_counts:
             f_out.write(',\n  "speaker_stats": ')

@@ -13,7 +13,7 @@ description: Create or adjust the Connected Timeline UI (HTML/CSS/JS) with AppSt
 
 ## Principes clés
 1. **Structure sémantique** : `<section class="workflow-pipeline">`, `.pipeline-timeline[role=list]`, `.timeline-step[role=listitem]` avec spine/nœud/connecteur.
-2. **Compatibilité JS** : Conserver IDs (`#step-{{ step_key }}`) et classes (`.step`, `.run-button`, `.specific-log-button`).
+2. **Compatibilité JS** : Conserver IDs (`#step-{{ step_key }}`) et classes (`.step`, `.run-button`, `.specific-log-button`). Maintenir la modernisation JS ES11 (suite à la résorption de dette technique SonarCloud).
 3. **AppState immuable** : Toute mise à jour via `AppState.setState()`. Les consommateurs utilisent `subscribeToProperty`.
 4. **DOMBatcher & Sécurité** : `DOMBatcher.scheduleUpdate()` pour chaque mutation DOM. Jamais d'`innerHTML` sans `DOMUpdateUtils.escapeHtml()`.
 5. **DOMDiff** : Toujours envelopper les listes dynamiques (ex: `<li>`) dans un conteneur (`<ul>`) avant d'appliquer `DOMDiff.morph` pour éviter la casse du polling.

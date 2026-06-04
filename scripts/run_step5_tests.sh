@@ -36,8 +36,7 @@ try:
 except ImportError:
     print('❌ opencv manquant')
     exit(1)
-
-echo "ℹ️  Environment tracking_env_slim allégé (MediaPipe CPU) validé"
+    print('ℹ️  Environment tracking_env_slim allégé (MediaPipe CPU) validé')
 "
 
 if [ $? -ne 0 ]; then
