@@ -26,9 +26,9 @@ else
 fi
 
 # Exécuter les tests STEP5 si environnement disponible
-if [ -d "/mnt/venv_ext4/tracking_env" ]; then
+if [ -d "/mnt/venv_ext4/tracking_env_slim" ]; then
     echo "3. Tests STEP5..."
-    source /mnt/venv_ext4/tracking_env/bin/activate
+    source /mnt/venv_ext4/tracking_env_slim/bin/activate
     DRY_RUN_DOWNLOADS=true pytest tests/unit/test_step5_*.py tests/unit/test_tracking_optimizations_*.py -v --tb=short | tee test_results_step5.log
     passed5=$(grep "PASSED" test_results_step5.log | wc -l)
     failed5=$(grep "FAILED" test_results_step5.log | wc -l)

@@ -80,11 +80,11 @@ setup_virtual_environments() {
         print_status "Audio environment already exists"
     fi
     
-    if [ ! -d "tracking_env" ]; then
-        print_status "Creating tracking environment..."
-        python3 -m venv tracking_env
+    if [ ! -d "tracking_env_slim" ]; then
+        print_status "Creating tracking environment (slim)..."
+        python3 -m venv tracking_env_slim
     else
-        print_status "Tracking environment already exists"
+        print_status "Tracking environment (slim) already exists"
     fi
     
     if [ ! -d "transnet_env" ]; then

@@ -23,7 +23,7 @@ except ImportError as e:
 
 # Vérifier les environnements
 echo "2. Vérification des environnements virtuels..."
-for env in env transnet_env audio_env tracking_env; do
+for env in env transnet_env audio_env tracking_env_slim; do
     if [ -d "/mnt/venv_ext4/$env" ]; then
         echo "✅ $env existe"
     else
@@ -57,19 +57,19 @@ except ImportError:
     print('❌ torch manquant dans transnet_env')
 "
 
-source /mnt/venv_ext4/tracking_env/bin/activate
+source /mnt/venv_ext4/tracking_env_slim/bin/activate
 python -c "
 try:
     import numpy
-    print('✅ numpy disponible dans tracking_env')
+    print('✅ numpy disponible dans tracking_env_slim')
 except ImportError:
-    print('❌ numpy manquant dans tracking_env')
+    print('❌ numpy manquant dans tracking_env_slim')
 
 try:
     import cv2
-    print('✅ opencv disponible dans tracking_env')
+    print('✅ opencv disponible dans tracking_env_slim')
 except ImportError:
-    print('❌ opencv manquant dans tracking_env')
+    print('❌ opencv manquant dans tracking_env_slim')
 "
 
 # Vérifier les scripts de test

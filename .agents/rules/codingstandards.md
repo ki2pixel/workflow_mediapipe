@@ -12,7 +12,7 @@ alwaysApply: true
 2. [Project Structure](#project-structure)
 3. [Code Style](#code-style)
 4. [Core Patterns](#core-patterns)
-5. [Pipeline (STEP2, STEP4, STEP5, STEP6 & STEP7)](#pipeline-step2-step4-step5-step6--step7)
+5. [Pipeline (STEP2, STEP3, STEP4, STEP5, STEP6 & STEP7)](#pipeline-step2-step3-step4-step5-step6--step7)
 6. [After Effects & CEP (ExtendScript ES3)](#after-effects--cep-extendscript-es3)
 7. [Quality & Testing](#quality--testing)
 8. [Process & Tooling](#process--tooling)
@@ -23,7 +23,7 @@ alwaysApply: true
 - **Backend** : Flask services Python 3.10 (venv `/mnt/venv_ext4/env`), logique métier confinée à `services/`.
 - **Frontend** : JS natif (`static/`, `templates/`) avec `DOMBatcher` + `AppState`; aucun framework SPA.
 - **Config** : `.env` → `config/settings.py` → `WorkflowCommandsConfig`, jamais de secrets en dur.
-- **Data Management** : Streaming JSON omniprésent (`ijson`, `StreamingJSONOutput`) pour garantir une empreinte RAM O(1).
+- **Data Management** : Streaming JSON omniprésent (`ijson`, `StreamingJSONOutput`) pour garantir une empreinte RAM O(1). SQLite (`download_history.sqlite3`) est l'unique base de données active via `CSVService`. MySQL est obsolète et confiné dans `services.deprecated.mysql_service` (`USE_MYSQL=false` par défaut).
 - **Environnements spécialisés** :
   - `transnet_env/` : Découpage scènes (PyTorch/TensorFlow).
   - `audio_env/` : Analyse audio (Whisper/Lemonfox).
@@ -97,10 +97,14 @@ domBatcher.scheduleUpdate(() => {
 - `subscribeToProperty(['steps', stepKey, 'status'])` pour badges Timeline.
 - `PollingManager` met à jour `WorkflowState` → `AppState` (jamais de dispatch global).
 
-## Pipeline (STEP2, STEP4, STEP5, STEP6 & STEP7)
+## Pipeline (STEP2, STEP3, STEP4, STEP5, STEP6 & STEP7)
 ### STEP2 Conversion
 - **Transcodage Parallèle** : Architecture en passe unique via GPU NVENC (jusqu'à 3 workers) avec parallélisation `ffprobe`.
 - **Robustesse** : Analyse audio prédictive et fallback CPU automatique (`libx264`).
+
+### STEP3 Transitions (transnet_env)
+- **Détection des Scènes** : Modèle TransNetV2 pour identifier les changements de plans.
+- **Optimisation GPU & RAM** : Inférence par lot configurable (`batch_size=8`, `mixed_precision=true`, `ffmpeg_threads=1`) et I/O asynchrone pour une empreinte RAM O(1).
 
 ### STEP4 Audio (audio_env)
 - Extraction via `ffmpeg` preset TV, analyse `Lemonfox` (smoothing) + fallback Pyannote.
@@ -175,6 +179,7 @@ domBatcher.scheduleUpdate(() => {
 - Charger entièrement de gros JSON en RAM avec `json.load()` (utiliser `ijson` et `StreamingJSONOutput` pour un export O(1) RAM).
 - JS moderne (ES6+) dans ExtendScript (.jsx) ou appels `callSystem()` non échappés.
 - Lancer l'application en production (`DEBUG=False`) avec des secrets/tokens par défaut (`dev-*`).
+- Réactiver ou utiliser MySQL en production (déprécié au profit de SQLite/Webhook, confiné dans `services/deprecated/`).
 
 ## Notes finales
 - Maintenir ce document <12 000 caractères. Réviser après toute évolution majeure.

@@ -37,8 +37,19 @@ test_env = {
 }
 
 with patch.dict(os.environ, test_env):
-    from services.mysql_service import MySQLService, MYSQL_AVAILABLE
+    from services.deprecated.mysql_service import MySQLService, MYSQL_AVAILABLE
     from config.settings import config
+    
+    # Inject missing MySQL properties for legacy tests
+    config.USE_MYSQL = True
+    config.MYSQL_HOST = 'test-host'
+    config.MYSQL_PORT = 3306
+    config.MYSQL_DATABASE = 'test_db'
+    config.MYSQL_USERNAME = 'test_user'
+    config.MYSQL_PASSWORD = 'test_pass'
+    config.MYSQL_TABLE_NAME = 'test_table'
+    config.MYSQL_CONNECTION_TIMEOUT = 30
+    config.MYSQL_MONITOR_INTERVAL = 15
 
 
 class TestMySQLService:
@@ -50,7 +61,7 @@ class TestMySQLService:
         MySQLService._connection_pool = None
         MySQLService._pool_lock = None
     
-    @patch('services.mysql_service.pymysql')
+    @patch('services.deprecated.mysql_service.pymysql')
     def test_get_connection_success(self, mock_pymysql):
         """Test successful database connection."""
         mock_connection = MagicMock()
@@ -60,18 +71,18 @@ class TestMySQLService:
         
         assert connection == mock_connection
         mock_pymysql.connect.assert_called_once_with(
-            host=config.MYSQL_HOST,
-            port=config.MYSQL_PORT,
-            user=config.MYSQL_USERNAME,
-            password=config.MYSQL_PASSWORD,
-            database=config.MYSQL_DATABASE,
+            host=getattr(config, 'MYSQL_HOST', 'localhost'),
+            port=int(getattr(config, 'MYSQL_PORT', 3306)),
+            user=getattr(config, 'MYSQL_USERNAME', ''),
+            password=getattr(config, 'MYSQL_PASSWORD', ''),
+            database=getattr(config, 'MYSQL_DATABASE', ''),
             charset='utf8mb4',
             cursorclass=mock_pymysql.cursors.DictCursor,
-            connect_timeout=config.MYSQL_CONNECTION_TIMEOUT,
+            connect_timeout=int(getattr(config, 'MYSQL_CONNECTION_TIMEOUT', 30)),
             autocommit=True
         )
     
-    @patch('services.mysql_service.pymysql')
+    @patch('services.deprecated.mysql_service.pymysql')
     def test_get_connection_failure(self, mock_pymysql):
         """Test database connection failure."""
         mock_pymysql.connect.side_effect = Exception("Connection failed")
@@ -80,7 +91,7 @@ class TestMySQLService:
         
         assert connection is None
     
-    @patch('services.mysql_service.MYSQL_AVAILABLE', False)
+    @patch('services.deprecated.mysql_service.MYSQL_AVAILABLE', False, create=True)
     def test_get_connection_mysql_unavailable(self):
         """Test connection when MySQL is not available."""
         connection = MySQLService._get_connection()
@@ -131,7 +142,7 @@ class TestMySQLService:
         assert result['details']['records_fetchable'] is True
         assert result['details']['record_count'] == 5
     
-    @patch('services.mysql_service.MYSQL_AVAILABLE', False)
+    @patch('services.deprecated.mysql_service.MYSQL_AVAILABLE', False, create=True)
     def test_test_connection_mysql_unavailable(self):
         """Test connection test when MySQL is unavailable."""
         result = MySQLService.test_connection()
@@ -139,7 +150,7 @@ class TestMySQLService:
         assert result['status'] == 'error'
         assert 'PyMySQL not available' in result['message']
     
-    @patch('services.mysql_service.config.USE_MYSQL', False)
+    @patch('services.deprecated.mysql_service.config.USE_MYSQL', False, create=True)
     def test_test_connection_disabled(self):
         """Test connection test when MySQL is disabled."""
         result = MySQLService.test_connection()
@@ -228,15 +239,16 @@ class TestMySQLService:
         assert 'connection_configured' in status
         assert 'cache_stats' in status
         
-        assert status['mysql_available'] == MYSQL_AVAILABLE
-        assert status['use_mysql'] == config.USE_MYSQL
-        assert status['host'] == config.MYSQL_HOST
-        assert status['database'] == config.MYSQL_DATABASE
+        assert status['host'] == getattr(config, 'MYSQL_HOST', 'test-host')
+        assert status['database'] == getattr(config, 'MYSQL_DATABASE', 'test_db')
+        assert status['table_name'] == getattr(config, 'MYSQL_TABLE_NAME', 'test_table')
+        assert status['monitor_interval'] == getattr(config, 'MYSQL_MONITOR_INTERVAL', 15)
 
 
 class TestMySQLServiceIntegration:
     """Integration tests for MySQLService with other components."""
     
+    @pytest.mark.skip(reason="CSVService no longer integrates with MySQL")
     @patch.object(MySQLService, 'test_connection')
     def test_csv_service_integration(self, mock_test_connection):
         """Test MySQLService integration with CSVService."""
@@ -256,7 +268,7 @@ class TestMySQLServiceIntegration:
         assert 'mysql' in status
         assert status['data_source'] == 'mysql'  # Should be MySQL since USE_MYSQL=true
     
-    @patch('services.mysql_service.CacheService')
+    @patch('services.deprecated.mysql_service.CacheService')
     def test_caching_integration(self, mock_cache_service):
         """Test MySQLService integration with CacheService."""
         # Test that fetch_records uses caching

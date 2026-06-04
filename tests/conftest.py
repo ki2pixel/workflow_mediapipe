@@ -64,7 +64,7 @@ def transnet_env_info():
 def tracking_env_info():
     """Information about Tracking environment for STEP5 tests."""
     return {
-        "env_path": "/mnt/venv_ext4/tracking_env",
+        "env_path": "/mnt/venv_ext4/tracking_env_slim",
         "required_modules": ["numpy", "cv2", "mediapipe"],
         "test_files": ["test_step5_*.py", "test_tracking_optimizations_*.py"]
     }

@@ -16,11 +16,19 @@ import subprocess
 import tempfile
 import pytest
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file to resolve VENV_BASE_DIR
+_env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+if _env_path.exists():
+    load_dotenv(_env_path)
+
+from config.settings import config
 
 
 # Path to the tracking manager script
 MANAGER_SCRIPT = Path(__file__).resolve().parent.parent.parent / "workflow_scripts" / "step5" / "run_tracking_manager.py"
-TRACKING_ENV_PYTHON = Path(__file__).resolve().parent.parent.parent / "tracking_env" / "bin" / "python"
+TRACKING_ENV_PYTHON = config.get_venv_python("tracking_env_slim")
 
 
 class TestStep5JsonFormats:
@@ -37,6 +45,10 @@ class TestStep5JsonFormats:
             json.dump(test_videos, f, indent=2)
             temp_path = f.name
         
+        test_env = os.environ.copy()
+        test_env["STEP5_TRACKING_ENGINE"] = ""
+        test_env["STEP5_ENABLE_GPU"] = "0"
+        
         try:
             # Run manager with raw list format
             # Use --disable_gpu to avoid GPU requirements in tests
@@ -46,6 +58,7 @@ class TestStep5JsonFormats:
                  '--disable_gpu'],
                 capture_output=True,
                 text=True,
+                env=test_env,
                 timeout=10
             )
             
@@ -73,6 +86,10 @@ class TestStep5JsonFormats:
             json.dump(test_videos_object, f, indent=2)
             temp_path = f.name
         
+        test_env = os.environ.copy()
+        test_env["STEP5_TRACKING_ENGINE"] = ""
+        test_env["STEP5_ENABLE_GPU"] = "0"
+        
         try:
             result = subprocess.run(
                 [str(TRACKING_ENV_PYTHON), str(MANAGER_SCRIPT), 
@@ -80,6 +97,7 @@ class TestStep5JsonFormats:
                  '--disable_gpu'],
                 capture_output=True,
                 text=True,
+                env=test_env,
                 timeout=10
             )
             
@@ -106,6 +124,10 @@ class TestStep5JsonFormats:
             json.dump(invalid_data, f, indent=2)
             temp_path = f.name
         
+        test_env = os.environ.copy()
+        test_env["STEP5_TRACKING_ENGINE"] = ""
+        test_env["STEP5_ENABLE_GPU"] = "0"
+        
         try:
             result = subprocess.run(
                 [str(TRACKING_ENV_PYTHON), str(MANAGER_SCRIPT), 
@@ -113,6 +135,7 @@ class TestStep5JsonFormats:
                  '--disable_gpu'],
                 capture_output=True,
                 text=True,
+                env=test_env,
                 timeout=10
             )
             
@@ -131,6 +154,10 @@ class TestStep5JsonFormats:
             json.dump(test_videos, f, indent=2)
             temp_path = f.name
         
+        test_env = os.environ.copy()
+        test_env["STEP5_TRACKING_ENGINE"] = ""
+        test_env["STEP5_ENABLE_GPU"] = "0"
+        
         try:
             result = subprocess.run(
                 [str(TRACKING_ENV_PYTHON), str(MANAGER_SCRIPT), 
@@ -138,6 +165,7 @@ class TestStep5JsonFormats:
                  '--disable_gpu'],
                 capture_output=True,
                 text=True,
+                env=test_env,
                 timeout=10
             )
             

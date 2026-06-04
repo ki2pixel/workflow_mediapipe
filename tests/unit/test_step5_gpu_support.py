@@ -30,7 +30,7 @@ class TestGPUAvailability:
             else:
                 pytest.skip("CUDA not available (expected in CI)")
         except ImportError:
-            pytest.skip("PyTorch not installed in tracking_env")
+            pytest.skip("PyTorch not installed in transnet_env / tracking_env_slim")
     
     def test_onnxruntime_providers(self):
         """Vérifier les providers ONNXRuntime disponibles."""

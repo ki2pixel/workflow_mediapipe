@@ -52,20 +52,20 @@ class MySQLService:
             logger.error("MySQL integration not available - PyMySQL not installed")
             return None
             
-        if not config.MYSQL_HOST or not config.MYSQL_DATABASE:
+        if not getattr(config, 'MYSQL_HOST', None) or not getattr(config, 'MYSQL_DATABASE', None):
             logger.error("MySQL connection parameters not configured")
             return None
             
         try:
             connection = pymysql.connect(
-                host=config.MYSQL_HOST,
-                port=config.MYSQL_PORT,
-                user=config.MYSQL_USERNAME,
-                password=config.MYSQL_PASSWORD,
-                database=config.MYSQL_DATABASE,
+                host=getattr(config, 'MYSQL_HOST', 'localhost'),
+                port=int(getattr(config, 'MYSQL_PORT', 3306)),
+                user=getattr(config, 'MYSQL_USERNAME', ''),
+                password=getattr(config, 'MYSQL_PASSWORD', ''),
+                database=getattr(config, 'MYSQL_DATABASE', ''),
                 charset='utf8mb4',
                 cursorclass=pymysql.cursors.DictCursor,
-                connect_timeout=config.MYSQL_CONNECTION_TIMEOUT,
+                connect_timeout=int(getattr(config, 'MYSQL_CONNECTION_TIMEOUT', 30)),
                 autocommit=True
             )
             logger.debug("MySQL connection established successfully")
@@ -90,13 +90,13 @@ class MySQLService:
         try:
             with connection.cursor() as cursor:
                 # Check if table exists
-                cursor.execute(f"SHOW TABLES LIKE '{config.MYSQL_TABLE_NAME}'")
+                cursor.execute(f"SHOW TABLES LIKE '{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}'")
                 table_exists = cursor.fetchone() is not None
 
                 if not table_exists:
                     # Create table with basic logs_dropbox structure
                     create_table_sql = f"""
-                    CREATE TABLE `{config.MYSQL_TABLE_NAME}` (
+                    CREATE TABLE `{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}` (
                         `id` INT AUTO_INCREMENT PRIMARY KEY,
                         `url_dropbox` TEXT NOT NULL,
                         `timestamp` DATETIME NOT NULL,
@@ -104,10 +104,10 @@ class MySQLService:
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
                     """
                     cursor.execute(create_table_sql)
-                    logger.info(f"Created table '{config.MYSQL_TABLE_NAME}'")
+                    logger.info(f"Created table '{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}'")
 
                 # Table exists or was created successfully
-                logger.debug(f"Table '{config.MYSQL_TABLE_NAME}' is available")
+                logger.debug(f"Table '{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}' is available")
                 return True
 
         except Exception as e:
@@ -129,10 +129,10 @@ class MySQLService:
             "message": "Connection test failed",
             "details": {
                 "mysql_available": MYSQL_AVAILABLE,
-                "use_mysql": config.USE_MYSQL,
-                "host": config.MYSQL_HOST,
-                "database": config.MYSQL_DATABASE,
-                "table_name": config.MYSQL_TABLE_NAME,
+                "use_mysql": getattr(config, 'USE_MYSQL', False),
+                "host": getattr(config, 'MYSQL_HOST', None),
+                "database": getattr(config, 'MYSQL_DATABASE', None),
+                "table_name": getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox'),
                 "connection_accessible": False,
                 "table_accessible": False,
                 "records_fetchable": False
@@ -145,7 +145,7 @@ class MySQLService:
             
         # Respect configuration: if MySQL integration is disabled, do not attempt a connection,
         # except in testing contexts where the connection method is explicitly mocked.
-        if not config.USE_MYSQL:
+        if not getattr(config, 'USE_MYSQL', False):
             if type(MySQLService._get_connection).__name__ not in ("MagicMock", "AsyncMock"):  # allow tests to bypass
                 result["status"] = "disabled"
                 result["message"] = "MySQL integration is disabled (USE_MYSQL=false)"
@@ -164,19 +164,19 @@ class MySQLService:
             try:
                 with connection.cursor() as cursor:
                     # Check if table exists
-                    cursor.execute(f"SHOW TABLES LIKE '{config.MYSQL_TABLE_NAME}'")
+                    cursor.execute(f"SHOW TABLES LIKE '{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}'")
                     table_exists = cursor.fetchone() is not None
                     
                     if not table_exists:
                         # Try to create table
                         if not MySQLService._ensure_table_exists():
-                            result["message"] = f"Table '{config.MYSQL_TABLE_NAME}' does not exist and could not be created"
+                            result["message"] = f"Table '{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}' does not exist and could not be created"
                             return result
                     
                     result["details"]["table_accessible"] = True
                     
                     # Test record access
-                    cursor.execute(f"SELECT COUNT(*) as count FROM `{config.MYSQL_TABLE_NAME}`")
+                    cursor.execute(f"SELECT COUNT(*) as count FROM `{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}`")
                     count_result = cursor.fetchone()
                     record_count = count_result['count'] if count_result else 0
                     
@@ -225,7 +225,7 @@ class MySQLService:
                         timestamp,
                         url_dropbox,
                         created_at as created_time
-                    FROM `{config.MYSQL_TABLE_NAME}`
+                    FROM `{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}`
                     ORDER BY created_at DESC
                 """)
 
@@ -302,7 +302,7 @@ class MySQLService:
                 # Use existing logs_dropbox schema (no record_id column)
                 # Use INSERT IGNORE to avoid duplicate key errors
                 cursor.execute(f"""
-                    INSERT INTO `{config.MYSQL_TABLE_NAME}`
+                    INSERT INTO `{getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox')}`
                     (timestamp, url_dropbox)
                     VALUES (%s, %s)
                 """, (timestamp_dt, url))
@@ -336,11 +336,11 @@ class MySQLService:
         """
         return {
             "mysql_available": MYSQL_AVAILABLE,
-            "use_mysql": config.USE_MYSQL,
-            "host": config.MYSQL_HOST,
-            "database": config.MYSQL_DATABASE,
-            "table_name": config.MYSQL_TABLE_NAME,
-            "monitor_interval": config.MYSQL_MONITOR_INTERVAL,
-            "connection_configured": bool(config.MYSQL_HOST and config.MYSQL_DATABASE and config.MYSQL_USERNAME),
+            "use_mysql": getattr(config, 'USE_MYSQL', False),
+            "host": getattr(config, 'MYSQL_HOST', None),
+            "database": getattr(config, 'MYSQL_DATABASE', None),
+            "table_name": getattr(config, 'MYSQL_TABLE_NAME', 'logs_dropbox'),
+            "monitor_interval": getattr(config, 'MYSQL_MONITOR_INTERVAL', 15),
+            "connection_configured": bool(getattr(config, 'MYSQL_HOST', None) and getattr(config, 'MYSQL_DATABASE', None) and getattr(config, 'MYSQL_USERNAME', None)),
             "cache_stats": CacheService.get_cache_stats()
         }
