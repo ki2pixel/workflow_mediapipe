@@ -504,7 +504,7 @@ def orphan_cleanup_service():
         time.sleep(interval_seconds)
 
 
-def run_process_async(step_key: str):
+def _run_process_async_internal(step_key: str):
     from services.workflow_service import WorkflowService
     
     APP_LOGGER.info(f"[RUN_PROCESS] Starting execution for {step_key}")
@@ -796,6 +796,21 @@ def run_process_async(step_key: str):
                 APP_LOGGER.info(f"Fichier temporaire de tracking '{temp_json_path_for_tracking.name}' supprimé.")
             except Exception as e_clean:
                 APP_LOGGER.error(f"Impossible de supprimer le fichier temporaire de tracking '{temp_json_path_for_tracking.name}': {e_clean}")
+
+
+def run_process_async(step_key: str):
+    """
+    Point d'entrée pour exécuter une étape. Si le Coral TPU est activé, 
+    les requêtes d'inférence (STEP3, 4, 5) sont envoyées à l'orchestrateur de queue asynchrone 
+    pour un traitement par micro-lots (protection de la SRAM 8Mo).
+    """
+    if config.ENABLE_CORAL_TPU_ACCELERATION and step_key in ["STEP3", "STEP4", "STEP5"]:
+        from services.coral_tpu_orchestrator import tpu_orchestrator
+        APP_LOGGER.info(f"[{step_key}] Routage vers l'orchestrateur TPU Asynchrone (Micro-lots)")
+        tpu_orchestrator.submit_task(lambda: _run_process_async_internal(step_key))
+    else:
+        _run_process_async_internal(step_key)
+
 
 
 def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="Custom"):

@@ -150,12 +150,21 @@ class WorkflowCommandsConfig:
         """
         step3_log_dir = self.logs_base_dir / "step3"
         
-        return {
-            "display_name": "3. Analyse des transitions",
-            "cmd": [
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+            cmd = [
+                str(config.get_venv_python("coral_env")),
+                str(self.base_path / "workflow_scripts" / "step3" / "run_scene_detect_tpu.py"),
+            ]
+        else:
+            cmd = [
                 str(config.get_venv_python("transnet_env")),
                 str(self.base_path / "workflow_scripts" / "step3" / "run_transnet.py"),
-            ],
+            ]
+
+        return {
+            "display_name": "3. Analyse des transitions",
+            "cmd": cmd,
+
             "cwd": str(self.base_path / "projets_extraits"),
             "specific_logs": [
                 {
@@ -188,26 +197,33 @@ class WorkflowCommandsConfig:
         """
         step4_log_dir = self.logs_base_dir / "step4"
 
-        resolved_method = "pyannote"
-        try:
-            resolved_method = config.resolve_step4_method()
-        except Exception:
-            resolved_method = "lemonfox" if getattr(config, "STEP4_USE_LEMONFOX", False) else "pyannote"
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+            cmd = [
+                str(config.get_venv_python("coral_env")),
+                str(self.base_path / "workflow_scripts" / "step4" / "run_audio_diarization_tpu.py"),
+                "--log_dir", str(step4_log_dir),
+            ]
+        else:
+            resolved_method = "pyannote"
+            try:
+                resolved_method = config.resolve_step4_method()
+            except Exception:
+                resolved_method = "lemonfox" if getattr(config, "STEP4_USE_LEMONFOX", False) else "pyannote"
 
-        step4_script_by_method = {
-            "pyannote": "run_audio_analysis.py",
-            "lemonfox": "run_audio_analysis_lemonfox.py",
-            "deepinfra": "run_audio_analysis_deepinfra.py",
-        }
-        step4_script_name = step4_script_by_method.get(resolved_method, "run_audio_analysis.py")
-        cmd = [
-            str(config.get_venv_python("audio_env")),
-            str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
-            "--log_dir", str(step4_log_dir),
-        ]
+            step4_script_by_method = {
+                "pyannote": "run_audio_analysis.py",
+                "lemonfox": "run_audio_analysis_lemonfox.py",
+                "deepinfra": "run_audio_analysis_deepinfra.py",
+            }
+            step4_script_name = step4_script_by_method.get(resolved_method, "run_audio_analysis.py")
+            cmd = [
+                str(config.get_venv_python("audio_env")),
+                str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
+                "--log_dir", str(step4_log_dir),
+            ]
 
-        if step4_script_name == "run_audio_analysis.py" and self.hf_token:
-            cmd.extend(["--hf_auth_token", str(self.hf_token)])
+            if step4_script_name == "run_audio_analysis.py" and self.hf_token:
+                cmd.extend(["--hf_auth_token", str(self.hf_token)])
         
         return {
             "display_name": "4. Analyse audio",
@@ -244,12 +260,20 @@ class WorkflowCommandsConfig:
         """
         step5_log_dir = self.logs_base_dir / "step5"
         
-        return {
-            "display_name": "5. Analyse du tracking",
-            "cmd": [
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+            cmd = [
+                str(config.get_venv_python("coral_env")),
+                str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_tpu.py")
+            ]
+        else:
+            cmd = [
                 str(config.get_venv_python("tracking_env_slim")),
                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
-            ],
+            ]
+
+        return {
+            "display_name": "5. Analyse du tracking",
+            "cmd": cmd,
             "cwd": str(self.base_path / "projets_extraits"),
             "specific_logs": [
                 {

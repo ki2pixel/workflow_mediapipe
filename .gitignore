@@ -86,4 +86,7 @@ tasks/
 # Temporary scratch files
 scratch/
 scratch_*.py
+
+#coral_env
+coral_env/
  

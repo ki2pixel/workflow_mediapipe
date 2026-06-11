@@ -720,6 +720,12 @@ class Config:
             os.environ.get('STEP5_GPU_MAX_VRAM_MB')
         ) or 2048
 
+    # ========================
+    # Coral TPU Acceleration
+    # ========================
+    ENABLE_CORAL_TPU_ACCELERATION: bool = os.environ.get('ENABLE_CORAL_TPU_ACCELERATION', 'false').lower() == 'true'
+
+
 
 # Global configuration instance
 config = Config()
