@@ -182,6 +182,9 @@ class WorkflowCommandsConfig:
                 "internal_simple": re.compile(
                     r"INTERNAL[_ ]PROGRESS:\s*(\d+)\s*batches\s*-\s*(.*)$", re.IGNORECASE
                 ),
+                "internal": re.compile(
+                    r"INTERNAL[_ ]PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)", re.IGNORECASE
+                ),
                 "current_success_line_pattern": re.compile(
                     r"Succès:\s*(.*?)(?:\.csv|\.json)\s+créé", re.IGNORECASE
                 ),

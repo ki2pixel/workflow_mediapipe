@@ -195,7 +195,7 @@ def main():
 
     # Initialisation TPU
     try:
-        delegate = edgetpu.load_delegate()
+        delegate = edgetpu.load_edgetpu_delegate()
         logging.info("Délégué Edge TPU initialisé.")
     except Exception as e:
         logging.critical(f"Impossible d'initialiser l'Edge TPU: {e}")

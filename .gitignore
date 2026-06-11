@@ -89,4 +89,8 @@ scratch_*.py
 
 #coral_env
 coral_env/
+
+# Lib TPU
+tmp_lib/
+libedgetpu.deb
  

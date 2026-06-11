@@ -203,7 +203,7 @@ def main():
     logging.info("--- Démarrage de l'analyse Audio TPU (YAMNet INT8) ---")
 
     # Initialisation TPU
-    delegate = edgetpu.load_delegate()
+    delegate = edgetpu.load_edgetpu_delegate()
     
     assets_dir = BASE_DIR / "assets"
     yamnet_model = assets_dir / "yamnet_audio_classificator_quantized_edgetpu.tflite"

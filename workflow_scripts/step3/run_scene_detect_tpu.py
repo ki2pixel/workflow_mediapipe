@@ -74,20 +74,39 @@ def compute_cosine_distance(v1, v2):
     norm_v2 = np.linalg.norm(v2)
     return 1.0 - (dot_product / (norm_v1 * norm_v2))
 
-def temporal_smoothing(distances, window_size=3):
-    """
-    Lissage temporel personnalisé sur CPU.
-    Applique un filtre médian glissant pour réduire le bruit (jittering INT8).
-    """
+def temporal_smoothing(distances, window_size=5):
+    """Lissage temporel des distances avec une moyenne mobile."""
     if len(distances) < window_size:
         return distances
-    smoothed = np.copy(distances)
-    pad = window_size // 2
-    for i in range(pad, len(distances) - pad):
-        smoothed[i] = np.median(distances[i - pad:i + pad + 1])
-    return smoothed
+    kernel = np.ones(window_size) / window_size
+    return np.convolve(distances, kernel, mode='same')
 
-def detect_scenes_tpu(video_path, interpreter, threshold, min_scene_len=12, fps=25.0):
+def get_video_frame_count(video_path):
+    """Estime le nombre total de frames via ffprobe pour la barre de progression."""
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+            '-show_entries', 'stream=nb_frames',
+            '-of', 'default=noprint_wrappers=1:nokey=1', str(video_path)
+        ]
+        output = subprocess.check_output(cmd, text=True).strip()
+        if output.isdigit():
+            return int(output)
+    except Exception:
+        pass
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1', str(video_path)
+        ]
+        output = subprocess.check_output(cmd, text=True).strip()
+        if output:
+            return int(float(output) * 25.0)
+    except Exception:
+        pass
+    return 1000
+
+def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=12):
     """
     Détecte les scènes en utilisant MobileNetV2 sur l'Edge TPU.
     Lit la vidéo via ffmpeg subprocess, effectue l'inférence frame par frame,
@@ -97,6 +116,9 @@ def detect_scenes_tpu(video_path, interpreter, threshold, min_scene_len=12, fps=
         # Configuration des entrées TFLite
         input_details = interpreter.get_input_details()[0]
         output_details = interpreter.get_output_details()[0]
+        
+        fps = 25.0
+        total_expected_frames = max(1, get_video_frame_count(video_path))
         
         # Le MobileNetV2 EdgeTPU prend du 224x224 RGB
         _, height, width, _ = input_details['shape']
@@ -138,14 +160,14 @@ def detect_scenes_tpu(video_path, interpreter, threshold, min_scene_len=12, fps=
             # On utilise ça comme empreinte/embedding de la scène
             output = common.output_tensor(interpreter, 0).copy()
             
-            # Cast en float32 pour le calcul de distance CPU
-            embeddings.append(output.astype(np.float32))
+            # Cast en float32 et aplatissement pour le calcul de distance CPU (np.dot)
+            embeddings.append(output.flatten().astype(np.float32))
             
             frame_idx += 1
-            if frame_idx % 500 == 0:
-                # Format requis pour le pattern interne "INTERNAL_PROGRESS: x batches - file"
-                logging.info(f"INTERNAL_PROGRESS: {frame_idx} batches - {video_path.name}")
-                print(f"INTERNAL_PROGRESS: {frame_idx} batches - {video_path.name}")
+            if frame_idx % 250 == 0:
+                progress_pct = int(min(100, (frame_idx / total_expected_frames) * 100))
+                logging.info(f"INTERNAL_PROGRESS: {frame_idx}/{total_expected_frames} frames ({progress_pct}%) - {video_path.name}")
+                print(f"INTERNAL_PROGRESS: {frame_idx}/{total_expected_frames} frames ({progress_pct}%) - {video_path.name}")
                 
         process.stdout.close()
         process.wait()
@@ -164,6 +186,9 @@ def detect_scenes_tpu(video_path, interpreter, threshold, min_scene_len=12, fps=
             
         # Lissage temporel
         smoothed_distances = temporal_smoothing(distances, window_size=5)
+        
+        # Stats pour debug
+        logging.info(f"Distances Stats - Max: {smoothed_distances.max():.4f}, Mean: {smoothed_distances.mean():.4f}, 99th: {np.percentile(smoothed_distances, 99):.4f}, 95th: {np.percentile(smoothed_distances, 95):.4f}")
         
         # Détection des pics (Cuts)
         cut_indices = []
@@ -200,7 +225,7 @@ def main():
     args = parser.parse_args()
 
     # Paramètres par défaut
-    threshold = 0.25 # Distance cosinus critique
+    threshold = 0.05 # Distance cosinus critique ajustée pour MobileNetV2 INT8
     min_scene_len = 12 # 0.5s à 25fps
 
     if args.config and Path(args.config).exists():
@@ -216,7 +241,7 @@ def main():
     
     try:
         # Load the Edge TPU delegate
-        delegate = edgetpu.load_delegate()
+        delegate = edgetpu.load_edgetpu_delegate()
         interpreter = tflite.Interpreter(model_path=str(model_path), experimental_delegates=[delegate])
         interpreter.allocate_tensors()
         logging.info("Modèle Edge TPU chargé avec succès.")
