@@ -20,6 +20,9 @@ globs:
 | `tracking`, `step5`, `mediapipe`, `insightface`, `gpu` | step5-gpu-ops | 2 |
 | `timeline`, `frontend`, `ui`, `logs`, `overlay` | frontend-timeline-designer | 2 |
 | `logs`, `overlay`, `conductor` | logs-overlay-conductor | 2 |
+| `coral`, `tpu`, `gasket`, `pcie`, `apex_0`, `orchestrator`, `sram` | coral-tpu-system-orchestration | 2 |
+| `tflite`, `int8`, `quantization`, `compiler`, `edgetpu`, `half_pixel_centers` | coral-tpu-model-compiler | 2 |
+| `kalman`, `spectral`, `clustering`, `hybrid`, `jittering`, `cosine` | coral-tpu-hybrid-algorithms | 2 |
 | `gros fichier`, `massive file`, `chirurgical`, `edit block` | fast-filesystem | 2 |
 | `json`, `path`, `structure`, `inspect`, `valeur`, `clé` | json-query | 2 |
 | `diagnostics`, `health`, `env`, `validation` | pipeline-diagnostics | 3 |
@@ -41,7 +44,7 @@ For complex requests, combine multiple skills based on pattern detection priorit
 
 ## Skills Usage Policy
 
-- **Local Skills** (`.agents/skills/`) : workflow-operator, debugging-strategies, documentation, tests-suite-guardian, step4-audio-orchestrator, step5-gpu-ops, frontend-timeline-designer, logs-overlay-conductor, pipeline-diagnostics, after-effects-scripts, after-effects-cep-panel, csv-monitoring-sme, workflow-docs-updater-plus, shrimp-task-manager, sequentialthinking, fast-filesystem, json-query
+- **Local Skills** (`.agents/skills/`) : workflow-operator, debugging-strategies, documentation, tests-suite-guardian, step4-audio-orchestrator, step5-gpu-ops, frontend-timeline-designer, logs-overlay-conductor, coral-tpu-system-orchestration, coral-tpu-model-compiler, coral-tpu-hybrid-algorithms, pipeline-diagnostics, after-effects-scripts, after-effects-cep-panel, csv-monitoring-sme, workflow-docs-updater-plus, shrimp-task-manager, sequentialthinking, fast-filesystem, json-query
 - **Global Skills** : Only if no local equivalent
 - **Detection** : Automatic via pattern matching above
 - **Priority** : Local skills first, then global fallback

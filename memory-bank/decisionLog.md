@@ -11,6 +11,11 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 ## Juin 2026
 
+- [2026-06-11 19:00:00] **Mise à jour Coding Standards Google Coral Edge TPU** : Décision d'intégrer les spécifications du Coral TPU tout en réduisant drastiquement la verbosité du fichier `.agents/rules/codingstandards.md`.
+  - **Raison** : La limite stricte de 12 000 caractères était menacée. Il fallait documenter l'usage obligatoire de `coral_tpu_orchestrator.py` et les modèles INT8 sans dépasser le quota.
+  - **Implémentation** : Réécriture complète et condensation des sections "After Effects & CEP" et "Pipeline", et ajout des contraintes TPU.
+  - **Impact** : Le fichier reste sous la barre des 5200 caractères, préservant la limite stricte de l'agent tout en incluant la nouvelle architecture Edge.
+
 - [2026-06-02 19:47:00] **Alignement de la Documentation Technique** : Décision de synchroniser l'ensemble de la documentation (`docs/workflow/`) avec les implémentations asynchrones et l'architecture O(1) RAM du pipeline (STEP2-STEP5), et le mécanisme de crash strict au démarrage en production.
   - **Raison** : Les récents audits et refactorisations (multiprocessing MediaPipe, TransNetV2 asynchrone, NVENC passe unique, isolation GPU Pyannote) avaient créé un décalage critique entre le comportement réel (optimisé pour O(1) RAM et sécurité stricte) et la documentation de référence, risquant de biaiser les prochains développements ou diagnostics.
   - **Implémentation** : Mise à jour des guides `02-conversion.md`, `03-scene-detection.md`, `04-audio-analysis.md`, `05-video-tracking.md` et `security.md` en appliquant les normes éditoriales de `documentation/SKILL.md`.
