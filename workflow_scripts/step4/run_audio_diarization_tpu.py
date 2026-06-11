@@ -40,14 +40,24 @@ BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
 
 # Modèles TPU par défaut
-YAMNET_URL = "https://github.com/google-coral/test_data/raw/master/yamnet_audio_classificator_quantized_edgetpu.tflite"
+YAMNET_URL = "https://s3.ap-northeast-2.wasabisys.com/pinto-model-zoo/097_YAMNet/resources.tar.gz"
 
 def download_model(url: str, path: Path):
     if not path.exists():
-        logging.info(f"Téléchargement du modèle: {path.name}...")
+        import tarfile
+        import io
+        logging.info(f"Téléchargement du modèle: {path.name} depuis {url}...")
         path.parent.mkdir(parents=True, exist_ok=True)
-        urllib.request.urlretrieve(url, str(path))
-        logging.info("Téléchargement terminé.")
+        try:
+            with urllib.request.urlopen(url) as response:
+                with tarfile.open(fileobj=io.BytesIO(response.read()), mode="r:gz") as tar:
+                    member = tar.getmember("saved_model/model_full_integer_quant.tflite")
+                    with tar.extractfile(member) as f_in, open(path, 'wb') as f_out:
+                        f_out.write(f_in.read())
+            logging.info("Téléchargement et extraction terminés.")
+        except Exception as e:
+            logging.critical(f"Échec du téléchargement du modèle YAMNet: {e}")
+            raise e
 
 def extract_audio(video_path: Path, temp_wav: Path):
     """Extrait l'audio de la vidéo en WAV 16kHz mono (Requis pour YAMNet)"""
@@ -73,6 +83,7 @@ def run_vad_and_embedding(wav_path: Path, yamnet_interpreter, extractor_interpre
     embeddings = []
     
     input_details = yamnet_interpreter.get_input_details()[0]
+    output_details = yamnet_interpreter.get_output_details()
     
     for start in range(0, total_samples, segment_size):
         end = min(start + segment_size, total_samples)
@@ -88,16 +99,25 @@ def run_vad_and_embedding(wav_path: Path, yamnet_interpreter, extractor_interpre
         # Les modèles YAMNet quantizés peuvent attendre du int16 ou float. On adapte selon le modèle.
         if input_details['dtype'] == np.int16:
             input_data = segment.reshape(input_details['shape'])
+        elif input_details['dtype'] in (np.int8, np.uint8):
+            segment_float = segment.astype(np.float32) / 32768.0
+            scale, zero_point = input_details['quantization']
+            input_data = np.round(segment_float / scale + zero_point).astype(input_details['dtype'])
         else:
             # Float fallback
             segment_float = segment.astype(np.float32) / 32768.0
             input_data = segment_float.reshape(input_details['shape'])
             
-        common.set_input(yamnet_interpreter, input_data)
+        yamnet_interpreter.set_tensor(input_details['index'], input_data)
         yamnet_interpreter.invoke()
         
         # Le premier output de YAMNet est généralement les 521 classes (Speech = index 0)
-        scores = common.output_tensor(yamnet_interpreter, 0)
+        scores_tensor = yamnet_interpreter.get_tensor(output_details[0]['index'])
+        if output_details[0]['dtype'] in (np.int8, np.uint8):
+            scale_out, zero_point_out = output_details[0]['quantization']
+            scores = (scores_tensor.astype(np.float32) - zero_point_out) * scale_out
+        else:
+            scores = scores_tensor
         
         # Seuil basique pour la parole (VAD)
         # La probabilité de Speech (Index 0 sur l'ontologie AudioSet)
@@ -116,11 +136,19 @@ def run_vad_and_embedding(wav_path: Path, yamnet_interpreter, extractor_interpre
                 # d_vector = common.output_tensor(extractor_interpreter, 0)[0]
                 d_vector = np.random.randn(128) # Simulation (Placeholder)
             else:
-                # Utiliser l'embedding de YAMNet si disponible (généralement output 1, taille 1024)
+                # Utiliser l'embedding de YAMNet si disponible (Identity_1:0_int8 à l'index 2 dans output_details)
                 try:
-                    d_vector = common.output_tensor(yamnet_interpreter, 1)[0]
-                except Exception:
+                    embeddings_tensor = yamnet_interpreter.get_tensor(output_details[2]['index'])
+                    if output_details[2]['dtype'] in (np.int8, np.uint8):
+                        scale_emb, zero_point_emb = output_details[2]['quantization']
+                        d_vector = (embeddings_tensor.astype(np.float32) - zero_point_emb) * scale_emb
+                    else:
+                        d_vector = embeddings_tensor
+                    # Squeeze the batch dimension
+                    d_vector = d_vector[0]
+                except Exception as e:
                     # Simulation si le modèle quantizé ne sort pas les embeddings
+                    logging.warning(f"Impossible de lire l'embedding YAMNet: {e}")
                     d_vector = np.random.randn(128)
             
             embeddings.append(d_vector)
@@ -213,6 +241,8 @@ def main():
     
     try:
         yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
+        # Redimensionnement de la forme d'entrée à 15360 samples avant allocation
+        yamnet_interp.resize_tensor_input(0, [15360])
         yamnet_interp.allocate_tensors()
         logging.info("Modèle YAMNet Edge TPU chargé.")
     except Exception as e:
@@ -228,7 +258,7 @@ def main():
         except Exception as e:
             logging.warning(f"Erreur avec l'extracteur CNN, utilisation des embeddings par défaut: {e}")
 
-    videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}')]
+    videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_name(f"{p.stem}_audio.json").exists()]
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
     print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
@@ -253,7 +283,7 @@ def main():
                 diarization_result = perform_clustering(embeddings, segments)
                 
                 # Sauvegarde JSON
-                output_json = video_path.with_suffix('.json')
+                output_json = video_path.with_name(f"{video_path.stem}_audio.json")
                 with open(output_json, 'w', encoding='utf-8') as f:
                     json.dump({"diarization": diarization_result}, f, indent=4)
                     
