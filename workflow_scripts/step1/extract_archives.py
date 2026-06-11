@@ -372,9 +372,12 @@ def secure_extract_tar(tar_path, temp_extract_dir, sanitizer):
 def extract_archive(archive_path, destination_base_dir):
     """Extrait une archive de manière sécurisée, gère les sous-dossiers et nettoie."""
     project_folder_name = get_project_folder_name(archive_path.name)
+    # Calcule un nom de dossier projet unique
+    unique_project_dir = compute_unique_project_dir(project_folder_name, destination_base_dir)
     # Le dossier final contiendra un sous-dossier "docs" pour la cohérence avec les étapes suivantes
-    final_destination = destination_base_dir / project_folder_name / "docs"
+    final_destination = unique_project_dir / "docs"
     temp_extract_dir = destination_base_dir / f"_temp_{project_folder_name}_{int(time.time())}"
+
 
     # Initialize security sanitizer
     sanitizer = FilenameSanitizer()

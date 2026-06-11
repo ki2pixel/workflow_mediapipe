@@ -180,6 +180,28 @@ def main():
     parser.add_argument("--log_dir", type=str, default="logs/step4", help="Dossier de logs")
     args = parser.parse_args()
 
+    # Configuration du Logger avec fichier log
+    log_dir = Path(args.log_dir)
+    if not log_dir.is_absolute():
+        log_dir = (BASE_DIR / log_dir).resolve()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"tpu_audio_diarization_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+    # Réinitialisation de la config root log
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+    logging.info("--- Démarrage de l'analyse Audio TPU (YAMNet INT8) ---")
+
     # Initialisation TPU
     delegate = edgetpu.load_delegate()
     

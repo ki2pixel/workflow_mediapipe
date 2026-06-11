@@ -32,7 +32,7 @@ sys.modules['tflite_runtime'] = MagicMock()
 sys.modules['tflite_runtime.interpreter'] = mock_tflite
 
 BASE_PATH = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(BASE_PATH / "scripts" / "workflow_scripts" / "step5"))
+sys.path.insert(0, str(BASE_PATH / "workflow_scripts" / "step5"))
 
 try:
     from run_tracking_tpu import KalmanFilterND, run_tracking_pipeline, detect_face, extract_landmarks, extract_blendshapes

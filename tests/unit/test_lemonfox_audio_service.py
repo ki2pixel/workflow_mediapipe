@@ -601,10 +601,9 @@ class TestLemonfoxAPIIntegration:
             assert "95" in result.error
             assert "trop volumineux" in result.error.lower()
             
-    @patch('services.lemonfox_audio_service.config')
-    def test_call_lemonfox_api_missing_key(self, mock_config):
+    def test_call_lemonfox_api_missing_key(self, monkeypatch):
         """Missing API key should return error."""
-        mock_config.LEMONFOX_API_KEY = None
+        monkeypatch.setattr(lemonfox_module.config, "LEMONFOX_API_KEY", None, raising=False)
         
         with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp_video:
             tmp_path = Path(tmp_video.name)

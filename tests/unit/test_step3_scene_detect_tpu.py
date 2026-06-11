@@ -35,7 +35,7 @@ sys.modules['tflite_runtime.interpreter'] = mock_tflite
 
 # Ajouter le chemin du projet pour résoudre le module
 BASE_PATH = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(BASE_PATH / "scripts" / "workflow_scripts" / "step3"))
+sys.path.insert(0, str(BASE_PATH / "workflow_scripts" / "step3"))
 
 try:
     from run_scene_detect_tpu import compute_cosine_distance, temporal_smoothing, format_timecode, detect_scenes_tpu

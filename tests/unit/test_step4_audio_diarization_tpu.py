@@ -36,7 +36,7 @@ sys.modules['tflite_runtime.interpreter'] = mock_tflite
 
 # Les vérifications d'import ont été déplacées au début du fichier.
 BASE_PATH = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(BASE_PATH / "scripts" / "workflow_scripts" / "step4"))
+sys.path.insert(0, str(BASE_PATH / "workflow_scripts" / "step4"))
 
 try:
     from run_audio_diarization_tpu import perform_clustering, run_vad_and_embedding

@@ -22,6 +22,11 @@ from workflow_scripts.step5.object_detector_registry import ObjectDetectorRegist
 class TestObjectDetectorRegistry:
     """Test suite for ObjectDetectorRegistry"""
     
+    @pytest.fixture(autouse=True)
+    def clean_env(self, monkeypatch):
+        monkeypatch.delenv("STEP5_OBJECT_DETECTOR_MODEL_PATH", raising=False)
+
+    
     def test_get_model_spec_valid(self):
         """Test retrieving valid model specifications"""
         # Test default model

@@ -8,24 +8,25 @@ import sys
 
 import pytest
 
-# Load ResultsArchiver via absolute path
+# Import ResultsArchiver normally
 PROJECT_ROOT = Path(__file__).parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-SPEC_PATH = PROJECT_ROOT / 'services' / 'results_archiver.py'
-spec = importlib.util.spec_from_file_location("results_archiver", str(SPEC_PATH))
-results_archiver = importlib.util.module_from_spec(spec)
-# Ensure module is visible to decorators (dataclasses) during exec
-sys.modules[spec.name] = results_archiver  # type: ignore
-spec.loader.exec_module(results_archiver)  # type: ignore
+import services.results_archiver as results_archiver
 
+
+
+@pytest.fixture(autouse=True)
+def clear_archiver_cache():
+    if hasattr(results_archiver.ResultsArchiver, '_PROJECT_ARCHIVE_DIRS'):
+        results_archiver.ResultsArchiver._PROJECT_ARCHIVE_DIRS.clear()
 
 def test_archive_writes_into_timestamped_project_dir(tmp_path, monkeypatch):
     # Patch config.ARCHIVES_DIR to a temporary directory
-    from config.settings import config as app_config
-    monkeypatch.setattr(app_config, 'ARCHIVES_DIR', tmp_path)
+    monkeypatch.setattr(results_archiver.config, 'ARCHIVES_DIR', tmp_path)
 
     base_project = "13 Camille"
+
 
     # Create a dummy video file to hash
     video_dir = tmp_path / 'dummy_project'
@@ -64,10 +65,10 @@ def test_archive_writes_into_timestamped_project_dir(tmp_path, monkeypatch):
 
 def test_find_analysis_file_reads_from_timestamped_archives(tmp_path, monkeypatch):
     # Patch config.ARCHIVES_DIR to a temporary directory
-    from config.settings import config as app_config
-    monkeypatch.setattr(app_config, 'ARCHIVES_DIR', tmp_path)
+    monkeypatch.setattr(results_archiver.config, 'ARCHIVES_DIR', tmp_path)
 
     base_project = "18 Camille"
+
 
     # Prepare a real video file to compute hash
     projects_area = tmp_path / 'dummy_project'

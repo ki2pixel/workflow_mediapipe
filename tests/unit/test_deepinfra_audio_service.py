@@ -64,6 +64,7 @@ class TestDeepinfraApiCall:
 
     @patch("services.deepinfra_audio_service.requests.post")
     def test_call_deepinfra_api_success(self, mock_post, monkeypatch):
+        monkeypatch.setattr(DeepinfraAudioService, "_extract_audio_to_temp", staticmethod(lambda _path: None), raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_API_KEY", "test-key", raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_MODEL", "openai/whisper-large-v3", raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_RESPONSE_FORMAT", "verbose_json", raising=False)
@@ -92,6 +93,7 @@ class TestDeepinfraApiCall:
 
     @patch("services.deepinfra_audio_service.requests.post")
     def test_call_deepinfra_api_retries_on_429(self, mock_post, monkeypatch):
+        monkeypatch.setattr(DeepinfraAudioService, "_extract_audio_to_temp", staticmethod(lambda _path: None), raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_API_KEY", "test-key", raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_TIMEOUT_SEC", 30, raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_MAX_RETRIES", 2, raising=False)
@@ -124,6 +126,7 @@ class TestDeepinfraApiCall:
 
     @patch("services.deepinfra_audio_service.requests.post")
     def test_call_deepinfra_api_retries_on_timeout(self, mock_post, monkeypatch):
+        monkeypatch.setattr(DeepinfraAudioService, "_extract_audio_to_temp", staticmethod(lambda _path: None), raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_API_KEY", "test-key", raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_TIMEOUT_SEC", 30, raising=False)
         monkeypatch.setattr(module.config, "DEEPINFRA_MAX_RETRIES", 1, raising=False)

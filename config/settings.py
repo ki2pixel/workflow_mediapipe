@@ -487,7 +487,12 @@ class Config:
         Returns:
             Path object to the virtual environment directory
         """
-        return self.VENV_BASE_DIR / venv_name
+        path = self.VENV_BASE_DIR / venv_name
+        if not path.exists():
+            fallback_path = self.BASE_PATH_SCRIPTS / venv_name
+            if fallback_path.exists():
+                return fallback_path
+        return path
     
     def get_venv_python(self, venv_name: str) -> Path:
         """
