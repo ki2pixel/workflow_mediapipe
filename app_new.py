@@ -812,7 +812,15 @@ def run_process_async(step_key: str):
     les requêtes d'inférence (STEP3, 4, 5) sont envoyées à l'orchestrateur de queue asynchrone 
     pour un traitement par micro-lots (protection de la SRAM 8Mo).
     """
-    if config.ENABLE_CORAL_TPU_ACCELERATION and step_key in ["STEP3", "STEP4", "STEP5"]:
+    is_tpu_step = False
+    if step_key == "STEP3":
+        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP3_ENABLE_CORAL_TPU", True)
+    elif step_key == "STEP4":
+        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP4_ENABLE_CORAL_TPU", True)
+    elif step_key == "STEP5":
+        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP5_ENABLE_CORAL_TPU", True)
+
+    if is_tpu_step:
         from services.coral_tpu_orchestrator import tpu_orchestrator
         APP_LOGGER.info(f"[{step_key}] Routage vers l'orchestrateur TPU Asynchrone (Micro-lots)")
         tpu_orchestrator.submit_task(lambda: _run_process_async_internal(step_key))

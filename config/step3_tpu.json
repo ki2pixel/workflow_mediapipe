@@ -1,0 +1,10 @@
+{
+    "ema_alpha": 0.85,
+    "median_filter_size": 5,
+    "dugad_window_size": 25,
+    "dugad_k": 2.6,
+    "twin_threshold_enabled": true,
+    "twin_k_high": 2.5,
+    "twin_k_low": 1.8,
+    "min_scene_len": 12
+}

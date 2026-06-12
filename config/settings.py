@@ -729,6 +729,9 @@ class Config:
     # Coral TPU Acceleration
     # ========================
     ENABLE_CORAL_TPU_ACCELERATION: bool = os.environ.get('ENABLE_CORAL_TPU_ACCELERATION', 'false').lower() == 'true'
+    STEP3_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP3_ENABLE_CORAL_TPU'), default=True)
+    STEP4_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP4_ENABLE_CORAL_TPU'), default=True)
+    STEP5_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP5_ENABLE_CORAL_TPU'), default=True)
 
 
 

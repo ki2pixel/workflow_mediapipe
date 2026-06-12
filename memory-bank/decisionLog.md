@@ -11,6 +11,19 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 ## Juin 2026
 
+- [2026-06-12 21:38:00] **Calibration du seuil de clustering audio (AHC = 0.32) (COMPLET)** : Fixation du seuil de clustering AHC par défaut à `0.32` dans `run_audio_diarization_tpu.py`.
+  - **Raison** : Le seuil précédent de `0.33` provoquait une sous-segmentation systématique des locuteurs (fusion des dialogues en un locuteur unique, moyenne TPU de 1.0 locuteur vs 1.6 sur GPU).
+  - **Bilan** : Le seuil affiné de 0.32 permet de distinguer correctement les locuteurs pour les vidéos de dialogue de *Hélène Romano* et *Sa fille se plaint* (2 locuteurs sur TPU), élevant la moyenne de locuteurs à 1.4, sans introduire de sur-segmentation sur les monologues de *Steffy* ou *Edouard Durand*.
+
+- [2026-06-12 14:55:00] **Implémentation Algorithmes Audit TPU vs GPU Camille (STEP3 & STEP4)** : Réécriture complète des deux scripts TPU pour intégrer les recommandations de l'audit comparatif `docs/audits/audit_tpu_vs_gpu_camille.md`.
+  - **Raison** : L'audit a identifié une sur-détection majeure (31.4 faux positifs/vidéo) en STEP3 et un rappel VAD insuffisant (54.89%) en STEP4, causés par l'utilisation de logits bruts 1000D, de seuils statiques, d'un fenêtrage non-chevauchant et d'un clustering fixe à 2 locuteurs.
+  - **Implémentation** :
+    - STEP3 : Support GAP 1280D (fallback 1000D), EMA sur embeddings (α=0.8), filtre médian 1D (remplace moyenne mobile), seuillage adaptatif de Dugad (μ+k·σ, k=3.0, M=25), twin-comparison (transitions graduelles), timecode `HH:MM:SS.mmm`.
+    - STEP4 : Fenêtrage glissant 50% overlap (hop=0.48s), seuil VAD calibré 0.20, filtre médian sur probabilités, FSM Hangover 3 états (1.0s, `ceil(1.0/hop_sec)` frames), clustering spectral adaptatif (eigengap + silhouette), `speaker_stats` dans le JSON.
+  - **Alternatives rejetées** : Remplacement complet par Whisper/TransNetV2 sur CPU (trop lent sans GPU). Seuils statiques affinés (insuffisant face à la variabilité du contenu).
+  - **Impact** : Tous les paramètres sont configurables via `--config` JSON. 38/38 tests passés. Aucune régression sur la suite complète (434/434 STEP3+STEP4 tests).
+
+
 - [2026-06-11 19:00:00] **Mise à jour Coding Standards Google Coral Edge TPU** : Décision d'intégrer les spécifications du Coral TPU tout en réduisant drastiquement la verbosité du fichier `.agents/rules/codingstandards.md`.
   - **Raison** : La limite stricte de 12 000 caractères était menacée. Il fallait documenter l'usage obligatoire de `coral_tpu_orchestrator.py` et les modèles INT8 sans dépasser le quota.
   - **Implémentation** : Réécriture complète et condensation des sections "After Effects & CEP" et "Pipeline", et ajout des contraintes TPU.

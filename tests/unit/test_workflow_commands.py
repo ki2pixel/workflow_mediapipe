@@ -201,6 +201,18 @@ class TestStepConfigurations:
             assert 'coral_env' in cmd_str
             assert 'run_scene_detect_tpu.py' in cmd_str
     
+    def test_step3_uses_transnet_when_tpu_disabled_for_step(self, temp_base_path):
+        """Test that STEP3 uses transnet_env when global TPU is enabled but step TPU is disabled."""
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
+             patch.object(config, 'STEP3_ENABLE_CORAL_TPU', False, create=True):
+            commands = WorkflowCommandsConfig(base_path=temp_base_path)
+            
+            cmd = commands.get_step_command('STEP3')
+            cmd_str = ' '.join(cmd)
+            
+            assert 'transnet_env' in cmd_str
+            assert 'run_transnet.py' in cmd_str
+    
     def test_step4_uses_audio_env(self, temp_base_path):
         """Test that STEP4 uses audio_env."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', False):
@@ -227,6 +239,22 @@ class TestStepConfigurations:
             assert 'coral_env' in cmd_str
             assert 'run_audio_diarization_tpu.py' in cmd_str
     
+    def test_step4_uses_audio_when_tpu_disabled_for_step(self, temp_base_path):
+        """Test that STEP4 uses audio_env when global TPU is enabled but step TPU is disabled."""
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
+             patch.object(config, 'STEP4_ENABLE_CORAL_TPU', False, create=True):
+            commands = WorkflowCommandsConfig(base_path=temp_base_path)
+            
+            cmd = commands.get_step_command('STEP4')
+            cmd_str = ' '.join(cmd)
+            
+            assert 'audio_env' in cmd_str
+            assert (
+                ('run_audio_analysis.py' in cmd_str)
+                or ('run_audio_analysis_lemonfox.py' in cmd_str)
+                or ('run_audio_analysis_deepinfra.py' in cmd_str)
+            )
+    
     def test_step5_uses_tracking_env_slim(self, temp_base_path):
         """Test that STEP5 uses tracking_env_slim."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', False):
@@ -248,6 +276,18 @@ class TestStepConfigurations:
             
             assert 'coral_env' in cmd_str
             assert 'run_tracking_tpu.py' in cmd_str
+
+    def test_step5_uses_tracking_when_tpu_disabled_for_step(self, temp_base_path):
+        """Test that STEP5 uses tracking_env_slim when global TPU is enabled but step TPU is disabled."""
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
+             patch.object(config, 'STEP5_ENABLE_CORAL_TPU', False, create=True):
+            commands = WorkflowCommandsConfig(base_path=temp_base_path)
+            
+            cmd = commands.get_step_command('STEP5')
+            cmd_str = ' '.join(cmd)
+            
+            assert 'tracking_env_slim' in cmd_str
+            assert 'run_tracking_manager.py' in cmd_str
     
     def test_step5_has_post_completion_message(self, temp_base_path):
         """Test that STEP5 has post_completion_message_ui."""

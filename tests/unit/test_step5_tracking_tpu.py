@@ -105,5 +105,21 @@ class TestStep5TPUFlow:
         bshapes = extract_blendshapes(blendshapes, landmarks)
         assert len(bshapes) == 52
 
+    def test_apply_affine_crop_zero_division(self):
+        # Given: Une image simulée et des paramètres de transformation avec distance nulle (les deux yeux superposés)
+        from utils.tpu_facemesh_utils import apply_affine_crop
+        image = np.zeros((100, 100, 3), dtype=np.uint8)
+        transform_params = {
+            "center": (0.5, 0.5),
+            "angle": 0.0,
+            "dist": 0.0,
+            "output_size": 192
+        }
+        
+        # When: Appliquer le crop affine
+        # Then: Il ne doit pas lever de ZeroDivisionError et doit retourner une image de la bonne taille
+        cropped = apply_affine_crop(image, transform_params)
+        assert cropped.shape == (192, 192, 3)
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

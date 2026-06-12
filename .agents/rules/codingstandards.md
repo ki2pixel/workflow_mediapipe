@@ -46,10 +46,10 @@ alwaysApply: true
 - **STEP2 (Conversion)**: NVENC parallèle (max 3 workers) + Fallback CPU `libx264`.
 - **STEP3 (Transitions)**:
   - GPU/CPU: TransNetV2 (batch=8, `mixed_precision=true`, O(1) RAM).
-  - TPU: MobileNetV2 INT8 séquentiel (batch=1) + Distance cosinus et filtre médian CPU.
+  - TPU: MobileNetV2 INT8 (GAP 1280D ou logits 1000D fallback) + EMA embeddings (α=0.8) + Filtre Médian 1D + Seuillage adaptatif Dugad (μ+k·σ, k=3.0) + Twin-Comparison (transitions graduelles). Timecode `HH:MM:SS.mmm`.
 - **STEP4 (Audio)**:
   - GPU/CPU: Lemonfox/Whisper + Fallback Pyannote. Isolement GPU (`AUDIO_GPU_ISOLATION=1`) en sous-processus. `AUDIO_PROFILE=gpu_fp32`.
-  - TPU: YAMNet INT8 (segments 0.96s) + Spectral Clustering CPU (`scikit-learn`).
+  - TPU: YAMNet INT8 (fenêtrage glissant overlap 50%, hop 0.48s) + Filtre Médian VAD + FSM Hangover (1.0s) + Spectral Clustering adaptatif (eigengap/silhouette) CPU. Seuil VAD calibré 0.20.
 - **STEP5 (Tracking)**:
   - CPU: MediaPipe (`tracking_env_slim`), multiprocessing obligatoire + `cv2.setNumThreads(0)`.
   - GPU: InsightFace (`insightface_env`, activé via `STEP5_ENABLE_GPU=1`).

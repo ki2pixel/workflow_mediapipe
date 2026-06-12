@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from PIL import Image
+import cv2
 
 def generate_blazeface_anchors():
     """
@@ -116,25 +116,29 @@ def get_affine_transform(right_eye, left_eye, output_size=192):
         "output_size": output_size
     }
 
-def apply_affine_crop(image_pil, transform_params):
+def apply_affine_crop(image_np, transform_params):
     """
-    Applique le recadrage orienté avec PIL.
+    Applique le recadrage orienté avec cv2.warpAffine (C++ SIMD).
     """
-    w, h = image_pil.size
+    h, w = image_np.shape[:2]
     cx = transform_params["center"][0] * w
     cy = transform_params["center"][1] * h
     angle = transform_params["angle"]
-    
-    # Rotation de l'image centrée sur le point
-    rotated = image_pil.rotate(angle, center=(cx, cy), resample=Image.BICUBIC)
+    out_size = transform_params["output_size"]
     
     # Echelle empirique : La face fait généralement 2.0x à 2.5x la distance inter-oculaire.
     box_size = transform_params["dist"] * 2.5 * max(w, h)
+    if box_size < 1e-5:
+        box_size = 1e-5
+    scale = out_size / box_size
     
-    left = cx - box_size / 2
-    top = cy - box_size / 2
-    right = cx + box_size / 2
-    bottom = cy + box_size / 2
+    # getRotationMatrix2D prend l'angle en degrés (rotation anti-horaire).
+    M = cv2.getRotationMatrix2D((cx, cy), angle, scale)
+    # Translation pour centrer la boîte recadrée
+    M[0, 2] += out_size / 2 - cx * scale
+    M[1, 2] += out_size / 2 - cy * scale
     
-    cropped = rotated.crop((left, top, right, bottom))
-    return cropped.resize((transform_params["output_size"], transform_params["output_size"]), Image.BICUBIC)
+    cropped = cv2.warpAffine(image_np, M, (out_size, out_size),
+                             flags=cv2.INTER_LINEAR,
+                             borderMode=cv2.BORDER_CONSTANT)
+    return cropped

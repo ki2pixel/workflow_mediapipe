@@ -150,10 +150,11 @@ class WorkflowCommandsConfig:
         """
         step3_log_dir = self.logs_base_dir / "step3"
         
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step3" / "run_scene_detect_tpu.py"),
+                "--config", str(self.base_path / "config" / "step3_tpu.json")
             ]
         else:
             cmd = [
@@ -200,7 +201,7 @@ class WorkflowCommandsConfig:
         """
         step4_log_dir = self.logs_base_dir / "step4"
 
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step4" / "run_audio_diarization_tpu.py"),
@@ -227,7 +228,7 @@ class WorkflowCommandsConfig:
 
             if step4_script_name == "run_audio_analysis.py" and self.hf_token:
                 cmd.extend(["--hf_auth_token", str(self.hf_token)])
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
             progress_patterns = {
                 "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
                 "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
@@ -274,7 +275,7 @@ class WorkflowCommandsConfig:
         """
         step5_log_dir = self.logs_base_dir / "step5"
         
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP5_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_tpu.py")
