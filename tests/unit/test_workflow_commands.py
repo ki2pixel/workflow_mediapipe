@@ -359,17 +359,22 @@ class TestLogConfiguration:
     
     def test_step5_has_multiple_logs(self, temp_base_path):
         """Test that STEP5 has multiple log configurations."""
-        commands = WorkflowCommandsConfig(base_path=temp_base_path)
-        
-        logs = commands.get_step_config('STEP5')['specific_logs']
-        
-        # Should have manager log, CPU worker log, and GPU worker log
-        assert len(logs) >= 3
-        
-        log_names = [log['name'] for log in logs]
-        assert any('Manager' in name for name in log_names)
-        assert any('CPU' in name for name in log_names)
-        assert any('GPU' in name for name in log_names)
+        # Test default/non-accelerated mode
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', False):
+            commands = WorkflowCommandsConfig(base_path=temp_base_path)
+            logs = commands.get_step_config('STEP5')['specific_logs']
+            assert len(logs) >= 3
+            log_names = [log['name'] for log in logs]
+            assert any('Manager' in name for name in log_names)
+            assert any('CPU' in name for name in log_names)
+            assert any('GPU' in name for name in log_names)
+
+        # Test accelerated mode (TPU)
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True):
+            commands = WorkflowCommandsConfig(base_path=temp_base_path)
+            logs = commands.get_step_config('STEP5')['specific_logs']
+            assert len(logs) == 1
+            assert logs[0]['name'] == 'Log Tracking TPU'
 
 
 class TestRepr:

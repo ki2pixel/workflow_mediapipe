@@ -243,6 +243,18 @@ class WorkflowService:
             return {"status": "error", "message": "Execution function not available"}
 
         try:
+            workflow_state.update_step_status(step_key, 'initiated')
+            workflow_state.clear_step_log(step_key)
+            workflow_state.update_step_info(
+                step_key,
+                return_code=None,
+                progress_current=0,
+                progress_total=0,
+                progress_text='En attente...',
+                start_time_epoch=time.time(),
+                duration_str=None
+            )
+            
             thread = threading.Thread(
                 target=app_new.run_process_async,
                 args=(step_key,)
@@ -251,6 +263,7 @@ class WorkflowService:
             thread.start()
         except Exception as e:
             logger.error(f"Error starting step execution thread: {e}")
+            workflow_state.update_step_status(step_key, 'idle')
             return {"status": "error", "message": f"Failed to start step execution: {str(e)}"}
         
         return {

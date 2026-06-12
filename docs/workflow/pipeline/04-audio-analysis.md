@@ -1,14 +1,14 @@
 # Analyse Audio
 
-**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Trois méthodes compatibles : **Pyannote** (défaut), **Lemonfox** (cloud diarisation), **DeepInfra** (OpenAI-compatible STT). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP5/STEP6.
+**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Supporte également l'accélération matérielle basse consommation Google Coral Edge TPU. Quatre méthodes compatibles : **Pyannote** (défaut local GPU/CPU), **Lemonfox** (cloud diarisation), **DeepInfra** (cloud STT), et **Edge TPU** (YAMNet local + Spectral Clustering CPU). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP5/STEP6.
 
 ## Le Problème : Analyse Audio Manuelle Inefficace
 
 Tu dois identifier qui parle et quand dans tes vidéos, mais le faire manuellement est impossible sur des contenus longs. Tu as besoin d'une solution automatique qui distingue les locuteurs et synchronise parfaitement l'analyse audio avec les frames vidéo pour la post-production.
 
-## Notre Solution : Diarisation / Transcription avec Triple Option
+## Notre Solution : Diarisation / Transcription avec Quadruple Option
 
-Nous utilisons Pyannote.audio 3.1 (local), Lemonfox API (cloud diarisation), et DeepInfra (cloud STT OpenAI-compatible). Le système convertit chaque méthode en timeline frame par frame et conserve le même schéma JSON en sortie.
+Nous utilisons Pyannote.audio 3.1 (local), Lemonfox API (cloud diarisation), DeepInfra (cloud STT OpenAI-compatible), et l'accélération matérielle Google Coral Edge TPU. Le système convertit chaque méthode en timeline frame par frame et conserve le même schéma JSON en sortie.
 
 ### ❌ AMP FP16 (anti-pattern)
 ```bash
@@ -92,10 +92,13 @@ projets_extraits/projet_camille_001/docs/video1_audio.json
 ### Variables d'Environnement
 
 ```bash
-# Sélection méthode STEP4 (prioritaire)
+# Sélection méthode STEP4 (lorsque TPU désactivé)
 STEP4_METHOD=pyannote          # pyannote | lemonfox | deepinfra
 
-# Profil de performance (recommandé)
+# Accélération matérielle
+ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (YAMNet)
+
+# Profil de performance (recommandé lorsque TPU désactivé)
 AUDIO_PROFILE=gpu_fp32          # gpu_fp32, gpu_optimized, cpu_only
 
 # GPU/CPU et Isolation
@@ -170,9 +173,10 @@ STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 
 ### Priorité de sélection STEP4
 
-1. `STEP4_METHOD` si valeur valide (`pyannote|lemonfox|deepinfra`)
-2. Fallback legacy `STEP4_USE_LEMONFOX=1` (→ Lemonfox)
-3. Sinon défaut historique Pyannote
+1. Accélération Coral TPU si `ENABLE_CORAL_TPU_ACCELERATION=true` (→ Exécution de `run_audio_diarization_tpu.py` sous `coral_env`).
+2. `STEP4_METHOD` si valeur valide (`pyannote|lemonfox|deepinfra`)
+3. Fallback legacy `STEP4_USE_LEMONFOX=1` (→ Lemonfox)
+4. Sinon défaut historique Pyannote (local)
 
 > Endpoint DeepInfra officiel appliqué avec garde-fou typo :
 > `https://api.deepinfra.com/v1/openai/audio/transcriptions`
@@ -194,7 +198,20 @@ STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 | **Pyannote Local** | Totale | Gratuit | GPU requis | Installation complexe | Données sensibles, on-premise |
 | **Lemonfox Cloud** | Données externes | Par usage | Stable | Dépendance réseau | Projets ponctuels, pas de GPU |
 | **DeepInfra Cloud** | Données externes | Par usage | Stable (retry/backoff) | Dépendance réseau, pas de diarisation native | Transcription rapide compatible API OpenAI |
+| **Edge TPU (YAMNet)** | Totale | Gratuit | Très rapide (VAD local TPU) | Faible résolution diarisation (Spectral Clustering CPU) | Postes Edge locaux basse consommation sans GPU dédié |
 | **Hybrid** | Configurable | Variable | Flexible | Complexité gestion | Environnements mixtes |
+
+## Accélération Google Coral Edge TPU
+
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 4 bascule vers un pipeline de traitement audio local ultra-léger et économe :
+
+* **Script d'exécution** : `workflow_scripts/step4/run_audio_diarization_tpu.py`
+* **Fonctionnement** :
+  1. **Extraction audio** : FFmpeg convertit la vidéo en fichier audio WAV 16kHz mono.
+  2. **VAD (Voice Activity Detection)** : Inférence séquentielle du modèle quantifié YAMNet INT8 sur le Coral TPU pour identifier la présence de voix humaine par blocs de 0.96s.
+  3. **Speaker Embedding** : Génération de d-vectors (embeddings de locuteur) soit par un extracteur CNN local TPU (`cnn_speaker_extractor_edgetpu.tflite`), soit par repli sur les embeddings de YAMNet.
+  4. **Diarisation (Spectral Clustering)** : Regroupement spectral déporté sur le CPU via `scikit-learn` pour segmenter et associer les morceaux de voix aux locuteurs (ex: SPEAKER_00, SPEAKER_01).
+  5. **Timeline frame-par-frame** : Alignement précis des segments de voix détectés sur une timeline à 25 fps et génération du format JSON final, garantissant une compatibilité totale avec les étapes aval (notamment la compression et la réduction JSON de la STEP6).
 
 ## Analogie : Studio Mixage vs Transcription Cloud
 
@@ -329,6 +346,23 @@ source audio_env/bin/activate
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install pyannote.audio
 pip install librosa numpy ffmpeg-python
+```
+
+### Environnement Edge TPU (coral_env)
+
+Pour exécuter l'analyse audio sous accélération TPU, configurez l'environnement dédié :
+
+```bash
+# Configuration des pilotes et règles udev (requis une seule fois)
+sudo bash scripts/install_coral_udev.sh
+
+# Création et activation de l'environnement virtuel (Python 3.10 requis pour pycoral)
+python3.10 -m venv coral_env
+source coral_env/bin/activate
+
+# Installation des paquets Coral, TFLite Runtime et dépendances mathématiques
+pip install tflite-runtime==2.17.1 pycoral==2.0.2 numpy
+pip install scipy scikit-learn
 ```
 
 ### PyTorch CUDA Compatibilité

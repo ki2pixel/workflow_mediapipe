@@ -180,7 +180,7 @@ export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
             const pollStartTime = performance.now();
             console.log(`[API POLL] Fetching status for ${stepKey} at ${new Date().toISOString()}`);
 
-            const response = await fetch(`/status/${stepKey}`);
+            const response = await fetch(`/status/${stepKey}?t=${Date.now()}`);
             if (!response.ok) {
                 console.warn(`[API performPoll] Erreur ${response.status} lors du polling pour ${stepKey}. Arrêt du polling.`);
                 stopPollingAPI(stepKey);
@@ -270,7 +270,7 @@ export async function fetchSpecificLogAPI(stepKey, logIndex, logName, buttonElOr
 
 export async function fetchInitialStatusAPI(stepKey) {
     try {
-        const response = await fetch(`/status/${stepKey}`);
+        const response = await fetch(`/status/${stepKey}?t=${Date.now()}`);
         if (!response.ok) {
             console.warn(`Initial status fetch failed for ${stepKey}: ${response.status}. Using fallback.`);
             appState.setState({

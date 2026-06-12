@@ -1,6 +1,6 @@
 # Détection de Scènes
 
-**TL;DR** : Analyse automatique des vidéos avec TransNetV2. Décodage asynchrone FFmpeg (Threading + Queue), pruning glissant de la RAM (O(1) constant) et batching GPU (taille 16) pour une performance maximale avec fallback CPU. Sortie CSV standardisée.
+**TL;DR** : Analyse automatique des vidéos avec TransNetV2. Décodage asynchrone FFmpeg (Threading + Queue), pruning glissant de la RAM (O(1) constant) et batching GPU (taille 16) pour une performance maximale avec fallback CPU. Supporte également l'accélération optionnelle via Google Coral Edge TPU (MobileNetV2 Siamois + Cosine Distance CPU). Sortie CSV standardisée.
 
 ## Le Problème : Segmentation Manuelle Fastidieuse
 
@@ -100,7 +100,10 @@ STEP3_WINDOW_SIZE=100
 STEP3_STRIDE=50
 STEP3_PADDING=25
 
-# Device et performance
+# Accélération matérielle
+ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (PCIe/USB)
+
+# Device et performance (lorsque TPU désactivé)
 STEP3_DEVICE=auto           # auto, cuda, cpu
 STEP3_BATCH_SIZE=8          # GPU: 8 pour VRAM 4Go
 STEP3_NUM_WORKERS=1        # Multi-vidéos (CPU only)
@@ -185,13 +188,26 @@ No,Timecode In,Timecode Out,Frame In,Frame Out
 | **Window 100** | Standard, rapide | Moins précis | Production courante |
 | **Window 200** | Moins de bruit | Manque transitions rapides | Contenus lents, paysages |
 
-## Trade-offs GPU vs CPU
+## Trade-offs GPU vs CPU vs Edge TPU
 
-| Mode | Performance | VRAM | Risques | Quand l'utiliser |
-|------|-------------|------|---------|-----------------|
-| **GPU CUDA** | 5-10× plus rapide | 2-4GB | OOM sur vidéos longues | Production, GPU disponible |
-| **CPU** | Lent mais stable | 0GB | Timeout sur longues vidéos | Développement, laptop |
+| Mode | Performance | Mémoire | Risques | Quand l'utiliser |
+|------|-------------|---------|---------|-----------------|
+| **GPU CUDA** | 5-10× plus rapide (TransNetV2) | 2-4GB VRAM | OOM sur vidéos longues | Production avec GPU dédié |
+| **CPU** | Lent mais stable (TransNetV2) | 0GB VRAM | Timeout sur longues vidéos | Développement, laptop |
+| **Edge TPU** | Très rapide et économique (MobileNetV2 Siamois) | 0GB VRAM (SRAM 8MB) | Requiert matériel Coral et `coral_env` | Postes Edge sans GPU dédié (consommation 2-4W) |
 | **Hybrid** | Auto-fallback | Variable | Complexité configuration | Environnements mixtes |
+
+## Accélération Google Coral Edge TPU
+
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 3 bascule du modèle lourd TransNetV2 vers une architecture optimisée pour les puces TPU Coral Edge (M.2 PCIe ou USB) :
+
+* **Script d'exécution** : `workflow_scripts/step3/run_scene_detect_tpu.py`
+* **Fonctionnement** :
+  1. **Décodage vidéo** : Extraction des frames à 25 FPS au format RGB 224x224 via FFmpeg.
+  2. **Inférence TPU** : Utilisation d'un modèle Siamois MobileNetV2 INT8 quantifié exécuté sur l'Edge TPU pour générer un vecteur d'empreinte (logits à 1000 dimensions) pour chaque frame.
+  3. **Calcul des transitions** : Calcul de la distance cosinus entre frames successives sur le CPU.
+  4. **Lissage temporel** : Application d'un filtre de convolution moyenne mobile sur le CPU pour gommer le bruit d'inférence INT8.
+  5. **Détection** : Identification des pics de transition qui franchissent le seuil configuré (par défaut 0.25) et écriture du fichier `.csv` de découpage.
 
 ## Benchmarks d'Optimisation VRAM (GPU 4 Go)
 
@@ -250,6 +266,22 @@ source transnet_env/bin/activate
 
 # Installation dépendances
 pip install torch torchvision ffmpeg-python scenedetect numpy
+```
+
+### Environnement Edge TPU (coral_env)
+
+Pour exécuter la détection de scènes sous accélération TPU, configurez l'environnement dédié :
+
+```bash
+# Configuration des pilotes et règles udev (requis une seule fois)
+sudo bash scripts/install_coral_udev.sh
+
+# Création et activation de l'environnement virtuel (Python 3.10 requis pour pycoral)
+python3.10 -m venv coral_env
+source coral_env/bin/activate
+
+# Installation des paquets Coral et TFLite Runtime
+pip install tflite-runtime==2.17.1 pycoral==2.0.2 numpy
 ```
 
 ### PyTorch avec Support CUDA

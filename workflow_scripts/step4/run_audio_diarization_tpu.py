@@ -68,6 +68,21 @@ def extract_audio(video_path: Path, temp_wav: Path):
     ]
     subprocess.run(cmd, check=True)
 
+def _run_ffprobe_duration(video_path: Path) -> float:
+    """Retourne la durée (en secondes) via ffprobe, ou -1 en cas d'échec."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=nw=1:nk=1", str(video_path)
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
+        )
+        return float(result.stdout.strip())
+    except Exception as e:
+        logging.warning(f"ffprobe a échoué pour {video_path.name}: {e}")
+        return -1.0
+
 def run_vad_and_embedding(wav_path: Path, yamnet_interpreter, extractor_interpreter=None):
     """
     Exécute le VAD via YAMNet (Edge TPU).
@@ -203,6 +218,75 @@ def perform_clustering(embeddings, segments):
     
     return results
 
+def _write_audio_json_file(output_json, video_path, diarization_result, duration_sec, temp_wav, fps=25.0):
+    if duration_sec <= 0 and temp_wav is not None:
+        # Fallback sur la durée de l'audio si ffprobe échoue
+        try:
+            sample_rate, wav_data = wavfile.read(temp_wav)
+            duration_sec = len(wav_data) / sample_rate
+        except Exception:
+            duration_sec = -1.0
+            
+    total_frames = int(round(duration_sec * fps)) if duration_sec > 0 else -1
+    
+    # Alignement des segments de diarisation sur la timeline des frames (25 fps)
+    audio_timeline = {}
+    max_frame_seen = 0
+    for item in diarization_result:
+        start_sec = item["start"]
+        end_sec = item["end"]
+        speaker_label = item["speaker"]
+        
+        start_frame = max(1, int(start_sec * fps))
+        end_frame = int(end_sec * fps)
+        if end_frame < start_frame:
+            continue
+        max_frame_seen = max(max_frame_seen, end_frame)
+        for frame_num in range(start_frame, end_frame + 1):
+            frame_entry = audio_timeline.get(frame_num)
+            if frame_entry is None:
+                frame_entry = set()
+                audio_timeline[frame_num] = frame_entry
+            frame_entry.add(speaker_label)
+            
+    if total_frames < 0:
+        total_frames = max_frame_seen
+    total_frames = max(1, total_frames)
+    
+    # Écriture JSON streaming (schéma identique à run_audio_analysis.py)
+    with open(output_json, 'w', encoding='utf-8') as f:
+        f.write("{\n")
+        f.write(f"  \"video_filename\": \"{video_path.name}\",\n")
+        f.write(f"  \"total_frames\": {total_frames},\n")
+        f.write(f"  \"fps\": {round(fps, 2)},\n")
+        f.write("  \"frames_analysis\": [\n")
+        
+        frames_processed = 0
+        for frame_num in range(1, total_frames + 1):
+            speakers = sorted(audio_timeline.get(frame_num, []))
+            is_speech = len(speakers) > 0
+            timecode = round((frame_num - 1) / fps, 3)
+            obj = {
+                "frame": frame_num,
+                "audio_info": {
+                    "is_speech_present": is_speech,
+                    "num_distinct_speakers_audio": len(speakers),
+                    "active_speaker_labels": speakers,
+                    "timecode_sec": timecode,
+                },
+            }
+            if frame_num > 1:
+                f.write(",\n")
+            f.write("    " + json.dumps(obj))
+            
+            frames_processed += 1
+            if frames_processed % 500 == 0 or frames_processed == total_frames:
+                progress_percent = int((frames_processed / total_frames) * 100) if total_frames else 100
+                logging.info(f"INTERNAL_PROGRESS: {frames_processed}/{total_frames} frames ({progress_percent}%) - {video_path.name}")
+                
+        f.write("\n  ]\n")
+        f.write("}\n")
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log_dir", type=str, default="logs/step4", help="Dossier de logs")
@@ -261,7 +345,6 @@ def main():
     videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_name(f"{p.stem}_audio.json").exists()]
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
-    print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
 
     if total_videos == 0:
         return
@@ -269,7 +352,6 @@ def main():
     successful_count = 0
     for idx, video_path in enumerate(videos):
         logging.info(f"PROCESSING_VIDEO: {video_path.name}")
-        print(f"PROCESSING_VIDEO: {video_path.name}")
         
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -282,13 +364,12 @@ def main():
                 # 2. Spectral Clustering (CPU)
                 diarization_result = perform_clustering(embeddings, segments)
                 
-                # Sauvegarde JSON
+                # Sauvegarde JSON au format original compatible STEP5/6
                 output_json = video_path.with_name(f"{video_path.stem}_audio.json")
-                with open(output_json, 'w', encoding='utf-8') as f:
-                    json.dump({"diarization": diarization_result}, f, indent=4)
-                    
+                duration_sec = _run_ffprobe_duration(video_path)
+                _write_audio_json_file(output_json, video_path, diarization_result, duration_sec, temp_wav)
+                
                 logging.info(f"Succès: {output_json.name} créé.")
-                print(f"Succès: {output_json.name} créé.")
                 successful_count += 1
                 
         except Exception as e:

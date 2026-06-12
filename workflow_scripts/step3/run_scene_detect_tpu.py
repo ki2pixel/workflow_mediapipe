@@ -167,7 +167,6 @@ def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=12)
             if frame_idx % 250 == 0:
                 progress_pct = int(min(100, (frame_idx / total_expected_frames) * 100))
                 logging.info(f"INTERNAL_PROGRESS: {frame_idx}/{total_expected_frames} frames ({progress_pct}%) - {video_path.name}")
-                print(f"INTERNAL_PROGRESS: {frame_idx}/{total_expected_frames} frames ({progress_pct}%) - {video_path.name}")
                 
         process.stdout.close()
         process.wait()
@@ -252,7 +251,6 @@ def main():
     videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_suffix('.csv').exists()]
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
-    print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
 
     if total_videos == 0:
         return
@@ -260,7 +258,6 @@ def main():
     successful_count = 0
     for idx, video_path in enumerate(videos):
         logging.info(f"PROCESSING_VIDEO: {video_path.name}")
-        print(f"PROCESSING_VIDEO: {video_path.name}")
         
         scenes = detect_scenes_tpu(video_path, interpreter, threshold=threshold, min_scene_len=min_scene_len)
         
@@ -276,7 +273,6 @@ def main():
                     writer.writerow([j + 1, tc_in, tc_out, start + 1, end + 1])
                     
             logging.info(f"Succès: {output_csv_path.name} créé avec {len(scenes)} scènes.")
-            print(f"Succès: {output_csv_path.name} créé avec {len(scenes)} scènes.")
             successful_count += 1
         else:
             logging.error(f"Échec de l'analyse pour {video_path.name}")

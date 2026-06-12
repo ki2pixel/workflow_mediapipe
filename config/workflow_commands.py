@@ -227,7 +227,29 @@ class WorkflowCommandsConfig:
 
             if step4_script_name == "run_audio_analysis.py" and self.hf_token:
                 cmd.extend(["--hf_auth_token", str(self.hf_token)])
-        
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False):
+            progress_patterns = {
+                "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
+                "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
+                "current_success_line_pattern": re.compile(
+                    r"Succès:\s*(.*?)(?:_audio\.json)?\s+créé", re.IGNORECASE
+                ),
+                "current_item_text_from_success_line": True
+            }
+        else:
+            progress_patterns = {
+                "total": re.compile(r"TOTAL_AUDIO_TO_ANALYZE:\s*(\d+)", re.IGNORECASE),
+                "current": re.compile(r"ANALYZING_AUDIO:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
+                "internal": re.compile(
+                    r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)",
+                    re.IGNORECASE
+                ),
+                "current_success_line_pattern": re.compile(
+                    r"Succès: analyse audio terminée pour (.*?)$", re.IGNORECASE
+                ),
+                "current_item_text_from_success_line": True
+            }
+
         return {
             "display_name": "4. Analyse audio",
             "cmd": cmd,
@@ -241,18 +263,7 @@ class WorkflowCommandsConfig:
                     "lines": 150
                 }
             ],
-            "progress_patterns": {
-                "total": re.compile(r"TOTAL_AUDIO_TO_ANALYZE:\s*(\d+)", re.IGNORECASE),
-                "current": re.compile(r"ANALYZING_AUDIO:\s*(\d+)/(\d+):\s*(.*)", re.IGNORECASE),
-                "internal": re.compile(
-                    r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)",
-                    re.IGNORECASE
-                ),
-                "current_success_line_pattern": re.compile(
-                    r"Succès: analyse audio terminée pour (.*?)$", re.IGNORECASE
-                ),
-                "current_item_text_from_success_line": True
-            }
+            "progress_patterns": progress_patterns
         }
     
     def _get_step5_config(self) -> Dict[str, Any]:
@@ -268,17 +279,32 @@ class WorkflowCommandsConfig:
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_tpu.py")
             ]
+            specific_logs = [
+                {
+                    "name": "Log Tracking TPU",
+                    "type": "directory_latest",
+                    "path": step5_log_dir,
+                    "pattern": "tpu_tracking*.log",
+                    "lines": 100
+                }
+            ]
+            progress_patterns = {
+                "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
+                "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
+                "internal": re.compile(
+                    r"INTERNAL[_ ]PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)", re.IGNORECASE
+                ),
+                "current_success_line_pattern": re.compile(
+                    r"Succès:\s*(.*?)(?:\.csv|\.json)\s+créé", re.IGNORECASE
+                ),
+                "current_item_text_from_success_line": True
+            }
         else:
             cmd = [
                 str(config.get_venv_python("tracking_env_slim")),
                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
             ]
-
-        return {
-            "display_name": "5. Analyse du tracking",
-            "cmd": cmd,
-            "cwd": str(self.base_path / "projets_extraits"),
-            "specific_logs": [
+            specific_logs = [
                 {
                     "name": "Log Tracking Manager",
                     "type": "directory_latest",
@@ -300,8 +326,8 @@ class WorkflowCommandsConfig:
                     "pattern": "*worker_GPU*.log",
                     "lines": 100
                 }
-            ],
-            "progress_patterns": {
+            ]
+            progress_patterns = {
                 "total": re.compile(r"Vidéos à traiter: (\d+)", re.IGNORECASE),
                 "current": re.compile(r"Traitement de (.*?):\s*(\d+)%", re.IGNORECASE),
                 "internal": re.compile(r"(.*?):\s*(\d+)%", re.IGNORECASE),
@@ -309,7 +335,14 @@ class WorkflowCommandsConfig:
                     r"\[Gestionnaire\] Succès pour (.*?)$", re.IGNORECASE
                 ),
                 "current_item_text_from_success_line": True
-            },
+            }
+
+        return {
+            "display_name": "5. Analyse du tracking",
+            "cmd": cmd,
+            "cwd": str(self.base_path / "projets_extraits"),
+            "specific_logs": specific_logs,
+            "progress_patterns": progress_patterns,
             "post_completion_message_ui": "Traitement du tracking terminé."
         }
     

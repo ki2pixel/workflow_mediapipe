@@ -195,11 +195,14 @@ def get_status(step_key):
     try:
         status_data = WorkflowService.get_step_status(step_key, include_logs=True)
 
-        # DEBUG: Log what we're returning to the frontend during AutoMode
-        if status_data.get('is_any_sequence_running', False):
-            logger.info(f"[ROUTE_DEBUG] /status/{step_key} returning: status='{status_data.get('status')}', progress={status_data.get('progress_current')}/{status_data.get('progress_total')}")
+        # Log what we are returning to the frontend for debugging
+        logger.info(f"[ROUTE_DEBUG] /status/{step_key} returning: status='{status_data.get('status')}', progress={status_data.get('progress_current')}/{status_data.get('progress_total')}")
 
-        return jsonify(status_data)
+        resp = jsonify(status_data)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
     except ValueError as e:
         return jsonify({"status": "error", "message": str(e)}), 404
     except Exception as e:
@@ -352,7 +355,12 @@ def sequence_status():
         500: Server error
     """
     try:
-        return jsonify(WorkflowService.get_sequence_status())
+        status_data = WorkflowService.get_sequence_status()
+        resp = jsonify(status_data)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
     except Exception as e:
         logger.error(f"Sequence status error: {e}")
         return jsonify({"error": "Unable to retrieve sequence status"}), 500

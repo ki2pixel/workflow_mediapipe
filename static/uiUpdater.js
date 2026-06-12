@@ -394,7 +394,7 @@ async function fetchAndDisplayLogsForPanel(stepKeyToFocus) {
     if(specificLogContainer) specificLogContainer.style.display = 'none';
 
     try {
-        const response = await fetch(`/status/${stepKeyToFocus}`);
+        const response = await fetch(`/status/${stepKeyToFocus}?t=${Date.now()}`);
         if (!response.ok) {
             console.error(`[UI] fetchAndDisplayLogsForPanel - fetch failed for ${stepKeyToFocus}: ${response.status}`);
             throw new Error(`Erreur ${response.status} lors de la récupération des logs pour ${displayName}`);

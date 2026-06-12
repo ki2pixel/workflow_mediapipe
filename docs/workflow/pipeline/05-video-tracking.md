@@ -1,14 +1,14 @@
 # Tracking Vidéo
 
-**TL;DR** : Détection faciale optimisée. Multiprocessing MediaPipe CPU avec `cv2.setNumThreads(0)` pour éliminer la contention, buffer asynchrone, et export obligatoire via `StreamingJSONOutput` (O(1) RAM). Mode GPU optionnel via InsightFace. 478 landmarks + 52 blendshapes ARKit par frame. Architecture simplifiée : pas d'OpenCV/EOS/YuNet depuis v4.3.
+**TL;DR** : Détection faciale optimisée. Multiprocessing MediaPipe CPU avec `cv2.setNumThreads(0)` pour éliminer la contention, buffer asynchrone, et export obligatoire via `StreamingJSONOutput` (O(1) RAM). Supporte également l'accélération matérielle Google Coral Edge TPU (cascade pure TFLite séquentielle) et le mode GPU optionnel via InsightFace. 478 landmarks + 52 blendshapes ARKit par frame. Architecture simplifiée : pas d'OpenCV/EOS/YuNet depuis v4.3.
 
 ## Le Problème : Tracking Manuel Impossible
 
 Tu dois suivre les visages et expressions dans tes vidéos frame par frame, mais le faire manuellement est inenvisageable pour des contenus longs. Tu as besoin d'une solution automatique qui détecte les visages, extrait les points faciaux précis, et génère les données d'animation 3D.
 
-## Notre Solution : Duo de Tracking Simplifié
+## Notre Solution : Trio de Tracking et Inférence TPU
 
-Nous utilisons deux approches complémentaires : MediaPipe pour le traitement CPU robuste en multiprocessing, et InsightFace pour la haute précision GPU. Le système génère des données denses avec landmarks faciaux et blendshapes ARKit, parfaitement synchronisées avec les frames vidéo. **Les moteurs historiques (OpenCV, YuNet, EOS, OpenSeeFace) ont été retirés en v4.3**.
+Nous utilisons trois approches complémentaires : MediaPipe pour le traitement CPU robuste en multiprocessing, InsightFace pour la haute précision GPU, et une cascade de modèles Edge TPU quantifiés en INT8 pour les environnements à basse consommation (puces Google Coral PCIe/USB). Le système génère des données denses avec landmarks faciaux et blendshapes ARKit, parfaitement synchronisées avec les frames vidéo. **Les moteurs historiques (OpenCV, YuNet, EOS, OpenSeeFace) ont été retirés en v4.3**.
 
 ### ❌ Anciens moteurs retirés (anti-pattern)
 ```bash
@@ -66,6 +66,11 @@ python ../workflow_scripts/step5/run_tracking_manager.py
 
 # Mode InsightFace GPU (optionnel)
 STEP5_TRACKING_ENGINE=insightface python ../workflow_scripts/step5/run_tracking_manager.py
+
+# Mode Edge TPU (optionnel, nécessite coral_env)
+source coral_env/bin/activate
+cd projets_extraits
+python ../workflow_scripts/step5/run_tracking_tpu.py
 ```
 
 ### Résultat Attendu
@@ -103,10 +108,13 @@ projets_extraits/projet_camille_001/docs/video1_tracking.json
 ### Variables d'Environnement
 
 ```bash
-# Moteur de tracking (défaut: MediaPipe)
+# Accélération matérielle
+ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (PCIe/USB)
+
+# Moteur de tracking (lorsque TPU désactivé - défaut: MediaPipe)
 STEP5_TRACKING_ENGINE=              # vide = MediaPipe, "insightface" = GPU
 
-# GPU (réservé à InsightFace)
+# GPU (lorsque TPU désactivé - réservé à InsightFace)
 STEP5_ENABLE_GPU=0                  # 1 pour activer GPU InsightFace
 STEP5_GPU_ENGINES=insightface        # Moteurs GPU autorisés
 STEP5_GPU_FALLBACK_AUTO=1           # Bascule CPU auto si GPU échoue
@@ -155,9 +163,9 @@ STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 }
 ```
 
-## Les Deux Moteurs de Tracking
+## Les Trois Options de Tracking (CPU, GPU et TPU)
 
-> **Architecture v4.3** : Seuls MediaPipe et InsightFace sont supportés. Les autres moteurs ont été retirés pour simplifier la maintenance et améliorer la fiabilité.
+> **Architecture v4.3** : MediaPipe, InsightFace, et l'accélération Edge TPU sont supportés. Les autres moteurs historiques obsolètes ont été retirés pour simplifier la maintenance et améliorer la fiabilité.
 
 ### MediaPipe (CPU - Défaut Recommandé)
 
@@ -208,7 +216,22 @@ STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 |--------|-----------|------------|---------|---------|-----------------|
 | **MediaPipe CPU** | Bonne (478 landmarks) | 15 workers CPU | 15 | Lent sur vidéos longues | Production stable, batch massif |
 | **InsightFace GPU** | Excellente (embeddings) | 1 worker GPU | 1 | VRAM limitée, CUDA requis | Haute précision, contenus courts |
+| **Edge TPU Cascade** | Élevée (Kalman lissé) | 1 worker TPU | 1 | Inférence séquentielle | Matériel Edge basse consommation (2-4W) sans GPU dédié |
 | **Hybrid Auto** | Adaptatif | Variable | Variable | Complexité configuration | Environnements mixtes |
+
+## Accélération Google Coral Edge TPU
+
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 5 bascule vers une cascade pure TFLite séquentielle optimisée pour les puces TPU Coral Edge :
+
+* **Script d'exécution** : `workflow_scripts/step5/run_tracking_tpu.py`
+* **Cascade d'Inférence** :
+  1. **Détection (BlazeFace)** : Inférence de `blazeface_front_quantized_edgetpu.tflite` pour isoler la boîte englobante (bounding box) et les coordonnées des yeux.
+  2. **Alignement Affine** : Recadrage géométrique et alignement affine du visage à 192x192 pixels.
+  3. **Landmarks (FaceMesh)** : Inférence de `facemesh_quantized_edgetpu.tflite` pour extraire les 468 landmarks 3D.
+  4. **Animation (Face Blendshapes)** : Inférence de `face_blendshapes.tflite` (exécuté sur le CPU en raison du padding de 146 points requis pour l'iris).
+  5. **Lissage temporel (Filtre de Kalman)** : Application d'un filtre de Kalman vectorisé à 52 dimensions (coefficients ARKit) pour gommer le sautillement (jittering) lié à la quantification INT8.
+  6. **Object Detection Fallback (EfficientDet Lite0)** : Exécuté uniquement si BlazeFace ne détecte aucun visage, éliminant ainsi le basculement coûteux de contexte TPU (TPU Context Switch).
+  7. **Export Streaming** : Utilisation de `StreamingJSONOutput` pour écrire les frames à la volée sur le disque, garantissant une complexité mémoire constante **O(1)**.
 
 ## Trade-offs par Configuration Workers
 
@@ -368,6 +391,30 @@ source tracking_env_slim/bin/activate
 pip install mediapipe opencv-python numpy onnxruntime
 pip install -r requirements-tracking-env-lite.txt
 ```
+
+### Environnement Edge TPU (coral_env)
+
+Pour exécuter le tracking vidéo sous accélération TPU, configurez l'environnement dédié :
+
+```bash
+# Configuration des pilotes et règles udev (requis une seule fois)
+sudo bash scripts/install_coral_udev.sh
+
+# Création et activation de l'environnement virtuel (Python 3.10 requis pour pycoral)
+python3.10 -m venv coral_env
+source coral_env/bin/activate
+
+# Installation des paquets Coral et TFLite Runtime
+pip install tflite-runtime==2.17.1 pycoral==2.0.2 numpy pillow
+```
+
+### Modèles Requis (Edge TPU)
+
+Les poids des modèles quantifiés doivent être positionnés dans le répertoire `assets/` :
+- `blazeface_front_quantized_edgetpu.tflite` : Détection de visage quantifiée pour Edge TPU.
+- `facemesh_quantized_edgetpu.tflite` : Extraction des 468 repères quantifiés pour Edge TPU.
+- `face_blendshapes.tflite` : Modèle de blendshapes ARKit standard (exécuté sur CPU).
+- `efficientdet_lite0_edgetpu.tflite` : Détecteur d'objets quantifié pour Edge TPU (utilisé comme fallback).
 
 ### Environnement InsightFace (GPU)
 

@@ -79,6 +79,9 @@ DEBUG=false
 VENV_BASE_DIR=/mnt/cache/venv/workflow_mediapipe
 PYTHON_VENV_EXE_ENV=env/bin/python
 
+# Accélération matérielle Edge TPU
+ENABLE_CORAL_TPU_ACCELERATION=false  # true pour activer l'Edge TPU (PCIe/USB)
+
 # Monitoring
 ENABLE_GPU_MONITORING=true
 SYSTEM_MONITOR_POLLING_INTERVAL=2000
@@ -258,9 +261,10 @@ echo $VIRTUAL_ENV
 # Solution
 # Vérifier que les bons environnements sont activés
 source env/bin/activate  # Pour l'application principale
-source tracking_env_slim/bin/activate  # Pour STEP5
-source audio_env/bin/activate      # Pour STEP4
-source transnet_env/bin/activate     # Pour STEP3
+source tracking_env_slim/bin/activate  # Pour STEP5 (CPU)
+source audio_env/bin/activate      # Pour STEP4 (GPU/CPU)
+source transnet_env/bin/activate     # Pour STEP3 (GPU/CPU)
+source coral_env/bin/activate       # Pour les étapes TPU (STEP3, STEP4, STEP5) si activé
 ```
 
 ### Permissions Insuffisantes

@@ -577,6 +577,7 @@ def _run_process_async_internal(step_key: str):
 
         process_env = os.environ.copy()
         process_env["PYTHONIOENCODING"] = "UTF-8"; process_env["PYTHONUTF8"] = "1"
+        process_env["PYTHONUNBUFFERED"] = "1"
 
         try:
             coral_lib_path = os.path.join(str(BASE_PATH_SCRIPTS), "coral_env", "lib")
@@ -659,7 +660,7 @@ def _run_process_async_internal(step_key: str):
                                     workflow_state.set_step_field(step_key, 'progress_total', total_num)
                                 if filename:
                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
-                            elif len(groups) >= 1 and step_key == 'STEP3':
+                            elif len(groups) >= 1 and step_key in ('STEP3', 'STEP4', 'STEP5'):
                                 filename = groups[0].strip()
                                 if filename:
                                     workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))

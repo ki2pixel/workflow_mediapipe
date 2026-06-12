@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 class LinkValidator:
     def __init__(self, docs_dir):
         self.docs_dir = Path(docs_dir)
-        self.markdown_files = list(self.docs_dir.glob("*.md"))
+        self.markdown_files = list(self.docs_dir.rglob("*.md"))
         self.issues = []
 
     def extract_links_from_markdown(self, content):

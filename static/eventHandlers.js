@@ -111,7 +111,7 @@ export function initializeEventHandlers() {
             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
                 ui.openLogPanelUI(stepKey, true);
                 try {
-                    const statusResponse = await fetch(`/status/${stepKey}`);
+                    const statusResponse = await fetch(`/status/${stepKey}?t=${Date.now()}`);
                     if (!statusResponse.ok) throw new Error(`Erreur statut: ${statusResponse.status}`);
                     const statusData = await statusResponse.json();
                     ui.updateMainLogOutputUI(statusData.log ? statusData.log.join('') : '<i>Log principal non disponible.</i>');

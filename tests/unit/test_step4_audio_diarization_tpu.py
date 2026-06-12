@@ -39,7 +39,7 @@ BASE_PATH = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(BASE_PATH / "workflow_scripts" / "step4"))
 
 try:
-    from run_audio_diarization_tpu import perform_clustering, run_vad_and_embedding
+    from run_audio_diarization_tpu import perform_clustering, run_vad_and_embedding, _write_audio_json_file
 except ImportError as e:
     pytestmark = pytest.mark.skip(reason=f"Impossible d'importer run_audio_diarization_tpu: {e}")
 
@@ -101,29 +101,37 @@ class TestStep4TPUVAD:
     """Validation du flux VAD simulé"""
     
     @patch("run_audio_diarization_tpu.wavfile.read")
-    @patch("run_audio_diarization_tpu.common.output_tensor")
-    def test_run_vad_and_embedding(self, mock_output_tensor, mock_wavfile_read):
+    def test_run_vad_and_embedding(self, mock_wavfile_read):
         # Given: Un faux fichier WAV de 3 secondes à 16kHz
         sr = 16000
         data = np.zeros(sr * 3, dtype=np.int16)
         mock_wavfile_read.return_value = (sr, data)
         
         interpreter = MagicMock()
-        interpreter.get_input_details.return_value = [{'shape': (15360,), 'dtype': np.int16}]
+        interpreter.get_input_details.return_value = [{
+            'shape': (15360,),
+            'dtype': np.int16,
+            'index': 0,
+            'quantization': (1.0, 0)
+        }]
+        interpreter.get_output_details.return_value = [
+            {'index': 0, 'dtype': np.float32, 'quantization': (1.0, 0)},
+            {'index': 1, 'dtype': np.float32, 'quantization': (1.0, 0)},
+            {'index': 2, 'dtype': np.float32, 'quantization': (1.0, 0)}
+        ]
         
-        # Simuler les scores YAMNet (Index 0 = Parole, > 0.3)
-        # On simule 1 segment avec parole, 1 sans, etc.
-        def tensor_side_effect(interp, index):
+        # Simuler get_tensor
+        def get_tensor_side_effect(index):
             if index == 0:
                 # Retourne un score de Speech (0.8) pour déclencher le VAD
-                return [[0.8]]
-            elif index == 1:
+                return np.array([[0.8]], dtype=np.float32)
+            elif index == 2:
                 # Retourne l'embedding
-                return [np.ones(1024)]
-            return [0]
+                return np.array([[np.ones(128)]], dtype=np.float32)
+            return np.array([0])
             
-        mock_output_tensor.side_effect = tensor_side_effect
-
+        interpreter.get_tensor.side_effect = get_tensor_side_effect
+ 
         # When: Analyse VAD
         segments, embeddings = run_vad_and_embedding(Path("dummy.wav"), interpreter, None)
         
@@ -132,5 +140,45 @@ class TestStep4TPUVAD:
         assert len(embeddings) > 0
         assert len(segments) == len(embeddings)
 
+class TestStep4TPUJsonFormat:
+    """Validation du format JSON de sortie généré pour compatibilité STEP5/6"""
+    
+    def test_write_audio_json_file(self, tmp_path):
+        import json
+        # Given: Faux résultats de diarisation et paramètres associés
+        output_json = tmp_path / "video_audio.json"
+        video_path = Path("video.mp4")
+        diarization_result = [
+            {"speaker": "SPEAKER_00", "start": 0.0, "end": 1.0},
+            {"speaker": "SPEAKER_01", "start": 1.5, "end": 2.5}
+        ]
+        duration_sec = 3.0
+        fps = 25.0
+        
+        # When: Écriture du fichier JSON
+        _write_audio_json_file(output_json, video_path, diarization_result, duration_sec, None, fps)
+        
+        # Then: Le fichier existe, est valide et contient la structure attendue
+        assert output_json.exists()
+        with open(output_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        assert data["video_filename"] == "video.mp4"
+        assert data["total_frames"] == 75 # 3.0 * 25.0
+        assert data["fps"] == 25.0
+        assert "frames_analysis" in data
+        assert isinstance(data["frames_analysis"], list)
+        assert len(data["frames_analysis"]) == 75
+        
+        # Vérification d'une frame spécifique de parole (SPEAKER_00 actif entre 0s et 1s)
+        # Frame 10 (0.36s)
+        frame_10 = data["frames_analysis"][9]
+        assert frame_10["frame"] == 10
+        assert frame_10["audio_info"]["is_speech_present"] is True
+        assert frame_10["audio_info"]["active_speaker_labels"] == ["SPEAKER_00"]
+        assert frame_10["audio_info"]["num_distinct_speakers_audio"] == 1
+        assert frame_10["audio_info"]["timecode_sec"] == 0.36
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

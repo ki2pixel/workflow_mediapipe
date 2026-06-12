@@ -89,7 +89,7 @@ class TestStep5TPUFlow:
         blendshapes = MagicMock()
         
         # When: Test unitaire des fonctions d'extraction individuelles
-        bbox = detect_face(blazeface, np.zeros((256, 256, 3), dtype=np.uint8))
+        bbox, eyes = detect_face(blazeface, np.zeros((256, 256, 3), dtype=np.uint8))
         assert len(bbox) == 4
         
         # FaceMesh
