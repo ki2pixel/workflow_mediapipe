@@ -132,6 +132,17 @@ class WorkflowService:
         """Retourne le chemin du fichier de logs pour une étape."""
 ```
 
+### Routage et Orchestration Matérielle Coral Edge TPU
+
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est activé, l'exécution des étapes concernées (STEP3, STEP4, STEP5) n'est pas lancée directement en sous-processus concurrents. Elles sont acheminées vers le **CoralTPUOrchestrator** (`services/coral_tpu_orchestrator.py`).
+
+Cet orchestrateur implémente un patron **Singleton** qui :
+- Gère une **file d'attente asynchrone (asyncio.Queue)** dans un thread démon dédié (`CoralTPU_AsyncLoop`).
+- **Sérialise** toutes les demandes d'inférence TPU.
+- Évite les évictions de cache et les crashs matériels du Coral dus à la limite stricte de **8 Mo de SRAM** lors des requêtes concurrentes sur le bus PCIe.
+
+Chaque tâche est soumise de manière thread-safe via `tpu_orchestrator.submit_task(func)` et exécutée de manière séquentielle, protégeant l'accès physique au pilote Gasket et au nœud de périphérique `/dev/apex_0`.
+
 ## Trade-offs par Mode d'Orchestration
 
 | Mode | Complexité | Testabilité | Performance | Quand l'utiliser |

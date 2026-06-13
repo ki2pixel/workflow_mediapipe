@@ -47,19 +47,27 @@ def test_compute_unique_project_dir_no_collision(tmp_path):
     base_name = "13 Camille"
     fixed = datetime(2025, 10, 6, 7, 51, 55)
     result = extract_archives.compute_unique_project_dir(base_name, tmp_path, now=fixed)
-    assert result == tmp_path / "13 Camille 2025-10-06_07-51-55"
+    # Sans collision, l'horodatage ne doit pas être ajouté
+    assert result == tmp_path / "13 Camille"
 
 
 def test_compute_unique_project_dir_with_collision(tmp_path):
     base_name = "13 Camille"
     fixed = datetime(2025, 10, 6, 7, 51, 55)
 
-    # Pre-create the first candidate to force a collision
-    first = tmp_path / "13 Camille 2025-10-06_07-51-55"
-    first.mkdir(parents=True, exist_ok=True)
+    # 1. Simuler l'existence du dossier de base (collision simple)
+    base_dir = tmp_path / "13 Camille"
+    base_dir.mkdir(parents=True, exist_ok=True)
 
-    result = extract_archives.compute_unique_project_dir(base_name, tmp_path, now=fixed)
-    assert result == tmp_path / "13 Camille 2025-10-06_07-51-55-2"
+    result_ts = extract_archives.compute_unique_project_dir(base_name, tmp_path, now=fixed)
+    assert result_ts == tmp_path / "13 Camille 2025-10-06_07-51-55"
+
+    # 2. Simuler l'existence du dossier de base ET du dossier horodaté (ultra-collision)
+    first_ts = tmp_path / "13 Camille 2025-10-06_07-51-55"
+    first_ts.mkdir(parents=True, exist_ok=True)
+
+    result_counter = extract_archives.compute_unique_project_dir(base_name, tmp_path, now=fixed)
+    assert result_counter == tmp_path / "13 Camille 2025-10-06_07-51-55-2"
 
 
 def test_integration_extract_archive_uses_unique_name(tmp_path, monkeypatch):
@@ -84,7 +92,7 @@ def test_integration_extract_archive_uses_unique_name(tmp_path, monkeypatch):
     ok = extract_archives.extract_archive(fake_archive, tmp_path)
     assert ok
 
-    # Verify destination structure: <tmp>/<"13 Camille 2025-10-06_07-51-55">/docs/a.txt
-    project_dir = tmp_path / "13 Camille 2025-10-06_07-51-55"
+    # Verify destination structure: <tmp>/<"13 Camille">/docs/a.txt
+    project_dir = tmp_path / "13 Camille"
     assert project_dir.exists()
     assert (project_dir / "docs" / "a.txt").exists()

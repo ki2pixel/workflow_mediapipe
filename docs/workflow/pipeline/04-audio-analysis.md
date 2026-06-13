@@ -208,10 +208,15 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 * **Script d'exécution** : `workflow_scripts/step4/run_audio_diarization_tpu.py`
 * **Fonctionnement** :
   1. **Extraction audio** : FFmpeg convertit la vidéo en fichier audio WAV 16kHz mono.
-  2. **VAD (Voice Activity Detection)** : Inférence séquentielle du modèle quantifié YAMNet INT8 sur le Coral TPU pour identifier la présence de voix humaine par blocs de 0.96s.
-  3. **Speaker Embedding** : Génération de d-vectors (embeddings de locuteur) soit par un extracteur CNN local TPU (`cnn_speaker_extractor_edgetpu.tflite`), soit par repli sur les embeddings de YAMNet.
-  4. **Diarisation (Spectral Clustering)** : Regroupement spectral déporté sur le CPU via `scikit-learn` pour segmenter et associer les morceaux de voix aux locuteurs (ex: SPEAKER_00, SPEAKER_01).
-  5. **Timeline frame-par-frame** : Alignement précis des segments de voix détectés sur une timeline à 25 fps et génération du format JSON final, garantissant une compatibilité totale avec les étapes aval (notamment la compression et la réduction JSON de la STEP6).
+  2. **VAD par fenêtrage glissant (Edge TPU)** : Inférence séquentielle du modèle quantifié YAMNet INT8 sur le Coral TPU avec 50% de recouvrement (hop size de 0.48s pour une fenêtre d'analyse de 0.96s), préservant la sensibilité pour les interjections et mots courts.
+  3. **Lissage VAD et FSM Hangover** : Application d'un filtre médian 1D (taille 5) sur les probabilités de parole et application d'un seuil calibré à $0.20$ pour compenser le tassement probabiliste (Softmax squashing) de la quantification INT8. Une Machine à États Finis (FSM) avec temps de maintien (*hangover*) de 1.0s relie les micro-silences physiologiques intra-mots.
+  4. **Speaker Embedding (ECAPA-TDNN CPU)** : Pour chaque fenêtre de parole valide, extraction de d-vectors (embeddings de locuteur) de 192 dimensions via le modèle ECAPA-TDNN Float32 s'exécutant sur le CPU (XNNPACK). Cela évite les pertes de précision massives inhérentes à la quantification INT8 des embeddings.
+  5. **Diarisation (AHC adaptatif sur CPU)** : 
+     - Calcul des distances cosinus sur les d-vectors normalisés L2.
+     - Clustering par Agglomération Hiérarchique (AHC) avec liaison moyenne et seuil de distance optimal de 0.32.
+     - Estimation automatique du nombre de locuteurs par Eigen-gap et Silhouette Score (évitant la division fictive des monologues).
+     - Réassignation des locuteurs mineurs (durée cumulée de parole < 7.0s) vers les locuteurs majeurs.
+  6. **Timeline & Export JSON Standardisé** : Alignement des segments de voix détectés à 25 fps et écriture du JSON en streaming. Pour une compatibilité structurelle totale avec STEP5/6, le fichier JSON contient la clé racine `speaker_stats` (durée et pourcentage par locuteur) et la clé `num_distinct_speakers_audio` dans `audio_info`.
 
 ## Analogie : Studio Mixage vs Transcription Cloud
 

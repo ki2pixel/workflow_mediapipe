@@ -11,6 +11,11 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 ## Juin 2026
 
+- [2026-06-13 13:30:00] **Migration ECAPA-TDNN vers ONNX Runtime (Dynamic Batching) (COMPLET)** : Remplacement de l'inférence TFLite séquentielle par ONNX Runtime dans `run_audio_diarization_tpu.py`.
+  - **Raison** : L'exécution itérative (`batch_size=1`) sur le CPU générait un *Memory-Bound Bottleneck*, limitant drastiquement les performances d'extraction des vecteurs vocaux malgré le multiprocessing.
+  - **Implémentation** : Export dynamique du modèle `speechbrain` en format ONNX via `export_ecapa_onnx.py`. Implémentation du *Dynamic Batching* (taille 32) pour accumuler les spectrogrammes Log-Mel. Tuning manuel de l'affinité mémoire NUMA du Threadripper via `sess_options.intra_op_num_threads` (distribué selon `STEP4_MAX_WORKERS`) et `ORT_SEQUENTIAL`.
+  - **Impact** : Le temps de traitement pour 8 vidéos a été divisé par 2 (de ~4m43s à 2m20s), propulsant l'utilisation CPU à 100% de manière fluide sans congestionner l'Edge TPU réservé au modèle VAD.
+
 - [2026-06-12 21:38:00] **Calibration du seuil de clustering audio (AHC = 0.32) (COMPLET)** : Fixation du seuil de clustering AHC par défaut à `0.32` dans `run_audio_diarization_tpu.py`.
   - **Raison** : Le seuil précédent de `0.33` provoquait une sous-segmentation systématique des locuteurs (fusion des dialogues en un locuteur unique, moyenne TPU de 1.0 locuteur vs 1.6 sur GPU).
   - **Bilan** : Le seuil affiné de 0.32 permet de distinguer correctement les locuteurs pour les vidéos de dialogue de *Hélène Romano* et *Sa fille se plaint* (2 locuteurs sur TPU), élevant la moyenne de locuteurs à 1.4, sans introduire de sur-segmentation sur les monologues de *Steffy* ou *Edouard Durand*.

@@ -69,6 +69,7 @@ python app_new.py
 ### ⚙️ **Services** - Composants Métier
 - **[CSV Service](services/csv-service.md)** : Monitoring téléchargements webhook
 - **[Workflow Service](services/workflow-service.md)** : Orchestrateur central du pipeline
+- **[Coral TPU Orchestrator](services/coral-tpu-orchestrator.md)** : Sérialisation et routage matériel asynchrone pour Coral Edge TPU
 - **[Lemonfox Audio Service](services/lemonfox-audio-service.md)** : Analyse audio Lemonfox/Pyannote
 - **[Results Archiver](services/results-archiver-service.md)** : Archivage automatique
 - **(Archive) [VisualizationService](archives/visualization-service.md)** : Service décommissionné (voir [plan de décommissionnement](DECOMMISSIONING_VISUALIZATION_SERVICE.md))
@@ -107,6 +108,7 @@ env/                    # Application principale
 ├── tracking_env_slim/   # MediaPipe CPU (STEP5)
 ├── audio_env/           # Analyse audio (STEP4)
 ├── transnet_env/        # Détection scènes (STEP3)
+├── coral_env/           # Détection scènes/audio/tracking sur Coral TPU (optionnel)
 └── insightface_env/     # InsightFace GPU (optionnel)
 ```
 

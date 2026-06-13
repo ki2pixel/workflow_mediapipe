@@ -189,13 +189,16 @@ def compute_unique_project_dir(base_name: str, destination_base_dir: Path, now: 
     Returns:
         Path: Chemin complet du dossier unique (sans le sous-dossier "docs").
     """
+    candidate_raw = destination_base_dir / base_name
+    if not candidate_raw.exists():
+        return candidate_raw
+
     ts = _format_timestamp(now)
-    candidate = destination_base_dir / f"{base_name} {ts}"
+    candidate_ts = destination_base_dir / f"{base_name} {ts}"
 
-    if not candidate.exists():
-        return candidate
+    if not candidate_ts.exists():
+        return candidate_ts
 
-        
     counter = 2
     while True:
         with_counter = destination_base_dir / f"{base_name} {ts}-{counter}"

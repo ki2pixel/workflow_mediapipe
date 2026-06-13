@@ -204,10 +204,13 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 * **Script d'exécution** : `workflow_scripts/step3/run_scene_detect_tpu.py`
 * **Fonctionnement** :
   1. **Décodage vidéo** : Extraction des frames à 25 FPS au format RGB 224x224 via FFmpeg.
-  2. **Inférence TPU** : Utilisation d'un modèle Siamois MobileNetV2 INT8 quantifié exécuté sur l'Edge TPU pour générer un vecteur d'empreinte (logits à 1000 dimensions) pour chaque frame.
-  3. **Calcul des transitions** : Calcul de la distance cosinus entre frames successives sur le CPU.
-  4. **Lissage temporel** : Application d'un filtre de convolution moyenne mobile sur le CPU pour gommer le bruit d'inférence INT8.
-  5. **Détection** : Identification des pics de transition qui franchissent le seuil configuré (par défaut 0.25) et écriture du fichier `.csv` de découpage.
+  2. **Inférence TPU** : Utilisation d'un modèle Siamois MobileNetV2 INT8 quantifié exécuté sur l'Edge TPU pour extraire les embeddings spatiaux structurels (couche GAP à 1280 dimensions, avec repli automatique sur les logits à 1000 dimensions).
+  3. **Lissage d'embeddings** : Application d'une Moyenne Mobile Exponentielle (EMA) avec coefficient $\alpha = 0.8$ sur les vecteurs d'embeddings pour gommer les micromouvements et le bruit de quantification INT8.
+  4. **Calcul des transitions** : Calcul de la distance cosinus entre les embeddings lissés de frames successives sur le CPU.
+  5. **Filtrage temporel** : Application d'un filtre médian 1D (taille 5) sur la série des distances pour éliminer le bruit impulsionnel (flashs, glitches de compression) sans dégrader les vraies coupures.
+  6. **Seuillage adaptatif (Dugad)** : Calcul statistique dynamique du seuil ($T_i = \mu_i + k \cdot \sigma_i$ sur une fenêtre glissante de 25 frames avec $k=3.0$), s'adaptant continuellement à la dynamique de l'image.
+  7. **Double Seuil (Twin-Comparison)** : Détection des transitions graduelles (fondus, balayages) à l'aide d'un double seuil adaptatif ($k_{high}=3.5, k_{low}=2.0$).
+  8. **Export CSV** : Écriture du fichier `.csv` de découpage avec timecodes au format standard `HH:MM:SS.mmm` identique au GPU et période réfractaire de 12 frames (0.5s à 25fps) pour éliminer les doublons.
 
 ## Benchmarks d'Optimisation VRAM (GPU 4 Go)
 

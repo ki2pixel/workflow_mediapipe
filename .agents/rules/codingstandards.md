@@ -49,11 +49,11 @@ alwaysApply: true
   - TPU: MobileNetV2 INT8 (GAP 1280D ou logits 1000D fallback) + EMA embeddings (α=0.8) + Filtre Médian 1D + Seuillage adaptatif Dugad (μ+k·σ, k=3.0) + Twin-Comparison (transitions graduelles). Timecode `HH:MM:SS.mmm`.
 - **STEP4 (Audio)**:
   - GPU/CPU: Lemonfox/Whisper + Fallback Pyannote. Isolement GPU (`AUDIO_GPU_ISOLATION=1`) en sous-processus. `AUDIO_PROFILE=gpu_fp32`.
-  - TPU: YAMNet INT8 (fenêtrage glissant overlap 50%, hop 0.48s) + Filtre Médian VAD + FSM Hangover (1.0s) + Spectral Clustering adaptatif (eigengap/silhouette) CPU. Seuil VAD calibré 0.20.
+  - TPU: YAMNet INT8 (fenêtrage glissant overlap 50%, hop 0.48s) + Filtre Médian VAD + FSM Hangover (1.0s) + AHC (Agglomerative Hierarchical Clustering) avec distance cosine (seuil calibré 0.32) + réassignation des locuteurs mineurs (<7.0s) + estimation optionnelle par Spectral Clustering (Eigen-gap/Silhouette) + extraction d-vectors ECAPA-TDNN Float32 CPU (XNNPACK) avec fallback embeddings YAMNet 1024D. Seuil VAD calibré 0.20.
 - **STEP5 (Tracking)**:
   - CPU: MediaPipe (`tracking_env_slim`), multiprocessing obligatoire + `cv2.setNumThreads(0)`.
   - GPU: InsightFace (`insightface_env`, activé via `STEP5_ENABLE_GPU=1`).
-  - TPU: Cascade séquentielle TFLite (BlazeFace + FaceMesh sans `half_pixel_centers` + Face Blendshapes) + Filtre de Kalman vectorisé (N-dim) CPU.
+  - TPU: Cascade séquentielle TFLite (BlazeFace + FaceMesh sans `half_pixel_centers` + Face Blendshapes) + Filtre One-Euro (OneEuroFilterND @njit 52 dimensions) CPU par défaut (Kalman de secours). Support optionnel des modèles co-compilés dans la SRAM partagée (8 Mo).
   - **Obligatoire**: `StreamingJSONOutput` pour export O(1).
 - **STEP6 & 7**: `ijson` obligatoire. Scripts AE priorisent `*_ae.json`.
 

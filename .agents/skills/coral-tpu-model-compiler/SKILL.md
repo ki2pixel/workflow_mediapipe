@@ -21,6 +21,10 @@ Avant toute modification ou recompilation :
   ```bash
   edgetpu_compiler -s model.tflite
   ```
+- Co-compilation de plusieurs modèles (ex: BlazeFace + FaceMesh pour optimiser l'utilisation de la SRAM de 8 Mo et éviter le changement de contexte) :
+  ```bash
+  ./scripts/compile_coral_comodels.sh
+  ```
 - Analyse des opérations non supportées : Lire attentivement les logs du compilateur qui précisent quelles opérations sont déportées sur le CPU.
 
 ## 🚑 Checklist Diagnostique & Résolution

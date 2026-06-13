@@ -27,12 +27,59 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 from enum import Enum
+import threading
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+import os
 
-# Gestion des dépendances Edge TPU et CPU (Scikit-Learn pour le clustering)
+# --- Process-level globals ---
+_tpu_lock = threading.Lock()
+_yamnet_interp = None
+_thread_local = threading.local()
+
+def get_extractor_model_cached(model_path):
+    if not hasattr(_thread_local, "extractor_model"):
+        model_str = str(model_path)
+        if model_str.endswith('.onnx'):
+            if not HAS_ONNX:
+                raise ImportError(f"Cannot load {model_str}: onnxruntime is not installed.")
+            
+            import multiprocessing
+            step4_workers_str = os.environ.get("STEP4_MAX_WORKERS", "")
+            max_workers = int(step4_workers_str) if step4_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
+            # Allocate the total CPU threads evenly among the max_workers
+            onnx_threads = max(1, multiprocessing.cpu_count() // max_workers)
+            
+            sess_options = ort.SessionOptions()
+            sess_options.intra_op_num_threads = onnx_threads
+            sess_options.inter_op_num_threads = 1
+            # Optimize execution mode for NUMA architecture
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            
+            _thread_local.extractor_model = ort.InferenceSession(model_str, sess_options, providers=['CPUExecutionProvider'])
+        else:
+            import tflite_runtime.interpreter as tflite
+            import multiprocessing
+            step4_workers_str = os.environ.get("STEP4_MAX_WORKERS", "")
+            max_workers = int(step4_workers_str) if step4_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
+            xnnpack_threads = max(1, multiprocessing.cpu_count() // max_workers)
+            
+            interp = tflite.Interpreter(model_path=model_str, num_threads=xnnpack_threads)
+            interp.allocate_tensors()
+            _thread_local.extractor_model = interp
+    return _thread_local.extractor_model
+
+# TFLite / PyCoral imports
+import tflite_runtime.interpreter as tflite
+try:
+    import onnxruntime as ort
+    HAS_ONNX = True
+except ImportError:
+    HAS_ONNX = False
 try:
     from pycoral.utils import edgetpu
     from pycoral.adapters import common
-    import tflite_runtime.interpreter as tflite
 except ImportError as e:
     logging.critical(f"ERREUR: Les bibliothèques Coral/TFLite ne sont pas installées dans coral_env: {e}")
     sys.exit(1)
@@ -188,42 +235,52 @@ def _extract_3s_segment(data, sample_rate, center_sample):
     return segment.astype(np.float32) / 32768.0
 
 
-def extract_ecapa_embedding(waveform_segment, extractor_interpreter):
-    """Extract a 192D speaker embedding from a waveform segment using ECAPA-TDNN.
+
+
+def extract_ecapa_embedding_batch(waveform_segments, extractor_model):
+    """Extract a batch of 192D speaker embeddings from waveform segments.
 
     Pipeline:
-    1. Compute Log-Mel spectrogram (CPU, numpy/scipy)
-    2. Pad/trim to fixed 300 frames (3 seconds)
-    3. Apply Cepstral Mean Normalization (CMN) along time axis
-    4. Run TFLite inference (CPU, XNNPACK, Float32)
+    1. Compute Log-Mel spectrogram for each segment
+    2. CMN normalization
+    3. Run batched Inference
 
     Args:
-        waveform_segment: 1D float32 numpy array (mono, 16kHz).
-        extractor_interpreter: TFLite Interpreter loaded with ECAPA-TDNN Float32.
+        waveform_segments: List of 1D float32 numpy arrays (mono, 16kHz).
+        extractor_model: ONNX InferenceSession or TFLite Interpreter.
 
     Returns:
-        1D float32 numpy array of shape (192,) — the speaker d-vector.
+        2D float32 numpy array of shape (batch, 192).
     """
-    # Step 1-2: Log-Mel spectrogram
-    log_mel = compute_log_mel_spectrogram(waveform_segment)
-    log_mel = _pad_or_trim_mel(log_mel)  # (80, 300)
+    log_mels = []
+    for wf in waveform_segments:
+        log_mel = compute_log_mel_spectrogram(wf)
+        log_mel = _pad_or_trim_mel(log_mel)  # (80, 300)
+        log_mel = log_mel - np.mean(log_mel, axis=1, keepdims=True)
+        log_mels.append(log_mel)
 
-    # Step 3: Cepstral Mean Normalization (CMN) along the time axis (axis=1)
-    log_mel = log_mel - np.mean(log_mel, axis=1, keepdims=True)
+    # shape: (batch, 80, 300)
+    input_data = np.stack(log_mels, axis=0).astype(np.float32)
 
-    input_details = extractor_interpreter.get_input_details()[0]
-    output_details = extractor_interpreter.get_output_details()[0]
-
-    input_data = log_mel[np.newaxis, :, :].astype(np.float32)  # (1, 80, 300)
-
-    # Step 4: Inference
-    extractor_interpreter.set_tensor(input_details['index'], input_data)
-    extractor_interpreter.invoke()
-
-    # Get output
-    embedding = extractor_interpreter.get_tensor(output_details['index'])
-
-    return embedding.flatten()  # (192,)
+    if hasattr(extractor_model, 'run'):
+        # ONNX mode
+        input_name = extractor_model.get_inputs()[0].name
+        output = extractor_model.run(None, {input_name: input_data})[0]
+        return output
+    else:
+        # TFLite fallback (iterative over batch since it doesn't support dynamic batching)
+        input_details = extractor_model.get_input_details()[0]
+        output_details = extractor_model.get_output_details()[0]
+        
+        embeddings = []
+        for i in range(input_data.shape[0]):
+            single_input = input_data[i:i+1, :, :]
+            extractor_model.set_tensor(input_details['index'], single_input)
+            extractor_model.invoke()
+            emb = extractor_model.get_tensor(output_details['index'])
+            embeddings.append(emb.flatten())
+            
+        return np.array(embeddings)
 
 
 class VADState(Enum):
@@ -450,11 +507,11 @@ def estimate_num_speakers(embeddings, max_speakers=DEFAULT_MAX_SPEAKERS):
         return 1
 
 
-def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=None,
+def run_vad_and_embedding(wav_path, extractor_model_path=None,
                           vad_threshold=DEFAULT_VAD_THRESHOLD,
                           hop_overlap=DEFAULT_HOP_OVERLAP,
                           median_filter_size=DEFAULT_MEDIAN_FILTER_SIZE,
-                          hangover_sec=DEFAULT_HANGOVER_SEC):
+                          hangover_sec=DEFAULT_HANGOVER_SEC, video_name=""):
     """
     Exécute le VAD via YAMNet (Edge TPU) avec fenêtrage glissant et FSM hangover.
 
@@ -479,6 +536,9 @@ def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=No
         - speech_segments : Liste de paires [start_sec, end_sec]
         - embeddings_array : Array numpy des d-vectors correspondants
     """
+    global _tpu_lock, _yamnet_interp
+    yamnet_interpreter = _yamnet_interp
+
     sample_rate, data = wavfile.read(wav_path)
 
     # YAMNet attend des segments de 0.96s (15360 samples à 16kHz)
@@ -514,7 +574,11 @@ def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=No
             input_data = segment_float.reshape(input_details['shape'])
 
         yamnet_interpreter.set_tensor(input_details['index'], input_data)
-        yamnet_interpreter.invoke()
+        if _tpu_lock is not None:
+            with _tpu_lock:
+                yamnet_interpreter.invoke()
+        else:
+            yamnet_interpreter.invoke()
 
         # Scores de classification (Speech = index 0)
         scores_tensor = yamnet_interpreter.get_tensor(output_details[0]['index'])
@@ -529,7 +593,7 @@ def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=No
         window_starts.append(start)
 
         # Extraction du d-vector pour chaque fenêtre (seulement pour fallback YAMNet)
-        if not extractor_interpreter:
+        if not extractor_model_path:
             # Fallback : embeddings YAMNet (1024D, généralistes)
             try:
                 embeddings_tensor = yamnet_interpreter.get_tensor(output_details[2]['index'])
@@ -560,7 +624,11 @@ def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=No
             input_data = segment_float.reshape(input_details['shape'])
 
         yamnet_interpreter.set_tensor(input_details['index'], input_data)
-        yamnet_interpreter.invoke()
+        if _tpu_lock is not None:
+            with _tpu_lock:
+                yamnet_interpreter.invoke()
+        else:
+            yamnet_interpreter.invoke()
 
         scores_tensor = yamnet_interpreter.get_tensor(output_details[0]['index'])
         if output_details[0]['dtype'] in (np.int8, np.uint8):
@@ -572,7 +640,7 @@ def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=No
         raw_probabilities.append(float(scores[0][0]))
         window_starts.append(start)
 
-        if not extractor_interpreter:
+        if not extractor_model_path:
             try:
                 embeddings_tensor = yamnet_interpreter.get_tensor(output_details[2]['index'])
                 if output_details[2]['dtype'] in (np.int8, np.uint8):
@@ -608,13 +676,44 @@ def run_vad_and_embedding(wav_path, yamnet_interpreter, extractor_interpreter=No
         speech_segments.append([start_sec, end_sec])
 
     # Collecter les embeddings des fenêtres de parole
-    if extractor_interpreter and speech_indices:
-        logging.info(f"ECAPA-TDNN: extraction de {len(speech_indices)} d-vectors 192D (CPU Float32)...")
-        for idx in speech_indices:
-            center_sample = window_starts[idx] + (segment_size // 2)
-            waveform_3s = _extract_3s_segment(data, sample_rate, center_sample)
-            d_vector = extract_ecapa_embedding(waveform_3s, extractor_interpreter)
-            speech_embeddings.append(d_vector)
+    if extractor_model_path and Path(extractor_model_path).exists() and speech_indices:
+        model_str = str(extractor_model_path)
+        # Try to use ONNX if it exists alongside TFLite
+        onnx_path = model_str.replace(".tflite", ".onnx")
+        if HAS_ONNX and os.path.exists(onnx_path):
+            model_to_load = onnx_path
+            logging.info(f"ECAPA-TDNN: Utilisation du moteur ONNX Runtime (Dynamic Batching) via {onnx_path}")
+        else:
+            model_to_load = model_str
+            logging.info(f"ECAPA-TDNN: Utilisation du moteur TFLite Float32 (Batch 1) via {model_to_load}")
+            
+        logging.info(f"ECAPA-TDNN: extraction de {len(speech_indices)} d-vectors 192D...")
+        
+        extractor_model = get_extractor_model_cached(model_to_load)
+        total_speech = len(speech_indices)
+        
+        BATCH_SIZE = 32
+        
+        for batch_start in range(0, total_speech, BATCH_SIZE):
+            batch_indices = speech_indices[batch_start:batch_start+BATCH_SIZE]
+            
+            waveforms = []
+            for idx in batch_indices:
+                center_sample = window_starts[idx] + (segment_size // 2)
+                waveform_3s = _extract_3s_segment(data, sample_rate, center_sample)
+                waveforms.append(waveform_3s)
+            
+            # Inférence groupée
+            d_vecs = extract_ecapa_embedding_batch(waveforms, extractor_model)
+            for d_vec in d_vecs:
+                speech_embeddings.append(d_vec)
+            
+            current_count = min(batch_start + BATCH_SIZE, total_speech)
+            if current_count % 32 == 0 or current_count == total_speech:
+                progress_percent = int(current_count / total_speech * 100)
+                vid_log = f" - {video_name}" if video_name else ""
+                logging.info(f"ECAPA_PROGRESS: {current_count}/{total_speech} embeddings ({progress_percent}%){vid_log}")
+            
         logging.info(f"ECAPA-TDNN: extraction terminée ({len(speech_embeddings)} embeddings)")
     elif speech_indices:
         # Fallback YAMNet : collecter directement les embeddings pré-calculés
@@ -869,6 +968,44 @@ def _write_audio_json_file(output_json, video_path, diarization_result, duration
         f.write("}\n")
 
 
+def worker_process_video(video_path, cfg, extractor_model_path):
+    try:
+        logging.info(f"PROCESSING_VIDEO: {video_path.name}")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_wav = Path(temp_dir) / "audio.wav"
+            extract_audio(video_path, temp_wav)
+
+            # 1. VAD et Extraction (TPU) avec fenêtrage glissant + FSM
+            segments, embeddings = run_vad_and_embedding(
+                temp_wav, 
+                extractor_model_path=extractor_model_path,
+                vad_threshold=cfg['vad_threshold'],
+                hop_overlap=cfg['hop_overlap'],
+                median_filter_size=cfg['median_filter_size'],
+                hangover_sec=cfg['hangover_sec'],
+                video_name=video_path.name
+            )
+
+            logging.info(f"VAD: {len(segments)} segments de parole détectés")
+
+            # 2. Spectral Clustering adaptatif (CPU)
+            diarization_result = perform_clustering(
+                embeddings, segments,
+                max_speakers=cfg['max_speakers']
+            )
+
+            # Sauvegarde JSON au format original compatible STEP5/6 + speaker_stats
+            output_json = video_path.with_name(f"{video_path.stem}_audio.json")
+            duration_sec = _run_ffprobe_duration(video_path)
+            _write_audio_json_file(output_json, video_path, diarization_result, duration_sec, temp_wav)
+
+            logging.info(f"Succès: {output_json.name} créé.")
+            return True
+    except Exception as e:
+        logging.exception(f"Échec de l'analyse audio pour {video_path.name}: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log_dir", type=str, default="logs/step4", help="Dossier de logs")
@@ -918,9 +1055,6 @@ def main():
         f"max_speakers={max_speakers}"
     )
 
-    # Initialisation TPU
-    delegate = edgetpu.load_edgetpu_delegate()
-
     assets_dir = BASE_DIR / "assets"
     yamnet_model = assets_dir / "yamnet_audio_classificator_quantized_edgetpu.tflite"
     # ECAPA-TDNN : modèle Float32 exécuté sur CPU (XNNPACK) — évite la perte de précision INT8
@@ -928,30 +1062,18 @@ def main():
 
     download_model(YAMNET_URL, yamnet_model)
 
+    global _yamnet_interp
     try:
-        yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
-        # Redimensionnement de la forme d'entrée à 15360 samples avant allocation
-        yamnet_interp.resize_tensor_input(0, [15360])
-        yamnet_interp.allocate_tensors()
-        logging.info("Modèle YAMNet Edge TPU chargé.")
+        from pycoral.utils import edgetpu
+        import tflite_runtime.interpreter as tflite
+        delegate = edgetpu.load_edgetpu_delegate()
+        _yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
+        _yamnet_interp.resize_tensor_input(0, [15360])
+        _yamnet_interp.allocate_tensors()
+        logging.info("Modèle YAMNet Edge TPU chargé dans le processus principal.")
     except Exception as e:
-        logging.critical(f"Erreur TPU YAMNet: {e}")
+        logging.critical(f"Erreur Edge TPU: {e}")
         sys.exit(1)
-
-    extractor_interp = None
-    if extractor_model.exists():
-        try:
-            # ECAPA-TDNN chargé sur CPU (pas de delegate TPU) via XNNPACK en Float32
-            extractor_interp = tflite.Interpreter(model_path=str(extractor_model), num_threads=4)
-            extractor_interp.allocate_tensors()
-            ext_input = extractor_interp.get_input_details()[0]
-            ext_output = extractor_interp.get_output_details()[0]
-            logging.info(
-                f"ECAPA-TDNN Speaker Extractor chargé (CPU Float32 XNNPACK). "
-                f"Input: {ext_input['shape']}, Output: {ext_output['shape']}"
-            )
-        except Exception as e:
-            logging.warning(f"Erreur avec l'extracteur ECAPA-TDNN, utilisation des embeddings YAMNet: {e}")
 
     videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_name(f"{p.stem}_audio.json").exists()]
     total_videos = len(videos)
@@ -960,42 +1082,39 @@ def main():
     if total_videos == 0:
         return
 
+    env_path = BASE_DIR / ".env"
+    if env_path.exists():
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    if k.strip() == "STEP4_MAX_WORKERS":
+                        os.environ["STEP4_MAX_WORKERS"] = v.strip()
+                        break
+
+    step4_workers_str = os.environ.get("STEP4_MAX_WORKERS", "")
+    if step4_workers_str.isdigit():
+        max_workers = int(step4_workers_str)
+    else:
+        max_workers = max(1, multiprocessing.cpu_count() // 2)
+    logging.info(f"Utilisation de {max_workers} threads (ThreadPoolExecutor) pour l'analyse inter-vidéos.")
+
+    cfg = {
+        'vad_threshold': vad_threshold,
+        'hop_overlap': hop_overlap,
+        'median_filter_size': median_filter_size,
+        'hangover_sec': hangover_sec,
+        'max_speakers': max_speakers
+    }
+
     successful_count = 0
-    for idx, video_path in enumerate(videos):
-        logging.info(f"PROCESSING_VIDEO: {video_path.name}")
 
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_wav = Path(temp_dir) / "audio.wav"
-                extract_audio(video_path, temp_wav)
-
-                # 1. VAD et Extraction (TPU) avec fenêtrage glissant + FSM
-                segments, embeddings = run_vad_and_embedding(
-                    temp_wav, yamnet_interp, extractor_interp,
-                    vad_threshold=vad_threshold,
-                    hop_overlap=hop_overlap,
-                    median_filter_size=median_filter_size,
-                    hangover_sec=hangover_sec
-                )
-
-                logging.info(f"VAD: {len(segments)} segments de parole détectés")
-
-                # 2. Spectral Clustering adaptatif (CPU)
-                diarization_result = perform_clustering(
-                    embeddings, segments,
-                    max_speakers=max_speakers
-                )
-
-                # Sauvegarde JSON au format original compatible STEP5/6 + speaker_stats
-                output_json = video_path.with_name(f"{video_path.stem}_audio.json")
-                duration_sec = _run_ffprobe_duration(video_path)
-                _write_audio_json_file(output_json, video_path, diarization_result, duration_sec, temp_wav)
-
-                logging.info(f"Succès: {output_json.name} créé.")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(worker_process_video, vp, cfg, extractor_model): vp for vp in videos}
+        for future in as_completed(futures):
+            if future.result():
                 successful_count += 1
-
-        except Exception as e:
-            logging.exception(f"Échec de l'analyse audio pour {video_path.name}: {e}")
 
     logging.info(f"--- Analyse terminée. {successful_count}/{total_videos} réussie(s). ---")
 
