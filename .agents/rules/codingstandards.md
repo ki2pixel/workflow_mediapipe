@@ -14,7 +14,7 @@ alwaysApply: true
 - **Data**: Streaming JSON O(1) (`ijson`, `StreamingJSONOutput`). SQLite (via `CSVService`) unique BDD active. MySQL est obsolète (`USE_MYSQL=false`, `services.deprecated.mysql_service`).
 - **Environnements (`envs/`)**:
   - `transnet_env/`, `audio_env/`, `tracking_env_slim/` (CPU-optimized), `insightface_env/` (GPU-only).
-  - `coral_env/` : Google Coral TPU (TFLite Runtime, PyCoral).
+  - `coral_env/` : Google Coral TPU (TFLite Runtime, PyCoral). Inférence audio hybride (STEP4) : **VAD** sur le TPU (YAMNet INT8) et **Embeddings** sur le CPU (ECAPA-TDNN via ONNX Runtime Float32 avec Dynamic Batching et topologie NUMA).
 
 ## 2. Project Structure
 - `services/`: Fonctions pures, logique métier (ex: `FilesystemService`).
@@ -46,7 +46,7 @@ alwaysApply: true
 - **STEP2 (Conversion)**: NVENC parallèle (max 3 workers) + Fallback CPU `libx264`.
 - **STEP3 (Transitions)**:
   - GPU/CPU: TransNetV2 (batch=8, `mixed_precision=true`, O(1) RAM).
-  - TPU: MobileNetV2 INT8 (GAP 1280D ou logits 1000D fallback) + EMA embeddings (α=0.8) + Filtre Médian 1D + Seuillage adaptatif Dugad (μ+k·σ, k=3.0) + Twin-Comparison (transitions graduelles). Timecode `HH:MM:SS.mmm`.
+  - TPU: MobileNetV2 INT8 (GAP 1280D ou logits 1000D fallback) avec architecture Producer-Consumer (FFmpeg I/O asynchrone) + EMA embeddings (α=0.8) + Post-traitements JIT Numba (Filtre Médian 1D + Seuillage adaptatif Dugad μ+k·σ + Twin-Comparison FSM). Timecode `HH:MM:SS.mmm`.
 - **STEP4 (Audio)**:
   - GPU/CPU: Lemonfox/Whisper + Fallback Pyannote. Isolement GPU (`AUDIO_GPU_ISOLATION=1`) en sous-processus. `AUDIO_PROFILE=gpu_fp32`.
   - TPU: YAMNet INT8 (fenêtrage glissant overlap 50%, hop 0.48s) + Filtre Médian VAD + FSM Hangover (1.0s) + AHC (Agglomerative Hierarchical Clustering) avec distance cosine (seuil calibré 0.32) + réassignation des locuteurs mineurs (<7.0s) + estimation optionnelle par Spectral Clustering (Eigen-gap/Silhouette) + extraction d-vectors ECAPA-TDNN Float32 CPU (XNNPACK) avec fallback embeddings YAMNet 1024D. Seuil VAD calibré 0.20.
@@ -78,6 +78,6 @@ alwaysApply: true
 - Charger de gros JSON entièrement en RAM avec `json.load()` (utiliser `ijson`).
 - JS moderne dans ExtendScript (.jsx).
 - Utiliser MySQL en production (déprécié).
-- **TPU Anti-Patterns**: Inférences TPU concurrentes sans passer par le `coral_tpu_orchestrator`. Exécution de modèles non compilés pour Edge TPU ou non quantifiés (INT8).
+- **TPU Anti-Patterns**: Inférences TPU concurrentes sans passer par le `coral_tpu_orchestrator`. Exécution de modèles non compilés pour Edge TPU ou non quantifiés (INT8). Tentative de quantification INT8 ou de compilation pour l'Edge TPU du modèle d'embeddings ECAPA-TDNN (doit s'exécuter obligatoirement sur CPU via ONNX Runtime pour garantir la précision). Exécuter des post-traitements lourds en Python pur après inférence TPU (utiliser Numba JIT) ou bloquer le TPU sur de l'I/O vidéo séquentiel (utiliser Producer-Consumer).
 
 > **Note**: Maintenir <12 000 caractères. Réviser après chaque évolution majeure.

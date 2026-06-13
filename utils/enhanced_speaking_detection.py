@@ -16,6 +16,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 
+try:
+    import orjson
+    _HAS_ORJSON = True
+except ImportError:
+    _HAS_ORJSON = False
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -127,8 +133,12 @@ class EnhancedSpeakingDetector:
             return None
         
         try:
-            with open(audio_json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            if _HAS_ORJSON:
+                with open(audio_json_path, 'rb') as f:
+                    data = orjson.loads(f.read())
+            else:
+                with open(audio_json_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
             audio_data = {}
             warned_schema_once = False

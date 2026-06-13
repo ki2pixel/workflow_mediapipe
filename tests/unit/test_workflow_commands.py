@@ -268,7 +268,8 @@ class TestStepConfigurations:
 
     def test_step5_uses_tpu_when_accelerated(self, temp_base_path):
         """Test that STEP5 uses Coral TPU script when accelerated."""
-        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True):
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
+             patch.object(config, 'STEP5_ENABLE_CORAL_TPU', True, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP5')
@@ -410,7 +411,8 @@ class TestLogConfiguration:
             assert any('GPU' in name for name in log_names)
 
         # Test accelerated mode (TPU)
-        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True):
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
+             patch.object(config, 'STEP5_ENABLE_CORAL_TPU', True, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             logs = commands.get_step_config('STEP5')['specific_logs']
             assert len(logs) == 1

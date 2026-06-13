@@ -12,6 +12,9 @@ global.document = {
   removeEventListener: () => {},
 };
 
+globalThis.addEventListener = () => {};
+globalThis.dispatchEvent = () => {};
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -1,7 +1,7 @@
 ---
 name: coral-tpu-hybrid-algorithms
-description: Expert des algorithmes CPU (Filtre de Kalman, Clustering Spectral) mis en place pour compenser la perte de précision INT8 et les limites de l'ASIC Coral.
-trigger: kalman, spectral, clustering, cosine, hybrid, jittering
+description: Expert des algorithmes CPU (Numba JIT, Filtre de Kalman, Clustering Spectral) mis en place pour compenser la perte de précision INT8 et les limites de l'ASIC Coral.
+trigger: kalman, spectral, clustering, cosine, hybrid, jittering, numba, jit, welford
 ---
 
 # Coral TPU Hybrid Algorithms Skill
@@ -9,7 +9,7 @@ trigger: kalman, spectral, clustering, cosine, hybrid, jittering
 Ce skill encadre les heuristiques mathématiques déportées sur le CPU pour compenser la limitation matérielle (précision INT8, manque d'opérations complexes) du TPU Coral.
 
 ## 🎯 Rôle
-Déboguer, profiler et optimiser les calculs lourds qui s'exécutent sur le CPU en complément des inférences TPU. Cela inclut le Filtre One-Euro (52 dimensions) par défaut pour réduire le jittering (avec le Filtre de Kalman vectorisé en secours), le Clustering Hiérarchique Agglomératif (AHC) et le Regroupement Spectral via `scikit-learn` pour l'audio, et les calculs de Distance Cosinus.
+Déboguer, profiler et optimiser les calculs lourds qui s'exécutent sur le CPU en complément des inférences TPU. Cela inclut la vectorisation compilée Numba JIT (STEP3: Dugad Welford, Twin-Comparison FSM, Filtre médian), le Filtre One-Euro (52 dimensions) pour réduire le jittering (avec le Filtre de Kalman vectorisé en secours), le Clustering Hiérarchique Agglomératif (AHC) et le Regroupement Spectral via `scikit-learn` pour l'audio, et les calculs de Distance Cosinus.
 
 ## 📋 Checklist de Préparation
 Avant d'optimiser le code algorithmique :
@@ -30,7 +30,7 @@ Avant d'optimiser le code algorithmique :
 
 ### Incident 2 : Le clustering audio (STEP4) est inexact ou engorge le CPU
 - **Symptôme** : Division fictive des locuteurs ou lenteurs lors du regroupement des d-vectors ECAPA-TDNN.
-- **Action** : Veiller à ce que l'Agglomerative Hierarchical Clustering (AHC) soit utilisé en production avec une métrique `cosine`, linkage `average` et un seuil de distance `distance_threshold=0.32`. S'assurer que le post-traitement réassigne les locuteurs mineurs (<7.0s de parole cumulée) aux centroïdes des locuteurs majeurs les plus proches. Si l'estimation adaptative du nombre de locuteurs par Spectral Clustering (Eigen-gap/Silhouette) est activée, paramétrer le solveur de `scikit-learn` (ex: `n_jobs=-1`) ou restreindre l'analyse aux `max_speakers` autorisés pour soulager le CPU.
+- **Action** : Depuis la migration d'ECAPA-TDNN vers ONNX Runtime CPU, les d-vectors extraits ne souffrent plus de la dégradation causée par la quantification INT8. Le rôle des algorithmes CPU (clustering AHC avec distance cosine, linkage average, seuil 0.32 et filtrage à 7.0s) reste indispensable pour structurer proprement la diarisation et fusionner les faux locuteurs générés par les bruits ambiants. Si l'estimation adaptative du nombre de locuteurs par Spectral Clustering (Eigen-gap/Silhouette) est activée, paramétrer le solveur de `scikit-learn` (ex: `n_jobs=-1`) ou restreindre l'analyse aux `max_speakers` autorisés pour soulager le CPU.
 
 ## ⚠️ Séparation des Responsabilités
 Se concentre purement sur la viabilité et la performance des algorithmes mathématiques CPU. Intervient "après" le TPU, là où l'ASIC s'arrête, sans se substituer aux orchestrateurs globaux de STEP4 ou STEP5.

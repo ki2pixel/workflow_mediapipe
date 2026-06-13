@@ -38,4 +38,4 @@ Avant toute modification ou recompilation :
 - **Action** : Revoir le dataset représentatif utilisé lors du processus de "Post-Training Quantization" (PTQ). L'échantillon d'images/audios doit couvrir l'entièreté de la distribution réelle.
 
 ## ⚠️ Séparation des Responsabilités
-Ce skill n'intervient pas dans l'exécution métier du pipeline (STEP3, 4 ou 5). Il agit en amont pour s'assurer que les modèles `.tflite` fournis sont syntaxiquement et matériellement compatibles avec le compilateur Coral.
+Ce skill n'intervient pas dans l'exécution métier du pipeline (STEP3, 4 ou 5). Il agit en amont pour s'assurer que les modèles `.tflite` fournis sont syntaxiquement et matériellement compatibles avec le compilateur Coral. À noter : le modèle ECAPA-TDNN a été déporté vers ONNX Runtime CPU pour des raisons de performance et de stabilité de précision, et ne fait plus partie des cibles de compilation `edgetpu_compiler`.

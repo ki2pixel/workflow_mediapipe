@@ -14,6 +14,8 @@ import logging
 import subprocess
 import threading
 import queue
+import multiprocessing as mp
+from multiprocessing import shared_memory
 import numpy as np
 import cv2
 from pathlib import Path
@@ -40,16 +42,7 @@ ARKIT_52_BLENDSHAPE_NAMES = [
     'cheekSquintLeft', 'cheekSquintRight', 'noseSneerLeft', 'noseSneerRight', 'tongueOut'
 ]
 
-# Gestion des dépendances Edge TPU
-try:
-    from pycoral.utils import edgetpu
-    from pycoral.adapters import common
-    from pycoral.adapters import detect
-    import tflite_runtime.interpreter as tflite
-    from PIL import Image
-except ImportError as e:
-    logging.critical(f"ERREUR: Les bibliothèques Coral/TFLite ne sont pas installées dans coral_env: {e}")
-    sys.exit(1)
+# Gestion des dépendances Edge TPU supprimée globalement pour éviter les crashs (Lazy Load)
 
 # --- Configuration Globale ---
 WORK_DIR = Path(os.getcwd())
@@ -144,7 +137,7 @@ class StreamingNDJSONOutput:
         
     def _write_line(self, obj):
         if _HAS_ORJSON:
-            self.file_obj.write(orjson.dumps(obj, option=orjson.OPT_SERIALIZE_NUMPY) + b'\n')
+            self.file_obj.write(orjson.dumps(obj, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_APPEND_NEWLINE))
         else:
             self.file_obj.write(json.dumps(obj, ensure_ascii=False) + '\n')
             
@@ -190,6 +183,7 @@ class KalmanFilterND:
 
 def load_tpu_model(model_path: Path, delegate=None):
     """Charge un modèle TFLite sur le delegate TPU ou CPU"""
+    import tflite_runtime.interpreter as tflite
     if not model_path.exists():
         logging.warning(f"Modèle manquant: {model_path}. Simulation de son exécution.")
         return None
@@ -218,15 +212,19 @@ def detect_face(interpreter, image):
         h, w = input_details['shape'][1], input_details['shape'][2]
         
         if image.shape[0] != h or image.shape[1] != w:
-            input_image = cv2.resize(image, (w, h), interpolation=cv2.INTER_NEAREST)
+            input_image = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
         else:
             input_image = image
             
-        common.set_input(interpreter, input_image)
+        if input_details['dtype'] == np.float32:
+            input_image = (input_image.astype(np.float32) / 127.5) - 1.0
+            
+        interpreter.tensor(input_details['index'])()[0][:, :] = input_image
         interpreter.invoke()
         
-        tensor_0 = common.output_tensor(interpreter, 0)[0]
-        tensor_1 = common.output_tensor(interpreter, 1)[0]
+        output_details = interpreter.get_output_details()
+        tensor_0 = interpreter.get_tensor(output_details[0]['index'])[0]
+        tensor_1 = interpreter.get_tensor(output_details[1]['index'])[0]
         
         # Le compilateur Edge TPU peut inverser l'ordre des tenseurs
         if tensor_0.shape[-1] == 1:
@@ -263,10 +261,21 @@ def extract_landmarks(interpreter, image_crop):
         return np.random.rand(468, 3) # Mock 468 landmarks
         
     try:
-        common.set_input(interpreter, np.array(image_crop))
+        input_details = interpreter.get_input_details()[0]
+        h, w = input_details['shape'][1], input_details['shape'][2]
+        if image_crop.shape[0] != h or image_crop.shape[1] != w:
+            input_image = cv2.resize(image_crop, (w, h), interpolation=cv2.INTER_LINEAR)
+        else:
+            input_image = image_crop
+            
+        if input_details['dtype'] == np.float32:
+            input_image = (input_image.astype(np.float32) / 127.5) - 1.0
+            
+        interpreter.tensor(input_details['index'])()[0][:, :] = input_image
         interpreter.invoke()
         
-        output = common.output_tensor(interpreter, 0)[0].copy()
+        output_details = interpreter.get_output_details()
+        output = interpreter.get_tensor(output_details[0]['index'])[0].copy()
         return output.reshape(-1, 3)
     except Exception as e:
         logging.error(f"Erreur FaceMesh: {e}")
@@ -504,253 +513,308 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
         if frame_idx % 25 == 0:
             progress_percent = int((frame_idx / total_frames) * 100) if total_frames else 0
             logging.info(f"INTERNAL_PROGRESS: {frame_idx}/{total_frames} frames ({progress_percent}%) - {video_path.name}")
+            print(f"INTERNAL_PROGRESS: {frame_idx}/{total_frames} frames ({progress_percent}%) - {video_path.name}", flush=True)
             
     if total_frames:
         logging.info(f"INTERNAL_PROGRESS: {total_frames}/{total_frames} frames (100%) - {video_path.name}")
+        print(f"INTERNAL_PROGRESS: {total_frames}/{total_frames} frames (100%) - {video_path.name}", flush=True)
         
     process.stdout.close()
     process.wait()
     
     return frame_idx
 
-def run_tracking_pipeline_threaded(video_path, blazeface, facemesh, blendshapes, object_detector_tpu,
-                                   width, height, fps, total_frames, speaking_detector, stream_out):
-    """
-    Exécute le pipeline de tracking avec 3 threads (Acquisition, Inférence, Sérialisation).
-    Améliore l'utilisation du TPU en chevauchant I/O et Inférence.
-    """
-    input_queue = queue.Queue(maxsize=8)
-    output_queue = queue.Queue(maxsize=8)
-    error_event = threading.Event()
-    exceptions = []
+def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, input_queue, output_queue, ipc_lock=None):
+    import logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - INFERENCE - %(message)s')
+    logging.info("Starting _inference_process")
+    import numpy as np
+    import cv2
+    from multiprocessing import shared_memory
+    import tflite_runtime.interpreter as tflite
+        
+    try:
+        if ipc_lock:
+            ipc_lock.acquire()
+            logging.info("IPC Lock acquired for PCIe initialization.")
+        logging.info("Loading delegate...")
+        try:
+            delegate_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tmp_lib', 'usr', 'lib', 'x86_64-linux-gnu', 'libedgetpu.so.1'))
+            if not os.path.exists(delegate_path):
+                delegate_path = 'libedgetpu.so.1'
+            delegate = tflite.load_delegate(delegate_path)
+            logging.info("Delegate loaded.")
+        except Exception as e:
+            logging.critical(f"Delegate failed: {e}")
+            raise e
+        blazeface = load_tpu_model(blazeface_path, delegate)
+        logging.info("BlazeFace loaded.")
+        facemesh = load_tpu_model(facemesh_path, delegate)
+        logging.info("FaceMesh loaded.")
+        if ipc_lock:
+            ipc_lock.release()
+            logging.info("IPC Lock released after SRAM allocation.")
+            
+        blendshapes = load_tpu_model(blendshapes_path, delegate=None)
+        logging.info("Blendshapes loaded.")
+        
+        object_detector_tpu = None
+        if enable_object_detection:
+            object_detector_tpu = load_tpu_model(object_detector_path, delegate=delegate)
+            
+        shm = shared_memory.SharedMemory(name=shm_name)
+        # Ring buffer size: 8
+        shared_array = np.ndarray((8, height, width, 3), dtype=np.uint8, buffer=shm.buf)
+        
+        from utils.one_euro_filter import OneEuroFilterND
+        temporal_filter = OneEuroFilterND(dim=52, rate=fps, min_cutoff=1.0, beta=0.007)
+        
+        while True:
+            item = input_queue.get()
+            if item is None:
+                output_queue.put(None)
+                break
+                
+            frame_idx, buffer_idx, tracked_objects_metadata = item
+            
+            # Zero-copy read
+            image = shared_array[buffer_idx]
+            
+            # The rest is the inference logic, similar to before
+            current_detections = []
+            
+            if image.shape[0] != height or image.shape[1] != width:
+                input_image = cv2.resize(image, (width, height), interpolation=cv2.INTER_NEAREST)
+            else:
+                input_image = image
+                
+            res = detect_face(blazeface, input_image)
+            
+            if res != (None, None):
+                raw_bbox, eyes = res
+                ymin, xmin, ymax, xmax = raw_bbox
+                
+                bbox_xmin = int(xmin * width)
+                bbox_ymin = int(ymin * height)
+                bbox_width = int((xmax - xmin) * width)
+                bbox_height = int((ymax - ymin) * height)
+                centroid_x = int(bbox_xmin + bbox_width / 2)
+                centroid_y = int(bbox_ymin + bbox_height / 2)
+                
+                if eyes:
+                    right_eye, left_eye = eyes
+                    transform_params = face_utils.get_affine_transform(right_eye, left_eye, output_size=192)
+                    face_crop_192 = face_utils.apply_affine_crop(image, transform_params)
+                else:
+                    face_crop_192 = cv2.resize(image, (192, 192))
+                    
+                landmarks = extract_landmarks(facemesh, face_crop_192)
+                raw_blendshapes = extract_blendshapes(blendshapes, landmarks)
+                smoothed_blendshapes = temporal_filter.update(raw_blendshapes).tolist()
+                
+                blendshapes_dict = dict(zip(
+                    ARKIT_52_BLENDSHAPE_NAMES,
+                    (float(v) for v in smoothed_blendshapes)
+                ))
+                
+                current_detections.append({
+                    "centroid": (centroid_x, centroid_y),
+                    "bbox": (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
+                    "blendshapes": blendshapes_dict,
+                    "source_detector": "face_landmarker",
+                    "confidence": 1.0
+                })
+            
+            if not current_detections and object_detector_tpu:
+                input_details = object_detector_tpu.get_input_details()[0]
+                od_height, od_width = input_details['shape'][1:3]
+                if image.shape[0] != od_height or image.shape[1] != od_width:
+                    img_od = cv2.resize(image, (od_width, od_height), interpolation=cv2.INTER_NEAREST)
+                else:
+                    img_od = image
+                    
+                if input_details['dtype'] == np.float32:
+                    img_od = (img_od.astype(np.float32) / 127.5) - 1.0
+                    
+                object_detector_tpu.tensor(input_details['index'])()[0][:, :] = img_od
+                object_detector_tpu.invoke()
+                
+                output_details = object_detector_tpu.get_output_details()
+                boxes = object_detector_tpu.get_tensor(output_details[0]['index'])[0]
+                classes = object_detector_tpu.get_tensor(output_details[1]['index'])[0]
+                scores = object_detector_tpu.get_tensor(output_details[2]['index'])[0]
+                count = int(object_detector_tpu.get_tensor(output_details[3]['index'])[0])
+                
+                for i in range(min(count, 5)):
+                    if scores[i] < 0.3:
+                        continue
+                        
+                    ymin, xmin, ymax, xmax = boxes[i]
+                    
+                    o_xmin = max(0, int(xmin * width))
+                    o_ymin = max(0, int(ymin * height))
+                    o_xmax = min(width, int(xmax * width))
+                    o_ymax = min(height, int(ymax * height))
+                    
+                    o_width_px = o_xmax - o_xmin
+                    o_height_px = o_ymax - o_ymin
+                    o_cx = o_xmin + o_width_px // 2
+                    o_cy = o_ymin + o_height_px // 2
+                    
+                    current_detections.append({
+                        "centroid": (o_cx, o_cy),
+                        "bbox": (o_xmin, o_ymin, o_width_px, o_height_px),
+                        "blendshapes": {},
+                        "source_detector": "object_detector",
+                        "label": f"class_{int(classes[i])}",
+                        "confidence": float(scores[i])
+                    })
+            
+            output_queue.put({
+                "frame_idx": frame_idx,
+                "current_detections": current_detections,
+                "tracked_objects_metadata": tracked_objects_metadata # jaw open threshold etc will be done in parent
+            })
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        output_queue.put(e)
+    finally:
+        try:
+            shm.close()
+        except:
+            pass
 
-    active_objects = {}
-    next_id_counter = {"value": 0}
+def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, width, height, fps, total_frames, speaking_detector, stream_out):
+    RING_BUFFER_SIZE = 8
+    frame_size = width * height * 3
+    shm_size = RING_BUFFER_SIZE * frame_size
+    
+    shm = mp.shared_memory.SharedMemory(create=True, size=shm_size)
+    shared_array = np.ndarray((RING_BUFFER_SIZE, height, width, 3), dtype=np.uint8, buffer=shm.buf)
+    
+    input_queue = mp.Queue(maxsize=RING_BUFFER_SIZE)
+    output_queue = mp.Queue(maxsize=RING_BUFFER_SIZE)
+    ipc_lock = mp.Lock()
+    
+    inference_proc = mp.Process(target=_inference_process, args=(
+        shm.name, width, height, fps, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, input_queue, output_queue, ipc_lock
+    ))
+    inference_proc.start()
+    logging.info("Inference process spawned")
+    
+    # Optional FFmpeg pipe size
+    # Python 3.10+ supports pipesize in Popen
+    import sys
+    popen_kwargs = {'stdout': subprocess.PIPE, 'stderr': subprocess.DEVNULL, 'bufsize': 10**8}
+    if sys.version_info >= (3, 10):
+        popen_kwargs['pipesize'] = 1048576
 
     command = [
         'ffmpeg', '-i', str(video_path),
         '-f', 'image2pipe',
         '-pix_fmt', 'rgb24',
+        '-s', f'{width}x{height}', '-r', str(fps),
         '-vcodec', 'rawvideo', '-'
     ]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**8)
-
-    def _acquisition_thread():
+    process = subprocess.Popen(command, **popen_kwargs)
+    
+    active_objects = {}
+    next_id_counter = {"value": 0}
+    
+    final_frame_count = 0
+    
+    import signal
+    import os
+    def handle_sigterm(signum, frame):
+        logging.info("SIGTERM received. Terminating processes...")
         try:
-            frame_idx = 0
-            frame_size = width * height * 3
-            while not error_event.is_set():
+            if inference_proc and inference_proc.is_alive():
+                inference_proc.terminate()
+            if process and process.poll() is None:
+                process.terminate()
+        except Exception:
+            pass
+        os._exit(0)
+    
+    signal.signal(signal.SIGTERM, handle_sigterm)
+    
+    def _acquisition_thread():
+        logging.info("Acquisition thread started")
+        frame_idx = 0
+        try:
+            while True:
                 raw_frame = process.stdout.read(frame_size)
                 if len(raw_frame) != frame_size:
+                    logging.info(f"Acquisition finished at frame {frame_idx}")
                     break
-                image = np.frombuffer(raw_frame, dtype=np.uint8).reshape((height, width, 3))
                 
-                while not error_event.is_set():
-                    try:
-                        input_queue.put((frame_idx, image), timeout=1.0)
-                        break
-                    except queue.Full:
-                        continue
-                        
+                buffer_idx = frame_idx % RING_BUFFER_SIZE
+                # Zero-copy write
+                shared_array[buffer_idx] = np.frombuffer(raw_frame, dtype=np.uint8).reshape((height, width, 3))
+                
+                if frame_idx % 25 == 0:
+                    logging.info(f"Acquisition pushed frame {frame_idx} to queue")
+                
+                input_queue.put((frame_idx, buffer_idx, None))
                 frame_idx += 1
-                
-            while not error_event.is_set():
-                try:
-                    input_queue.put(None, timeout=1.0)
-                    break
-                except queue.Full:
-                    continue
+            input_queue.put(None)
         except Exception as e:
-            exceptions.append(("Acquisition", e))
-            error_event.set()
+            logging.error(f"Acquisition error: {e}")
             input_queue.put(None)
 
-    def _inference_thread():
-        nonlocal active_objects, next_id_counter
-        try:
-            from utils.one_euro_filter import OneEuroFilterND
-            temporal_filter = OneEuroFilterND(dim=52, rate=fps, min_cutoff=1.0, beta=0.007)
+    acq_thread = threading.Thread(target=_acquisition_thread)
+    acq_thread.start()
+    
+    try:
+        while True:
+            item = output_queue.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+                
+            frame_idx = item["frame_idx"]
+            current_detections = item["current_detections"]
             
-            while not error_event.is_set():
-                try:
-                    item = input_queue.get(timeout=1.0)
-                except queue.Empty:
-                    continue
+            tracked_objects = apply_tracking_and_management(
+                active_objects=active_objects,
+                current_detections=current_detections,
+                next_id_counter=next_id_counter,
+                distance_threshold=100.0,
+                frames_unseen_to_deregister=10,
+                speaking_detection_jaw_open_threshold=0.08,
+                enhanced_speaking_detector=speaking_detector,
+                current_frame_num=frame_idx + 1
+            )
+            
+            stream_out.add_frame({
+                "frame": frame_idx + 1,
+                "tracked_objects": tracked_objects
+            })
+            
+            final_frame_count = frame_idx + 1
+            if final_frame_count % 25 == 0:
+                progress_percent = int((final_frame_count / total_frames) * 100) if total_frames else 0
+                logging.info(f"INTERNAL_PROGRESS: {final_frame_count}/{total_frames} frames ({progress_percent}%) - {video_path.name}")
+                print(f"INTERNAL_PROGRESS: {final_frame_count}/{total_frames} frames ({progress_percent}%) - {video_path.name}", flush=True)
                 
-                if item is None:
-                    output_queue.put(None)
-                    break
-                
-                frame_idx, image = item
-                current_detections = []
-                
-                if image.shape[0] != height or image.shape[1] != width:
-                    input_image = cv2.resize(image, (width, height), interpolation=cv2.INTER_NEAREST)
-                else:
-                    input_image = image
-                    
-                res = detect_face(blazeface, input_image)
-                
-                if res != (None, None):
-                    raw_bbox, eyes = res
-                    ymin, xmin, ymax, xmax = raw_bbox
-                    
-                    bbox_xmin = int(xmin * width)
-                    bbox_ymin = int(ymin * height)
-                    bbox_width = int((xmax - xmin) * width)
-                    bbox_height = int((ymax - ymin) * height)
-                    centroid_x = int(bbox_xmin + bbox_width / 2)
-                    centroid_y = int(bbox_ymin + bbox_height / 2)
-                    
-                    if eyes:
-                        right_eye, left_eye = eyes
-                        transform_params = face_utils.get_affine_transform(right_eye, left_eye, output_size=192)
-                        face_crop_192 = face_utils.apply_affine_crop(image, transform_params)
-                    else:
-                        face_crop_192 = cv2.resize(image, (192, 192))
-                        
-                    landmarks = extract_landmarks(facemesh, face_crop_192)
-                    raw_blendshapes = extract_blendshapes(blendshapes, landmarks)
-                    smoothed_blendshapes = temporal_filter.update(raw_blendshapes).tolist()
-                    
-                    blendshapes_dict = dict(zip(
-                        ARKIT_52_BLENDSHAPE_NAMES,
-                        (float(v) for v in smoothed_blendshapes)
-                    ))
-                    
-                    current_detections.append({
-                        "centroid": (centroid_x, centroid_y),
-                        "bbox": (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
-                        "blendshapes": blendshapes_dict,
-                        "source_detector": "face_landmarker",
-                        "confidence": 1.0
-                    })
-                
-                if not current_detections and object_detector_tpu:
-                    od_height, od_width = object_detector_tpu.get_input_details()[0]['shape'][1:3]
-                    if image.shape[0] != od_height or image.shape[1] != od_width:
-                        img_od = cv2.resize(image, (od_width, od_height), interpolation=cv2.INTER_NEAREST)
-                    else:
-                        img_od = image
-                    # Évite le cast numpy superflu car cv2.resize renvoie déjà un ndarray contigu
-                    common.set_input(object_detector_tpu, img_od)
-                    object_detector_tpu.invoke()
-                    
-                    objs = detect.get_objects(object_detector_tpu, score_threshold=0.3)
-                    
-                    # Filtrage par slicing identique pour le pipeline multi-thread
-                    max_results = 5
-                    objs = objs[:max_results]
-                    
-                    for obj in objs:
-                        o_xmin = max(0, int((obj.bbox.xmin / od_width) * width))
-                        o_ymin = max(0, int((obj.bbox.ymin / od_height) * height))
-                        o_xmax = min(width, int((obj.bbox.xmax / od_width) * width))
-                        o_ymax = min(height, int((obj.bbox.ymax / od_height) * height))
-                        
-                        o_width_px = o_xmax - o_xmin
-                        o_height_px = o_ymax - o_ymin
-                        o_cx = o_xmin + o_width_px // 2
-                        o_cy = o_ymin + o_height_px // 2
-                        
-                        current_detections.append({
-                            "centroid": (o_cx, o_cy),
-                            "bbox": (o_xmin, o_ymin, o_width_px, o_height_px),
-                            "blendshapes": {},
-                            "source_detector": "object_detector",
-                            "label": f"class_{obj.id}",
-                            "confidence": float(obj.score)
-                        })
-                
-                tracked_objects = apply_tracking_and_management(
-                    active_objects=active_objects,
-                    current_detections=current_detections,
-                    next_id_counter=next_id_counter,
-                    distance_threshold=100.0,
-                    frames_unseen_to_deregister=10,
-                    speaking_detection_jaw_open_threshold=0.08,
-                    enhanced_speaking_detector=speaking_detector,
-                    current_frame_num=frame_idx + 1
-                )
-                
-                while not error_event.is_set():
-                    try:
-                        output_queue.put({
-                            "frame": frame_idx + 1,
-                            "tracked_objects": tracked_objects
-                        }, timeout=1.0)
-                        break
-                    except queue.Full:
-                        continue
-                        
-            # Envoi du signal de fin normal si pas d'erreur
-            if not error_event.is_set():
-                while not error_event.is_set():
-                    try:
-                        output_queue.put(None, timeout=1.0)
-                        break
-                    except queue.Full:
-                        continue
-        except Exception as e:
-            exceptions.append(("Inference", e))
-            error_event.set()
-            # Ne pas bloquer sur le put d'erreur
-            try:
-                output_queue.put(None, timeout=0.5)
-            except:
-                pass
-
-    final_frame_count = 0
-    def _serialization_thread():
-        nonlocal final_frame_count
-        try:
-            while not error_event.is_set():
-                try:
-                    item = output_queue.get(timeout=1.0)
-                except queue.Empty:
-                    continue
-                    
-                if item is None:
-                    break
-                
-                stream_out.add_frame(item)
-                
-                frame_idx = item["frame"]
-                final_frame_count = frame_idx
-                if frame_idx % 25 == 0:
-                    progress_percent = int((frame_idx / total_frames) * 100) if total_frames else 0
-                    logging.info(f"INTERNAL_PROGRESS: {frame_idx}/{total_frames} frames ({progress_percent}%) - {video_path.name}")
-                    
-        except Exception as e:
-            exceptions.append(("Serialization", e))
-            error_event.set()
-
-    threads = [
-        threading.Thread(target=_acquisition_thread, name="Acquisition"),
-        threading.Thread(target=_inference_thread, name="Inference"),
-        threading.Thread(target=_serialization_thread, name="Serialization")
-    ]
-    
-    for t in threads:
-        t.start()
+    except Exception as e:
+        logging.error(f"Erreur durant l'inférence: {e}")
+    finally:
+        acq_thread.join()
+        inference_proc.join()
+        process.stdout.close()
+        process.wait()
         
-    for t in threads:
-        t.join()
-        
-    if total_frames:
-        logging.info(f"INTERNAL_PROGRESS: {total_frames}/{total_frames} frames (100%) - {video_path.name}")
-        
-    process.stdout.close()
-    process.wait()
-    
-    if exceptions:
-        for stage, e in exceptions:
-            logging.error(f"Error in {stage} thread: {e}")
-        raise RuntimeError("Pipeline threadé a échoué")
+        shm.close()
+        shm.unlink()
         
     return final_frame_count
 
 def main():
+    mp.set_start_method('spawn', force=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--videos_json_path", help="Chemin JSON des vidéos à traiter.")
     parser.add_argument("--out", type=str, default="tracking_output.json", help="Chemin vers le fichier de sortie JSON")
@@ -761,17 +825,8 @@ def main():
 
     logging.info("--- Démarrage de l'analyse Tracking TPU (Cascade) ---")
 
-    # Initialisation TPU
-    try:
-        delegate = edgetpu.load_edgetpu_delegate()
-        logging.info("Délégué Edge TPU initialisé.")
-    except Exception as e:
-        logging.critical(f"Impossible d'initialiser l'Edge TPU: {e}")
-        sys.exit(1)
-
     assets_dir = BASE_DIR / "assets"
     
-    # Co-compiled models (shared SRAM cache)
     cocompiled_dir = assets_dir / "cocompiled"
     use_cocompiled = (
         cocompiled_dir.exists() and
@@ -791,20 +846,33 @@ def main():
         facemesh_path = assets_dir / "facemesh_quantized_edgetpu.tflite"
         logging.info("Using standard models (separate SRAM loading)")
     
-    # Chargement des modèles
-    blazeface = load_tpu_model(blazeface_path, delegate)
-    facemesh = load_tpu_model(facemesh_path, delegate)
-    blendshapes = load_tpu_model(assets_dir / "face_blendshapes.tflite", delegate=None)
+    blendshapes_path = assets_dir / "face_blendshapes.tflite"
+    object_detector_path = assets_dir / "detect_edgetpu.tflite"
     
-    # Respect the STEP5_ENABLE_OBJECT_DETECTION environment variable to avoid costly TPU context switching
     enable_object_detection = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
-    if enable_object_detection:
-        logging.info("Fallback object detection enabled on CPU (loading detect.tflite with delegate=None)")
-        # We load with delegate=None to execute on CPU and prevent costly Edge TPU context switching
-        object_detector_tpu = load_tpu_model(assets_dir / "detect.tflite", delegate=None)
-    else:
-        logging.info("Fallback object detection is disabled (helps avoid TPU context switches)")
+
+    if args.sequential:
+        try:
+            import tflite_runtime.interpreter as tflite
+            delegate_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tmp_lib', 'usr', 'lib', 'x86_64-linux-gnu', 'libedgetpu.so.1'))
+            if not os.path.exists(delegate_path):
+                delegate_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tmp_lib', 'usr', 'lib', 'x86_64-linux-gnu', 'libedgetpu.so.1'))
+            delegate = tflite.load_delegate(delegate_path)
+            logging.info("Délégué Edge TPU initialisé.")
+        except Exception as e:
+            logging.critical(f"Impossible d'initialiser l'Edge TPU: {e}")
+            sys.exit(1)
+            
+        blazeface = load_tpu_model(blazeface_path, delegate)
+        facemesh = load_tpu_model(facemesh_path, delegate)
+        blendshapes = load_tpu_model(blendshapes_path, delegate=None)
+        
         object_detector_tpu = None
+        if enable_object_detection:
+            logging.info("Fallback object detection enabled on CPU")
+            object_detector_tpu = load_tpu_model(object_detector_path, delegate=None)
+    else:
+        blazeface = facemesh = blendshapes = object_detector_tpu = None
 
     if args.videos_json_path:
         logging.info(f"Chargement des vidéos depuis le fichier temporaire: {args.videos_json_path}")
@@ -813,35 +881,30 @@ def main():
                 video_paths = json.load(f)
             videos = [Path(p) for p in video_paths]
         except Exception as e:
-            logging.error(f"Impossible de lire le fichier JSON des vidéos {args.videos_json_path}: {e}")
+            logging.error(f"Impossible de lire le fichier JSON: {e}")
             sys.exit(1)
     else:
         videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}')]
     total_videos = len(videos)
     
-    logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
-
     if total_videos == 0:
         return
+
+    logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
+    print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}", flush=True)
 
     successful_count = 0
     for idx, video_path in enumerate(videos):
         logging.info(f"PROCESSING_VIDEO: {video_path.name}")
-        
         try:
-            # 1. Obtenir les métadonnées de la vidéo (dimensions originales)
             vid_width, vid_height, vid_fps, vid_total_frames = get_video_metadata_ffprobe(video_path)
-            logging.info(f"Metadata - {vid_width}x{vid_height} @ {vid_fps}fps, {vid_total_frames} frames")
             
-            # 2. Initialiser EnhancedSpeakingDetector
             speaking_detector = EnhancedSpeakingDetector(
                 video_path=str(video_path),
                 jaw_threshold=0.08
             )
             
-            # 3. Préparer la sortie streaming (écriture directe pendant le pipeline)
             output_json = video_path.with_suffix('.json')
-            
             metadata = {
                 "video_path": str(video_path),
                 "original_fps": vid_fps,
@@ -856,7 +919,6 @@ def main():
             else:
                 stream_out = StreamingJSONOutput(output_json, metadata)
             
-            # 4. Exécuter le pipeline (streaming direct vers disque)
             if args.sequential:
                 frame_count = run_tracking_pipeline(
                     video_path, blazeface, facemesh, blendshapes, object_detector_tpu,
@@ -864,8 +926,8 @@ def main():
                     speaking_detector=speaking_detector, stream_out=stream_out
                 )
             else:
-                frame_count = run_tracking_pipeline_threaded(
-                    video_path, blazeface, facemesh, blendshapes, object_detector_tpu,
+                frame_count = run_tracking_pipeline_multiprocessing(
+                    video_path, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection,
                     width=vid_width, height=vid_height, fps=vid_fps, total_frames=vid_total_frames,
                     speaking_detector=speaking_detector, stream_out=stream_out
                 )

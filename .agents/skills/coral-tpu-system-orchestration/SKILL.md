@@ -9,7 +9,10 @@ trigger: coral, tpu, gasket, apex_0, aspm, pcie, orchestrator, sram
 Ce skill est dédié à la maintenance et au diagnostic de l'intégration matérielle du Google Coral M.2 PCIe TPU et de son routeur applicatif.
 
 ## 🎯 Rôle
-Maintenir l'intégrité du pont matériel TPU-Système. Gérer la configuration du noyau (pilote `feranick/gasket-driver`, paramètres ASPM/AER), surveiller l'allocation `/dev/apex_0` et diagnostiquer la file d'attente asynchrone du singleton `coral_tpu_orchestrator.py` gérant la SRAM de 8 Mo.
+Maintenir l'intégrité du pont matériel TPU-Système. Gérer la configuration du noyau (pilote `feranick/gasket-driver`, paramètres ASPM/AER), surveiller l'allocation `/dev/apex_0` et diagnostiquer la gestion du double niveau de verrouillage/sérialisation :
+- **Macro** : Le singleton `coral_tpu_orchestrator.py` qui sérialise les étapes globales sur la SRAM PCIe (8 Mo).
+- **Micro** : Le thread lock local `_tpu_lock` au sein de `run_audio_diarization_tpu.py` pour sécuriser les exécutions concurrentes de YAMNet.
+- **Asynchrone** : L'architecture Producer-Consumer (`threading`, `queue`) dans `run_scene_detect_tpu.py` qui parallélise l'I/O FFmpeg et l'inférence TPU sans surcharger l'ASIC.
 
 ## 📋 Checklist de Préparation
 Avant toute intervention, vérifiez :

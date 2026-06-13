@@ -9,6 +9,9 @@ global.window = {
   cancelAnimationFrame: (id) => clearTimeout(id),
   location: { hostname: 'localhost' },
 };
+globalThis.addEventListener = () => {};
+globalThis.dispatchEvent = () => {};
+globalThis.location = global.window.location;
 global.document = {
   addEventListener: () => {},
   removeEventListener: () => {},

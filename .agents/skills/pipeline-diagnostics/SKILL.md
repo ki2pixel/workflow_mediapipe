@@ -7,7 +7,7 @@ description: Checklists and scripts to validate env vars, venv availability, and
 
 ## Quick Start
 1. Lire `.env` via `config/settings.py` (`python - <<'PY' ...`) pour afficher les variables critiques (`CACHE_ROOT_DIR`, `STEP5_*`, `DOWNLOAD_HISTORY_DB_PATH`).
-2. Valider l'existence des venv spécialisés (`env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
+2. Valider l'existence des venv spécialisés (`env/`, `coral_env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
 3. Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
 4. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP5 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
 5. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur, y compris les vérifications STEP7/STEP8.
@@ -17,7 +17,7 @@ description: Checklists and scripts to validate env vars, venv availability, and
    - Charger via `python3 config/settings.py --print` (si script dispo) ou `python - <<'PY'` pour inspecter `config.settings.config`.
    - Contrôler : chemins cache, flags `DRY_RUN_DOWNLOADS`, `STEP5_ENABLE_GPU`, `AUDIO_PROFILE`, URLs webhook. (Note: les variables Vultr et Lightning doivent être supprimées). Vérifier la configuration de taille de batch pour la STEP3 GPU si applicable.
 2. **Venv Readiness**
-   - `ls env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env_slim/bin/python insightface_env/bin/python`.
+   - `ls env/bin/python coral_env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env_slim/bin/python insightface_env/bin/python`.
    - `python -V` dans chaque venv (ex: `env/bin/python -V`).
    - Vérifier la présence de `ijson` dans l'environnement de base (`env/`) pour garantir l'exécution de STEP6/7 en O(1) RAM.
    - Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).

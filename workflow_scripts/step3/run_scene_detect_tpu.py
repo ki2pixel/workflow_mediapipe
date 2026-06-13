@@ -23,6 +23,9 @@ import json
 import urllib.request
 import subprocess
 import numpy as np
+import threading
+import queue
+import numba as nb
 from pathlib import Path
 from datetime import datetime
 import multiprocessing as mp
@@ -121,56 +124,34 @@ def apply_ema_smoothing(embeddings, alpha=DEFAULT_EMA_ALPHA):
     return smoothed
 
 
-def temporal_smoothing(distances, window_size=DEFAULT_MEDIAN_FILTER_SIZE):
-    """Filtre Médian 1D sur les distances cosinus.
+@nb.njit(nopython=True, fastmath=True)
+def _temporal_smoothing_numba(distances, window_size):
+    n = len(distances)
+    if n < window_size:
+        return distances.copy()
 
-    Rejette le bruit impulsionnel (flashs, glitches) sans propager les pics,
-    contrairement à la moyenne mobile qui les étale.
-
-    Args:
-        distances: Signal 1D numpy des distances cosinus.
-        window_size: Taille du noyau médian (impaire, typiquement 3 ou 5).
-
-    Returns:
-        Signal filtré par médiane.
-    """
-    if len(distances) < window_size:
-        return distances
-
-    # Forcer taille impaire
     if window_size % 2 == 0:
         window_size += 1
 
-    try:
-        from scipy.signal import medfilt
-        return medfilt(distances, kernel_size=window_size)
-    except ImportError:
-        # Fallback numpy si scipy absent : médiane glissante manuelle
-        half_w = window_size // 2
-        filtered = distances.copy()
-        for i in range(half_w, len(distances) - half_w):
+    half_w = window_size // 2
+    filtered = np.zeros(n, dtype=np.float32)
+
+    for i in range(n):
+        if i < half_w or i >= n - half_w:
+            filtered[i] = distances[i]
+        else:
             filtered[i] = np.median(distances[i - half_w:i + half_w + 1])
-        return filtered
+    return filtered
+
+def temporal_smoothing(distances, window_size=DEFAULT_MEDIAN_FILTER_SIZE):
+    """Filtre Médian 1D sur les distances cosinus accéléré par Numba JIT."""
+    return _temporal_smoothing_numba(np.asarray(distances, dtype=np.float32), window_size)
 
 
-def compute_adaptive_threshold(distances, window_size=DEFAULT_DUGAD_WINDOW, k=DEFAULT_DUGAD_K):
-    """Calcule le seuil adaptatif de Dugad sur une fenêtre glissante.
-
-    T_i = μ_i + k · σ_i
-
-    Où μ_i et σ_i sont la moyenne et l'écart-type des distances dans une fenêtre
-    centrée de taille M autour de la frame i.
-
-    Args:
-        distances: Signal 1D numpy des distances cosinus (après filtrage médian).
-        window_size: Taille de la fenêtre glissante (M, typiquement 25).
-        k: Coefficient de sensibilité (entre 2.5 et 4.0, défaut 3.0).
-
-    Returns:
-        Array numpy des seuils dynamiques T_i pour chaque frame.
-    """
+@nb.njit(nopython=True, fastmath=True)
+def _compute_adaptive_threshold_numba(distances, window_size, k):
     n = len(distances)
-    thresholds = np.zeros(n)
+    thresholds = np.zeros(n, dtype=np.float32)
     half_w = window_size // 2
 
     for i in range(n):
@@ -180,113 +161,112 @@ def compute_adaptive_threshold(distances, window_size=DEFAULT_DUGAD_WINDOW, k=DE
         mu = np.mean(window)
         sigma = np.std(window)
         thresholds[i] = mu + k * sigma
-
     return thresholds
 
+def compute_adaptive_threshold(distances, window_size=DEFAULT_DUGAD_WINDOW, k=DEFAULT_DUGAD_K):
+    """Calcule le seuil adaptatif de Dugad accéléré par Numba JIT."""
+    return _compute_adaptive_threshold_numba(np.asarray(distances, dtype=np.float32), window_size, float(k))
 
-def detect_cuts_dugad(distances, thresholds, refractory_period, min_scene_len=DEFAULT_MIN_SCENE_LEN):
-    """Détecte les coupures nettes via le modèle de Dugad.
 
-    Conditions de détection :
-    1. d_i est un maximum local (pic)
-    2. d_i > T_i (rupture statistique)
-    3. Période réfractaire de M/2 frames après chaque détection
-
-    Args:
-        distances: Signal 1D des distances cosinus (filtré).
-        thresholds: Seuils adaptatifs T_i (même taille que distances).
-        refractory_period: Nombre de frames minimum entre deux détections.
-        min_scene_len: Durée minimale d'une scène en frames.
-
-    Returns:
-        Liste d'indices de frames où une coupure est détectée.
-    """
+@nb.njit(nopython=True, fastmath=True)
+def _detect_cuts_dugad_numba(distances, thresholds, refractory_period, min_scene_len):
     n = len(distances)
-    cut_indices = []
-    last_cut = -refractory_period  # Permet la détection dès le début
+    cut_indices = np.zeros(n, dtype=np.int32)
+    cut_count = 0
+    last_cut = -refractory_period
 
     for i in range(1, n - 1):
-        # Condition 1 : maximum local
-        is_local_max = (distances[i] > distances[i - 1] and
-                        distances[i] > distances[i + 1])
-        # Condition 2 : rupture statistique
+        is_local_max = (distances[i] > distances[i - 1] and distances[i] > distances[i + 1])
         above_threshold = distances[i] > thresholds[i]
-        # Condition 3 : période réfractaire
         after_refractory = (i - last_cut) >= refractory_period
-        # Condition 4 : scène minimale
-        meets_min_len = (i - last_cut) >= min_scene_len if cut_indices else True
+        meets_min_len = (i - last_cut) >= min_scene_len if cut_count > 0 else True
 
         if is_local_max and above_threshold and after_refractory and meets_min_len:
-            cut_indices.append(i)
+            cut_indices[cut_count] = i
+            cut_count += 1
             last_cut = i
 
-    return cut_indices
+    return cut_indices[:cut_count]
+
+def detect_cuts_dugad(distances, thresholds, refractory_period, min_scene_len=DEFAULT_MIN_SCENE_LEN):
+    """Détecte les coupures nettes via le modèle de Dugad accéléré par Numba JIT."""
+    return list(_detect_cuts_dugad_numba(np.asarray(distances, dtype=np.float32), 
+                                         np.asarray(thresholds, dtype=np.float32), 
+                                         refractory_period, min_scene_len))
 
 
-def detect_gradual_transitions(distances, thresholds_high, thresholds_low, refractory_period,
-                               existing_cuts=None):
-    """Détecte les transitions graduelles (fondus, balayages) via double seuil.
-
-    Un franchissement de T_l active un accumulateur de distances. La transition
-    est validée si la somme cumulée dépasse un critère avant que le signal ne
-    repasse durablement sous T_l.
-
-    Args:
-        distances: Signal 1D des distances cosinus (filtré).
-        thresholds_high: Seuils hauts T_h pour chaque frame.
-        thresholds_low: Seuils bas T_l pour chaque frame.
-        refractory_period: Période réfractaire entre détections.
-        existing_cuts: Indices de coupures nettes déjà détectées (pour éviter les doublons).
-
-    Returns:
-        Liste d'indices de frames correspondant au milieu des transitions graduelles.
-    """
-    n = len(distances)
-    gradual_indices = []
-    existing_set = set(existing_cuts or [])
-
+@nb.njit(nopython=True, fastmath=True)
+def _detect_gradual_transitions_numba(distances, thresholds_high, thresholds_low, refractory_period, existing_cuts):
+    n_frames = len(distances)
+    detected_scenes = np.zeros(n_frames, dtype=np.int32)
+    scene_idx = 0
+    
     in_gradual = False
-    cumulative_distance = 0.0
-    gradual_start = 0
+    acc_distance = 0.0
+    start_gradual_idx = 0
+    frames_above = 0
     gradual_peak_idx = 0
     gradual_peak_val = 0.0
-    # Le critère de validation est la moyenne de T_h sur la zone
-    frames_above = 0
-
-    for i in range(1, n - 1):
+    
+    for i in range(1, n_frames - 1):
         if not in_gradual:
-            # Entrée dans une zone de transition potentielle
             if distances[i] > thresholds_low[i] and distances[i] <= thresholds_high[i]:
                 in_gradual = True
-                cumulative_distance = distances[i]
-                gradual_start = i
+                acc_distance = distances[i]
+                start_gradual_idx = i
                 gradual_peak_idx = i
                 gradual_peak_val = distances[i]
                 frames_above = 1
         else:
             if distances[i] > thresholds_low[i]:
-                cumulative_distance += distances[i]
+                acc_distance += distances[i]
                 frames_above += 1
                 if distances[i] > gradual_peak_val:
                     gradual_peak_val = distances[i]
                     gradual_peak_idx = i
             else:
-                # Fin de la zone : valider ou rejeter
                 if frames_above >= 3:
-                    avg_threshold_h = np.mean(thresholds_high[gradual_start:i])
-                    if cumulative_distance > avg_threshold_h * 1.5:
-                        mid_point = (gradual_start + i) // 2
-                        # Vérifier qu'on n'est pas trop proche d'un cut existant
-                        too_close = any(abs(mid_point - c) < refractory_period
-                                        for c in existing_set | set(gradual_indices))
+                    sum_t_h = 0.0
+                    for j in range(start_gradual_idx, i):
+                        sum_t_h += thresholds_high[j]
+                    avg_threshold_h = sum_t_h / max(1, (i - start_gradual_idx))
+                    
+                    if acc_distance > avg_threshold_h * 1.5:
+                        mid_point = (start_gradual_idx + i) // 2
+                        
+                        too_close = False
+                        for c in existing_cuts:
+                            if abs(mid_point - c) < refractory_period:
+                                too_close = True
+                                break
                         if not too_close:
-                            gradual_indices.append(mid_point)
-
+                            for j in range(scene_idx):
+                                if abs(mid_point - detected_scenes[j]) < refractory_period:
+                                    too_close = True
+                                    break
+                                
+                        if not too_close:
+                            detected_scenes[scene_idx] = mid_point
+                            scene_idx += 1
+                
                 in_gradual = False
-                cumulative_distance = 0.0
+                acc_distance = 0.0
                 frames_above = 0
 
-    return gradual_indices
+    return detected_scenes[:scene_idx]
+
+def detect_gradual_transitions(distances, thresholds_high, thresholds_low, refractory_period,
+                               existing_cuts=None):
+    """Détecte les transitions graduelles accéléré par Numba JIT."""
+    existing_cuts_arr = np.array(existing_cuts if existing_cuts is not None else [], dtype=np.int32)
+    gradual_arr = _detect_gradual_transitions_numba(
+        np.asarray(distances, dtype=np.float32), 
+        np.asarray(thresholds_high, dtype=np.float32), 
+        np.asarray(thresholds_low, dtype=np.float32), 
+        refractory_period, 
+        existing_cuts_arr
+    )
+    return list(gradual_arr)
 
 
 def get_video_frame_count(video_path):
@@ -363,12 +343,15 @@ def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=DEF
         # Lancement de ffmpeg pour extraire les frames 224x224 RGB à 25 FPS
         command = [
             'ffmpeg',
+            '-threads', '6',
             '-i', str(video_path),
             '-f', 'image2pipe',
             '-pix_fmt', 'rgb24',
             '-s', f'{width}x{height}',
             '-r', str(fps),
             '-vcodec', 'rawvideo',
+            '-sws_flags', 'fast_bilinear',
+            '-sws_dither', 'none',
             '-loglevel', 'error',
             '-'
         ]
@@ -377,18 +360,30 @@ def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=DEF
 
         frame_size = width * height * 3
         raw_embeddings = []
+        frame_queue = queue.Queue(maxsize=128)
+
+        def producer():
+            while True:
+                raw_image = process.stdout.read(frame_size)
+                if len(raw_image) != frame_size:
+                    frame_queue.put(None)
+                    break
+                # Allocation mémoire en parallèle du TPU
+                image = np.frombuffer(raw_image, dtype=np.uint8).reshape((height, width, 3))
+                frame_queue.put(image)
+
+        producer_thread = threading.Thread(target=producer, daemon=True)
+        producer_thread.start()
 
         frame_idx = 0
-        logging.info(f"Démarrage de l'inférence TPU pour {video_path.name}")
+        logging.info(f"Démarrage de l'inférence TPU pour {video_path.name} (Producer-Consumer activé)")
 
         while True:
-            raw_image = process.stdout.read(frame_size)
-            if len(raw_image) != frame_size:
+            image = frame_queue.get()
+            if image is None:
                 break
 
-            image = np.frombuffer(raw_image, dtype=np.uint8).reshape((height, width, 3))
-
-            # Inférence Edge TPU
+            # Inférence Edge TPU (Libère le GIL)
             common.set_input(interpreter, image)
             interpreter.invoke()
 
@@ -406,6 +401,7 @@ def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=DEF
                     f"({progress_pct}%) - {video_path.name}"
                 )
 
+        producer_thread.join()
         process.stdout.close()
         process.wait()
 
