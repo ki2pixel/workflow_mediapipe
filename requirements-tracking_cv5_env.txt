@@ -1,0 +1,29 @@
+# Requirements for STEP 5 Video Tracking using OpenCV 5.0 DNN Engine
+# Virtual environment: tracking_cv5_env
+#
+# This is an EXPERIMENTAL hybrid pipeline:
+#   - OpenCV 5.0 DNN ENGINE_NEW for BlazeFace/FaceMesh inference (CPU ONNX fallback)
+#   - tflite-runtime retained for Edge TPU compatibility (when available)
+#
+# ONNX models (blazeface.onnx, facemesh.onnx) must be placed in assets/models/onnx/
+# before running. See docs/recherches/vision/ for conversion instructions.
+
+# Core: OpenCV 5.0 with DNN graph-oriented engine and HAL acceleration
+opencv-python-headless>=4.11.0
+
+# NumPy 2.x (required by OpenCV 5.0 for ABI compatibility)
+numpy>=2.0.0
+
+# TFLite Runtime for Edge TPU delegate (when Coral is available)
+tflite-runtime>=2.14.0
+
+# Fast JSON serialization (same as legacy TPU pipeline)
+orjson>=3.9.0
+
+# Scientific computing (required by tracking optimizations for KDTree spatial indexing)
+scipy>=1.10.0
+
+# ONNX Runtime for high-performance and fully-compatible ONNX model execution
+onnxruntime>=1.16.0
+
+

@@ -1,4 +1,5 @@
-import numpy as np
+import pytest
+np = pytest.importorskip("numpy")
 from utils.one_euro_filter import OneEuroFilterND
 
 def test_one_euro_initialization():

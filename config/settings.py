@@ -513,7 +513,7 @@ class Config:
         Returns:
             List of Path objects representing allowed base directories
         """
-        return [
+        paths = [
             self.BASE_PATH_SCRIPTS,
             self.LOCAL_DOWNLOADS_DIR,
             self.LOGS_DIR,
@@ -522,6 +522,12 @@ class Config:
             self.BASE_PATH_SCRIPTS / 'templates',
             self.BASE_PATH_SCRIPTS / 'utils',
         ]
+        # Include OpenCV 5.0 experimental venv paths when enabled
+        if getattr(self, 'USE_OPENCV5_STEP3', False):
+            paths.append(self.get_venv_path('transnet_cv5_env'))
+        if getattr(self, 'USE_OPENCV5_STEP5', False):
+            paths.append(self.get_venv_path('tracking_cv5_env'))
+        return paths
     
     def to_dict(self) -> dict:
         """
@@ -732,6 +738,14 @@ class Config:
     STEP3_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP3_ENABLE_CORAL_TPU'), default=True)
     STEP4_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP4_ENABLE_CORAL_TPU'), default=True)
     STEP5_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP5_ENABLE_CORAL_TPU'), default=True)
+
+    # ========================
+    # OpenCV 5.0 Experimental
+    # ========================
+    USE_OPENCV5_STEP3: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
+    USE_OPENCV5_STEP5: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
+    STEP5_CV5_NUM_WORKERS: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
+
 
 
 

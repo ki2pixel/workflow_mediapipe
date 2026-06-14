@@ -1,0 +1,22 @@
+# Requirements for STEP 3 Scene Detection using OpenCV 5.0 DNN Engine
+# Virtual environment: transnet_cv5_env
+#
+# This is an EXPERIMENTAL alternative to the PyTorch-based TransNetV2 pipeline.
+# The ONNX model (transnetv2.onnx) must be placed in assets/models/onnx/
+# before running. See docs/recherches/vision/ for conversion instructions.
+
+# Core: OpenCV 5.0 with DNN graph-oriented engine
+opencv-python-headless>=4.11.0
+
+# NumPy 2.x (required by OpenCV 5.0 for ABI compatibility)
+numpy>=2.0.0
+
+# FFmpeg streaming for frame acquisition (same as legacy pipeline)
+ffmpeg-python>=0.2.0
+
+# Scene timecode formatting (shared with legacy pipeline)
+scenedetect>=0.6.4
+
+# ONNX Runtime for high-performance and fully-compatible ONNX model execution
+onnxruntime>=1.16.0
+

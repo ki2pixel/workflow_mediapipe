@@ -1,13 +1,20 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-Aucune.
+- Validation finale et activation en production expérimentale d'OpenCV 5.0 (STEP 3 & STEP 5).
 
 ## Objectifs
+- Activer et valider les pipelines expérimentaux OpenCV 5.0 pour STEP 3 (Scene Detection) et STEP 5 (Video Tracking).
+- Assurer la rétrocompatibilité totale avec les pipelines classiques et Coral TPU.
 - Maintenir l'intégrité du repo.
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-06-14 20:01:00] **Correction de format JSON, résolution ONNX et Détecteur Objets STEP5 CV5 (COMPLET)** : Résolution de trois problèmes identifiés sur le pipeline OpenCV 5.0 GPU/CPU : 1. Suppression du double backslash provoquant des sauts de ligne littéraux `\n` dans le JSON produit. 2. Correction de la résolution absolue des modèles ONNX dans `load_cv5_model` pour éviter la concaténation erronée avec le dossier par défaut. 3. Retrait temporaire du modèle `.tflite` de `os.environ` lors de la résolution via `ObjectDetectorRegistry` pour forcer le chargement de `yolo11n.onnx` en mode CV5.
+- [2026-06-14 16:15:00] **Amélioration Progression UI STEP5 CV5 (COMPLET)** : Implémentation du suivi multi-ligne (`[Progression-MultiLine]`) pour le tracking en parallèle. Les workers ne polluent plus stdout directement mais passent par une queue IPC. Le parent agrège les informations, affiche la progression de chaque worker avec son index absolu et calcule le pourcentage moyen cumulé de l'étape. Ajout de `current_failure_line_pattern` pour faire avancer la barre de progression même en cas d'erreur.
+- [2026-06-14 15:45:00] **Optimisation Multiprocessing & GPU STEP5 CV5 (COMPLET)** : Parallélisation du tracking via multiprocessing spawn (`STEP5_CV5_NUM_WORKERS=4`) et support GPU `CUDAExecutionProvider` dynamique. Résolution de l'incompatibilité de dimension d'entrée statique YOLOv11 (`yolo11n.onnx` en shape static `480x480`) par détection dynamique et correction spatiale. Vitesse mesurée de 5m 54s sur le lot de 8 vidéos (25% plus rapide que le TPU Edge classique séquentiel).
+- [2026-06-14 14:12:00] **Intégration d'OpenCV 5.0 (COMPLET)** : Activation des pipelines expérimentaux OpenCV 5.0 pour STEP 3 (Scene Detection) et STEP 5 (Video Tracking) via `USE_OPENCV5_STEP3=true` et `USE_OPENCV5_STEP5=true` dans `.env`. Rétrogradation de `numpy` à `<2.0.0` (1.26.4) dans `tracking_cv5_env` pour restaurer la compatibilité avec `tflite-runtime` 2.14.0 (correction de `AttributeError: _ARRAY_API not found`). Alignement et validation du parser JSON de `run_tracking_cv5.py`. Création et validation réussie de la suite de tests d'intégration unitaires (`test_step3_cv5_integration.py` et `test_step5_cv5_json_formats.py`) avec 100% de tests réussis.
+- [2026-06-14 12:40:00] **Réorganisation des Documents de Recherche (COMPLET)** : Catégorisation des 16 fichiers markdown de recherche dans des sous-dossiers thématiques (`audio/`, `hardware/`, `models/`, `vision/`) sous `docs/recherches/` pour une structure plus propre. Aucun lien cassé dans le projet.
 - [2026-06-14 04:21:00] **Abandon et Nettoyage de l'Optimisation STEP3 Axe A (COMPLET)** : Suppression complète de l'Axe A (décodage GPU TorchCodec + torch.compile en FP16) après benchmarks révélant un goulot d'étranglement GPU séquentiel (27s par vidéo vs 22s en classique) et des décalages d'indices VFR. Nettoyage de l'environnement virtuel local `transnet_env`, des bibliothèques ffmpeg GPU et des modèles TensorRT/ONNX (libérant ~4 Go d'espace disque). Intégration de la méthode classique consolidée et validation par test suite.
 - [2026-06-13 17:55:00] **Correction Annulation UI & Object Detector TPU (COMPLET)** : Modification du gestionnaire `SIGTERM` dans `run_tracking_tpu.py` pour utiliser `os._exit(0)` afin d'éviter le blocage asynchrone lors de l'annulation depuis l'UI. Compilation du modèle SSD MobileNet V2 (`detect.tflite` -> `detect_edgetpu.tflite`) permettant au Fallback Object Detector de s'exécuter sur TPU. Vitesse globale mesurée : 82.2 FPS cumulés.
 - [2026-06-13 13:40:00] **Refonte Multiprocessing Zéro-Copie STEP5 (COMPLET)** : L'architecture de la STEP5 TPU a été refondue pour éliminer le GIL et les I/O bloquants. Séparation en `Producer` (FFmpeg) et `Consumer` (Inférence) via `multiprocessing.spawn`, avec communication zéro-copie utilisant `multiprocessing.shared_memory` (Ring Buffer). Optimisation de `StreamingNDJSONOutput` et `EnhancedSpeakingDetector` avec `orjson` en mode append_newline. Note : le pilote `gasket` / TFLite (v2.17.1) remonte actuellement un Segfault (`allocate_tensors`) ou `NumOutputs != 1` nécessitant une réinitialisation de `/dev/apex_0` ou un alignement des versions pycoral.
@@ -52,4 +59,5 @@ Aucune.
 - Aucune
 
 ## Prochaines Étapes
-- Compilation optionnelle du modèle GAP 1280D via `scripts/compile_mobilenet_gap.py` si TensorFlow et `edgetpu_compiler` sont disponibles.
+- Intégrer définitivement les optimisations multiprocessing et GPU en production après les phases de test expérimentales.
+- Surveiller la consommation VRAM et CPU lors des runs de production lourds.

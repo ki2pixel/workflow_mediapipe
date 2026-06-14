@@ -569,6 +569,7 @@ def _run_process_async_internal(step_key: str):
     total_pattern_re = step_progress_patterns.get("total")
     current_pattern_re = step_progress_patterns.get("current")
     current_success_line_pattern_re = step_progress_patterns.get("current_success_line_pattern")
+    current_failure_line_pattern_re = step_progress_patterns.get("current_failure_line_pattern")
     current_item_counter = 0
 
     try:
@@ -582,7 +583,33 @@ def _run_process_async_internal(step_key: str):
         try:
             coral_lib_path = os.path.join(str(BASE_PATH_SCRIPTS), "coral_env", "lib")
             current_ld = process_env.get("LD_LIBRARY_PATH", "")
-            process_env["LD_LIBRARY_PATH"] = f"{coral_lib_path}:{current_ld}" if current_ld else coral_lib_path
+            ld_paths = [coral_lib_path]
+            if current_ld:
+                ld_paths.append(current_ld)
+
+            # Détection et injection dynamique des répertoires nvidia/*/lib du venv de l'étape
+            if cmd_str_list:
+                try:
+                    from pathlib import Path
+                    step_python = cmd_str_list[0]
+                    venv_root = Path(step_python).parent.parent
+                    venv_site_packages = venv_root / "lib" / "python3.10" / "site-packages"
+                    if not venv_site_packages.exists():
+                        lib_dir = venv_root / "lib"
+                        if lib_dir.exists():
+                            py_dirs = list(lib_dir.glob("python3.*"))
+                            if py_dirs:
+                                venv_site_packages = py_dirs[0] / "site-packages"
+                    
+                    if venv_site_packages.exists():
+                        nvidia_dirs = list(venv_site_packages.glob("nvidia/*/lib"))
+                        for d in nvidia_dirs:
+                            ld_paths.insert(0, str(d))
+                        APP_LOGGER.info(f"[{step_key}] LD_LIBRARY_PATH enrichi avec les packages nvidia du venv: {len(nvidia_dirs)} répertoires ajoutés.")
+                except Exception as e_ld:
+                    APP_LOGGER.warning(f"[{step_key}] Échec de la détection des librairies nvidia du venv: {e_ld}")
+
+            process_env["LD_LIBRARY_PATH"] = ":".join(ld_paths)
 
         except Exception as _e:
             APP_LOGGER.warning(f"Unable to set LD_LIBRARY_PATH: {_e}")
@@ -737,18 +764,32 @@ def _run_process_async_internal(step_key: str):
                         except Exception:
                             APP_LOGGER.warning(f"[{step_key}] Internal simple progress parse error: {line_strip}")
 
+                item_finished = False
+                finished_name = ""
                 if current_success_line_pattern_re:
                     success_match = current_success_line_pattern_re.search(line_strip)
                     if success_match:
-                        current_item_counter += 1
-                        workflow_state.set_step_field(step_key, 'progress_current', current_item_counter)
-                        workflow_state.set_step_field(step_key, 'files_completed', current_item_counter)
-                        workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
-                        if step_progress_patterns.get("current_item_text_from_success_line"):
-                            try:
-                                workflow_state.set_step_field(step_key, 'progress_text', html.escape(success_match.group(1).strip()))
-                            except IndexError:
-                                pass
+                        item_finished = True
+                        try:
+                            finished_name = success_match.group(1).strip()
+                        except IndexError:
+                            pass
+                if not item_finished and current_failure_line_pattern_re:
+                    failure_match = current_failure_line_pattern_re.search(line_strip)
+                    if failure_match:
+                        item_finished = True
+                        try:
+                            finished_name = failure_match.group(1).strip()
+                        except IndexError:
+                            pass
+
+                if item_finished:
+                    current_item_counter += 1
+                    workflow_state.set_step_field(step_key, 'progress_current', current_item_counter)
+                    workflow_state.set_step_field(step_key, 'files_completed', current_item_counter)
+                    workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
+                    if step_progress_patterns.get("current_item_text_from_success_line") and finished_name:
+                        workflow_state.set_step_field(step_key, 'progress_text', html.escape(finished_name))
             
             process.stdout.close()
         subprocess_start_time = time.time()

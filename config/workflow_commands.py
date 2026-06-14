@@ -150,7 +150,13 @@ class WorkflowCommandsConfig:
         """
         step3_log_dir = self.logs_base_dir / "step3"
         
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
+        # Priority: OpenCV 5.0 experimental > Coral TPU > Legacy PyTorch
+        if getattr(config, 'USE_OPENCV5_STEP3', False):
+            cmd = [
+                str(config.get_venv_python('transnet_cv5_env')),
+                str(self.base_path / 'workflow_scripts' / 'step3' / 'run_transnet_cv5.py'),
+            ]
+        elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step3" / "run_scene_detect_tpu.py"),
@@ -275,7 +281,44 @@ class WorkflowCommandsConfig:
         """
         step5_log_dir = self.logs_base_dir / "step5"
         
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP5_ENABLE_CORAL_TPU", True):
+        # Priority: OpenCV 5.0 experimental > Coral TPU > Legacy CPU/GPU
+        if getattr(config, 'USE_OPENCV5_STEP5', False):
+            cmd = [
+                str(config.get_venv_python('tracking_cv5_env')),
+                str(self.base_path / 'workflow_scripts' / 'step5' / 'run_tracking_cv5.py'),
+                "--num_workers", str(getattr(config, 'STEP5_CV5_NUM_WORKERS', 4))
+            ]
+            specific_logs = [
+                {
+                    "name": "Log Tracking CV5",
+                    "type": "directory_latest",
+                    "path": step5_log_dir,
+                    "pattern": "tpu_tracking_cv5*.log",
+                    "lines": 100
+                },
+                {
+                    "name": "Log Worker CV5",
+                    "type": "directory_latest",
+                    "path": step5_log_dir,
+                    "pattern": "*worker_CPU_cv5*.log",
+                    "lines": 100
+                }
+            ]
+            progress_patterns = {
+                "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
+                "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
+                "internal": re.compile(
+                    r"INTERNAL[_ ]PROGRESS:\s*(\d+)/(\d+)\s*frames\s*\((\d+)%\)\s*-\s*(.*)", re.IGNORECASE
+                ),
+                "current_success_line_pattern": re.compile(
+                    r"Succès:\s*(.*?)(?:\.csv|\.json)?\s+créé", re.IGNORECASE
+                ),
+                "current_failure_line_pattern": re.compile(
+                    r"Échec:\s*(.*?)\s+échoué", re.IGNORECASE
+                ),
+                "current_item_text_from_success_line": True
+            }
+        elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP5_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_tpu.py")
