@@ -30,6 +30,8 @@ globs:
 | `cep`, `panel`, `extension`, `adobe` | after-effects-cep-panel | 3 |
 | `csv`, `monitoring`, `download`, `webhook` | csv-monitoring-sme | 3 |
 | `docs`, `update`, `workflow`, `updater` | workflow-docs-updater-plus | 3 |
+| `opencv5`, `dnn`, `graph`, `engine`, `fallback` | opencv5-dnn-engine-expert | 2 |
+| `multiprocessing`, `spawn`, `ipc`, `threads`, `oversubscription` | cv5-multiprocessing-orchestrator | 2 |
 
 ## Auto-Loading Logic
 
@@ -44,7 +46,7 @@ For complex requests, combine multiple skills based on pattern detection priorit
 
 ## Skills Usage Policy
 
-- **Local Skills** (`.agents/skills/`) : workflow-operator, debugging-strategies, documentation, tests-suite-guardian, step4-audio-orchestrator, step5-gpu-ops, frontend-timeline-designer, logs-overlay-conductor, coral-tpu-system-orchestration, coral-tpu-model-compiler, coral-tpu-hybrid-algorithms, pipeline-diagnostics, after-effects-scripts, after-effects-cep-panel, csv-monitoring-sme, workflow-docs-updater-plus, shrimp-task-manager, sequentialthinking, fast-filesystem, json-query
+- **Local Skills** (`.agents/skills/`) : workflow-operator, debugging-strategies, documentation, tests-suite-guardian, step4-audio-orchestrator, step5-gpu-ops, frontend-timeline-designer, logs-overlay-conductor, coral-tpu-system-orchestration, coral-tpu-model-compiler, coral-tpu-hybrid-algorithms, pipeline-diagnostics, after-effects-scripts, after-effects-cep-panel, csv-monitoring-sme, workflow-docs-updater-plus, shrimp-task-manager, sequentialthinking, fast-filesystem, json-query, opencv5-dnn-engine-expert, cv5-multiprocessing-orchestrator
 - **Global Skills** : Only if no local equivalent
 - **Detection** : Automatic via pattern matching above
 - **Priority** : Local skills first, then global fallback

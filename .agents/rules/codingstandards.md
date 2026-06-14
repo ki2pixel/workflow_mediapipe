@@ -14,6 +14,7 @@ alwaysApply: true
 - **Data**: Streaming JSON O(1) (`ijson`, `StreamingJSONOutput`). SQLite (via `CSVService`) unique BDD active. MySQL est obsolète (`USE_MYSQL=false`, `services.deprecated.mysql_service`).
 - **Environnements (`envs/`)**:
   - `transnet_env/`, `audio_env/`, `tracking_env_slim/` (CPU-optimized), `insightface_env/` (GPU-only).
+  - OpenCV 5.0 DNN (expérimental) : `tracking_cv5_env/`, `transnet_cv5_env/`.
   - `coral_env/` : Google Coral TPU (TFLite Runtime, PyCoral). Inférence audio hybride (STEP4) : **VAD** sur le TPU (YAMNet INT8) et **Embeddings** sur le CPU (ECAPA-TDNN via ONNX Runtime Float32 avec Dynamic Batching et topologie NUMA).
 
 ## 2. Project Structure
@@ -28,6 +29,7 @@ alwaysApply: true
 - State: `WorkflowState` (RLock). Pas de globales type `PROCESS_INFO`.
 - I/O: Via `FilesystemService.open_path_in_explorer()` avec verrous.
 - Logging: `progress_text` brut + JSON streaming structuré.
+- **Multiprocessing OpenCV 5.0**: Contexte `spawn` obligatoire (bannir `fork` pour éviter les deadlocks). Limitation à un seul thread par worker via `cv2.setNumThreads(1)` contre l'oversubscription CPU. Exception : STEP 3 (Transitions) sous OpenCV 5.0 DNN est strictement séquentiel (le coût de `spawn` est trop élevé pour le chargement du modèle).
 
 ### Frontend
 - Immuabilité: `AppState.setState()` diff superficiel.
@@ -39,6 +41,7 @@ alwaysApply: true
 ## 4. Core Patterns
 - **Services Singleton**: Accès statique via `get_workflow_state()`.
 - **TPU Orchestrator**: L'orchestrateur `services/coral_tpu_orchestrator.py` gère une file séquentielle (Queue) pour protéger la SRAM (8 Mo) du Coral TPU contre l'éviction de cache. Obligatoire pour toute inférence TPU.
+- **OpenCV 5.0 DNN Graph Engine**: Initialisation avec `cv2.dnn.DNN_BACKEND_OPENCV` et `cv2.dnn.DNN_TARGET_CPU`, activation explicite via `cv2.dnn.ENGINE_NEW`. Validation pré-vol du graphe via des tenseurs synthétiques (ex: `validate_onnx_slice_operator` pour TransNetV2). Fallback silencieux vers ONNX Runtime ou TFLite en cas d'échec, avec injection dynamique de `LD_LIBRARY_PATH`.
 - **Routes**: Validation d'entrée → `@measure_api` → Service → `jsonify({"status": "queued"})`.
 - **State Sync**: PollingManager met à jour AppState via WorkflowState.
 
@@ -79,5 +82,6 @@ alwaysApply: true
 - JS moderne dans ExtendScript (.jsx).
 - Utiliser MySQL en production (déprécié).
 - **TPU Anti-Patterns**: Inférences TPU concurrentes sans passer par le `coral_tpu_orchestrator`. Exécution de modèles non compilés pour Edge TPU ou non quantifiés (INT8). Tentative de quantification INT8 ou de compilation pour l'Edge TPU du modèle d'embeddings ECAPA-TDNN (doit s'exécuter obligatoirement sur CPU via ONNX Runtime pour garantir la précision). Exécuter des post-traitements lourds en Python pur après inférence TPU (utiliser Numba JIT) ou bloquer le TPU sur de l'I/O vidéo séquentiel (utiliser Producer-Consumer).
+- **OpenCV 5.0 Anti-Patterns**: Invoquer le multiprocessing OpenCV 5.0 sans contexte `spawn` ou sans limiter les threads à 1 (`cv2.setNumThreads(1)`). Faire des inférences OpenCV 5.0 sans validation d'opérateurs pré-vol ou sans mécanisme de fallback. Utiliser le multiprocessing pour OpenCV 5.0 DNN dans STEP 3.
 
 > **Note**: Maintenir <12 000 caractères. Réviser après chaque évolution majeure.

@@ -1,6 +1,6 @@
 # Tracking Vidéo
 
-**TL;DR** : Détection faciale optimisée. Multiprocessing MediaPipe CPU avec `cv2.setNumThreads(0)` pour éliminer la contention, buffer asynchrone, et export obligatoire via `StreamingJSONOutput` (O(1) RAM). Supporte également l'accélération matérielle Google Coral Edge TPU (cascade pure TFLite séquentielle) et le mode GPU optionnel via InsightFace. 478 landmarks + 52 blendshapes ARKit par frame. Architecture simplifiée : pas d'OpenCV/EOS/YuNet depuis v4.3.
+**TL;DR** : Détection faciale optimisée. Multiprocessing MediaPipe CPU avec `cv2.setNumThreads(0)` pour éliminer la contention, buffer asynchrone, et export obligatoire via `StreamingJSONOutput` (O(1) RAM). Supporte également l'accélération matérielle Google Coral Edge TPU (cascade pure TFLite séquentielle), le mode GPU optionnel via InsightFace et le mode expérimental OpenCV 5.0 DNN (cascade ONNX/TFLite). 478 landmarks + 52 blendshapes ARKit par frame.
 
 ## Le Problème : Tracking Manuel Impossible
 
@@ -8,7 +8,7 @@ Tu dois suivre les visages et expressions dans tes vidéos frame par frame, mais
 
 ## Notre Solution : Trio de Tracking et Inférence TPU
 
-Nous utilisons trois approches complémentaires : MediaPipe pour le traitement CPU robuste en multiprocessing, InsightFace pour la haute précision GPU, et une cascade de modèles Edge TPU quantifiés en INT8 pour les environnements à basse consommation (puces Google Coral PCIe/USB). Le système génère des données denses avec landmarks faciaux et blendshapes ARKit, parfaitement synchronisées avec les frames vidéo. **Les moteurs historiques (OpenCV, YuNet, EOS, OpenSeeFace) ont été retirés en v4.3**.
+Nous utilisons plusieurs approches complémentaires : MediaPipe pour le traitement CPU robuste en multiprocessing, InsightFace pour la haute précision GPU, une cascade de modèles Edge TPU quantifiés en INT8 pour les environnements à basse consommation (puces Google Coral PCIe/USB), et un mode expérimental OpenCV 5.0 DNN reposant sur un graphe d'inférence ONNX. Le système génère des données denses avec landmarks faciaux et blendshapes ARKit, parfaitement synchronisées avec les frames vidéo. **Les moteurs historiques (YuNet, EOS, OpenSeeFace) ont été retirés en v4.3**.
 
 ### ❌ Anciens moteurs retirés (anti-pattern)
 ```bash
@@ -133,10 +133,11 @@ STEP5_ENABLE_PROFILING=0            # Logs performance toutes les 20 frames
 STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 ```
 
-> **Note v4.3** : Les variables suivantes ont été supprimées et ne sont plus prises en compte :
-> - `STEP5_ENABLE_OBJECT_DETECTION` (plus de fallback object detector)
-> - `STEP5_OPENCV_*`, `STEP5_YUNET_*`, `STEP5_EOS_*`, `STEP5_OPENSEEFACE_*` (moteurs retirés)
+> **Note v4.3** : Les variables suivantes ont été supprimées et ne sont plus prises en compte dans le pipeline legacy :
+> - `STEP5_OPENCV_*` (historique), `STEP5_YUNET_*`, `STEP5_EOS_*`, `STEP5_OPENSEEFACE_*` (moteurs retirés)
 > - `STEP5_BLENDSHAPES_PROFILE` (profil unique conservé)
+> 
+> *Note relative à l'activation d'OpenCV 5.0* : La variable `STEP5_ENABLE_OBJECT_DETECTION` est réutilisée en mode expérimental OpenCV 5.0 pour activer le détecteur d'objets YOLOv11 ONNX en cas d'absence de visage.
 
 ### Configuration MediaPipe (CPU)
 
@@ -217,6 +218,7 @@ STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 | **MediaPipe CPU** | Bonne (478 landmarks) | 15 workers CPU | 15 | Lent sur vidéos longues | Production stable, batch massif |
 | **InsightFace GPU** | Excellente (embeddings) | 1 worker GPU | 1 | VRAM limitée, CUDA requis | Haute précision, contenus courts |
 | **Edge TPU Cascade** | Élevée (Kalman lissé) | 1 worker TPU | 1 | Inférence séquentielle | Matériel Edge basse consommation (2-4W) sans GPU dédié |
+| **OpenCV 5.0 DNN** | Élevée (BlazeFace + FaceMesh) | Multi-workers CPU | Configurable | Légère latence de chargement | Alternative stable sans MediaPipe, optimisée pour processeurs x86 (AVX2/AVX-512) |
 | **Hybrid Auto** | Adaptatif | Variable | Variable | Complexité configuration | Environnements mixtes |
 
 ## Accélération Google Coral Edge TPU
@@ -232,6 +234,21 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
   5. **Lissage temporel (Filtre de Kalman)** : Application d'un filtre de Kalman vectorisé à 52 dimensions (coefficients ARKit) pour gommer le sautillement (jittering) lié à la quantification INT8.
   6. **Object Detection Fallback (EfficientDet Lite0)** : Exécuté uniquement si BlazeFace ne détecte aucun visage, éliminant ainsi le basculement coûteux de contexte TPU (TPU Context Switch).
   7. **Export Streaming** : Utilisation de `StreamingJSONOutput` pour écrire les frames à la volée sur le disque, garantissant une complexité mémoire constante **O(1)**.
+
+## Mode Expérimental OpenCV 5.0 DNN
+
+Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape 5 bascule vers le nouveau mode expérimental basé sur OpenCV 5.0 DNN :
+
+* **Script d'exécution** : `workflow_scripts/step5/run_tracking_cv5.py`
+* **Cascade d'Inférence** :
+  1. **Détection (BlazeFace)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `blazeface.onnx`) pour obtenir la boîte englobante et l'emplacement des yeux.
+  2. **Alignement Géométrique** : Crop du visage et transformation affine à 192x192 pixels.
+  3. **Landmarks (FaceMesh)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `facemesh.onnx`) pour extraire 468 points faciaux 3D.
+  4. **Animation (Face Blendshapes)** : Inférence du modèle TFLite `face_blendshapes.tflite` effectuée sur le CPU (en raison du padding 146 points pour l'iris).
+  5. **Lissage Temporel** : Application d'un filtre One Euro et d'un filtre de Kalman à 52 dimensions pour stabiliser les expressions (ARKit).
+* **Détecteur d'Objets Fallback (YOLOv11 ONNX)** : Si `STEP5_ENABLE_OBJECT_DETECTION=1` est activé, YOLOv11 ONNX (`yolo11n.onnx`) prend le relais si aucun visage n'est détecté.
+* **Multiprocessing spawn-safe** : Le traitement s'appuie sur le multiprocessing de type `spawn` (les modèles ne sont pas partagés entre processus parents/enfants) avec une configuration `cv2.setNumThreads(1)` forcée dans les workers pour éliminer la contention et l'oversubscription CPU.
+* **Consommation Mémoire O(1)** : Utilisation obligatoire des classes `StreamingJSONOutput` ou `StreamingNDJSONOutput` pour sérialiser les frames sur le disque à la volée.
 
 ## Trade-offs par Configuration Workers
 
