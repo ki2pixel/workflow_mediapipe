@@ -54,15 +54,16 @@ class TransNetV2(nn.Module):
         self.eval()
 
     def forward(self, inputs):
-        if not isinstance(inputs, torch.Tensor):
-            raise TypeError(f"Expected torch.Tensor, got {type(inputs)}")
-        if inputs.dtype != torch.uint8:
-            raise TypeError(f"Expected dtype torch.uint8, got {inputs.dtype}")
+        if inputs.dtype not in (torch.uint8, torch.float32, torch.float16):
+            raise TypeError(f"Expected dtype torch.uint8, float32 or float16, got {inputs.dtype}")
         if inputs.dim() != 5 or inputs.shape[2] != 27 or inputs.shape[3] != 48 or inputs.shape[4] != 3:
             raise ValueError(f"Expected shape [B, T, 27, 48, 3], got {inputs.shape}")
         
-        x = inputs.permute([0, 4, 1, 2, 3]).float()
-        x = x.div_(255.)
+        # Preserve float16 or cast uint8 to float32
+        x = inputs.permute([0, 4, 1, 2, 3])
+        if x.dtype == torch.uint8:
+            x = x.float()
+        x = x / 255.0
 
         block_features = []
         for block in self.SDDCNN:
@@ -282,7 +283,9 @@ class ColorHistograms(nn.Module):
         assert lookup_window % 2 == 1, "`lookup_window` must be odd integer"
 
     @staticmethod
-    def compute_color_histograms(frames):
+    def compute_color_histograms(frames, target_dtype=torch.float32):
+        if target_dtype == torch.uint8:
+            target_dtype = torch.float32
         frames = frames.int()
 
         def get_bin(frames):
@@ -302,12 +305,15 @@ class ColorHistograms(nn.Module):
         histograms = torch.zeros(batch_size * time_window * 512, dtype=torch.int32, device=frames.device)
         histograms.scatter_add_(0, binned_values, torch.ones(binned_values.shape[0], dtype=torch.int32, device=frames.device))
 
-        histograms = histograms.view(batch_size, time_window, 512).float()
+        histograms = histograms.view(batch_size, time_window, 512).to(target_dtype)
         histograms_normalized = functional.normalize(histograms, p=2, dim=2)
         return histograms_normalized
 
     def forward(self, inputs):
-        x = self.compute_color_histograms(inputs)
+        target_dtype = inputs.dtype
+        if target_dtype == torch.uint8:
+            target_dtype = torch.float32
+        x = self.compute_color_histograms(inputs, target_dtype=target_dtype)
 
         batch_size, time_window = x.shape[0], x.shape[1]
         similarities = torch.bmm(x, x.transpose(1, 2))  # [batch_size, time_window, time_window]

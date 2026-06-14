@@ -192,7 +192,8 @@ class TestStepConfigurations:
     
     def test_step3_uses_tpu_when_accelerated(self, temp_base_path):
         """Test that STEP3 uses Coral TPU script when accelerated."""
-        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True):
+        with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
+             patch.object(config, 'STEP3_ENABLE_CORAL_TPU', True, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP3')

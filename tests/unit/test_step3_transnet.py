@@ -47,11 +47,11 @@ class TestTransNetV2Model:
         model = TransNetV2()
         model.eval()
         
-        # Créer un batch avec mauvais dtype (float32 au lieu de uint8)
-        invalid_input = torch.rand(1, 100, 27, 48, 3, dtype=torch.float32)
+        # Créer un batch avec mauvais dtype (int64 au lieu de uint8, float32 ou float16)
+        invalid_input = torch.randint(0, 256, (1, 100, 27, 48, 3), dtype=torch.int64)
         
         # Devrait lever TypeError
-        with pytest.raises(TypeError, match="Expected dtype torch.uint8"):
+        with pytest.raises(TypeError, match="Expected dtype torch.uint8, float32 or float16"):
             model(invalid_input)
     
     def test_input_validation_wrong_shape(self):

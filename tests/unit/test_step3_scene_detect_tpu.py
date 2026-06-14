@@ -289,12 +289,11 @@ class TestStep3TPUFlow:
     """Validation du flux de détection de scènes"""
 
     @patch("run_scene_detect_tpu.subprocess.Popen")
-    @patch("run_scene_detect_tpu.common.output_tensor")
-    def test_detect_scenes_tpu(self, mock_output_tensor, mock_popen):
+    def test_detect_scenes_tpu(self, mock_popen):
         # Given: Un faux interpréteur et un faux flux vidéo
         interpreter = MagicMock()
-        interpreter.get_input_details.return_value = [{'shape': (1, 224, 224, 3)}]
-        interpreter.get_output_details.return_value = [{'shape': (1, 1000)}]
+        interpreter.get_input_details.return_value = [{'shape': (1, 224, 224, 3), 'index': 0}]
+        interpreter.get_output_details.return_value = [{'shape': (1, 1000), 'index': 0}]
 
         mock_process = MagicMock()
         # Simuler 30 frames de vidéo 224x224 RGB
@@ -312,7 +311,7 @@ class TestStep3TPUFlow:
                 return np.ones((1000,), dtype=np.float32)
             return np.zeros((1000,), dtype=np.float32)
 
-        mock_output_tensor.side_effect = tensor_side_effect
+        interpreter.get_tensor.side_effect = tensor_side_effect
 
         # When: Lancement de l'analyse avec les paramètres Audit Camille
         scenes = detect_scenes_tpu(

@@ -71,18 +71,13 @@ def get_extractor_model_cached(model_path):
     return _thread_local.extractor_model
 
 # TFLite / PyCoral imports
+# TFLite imports
 import tflite_runtime.interpreter as tflite
 try:
     import onnxruntime as ort
     HAS_ONNX = True
 except ImportError:
     HAS_ONNX = False
-try:
-    from pycoral.utils import edgetpu
-    from pycoral.adapters import common
-except ImportError as e:
-    logging.critical(f"ERREUR: Les bibliothèques Coral/TFLite ne sont pas installées dans coral_env: {e}")
-    sys.exit(1)
 
 try:
     import scipy.io.wavfile as wavfile
@@ -1064,9 +1059,8 @@ def main():
 
     global _yamnet_interp
     try:
-        from pycoral.utils import edgetpu
         import tflite_runtime.interpreter as tflite
-        delegate = edgetpu.load_edgetpu_delegate()
+        delegate = tflite.load_delegate('libedgetpu.so.1')
         _yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
         _yamnet_interp.resize_tensor_input(0, [15360])
         _yamnet_interp.allocate_tensors()

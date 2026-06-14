@@ -583,6 +583,7 @@ def _run_process_async_internal(step_key: str):
             coral_lib_path = os.path.join(str(BASE_PATH_SCRIPTS), "coral_env", "lib")
             current_ld = process_env.get("LD_LIBRARY_PATH", "")
             process_env["LD_LIBRARY_PATH"] = f"{coral_lib_path}:{current_ld}" if current_ld else coral_lib_path
+
         except Exception as _e:
             APP_LOGGER.warning(f"Unable to set LD_LIBRARY_PATH: {_e}")
 

@@ -32,11 +32,9 @@ import multiprocessing as mp
 
 # Gestion des dépendances TPU
 try:
-    from pycoral.utils import edgetpu
-    from pycoral.adapters import common
     import tflite_runtime.interpreter as tflite
 except ImportError as e:
-    logging.critical(f"ERREUR: Les bibliothèques Coral/TFLite ne sont pas installées dans coral_env: {e}")
+    logging.critical(f"ERREUR: Les bibliothèques TFLite ne sont pas installées dans coral_env: {e}")
     sys.exit(1)
 
 # --- Configuration ---
@@ -384,11 +382,11 @@ def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=DEF
                 break
 
             # Inférence Edge TPU (Libère le GIL)
-            common.set_input(interpreter, image)
+            interpreter.set_tensor(input_details['index'], np.expand_dims(image, axis=0))
             interpreter.invoke()
 
             # Récupérer l'embedding (1280D GAP ou 1000D logits selon le modèle)
-            output = common.output_tensor(interpreter, 0).copy()
+            output = interpreter.get_tensor(output_details['index']).copy()
 
             # Cast en float32 et aplatissement pour le calcul de distance CPU
             raw_embeddings.append(output.flatten().astype(np.float32))
@@ -538,7 +536,7 @@ def main():
 
     try:
         # Load the Edge TPU delegate
-        delegate = edgetpu.load_edgetpu_delegate()
+        delegate = tflite.load_delegate('libedgetpu.so.1')
         interpreter = tflite.Interpreter(model_path=str(model_path), experimental_delegates=[delegate])
         interpreter.allocate_tensors()
         logging.info("Modèle Edge TPU chargé avec succès.")
