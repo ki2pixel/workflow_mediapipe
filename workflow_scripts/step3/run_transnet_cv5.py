@@ -112,6 +112,57 @@ def validate_onnx_slice_operator(net, window_size=100):
         return False
 
 
+class ORTDNNNet:
+    """Wrapper imitant l'API cv2.dnn.Net pour un remplacement transparent par ONNX Runtime."""
+    def __init__(self, path, force_cpu=False):
+        import onnxruntime as ort
+        opts = ort.SessionOptions()
+        
+        env_force_cpu = os.environ.get("STEP3_CV5_FORCE_CPU", "false").lower() == "true"
+        effective_force_cpu = force_cpu or env_force_cpu
+        
+        # Détection et priorisation des execution providers (GPU vs CPU)
+        available = ort.get_available_providers()
+        providers = []
+        if not effective_force_cpu and 'CUDAExecutionProvider' in available:
+            providers.append('CUDAExecutionProvider')
+            logging.info("ONNX Runtime : Accélération GPU CUDA disponible et activée.")
+        if 'CPUExecutionProvider' in available:
+            providers.append('CPUExecutionProvider')
+        
+        if not providers:
+            providers = ['CPUExecutionProvider']
+        
+        # Optimisation du multi-threading :
+        # - Sur GPU, on limite les threads CPU d'appoint pour éviter la contention CPU.
+        # - Sur CPU uniquement, on évite de brider à 1 thread car le traitement des vidéos est séquentiel.
+        #   On laisse ORT utiliser son multi-threading interne auto-détecté.
+        if 'CUDAExecutionProvider' in providers:
+            opts.intra_op_num_threads = 2
+            opts.inter_op_num_threads = 2
+            
+        self.session = ort.InferenceSession(str(path), sess_options=opts, providers=providers)
+        
+        # Journalisation du provider actif pour confirmation
+        active_providers = self.session.get_providers()
+        logging.info(f"Session ONNX Runtime initialisée avec les providers actifs : {active_providers}")
+        
+        self.input_name = self.session.get_inputs()[0].name
+        self.output_names = [o.name for o in self.session.get_outputs()]
+        self.inputs = {}
+
+    def setInput(self, blob, name=""):
+        self.inputs[name or self.input_name] = blob
+
+    def forward(self, outputName=""):
+        if outputName:
+            outputs = self.session.run([outputName], self.inputs)
+            return outputs[0]
+        else:
+            outputs = self.session.run(self.output_names, self.inputs)
+            return outputs[0] if len(outputs) == 1 else outputs
+
+
 def load_opencv_dnn_model(model_path):
     """Charge le modèle TransNetV2 ONNX via OpenCV 5.0 DNN avec Fallback ONNX Runtime."""
     model_path = Path(model_path)
@@ -146,53 +197,6 @@ def load_opencv_dnn_model(model_path):
 
     # 2. Fallback ONNX Runtime
     try:
-        class ORTDNNNet:
-            """Wrapper imitant l'API cv2.dnn.Net pour un remplacement transparent par ONNX Runtime."""
-            def __init__(self, path):
-                import onnxruntime as ort
-                opts = ort.SessionOptions()
-                
-                # Détection et priorisation des execution providers (GPU vs CPU)
-                available = ort.get_available_providers()
-                providers = []
-                if 'CUDAExecutionProvider' in available:
-                    providers.append('CUDAExecutionProvider')
-                    logging.info("ONNX Runtime : Accélération GPU CUDA disponible et activée.")
-                if 'CPUExecutionProvider' in available:
-                    providers.append('CPUExecutionProvider')
-                
-                if not providers:
-                    providers = ['CPUExecutionProvider']
-                
-                # Optimisation du multi-threading :
-                # - Sur GPU, on limite les threads CPU d'appoint pour éviter la contention CPU.
-                # - Sur CPU uniquement, on évite de brider à 1 thread car le traitement des vidéos est séquentiel.
-                #   On laisse ORT utiliser son multi-threading interne auto-détecté.
-                if 'CUDAExecutionProvider' in providers:
-                    opts.intra_op_num_threads = 2
-                    opts.inter_op_num_threads = 2
-                    
-                self.session = ort.InferenceSession(str(path), sess_options=opts, providers=providers)
-                
-                # Journalisation du provider actif pour confirmation
-                active_providers = self.session.get_providers()
-                logging.info(f"Session ONNX Runtime initialisée avec les providers actifs : {active_providers}")
-                
-                self.input_name = self.session.get_inputs()[0].name
-                self.output_names = [o.name for o in self.session.get_outputs()]
-                self.inputs = {}
-
-            def setInput(self, blob, name=""):
-                self.inputs[name or self.input_name] = blob
-
-            def forward(self, outputName=""):
-                if outputName:
-                    outputs = self.session.run([outputName], self.inputs)
-                    return outputs[0]
-                else:
-                    outputs = self.session.run(self.output_names, self.inputs)
-                    return outputs[0] if len(outputs) == 1 else outputs
-
         net = ORTDNNNet(model_path)
         logging.info(f"Modèle ONNX chargé via ONNX Runtime (fallback) : {model_path.name}")
         return net
@@ -201,7 +205,7 @@ def load_opencv_dnn_model(model_path):
         return None
 
 
-def detect_scenes_cv5(video_path, net, threshold=0.5):
+def detect_scenes_cv5(video_path, net, model_path, threshold=0.5):
     """Détection de scènes avec OpenCV 5.0 DNN et streaming FFmpeg.
 
     Pipeline :
@@ -363,8 +367,18 @@ def detect_scenes_cv5(video_path, net, threshold=0.5):
                 # [B, C, T, H, W] et la division par 255.0 sont intégrées au graphe de calcul.
                 batch_blob = np.stack(windows_batch)
 
-                net.setInput(batch_blob)
-                output = net.forward()
+                try:
+                    net.setInput(batch_blob)
+                    output = net.forward()
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "runtime_exception" in err_str or "allocate" in err_str or "memory" in err_str or "cuda" in err_str:
+                        logging.warning(f"OOM ou erreur CUDA détectée lors de l'inférence. Bascule à chaud sur CPU... Détails: {e}")
+                        net = ORTDNNNet(model_path, force_cpu=True)
+                        net.setInput(batch_blob)
+                        output = net.forward()
+                    else:
+                        raise
 
                 # Appliquer sigmoid pour obtenir les probabilités
                 batch_preds = 1.0 / (1.0 + np.exp(-output))
@@ -406,13 +420,13 @@ def detect_scenes_cv5(video_path, net, threshold=0.5):
             pass
 
         if not predictions:
-            return [[0, total_frames_read - 1]] if total_frames_read > 0 else []
+            return ([[0, total_frames_read - 1]] if total_frames_read > 0 else []), net
 
         final_predictions = np.concatenate(predictions)[:total_frames_read]
         shot_boundaries = np.where(final_predictions > threshold)[0]
 
         if len(shot_boundaries) == 0:
-            return [[0, total_frames_read - 1]] if total_frames_read > 0 else []
+            return ([[0, total_frames_read - 1]] if total_frames_read > 0 else []), net
 
         detected_scenes = []
         last_cut = -1
@@ -423,14 +437,14 @@ def detect_scenes_cv5(video_path, net, threshold=0.5):
         if last_cut < total_frames_read - 1:
             detected_scenes.append([last_cut + 1, total_frames_read - 1])
 
-        return detected_scenes
+        return detected_scenes, net
 
     except Exception as e:
         logging.exception(f"Erreur lors de la détection de scènes pour {video_path.name}: {e}")
-        return None
+        return None, net
 
 
-def process_single_video(idx, total, video_path, net, cfg):
+def process_single_video(idx, total, video_path, net, model_path, cfg):
     """Traite une seule vidéo : inférence, écriture CSV.
 
     Args:
@@ -438,10 +452,11 @@ def process_single_video(idx, total, video_path, net, cfg):
         total: total de vidéos
         video_path: Path vers la vidéo
         net: réseau OpenCV DNN chargé
+        model_path: Path vers le modèle ONNX
         cfg: configuration effective
 
     Returns:
-        bool: True si succès
+        tuple: (True si succès, net (potentiellement mis à jour))
     """
     try:
         logging.info(f"PROCESSING_VIDEO: {idx + 1}/{total}: {video_path.name}")
@@ -449,11 +464,11 @@ def process_single_video(idx, total, video_path, net, cfg):
 
         t0 = time.perf_counter()
 
-        scenes = detect_scenes_cv5(video_path, net, threshold=float(cfg["threshold"]))
+        scenes, net = detect_scenes_cv5(video_path, net, model_path, threshold=float(cfg["threshold"]))
 
         if scenes is None:
             logging.error(f"Échec du traitement de {video_path.name}")
-            return False
+            return False, net
 
         elapsed = time.perf_counter() - t0
 
@@ -480,11 +495,11 @@ def process_single_video(idx, total, video_path, net, cfg):
             f"Succès: {output_csv_path.name} créé avec {len(scenes)} scènes "
             f"({elapsed:.2f}s, OpenCV 5.0 DNN)"
         )
-        return True
+        return True, net
 
     except Exception as e:
         logging.exception(f"Erreur worker pour {video_path}: {e}")
-        return False
+        return False, net
 
 
 def setup_cuda_paths():
@@ -528,7 +543,7 @@ def main():
     parser.add_argument("--stride", type=int, default=None, help="Pas entre fenêtres (frames). Défaut: 50")
     parser.add_argument("--padding", type=int, default=None, help="Padding au début/fin (frames). Défaut: 25")
     parser.add_argument("--ffmpeg_threads", type=int, default=None, help="Nombre de threads FFmpeg (0 = auto)")
-    parser.add_argument("--batch_size", type=int, default=None, help="Taille de lot pour l'inférence. Défaut: 16")
+    parser.add_argument("--batch_size", type=int, default=None, help="Taille de lot pour l'inférence. Défaut: 8")
     args = parser.parse_args()
 
     # Defaults
@@ -538,7 +553,7 @@ def main():
         "stride": 50,
         "padding": 25,
         "ffmpeg_threads": 0,
-        "batch_size": 16,
+        "batch_size": 8,
     }
 
     # Config JSON optionnel
@@ -627,7 +642,7 @@ def main():
     t_start = time.perf_counter()
 
     for i, video_path in enumerate(videos):
-        ok = process_single_video(i, total_videos, video_path, net, effective_cfg)
+        ok, net = process_single_video(i, total_videos, video_path, net, model_path, effective_cfg)
         successful_count += 1 if ok else 0
 
     total_elapsed = time.perf_counter() - t_start

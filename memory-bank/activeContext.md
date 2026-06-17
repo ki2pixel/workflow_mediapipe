@@ -10,6 +10,7 @@
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-06-17 10:05:00] **Correction OOM TransNetV2 CV5 (COMPLET)** : Implémentation du fallback dynamique CPU (ORTDNNNet) en cas d'erreur mémoire/CUDA (OOM) d'ONNX Runtime, et réduction du batch_size par défaut de 16 à 8 dans STEP3.
 - [2026-06-14 20:35:00] **Mise à jour Coding Standards OpenCV 5.0 (COMPLET)** : Alignement du fichier `codingstandards.md` avec les récentes évolutions d'OpenCV 5.0 DNN. Ajout des règles d'initialisation du Graph Engine, de validation pré-vol des opérateurs, de fallback silencieux, et des contraintes de multiprocessing (`spawn`, limitation `setNumThreads(1)` et séquentialité de la STEP3).
 - [2026-06-14 20:30:00] **Création des skills OpenCV 5.0 (COMPLET)** : Création et intégration de `opencv5-dnn-engine-expert` et `cv5-multiprocessing-orchestrator` dans la base de connaissances pour documenter les spécificités du moteur de graphe et du multiprocessing sous CV5.
 - [2026-06-14 20:25:00] **Harmonisation de la Documentation OpenCV 5.0 (COMPLET)** : Mise à jour et alignement de la documentation opérationnelle de détection de scènes (STEP 3) et de tracking (STEP 5) avec les spécifications et fonctionnalités du moteur expérimental OpenCV 5.0 DNN (Graph Engine, cascade d'inférence ONNX/TFLite, multiprocessing spawn avec isolation de threads).
