@@ -101,8 +101,12 @@ def _extract_metadata_streaming(file_path: Path) -> Tuple[Optional[float], Optio
                     fps = float(value)
                 elif prefix == 'metadata.total_frames' and event == 'integer':
                     total_frames = int(value)
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors de l'extraction de métadonnées pour {file_path.name}: {e}")
+    except StopIteration:
+        logger.error(f"Fichier JSON tronqué ou structure vide pour {file_path.name}")
     except Exception as e:
-        logger.warning(f"Error during metadata extraction streaming for {file_path.name}: {e}")
+        logger.error(f"Erreur inattendue lors de l'extraction de métadonnées pour {file_path.name}: {e}")
         
     return fps, total_frames, array_key
 
@@ -560,7 +564,13 @@ def stream_reduce_audio_json(input_path: Path, output_path: Path) -> Optional[Di
                             speaker_embeddings = v
                             break
                     break
-    except Exception: pass
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors de l'extraction des embeddings de locuteurs : {e}")
+    except StopIteration:
+        logger.error("Fichier JSON tronqué lors de l'extraction des embeddings de locuteurs")
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors de l'extraction des embeddings de locuteurs : {e}")
+
     
     with open(input_path, 'rb') as f_in, open(tmp_path, 'w', encoding='utf-8') as f_out:
         f_out.write(f'{{\n  "{KEY_FRAMES_ANALYSIS}": [\n')
@@ -704,8 +714,12 @@ def _reduced_tracking_needs_enrichment_streaming(input_path: Path) -> bool:
                                 for key in _TRACKING_ENRICH_FIELDS:
                                     if obj.get(key) is None:
                                         return True
-    except Exception:
-        pass
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors du test d'enrichissement pour {input_path.name}: {e}")
+    except StopIteration:
+        logger.error(f"Fichier JSON tronqué lors du test d'enrichissement pour {input_path.name}")
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors du test d'enrichissement pour {input_path.name}: {e}")
     return False
 
 def _reduced_tracking_needs_enrichment(reduced_tracking: Dict[str, Any]) -> bool:

@@ -234,10 +234,10 @@ class WorkflowService:
 
                 
         import sys
-        if 'app_new' not in sys.modules:
+        app_new = sys.modules.get('app_new') or sys.modules.get('__main__')
+        if not app_new:
             return {"status": "error", "message": "Execution context not available"}
         
-        app_new = sys.modules['app_new']
         if not hasattr(app_new, 'run_process_async'):
             logger.error("run_process_async not available in app_new")
             return {"status": "error", "message": "Execution function not available"}
@@ -304,13 +304,16 @@ class WorkflowService:
 
                 
         import sys
-        if 'app_new' not in sys.modules:
+        app_new = sys.modules.get('app_new') or sys.modules.get('__main__')
+        if not app_new or not hasattr(app_new, 'execute_step_sequence_worker'):
+            try:
+                import app_new
+            except ImportError:
+                app_new = None
+
+        if not app_new or not hasattr(app_new, 'execute_step_sequence_worker'):
+            logger.error("execute_step_sequence_worker not available in sys.modules or via import")
             return {"status": "error", "message": "Execution context not available"}
-        
-        app_new = sys.modules['app_new']
-        if not hasattr(app_new, 'execute_step_sequence_worker'):
-            logger.error("execute_step_sequence_worker not available in app_new")
-            return {"status": "error", "message": "Sequence execution function not available"}
 
         try:
             thread = threading.Thread(

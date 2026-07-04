@@ -238,7 +238,73 @@ class CleanupService:
                 result["cleaned_projects"].append(name)
                 result["total_space_saved_bytes"] += size
                 
+        # Call step logs cleanup
+        try:
+            log_result = CleanupService.cleanup_step_logs(threshold_hours=threshold_hours, dry_run=dry_run)
+            result["cleaned_logs"] = log_result["cleaned_logs"]
+            result["total_space_saved_bytes"] += log_result["total_space_saved_bytes"]
+            if log_result["errors"]:
+                result["errors"].extend(log_result["errors"])
+        except Exception as e_log:
+            logger.error(f"Error calling cleanup_step_logs: {e_log}")
+
         result["total_space_saved_human"] = FilesystemService.format_bytes_human(result["total_space_saved_bytes"])
         
-        logger.info(f"Cleanup finished. Removed {len(result['cleaned_projects'])} projects. Space saved: {result['total_space_saved_human']}.")
+        logger.info(f"Cleanup finished. Removed {len(result['cleaned_projects'])} projects and {len(result.get('cleaned_logs', []))} log files. Space saved: {result['total_space_saved_human']}.")
+        return result
+
+    @staticmethod
+    def cleanup_step_logs(threshold_hours: int = 48, dry_run: bool = False) -> Dict[str, Any]:
+        """Identifies and safely removes step logs that are older than threshold_hours.
+        
+        Args:
+            threshold_hours: Minimum hours of inactivity to delete logs.
+            dry_run: If True, only lists candidates without deleting.
+            
+        Returns:
+            Dictionary with results.
+        """
+        logger.info(f"Starting step logs cleanup. Threshold: {threshold_hours}h. Dry run: {dry_run}")
+        
+        result = {
+            "cleaned_logs": [],
+            "total_space_saved_bytes": 0,
+            "total_space_saved_human": "0B",
+            "errors": [],
+            "dry_run": dry_run
+        }
+        
+        logs_dir = config.LOGS_DIR
+        if not logs_dir or not logs_dir.exists():
+            logger.warning(f"LOGS_DIR '{logs_dir}' does not exist. Log cleanup skipped.")
+            return result
+            
+        current_time = time.time()
+        threshold_seconds = threshold_hours * 3600
+        
+        try:
+            for entry in logs_dir.glob("step_*.log"):
+                if not entry.is_file():
+                    continue
+                try:
+                    last_mtime = entry.stat().st_mtime
+                    age_seconds = current_time - last_mtime
+                    if age_seconds > threshold_seconds:
+                        size_bytes = entry.stat().st_size
+                        if not dry_run:
+                            entry.unlink()
+                            logger.info(f"Successfully removed log file: '{entry.name}'")
+                        result["cleaned_logs"].append(entry.name)
+                        result["total_space_saved_bytes"] += size_bytes
+                except Exception as file_err:
+                    msg = f"Exception while handling log file '{entry.name}': {file_err}"
+                    logger.error(msg)
+                    result["errors"].append(msg)
+        except Exception as scan_err:
+            msg = f"Error scanning LOGS_DIR for step logs: {scan_err}"
+            logger.error(msg)
+            result["errors"].append(msg)
+            
+        result["total_space_saved_human"] = FilesystemService.format_bytes_human(result["total_space_saved_bytes"])
+        logger.info(f"Step logs cleanup finished. Removed {len(result['cleaned_logs'])} files. Space saved: {result['total_space_saved_human']}.")
         return result

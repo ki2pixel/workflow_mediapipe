@@ -683,7 +683,7 @@ def run_tracking_pipeline_cv5(video_path, blazeface_net, facemesh_net, blendshap
         '-vcodec', 'rawvideo', '-loglevel', 'error', '-'
     ]
 
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**8)
     frame_size = model_width * model_height * 3
 
     # Filtre temporel

@@ -38,6 +38,15 @@ def pytest_sessionstart(session):
 
 
 # Standard fixtures for test patterns
+@pytest.fixture(autouse=True)
+def clean_workflow_state():
+    """Réinitialise proprement le singleton WorkflowState avant et après chaque test."""
+    from services.workflow_state import reset_workflow_state
+    reset_workflow_state()
+    yield
+    reset_workflow_state()
+
+
 @pytest.fixture
 def mock_workflow_state():
     """Mock WorkflowState with sensible defaults."""

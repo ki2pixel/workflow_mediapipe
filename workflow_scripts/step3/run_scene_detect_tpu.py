@@ -354,7 +354,7 @@ def detect_scenes_tpu(video_path, interpreter, threshold=0.25, min_scene_len=DEF
             '-'
         ]
 
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**8)
 
         frame_size = width * height * 3
         raw_embeddings = []

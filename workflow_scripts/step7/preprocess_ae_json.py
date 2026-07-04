@@ -123,7 +123,12 @@ def _extract_complex_metadata_streaming(file_path: Path) -> Dict[str, Any]:
                     out[prefix] = value
                 elif prefix == 'schema' and event == 'string':
                     out[prefix] = value
-    except Exception: pass
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors de l'extraction des métadonnées complexes pour {file_path.name}: {e}")
+    except StopIteration:
+        logger.error(f"Fichier JSON tronqué lors de l'extraction des métadonnées complexes pour {file_path.name}")
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors de l'extraction des métadonnées complexes pour {file_path.name}: {e}")
     
     for key in ['tracking_analytics', 'expression_summary', 'temporal_alignment', 'speaker_embeddings']:
         try:
@@ -131,7 +136,12 @@ def _extract_complex_metadata_streaming(file_path: Path) -> Dict[str, Any]:
                 val = next(ijson.items(f, key, use_float=True), None)
                 if val is not None:
                     out[key] = val
-        except Exception: pass
+        except ijson.JSONError as e:
+            logger.error(f"Format JSON invalide lors de la lecture de la clé '{key}' dans {file_path.name}: {e}")
+        except StopIteration:
+            logger.error(f"Clé '{key}' introuvable ou fichier tronqué dans {file_path.name}")
+        except Exception as e:
+            logger.error(f"Erreur inattendue lors de la lecture de la clé '{key}' dans {file_path.name}: {e}")
     return out
 
 def _stream_index_audio(audio_path: Path) -> Tuple[Dict[int, Dict[str, Any]], Optional[int]]:
@@ -159,8 +169,12 @@ def _stream_index_audio(audio_path: Path) -> Tuple[Dict[int, Dict[str, Any]], Op
                     by_frame[frame_i] = audio_info
                     if max_frame is None or frame_i > max_frame:
                         max_frame = frame_i
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors du streaming de l'index audio pour {audio_path.name}: {e}")
+    except StopIteration:
+        logger.error(f"Fichier JSON tronqué lors du streaming de l'index audio pour {audio_path.name}")
     except Exception as e:
-        logger.warning(f"Error streaming audio index from {audio_path.name}: {e}")
+        logger.error(f"Erreur inattendue lors du streaming de l'index audio pour {audio_path.name}: {e}")
         
     return by_frame, max_frame
 
@@ -181,7 +195,12 @@ def _stream_index_tracking(video_json_path: Path) -> Optional[Dict[str, Any]]:
                 if event == 'start_array' and prefix in ('frames', 'frames_analysis'):
                     array_key = prefix
                     break
-    except Exception: pass
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors de la détection de la clé array dans {video_json_path.name}: {e}")
+    except StopIteration:
+        logger.error(f"Fichier JSON tronqué lors de la détection de la clé array dans {video_json_path.name}")
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors de la détection de la clé array dans {video_json_path.name}: {e}")
     
     if has_data_by_frame:
         return _load_json(video_json_path)
@@ -234,8 +253,14 @@ def _stream_index_tracking(video_json_path: Path) -> Optional[Dict[str, Any]]:
                     })
                 if out_tracked:
                     data_by_frame[frame_i] = out_tracked
+    except ijson.JSONError as e:
+        logger.error(f"Format JSON invalide lors du streaming de l'index de tracking pour {video_json_path.name}: {e}")
+        return None
+    except StopIteration:
+        logger.error(f"Fichier JSON tronqué lors du streaming de l'index de tracking pour {video_json_path.name}")
+        return None
     except Exception as e:
-        logger.warning(f"Error streaming tracking index from {video_json_path.name}: {e}")
+        logger.error(f"Erreur inattendue lors du streaming de l'index de tracking pour {video_json_path.name}: {e}")
         return None
         
     out = meta.copy()

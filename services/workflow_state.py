@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Set
 from pathlib import Path
 import logging
+from services.types import StepStatus
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class WorkflowState:
     def initialize_step(self, step_key: str) -> None:
         with self._lock:
             self._process_info[step_key] = {
-                'status': 'idle',
+                'status': StepStatus.IDLE.value,
                 'log': deque(maxlen=300),
                 'return_code': None,
                 'process': None,
@@ -120,12 +121,12 @@ class WorkflowState:
     
     def is_step_running(self, step_key: str) -> bool:
         status = self.get_step_status(step_key)
-        return status in ['running', 'starting', 'initiated']
+        return status in [StepStatus.RUNNING.value, StepStatus.STARTING.value, 'initiated']
     
     def is_any_step_running(self) -> bool:
         with self._lock:
             return any(
-                info['status'] in ['running', 'starting', 'initiated']
+                info['status'] in [StepStatus.RUNNING.value, StepStatus.STARTING.value, 'initiated']
                 for info in self._process_info.values()
             )
     

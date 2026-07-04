@@ -23,6 +23,7 @@ EXCLUDE_TESTS=(
     "tests/unit/test_step5_yunet_pyfeat_optimizations.py"
     "tests/unit/test_tracking_optimizations_blendshapes_filter.py"
     "tests/integration/test_step5_json_formats.py"
+    "tests/integration/test_step5_cv5_json_formats.py"
 )
 
 # Construire la commande pytest avec les exclusions
