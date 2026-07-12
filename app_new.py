@@ -59,34 +59,10 @@ except ImportError:
     PANDAS_AVAILABLE = False
     logger.warning("pandas not available; Excel files cannot be processed")
 
-try:
-    import pynvml
-    if config.ENABLE_GPU_MONITORING:
-        PYNVML_AVAILABLE = True
-        pynvml.nvmlInit()
-        logger.info("GPU monitoring initialized successfully")
-    else:
-        PYNVML_AVAILABLE = False
-        logger.info("GPU monitoring disabled by configuration")
-except ImportError:
-    PYNVML_AVAILABLE = False
-    logger.warning("pynvml not available. GPU monitoring disabled.")
-except Exception as e:
-    PYNVML_AVAILABLE = False
-    logger.error(f"Failed to initialize GPU monitoring: {e}")
-
 BASE_PATH_SCRIPTS = config.BASE_PATH_SCRIPTS
 PYTHON_VENV_EXE = config.PYTHON_VENV_EXE
 
 PARALLEL_TRACKING_SCRIPT_PATH = BASE_PATH_SCRIPTS / "workflow_scripts" / "step5" / "run_tracking_manager.py"
-
-os.environ['ROOT_SCAN_DIR'] = str(BASE_PATH_SCRIPTS / "projets_extraits")
-KEYWORD_FILTER_TRACKING_ENV = "Camille"
-os.environ['FOLDER_KEYWORD'] = KEYWORD_FILTER_TRACKING_ENV
-SUBDIR_FILTER_TRACKING_ENV = "docs"
-os.environ['SUBFOLDER_NAME'] = SUBDIR_FILTER_TRACKING_ENV
-os.environ.setdefault('TRACKING_DISABLE_GPU', '1')
-os.environ.setdefault('TRACKING_CPU_WORKERS', '15')
 
 LOGS_BASE_DIR = BASE_PATH_SCRIPTS / "logs"
 os.makedirs(LOGS_BASE_DIR, exist_ok=True)
@@ -163,8 +139,7 @@ APP_LOGGER = APP_FLASK.logger
 with APP_FLASK.app_context():
     CACHE = APP_FLASK.extensions['cache']
 
-KEYWORD_FILTER_TRACKING_ENV = os.environ.get('KEYWORD_FILTER_TRACKING_ENV', "Camille")
-SUBDIR_FILTER_TRACKING_ENV = os.environ.get('SUBDIR_FILTER_TRACKING_ENV', "docs")
+
 
 if not HF_AUTH_TOKEN_ENV:
     APP_LOGGER.warning("HF_AUTH_TOKEN environment variable not set. Step 4 (Audio Analysis) will fail if executed.")
@@ -243,7 +218,14 @@ def init_app():
         logs_dir.mkdir(exist_ok=True)
 
         log_file_path = logs_dir / "app.log"
-        file_handler = logging.FileHandler(log_file_path, mode='w', encoding='utf-8')  # 'w' mode to start fresh each time
+        from logging.handlers import RotatingFileHandler
+        file_handler = RotatingFileHandler(
+            log_file_path,
+            maxBytes=10*1024*1024,  # 10 MB
+            backupCount=5,
+            mode='a',
+            encoding='utf-8'
+        )
         file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
         file_handler.setFormatter(file_formatter)
 
@@ -287,6 +269,11 @@ def init_app():
         initialize_services()
 
         if not getattr(APP_FLASK, "_polling_threads_started", False):
+            from services.csv_monitor import stop_csv_monitor
+            from services.cleanup_monitor import stop_cleanup_monitor
+            atexit.register(stop_csv_monitor)
+            atexit.register(stop_cleanup_monitor)
+
             csv_monitor_thread = threading.Thread(target=csv_monitor_service, name="CSVMonitorService")
             csv_monitor_thread.daemon = True
             csv_monitor_thread.start()
@@ -306,9 +293,7 @@ initialize_services()
 
 
 
-if PYNVML_AVAILABLE:
-    atexit.register(pynvml.nvmlShutdown)
-    logger.info("pynvml shutdown hook registered")
+
 def format_duration_seconds(seconds_total: float) -> str:
     if seconds_total is None or seconds_total < 0: return "N/A"
     seconds_total = int(seconds_total)

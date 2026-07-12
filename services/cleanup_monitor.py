@@ -8,10 +8,19 @@ Handles periodic continuous cleanup tasks in a background thread.
 import os
 import time
 import logging
+import threading
 
 from services.cleanup_service import CleanupService
 
 logger = logging.getLogger(__name__)
+
+# Event to handle graceful shutdown of cleanup monitor daemon
+shutdown_event = threading.Event()
+
+def stop_cleanup_monitor() -> None:
+    """Signal the cleanup monitor service to stop."""
+    logger.info("CLEANUP MONITOR: Shutdown signal received.")
+    shutdown_event.set()
 
 def orphan_cleanup_service():
     """Service de nettoyage en arrière-plan (orphelins STEP8 & logs obsolètes). S'exécute toutes les 12 heures."""
@@ -21,9 +30,11 @@ def orphan_cleanup_service():
     threshold_hours = int(os.environ.get('CLEANUP_ORPHANS_THRESHOLD_HOURS', 48))
     
     # Premier nettoyage au bout de 5 minutes pour ne pas ralentir le démarrage
-    time.sleep(300)
+    if shutdown_event.wait(300):
+        logger.info("CLEANUP MONITOR: Arrêt avant le premier nettoyage.")
+        return
     
-    while True:
+    while not shutdown_event.is_set():
         try:
             logger.info("CLEANUP MONITOR: Exécution périodique du nettoyage des projets orphelins et des logs obsolètes.")
             results = CleanupService.cleanup_orphan_projects(threshold_hours=threshold_hours, dry_run=False)
@@ -39,4 +50,7 @@ def orphan_cleanup_service():
         except Exception as e:
             logger.error(f"CLEANUP MONITOR: Erreur inattendue: {e}", exc_info=True)
             
-        time.sleep(interval_seconds)
+        if shutdown_event.wait(interval_seconds):
+            break
+
+    logger.info("CLEANUP MONITOR: Service arrêté proprement.")

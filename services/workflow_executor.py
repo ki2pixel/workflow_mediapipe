@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 # Constants
 BASE_PATH_SCRIPTS = config.BASE_PATH_SCRIPTS
 BASE_TRACKING_LOG_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_LOG_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))
-KEYWORD_FILTER_TRACKING_ENV = os.environ.get('KEYWORD_FILTER_TRACKING_ENV', "Camille")
-SUBDIR_FILTER_TRACKING_ENV = os.environ.get('SUBDIR_FILTER_TRACKING_ENV', "docs")
 
 # Initialize config
 workflow_commands_config = WorkflowCommandsConfig(
@@ -222,14 +220,14 @@ def _run_process_async_internal(step_key: str):
     projects_dir = os.path.join(BASE_PATH_SCRIPTS, 'projets_extraits')
     os.makedirs(projects_dir, exist_ok=True)
 
-    config = workflow_commands_config.get_step_config(step_key)
-    if not config:
+    step_config = workflow_commands_config.get_step_config(step_key)
+    if not step_config:
         logger.error(f"Invalid step_key: {step_key}")
         return
         
     workflow_state.update_step_status(step_key, StepStatus.STARTING.value)
     workflow_state.clear_step_log(step_key)
-    workflow_state.append_step_log(step_key, f"--- Lancement de: {html.escape(config['display_name'])} ---\n")
+    workflow_state.append_step_log(step_key, f"--- Lancement de: {html.escape(step_config['display_name'])} ---\n")
     workflow_state.update_step_info(
         step_key,
         return_code=None,
@@ -240,7 +238,7 @@ def _run_process_async_internal(step_key: str):
         duration_str=None
     )
 
-    cmd_str_list = [str(c) for c in config['cmd']]
+    cmd_str_list = [str(c) for c in step_config['cmd']]
     temp_json_path_for_tracking = None
 
     if step_key == StepKey.STEP5.value:
@@ -248,8 +246,8 @@ def _run_process_async_internal(step_key: str):
         try:
             videos_to_process = WorkflowService.prepare_tracking_step(
                 BASE_TRACKING_LOG_SEARCH_PATH,
-                KEYWORD_FILTER_TRACKING_ENV,
-                SUBDIR_FILTER_TRACKING_ENV
+                config.FOLDER_KEYWORD,
+                config.SUBFOLDER_NAME
             )
             
             if not videos_to_process:
@@ -272,23 +270,44 @@ def _run_process_async_internal(step_key: str):
             return
 
     workflow_state.append_step_log(step_key, f"Commande: {html.escape(' '.join(cmd_str_list))}\n")
-    workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(config['cwd']))}\n\n")
+    workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(step_config['cwd']))}\n\n")
     
-    step_progress_patterns = config.get("progress_patterns", {})
+    step_progress_patterns = step_config.get("progress_patterns", {})
     state_vars = {"current_item_counter": 0}
 
-    # Prepare log path
-    log_dir = Path("logs")
+    # Prepare log path (absolute path via config.LOGS_DIR)
+    log_dir = Path(config.LOGS_DIR)
     log_dir.mkdir(exist_ok=True)
     log_file_path = log_dir / f"step_{step_key}.log"
 
+    # Manual log file rotation if size exceeds 5MB
+    if log_file_path.exists() and log_file_path.stat().st_size > 5 * 1024 * 1024:
+        try:
+            max_backups = 5
+            for i in range(max_backups - 1, 0, -1):
+                src = log_file_path.with_suffix(f".log.{i}")
+                dst = log_file_path.with_suffix(f".log.{i+1}")
+                if src.exists():
+                    src.replace(dst)
+            log_file_path.replace(log_file_path.with_suffix(".log.1"))
+            logger.info(f"[{step_key}] Rotated step log file.")
+        except Exception as e_rot:
+            logger.warning(f"[{step_key}] Failed to rotate log file: {e_rot}")
+
     try:
         logger.info(f"[SUBPROCESS_DEBUG] {step_key} executing command: {cmd_str_list}")
-        logger.info(f"[SUBPROCESS_DEBUG] {step_key} working directory: {config['cwd']}")
+        logger.info(f"[SUBPROCESS_DEBUG] {step_key} working directory: {step_config['cwd']}")
 
         process_env = os.environ.copy()
         process_env["PYTHONIOENCODING"] = "UTF-8"; process_env["PYTHONUTF8"] = "1"
         process_env["PYTHONUNBUFFERED"] = "1"
+
+        # Inject standard project environment variables into subprocess env
+        process_env.setdefault("ROOT_SCAN_DIR", str(config.PROJECTS_DIR))
+        process_env.setdefault("FOLDER_KEYWORD", config.FOLDER_KEYWORD)
+        process_env.setdefault("SUBFOLDER_NAME", config.SUBFOLDER_NAME)
+        process_env.setdefault("TRACKING_DISABLE_GPU", "1" if config.TRACKING_DISABLE_GPU else "0")
+        process_env.setdefault("TRACKING_CPU_WORKERS", str(config.TRACKING_CPU_WORKERS))
 
         try:
             coral_lib_path = os.path.join(str(BASE_PATH_SCRIPTS), "coral_env", "lib")
@@ -337,10 +356,10 @@ def _run_process_async_internal(step_key: str):
             except Exception as _e:
                 logger.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
 
-        # Open log file to redirect output (Phase 2 - No blocking on subprocess.PIPE)
-        with open(log_file_path, "w", encoding="utf-8") as log_file:
+        # Open log file to redirect output in append mode 'a'
+        with open(log_file_path, "a", encoding="utf-8") as log_file:
             process = subprocess.Popen(
-                cmd_str_list, cwd=str(config['cwd']),
+                cmd_str_list, cwd=str(step_config['cwd']),
                 stdout=log_file, stderr=subprocess.STDOUT,
                 text=True, env=process_env
             )
@@ -360,12 +379,32 @@ def _run_process_async_internal(step_key: str):
             tail_thread.daemon = True
             tail_thread.start()
 
-            # Wait for subprocess to complete
+            # Wait for subprocess to complete with timeout
             subprocess_start_time = time.time()
-            process.wait()
-            subprocess_duration = time.time() - subprocess_start_time
-
-        logger.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess completed in {subprocess_duration:.2f} seconds (return_code: {process.returncode})")
+            timeout = step_config.get("timeout") or getattr(config, "SUBPROCESS_TIMEOUT", 1800)
+            try:
+                process.wait(timeout=timeout)
+                subprocess_duration = time.time() - subprocess_start_time
+                logger.info(f"[SUBPROCESS_DEBUG] {step_key} subprocess completed in {subprocess_duration:.2f} seconds (return_code: {process.returncode})")
+            except subprocess.TimeoutExpired:
+                logger.error(f"[{step_key}] Subprocess exceeded timeout of {timeout}s. Terminating process...")
+                workflow_state.append_step_log(step_key, f"\n⚠️ ERREUR : Le script a dépassé le délai maximum de {timeout} secondes.\nArrêt forcé en cours...\n")
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                    logger.info(f"[{step_key}] Subprocess terminated successfully after terminate()")
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"[{step_key}] Subprocess did not terminate after 5s. Killing...")
+                    process.kill()
+                    process.wait()  # reap zombie
+                    logger.info(f"[{step_key}] Subprocess killed successfully")
+                
+                workflow_state.update_step_info(
+                    step_key,
+                    return_code=-9,
+                    status=StepStatus.FAILED.value
+                )
+                return
 
         running_status_duration = time.time() - running_status_start_time
         min_running_time = 0.6
@@ -381,7 +420,7 @@ def _run_process_async_internal(step_key: str):
             status=StepStatus.COMPLETED.value if process.returncode == 0 else StepStatus.FAILED.value
         )
         log_suffix = "terminé avec succès" if process.returncode == 0 else f"a échoué (code: {process.returncode})"
-        workflow_state.append_step_log(step_key, f"\n--- {html.escape(config['display_name'])} {log_suffix} ---")
+        workflow_state.append_step_log(step_key, f"\n--- {html.escape(step_config['display_name'])} {log_suffix} ---")
 
         status = workflow_state.get_step_status(step_key)
         progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)

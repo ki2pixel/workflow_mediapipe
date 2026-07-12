@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 import logging
 import time
+import threading
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -19,6 +20,9 @@ import requests
 from config.settings import config
 
 logger = logging.getLogger(__name__)
+
+# Reentrant lock to protect access to global state/cache variables
+_lock = threading.RLock()
 
 # In-memory cache
 _cache_data: Optional[List[Dict[str, str]]] = None
@@ -129,53 +133,55 @@ def fetch_records() -> Optional[List[Dict[str, str]]]:
     Respects WEBHOOK_CACHE_TTL for caching.
     """
     global _cache_data, _cache_fetched_at, _last_error, _last_status
-    now = time.time()
+    
+    with _lock:
+        now = time.time()
+        # Use cache if within TTL
+        if _cache_data is not None and (now - _cache_fetched_at) < max(0, config.WEBHOOK_CACHE_TTL):
+            return _cache_data
 
-    # Use cache if within TTL
-    if _cache_data is not None and (now - _cache_fetched_at) < max(0, config.WEBHOOK_CACHE_TTL):
-        return _cache_data
+        url = config.WEBHOOK_JSON_URL
+        timeout = max(1, config.WEBHOOK_TIMEOUT)
 
-    url = config.WEBHOOK_JSON_URL
-    timeout = max(1, config.WEBHOOK_TIMEOUT)
+        # Simple retry: up to 2 retries (total 3 attempts) with small backoff
+        attempts = 3
+        backoff = 1.0
+        last_exc: Optional[Exception] = None
 
-    # Simple retry: up to 2 retries (total 3 attempts) with small backoff
-    attempts = 3
-    backoff = 1.0
-    last_exc: Optional[Exception] = None
-
-    for attempt in range(1, attempts + 1):
-        try:
-            resp = requests.get(url, timeout=timeout)
-            resp.raise_for_status()
-            data = resp.json()
-            rows = _validate_and_format(data)
-            _cache_data = rows
-            _cache_fetched_at = now
-            _last_error = None
-            _last_status.update({
-                "available": True,
-                "last_fetch_ts": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now)),
-                "error": None,
-                "records": len(rows),
-            })
-            return rows
-        except Exception as e:
-            last_exc = e
-            _last_error = str(e)
-            _last_status.update({
-                "available": False,
-                "last_fetch_ts": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now)),
-                "error": _last_error,
-            })
-            if attempt < attempts:
-                time.sleep(backoff)
-                backoff *= 2
-            else:
-                logger.error(f"WebhookService: failed to fetch webhook JSON after {attempts} attempts: {e}")
-                return None
+        for attempt in range(1, attempts + 1):
+            try:
+                resp = requests.get(url, timeout=timeout)
+                resp.raise_for_status()
+                data = resp.json()
+                rows = _validate_and_format(data)
+                _cache_data = rows
+                _cache_fetched_at = now
+                _last_error = None
+                _last_status.update({
+                    "available": True,
+                    "last_fetch_ts": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now)),
+                    "error": None,
+                    "records": len(rows),
+                })
+                return rows
+            except Exception as e:
+                last_exc = e
+                _last_error = str(e)
+                _last_status.update({
+                    "available": False,
+                    "last_fetch_ts": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now)),
+                    "error": _last_error,
+                })
+                if attempt < attempts:
+                    time.sleep(backoff)
+                    backoff *= 2
+                else:
+                    logger.error(f"WebhookService: failed to fetch webhook JSON after {attempts} attempts: {e}")
+                    return None
 
 
 def get_service_status() -> Dict[str, Any]:
     """Return last known status for observability."""
-    # Shallow copy to avoid mutation
-    return dict(_last_status)
+    with _lock:
+        # Shallow copy to avoid mutation
+        return dict(_last_status)

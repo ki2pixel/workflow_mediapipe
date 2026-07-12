@@ -116,10 +116,11 @@ class PerformanceService:
             elapsed_time = (time.perf_counter() - start_time) * 1000  # Convert to ms
             
             with PROFILING_LOCK:
-                stats = PROFILING_STATS[section_name]
-                stats["total_time"] += elapsed_time
-                stats["calls"] += 1
-                stats["avg_time"] = stats["total_time"] / stats["calls"]
+                if len(PROFILING_STATS) < 100 or section_name in PROFILING_STATS:
+                    stats = PROFILING_STATS[section_name]
+                    stats["total_time"] += elapsed_time
+                    stats["calls"] += 1
+                    stats["avg_time"] = stats["total_time"] / stats["calls"]
     
     @staticmethod
     def record_api_response_time(endpoint: str, response_time_ms: float, status_code: int) -> None:

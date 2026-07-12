@@ -20,12 +20,15 @@ class DownloadHistoryRepository:
         self._db_path = Path(db_path)
         self._shared_group = shared_group
         self._shared_file_mode = shared_file_mode
+        self._initialized = False
 
     @property
     def db_path(self) -> Path:
         return self._db_path
 
     def initialize(self) -> None:
+        if self._initialized:
+            return
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(
@@ -34,6 +37,7 @@ class DownloadHistoryRepository:
         self._ensure_shared_permissions(self._db_path)
         self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-wal"))
         self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-shm"))
+        self._initialized = True
 
     def count(self) -> int:
         self.initialize()

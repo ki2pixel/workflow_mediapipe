@@ -7,6 +7,7 @@ import logging
 import json
 import time
 import re
+import threading
 from functools import lru_cache, wraps
 from typing import Dict, Any, Optional, Callable
 from pathlib import Path
@@ -18,6 +19,9 @@ from services.workflow_state import get_workflow_state
 logger = logging.getLogger(__name__)
 
 _SAFE_STEP_KEY_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
+
+# Lock to protect access to cache_instance and cache_stats
+_stats_lock = threading.Lock()
 
 # Global cache instance (will be initialized by Flask app)
 cache_instance: Optional[Cache] = None
@@ -46,7 +50,8 @@ class CacheService:
             cache: Flask-Caching instance
         """
         global cache_instance
-        cache_instance = cache
+        with _stats_lock:
+            cache_instance = cache
         logger.info("Cache service initialized")
     
     @staticmethod
@@ -57,35 +62,39 @@ class CacheService:
         Returns:
             Cache statistics dictionary
         """
-        total_requests = cache_stats["hits"] + cache_stats["misses"]
-        hit_rate = (cache_stats["hits"] / total_requests * 100) if total_requests > 0 else 0
-        
-        return {
-            "hits": cache_stats["hits"],
-            "misses": cache_stats["misses"],
-            "errors": cache_stats["errors"],
-            "hit_rate_percent": round(hit_rate, 2),
-            "total_requests": total_requests,
-            "uptime_seconds": round(time.time() - cache_stats["last_reset"], 1)
-        }
+        with _stats_lock:
+            total_requests = cache_stats["hits"] + cache_stats["misses"]
+            hit_rate = (cache_stats["hits"] / total_requests * 100) if total_requests > 0 else 0
+            
+            return {
+                "hits": cache_stats["hits"],
+                "misses": cache_stats["misses"],
+                "errors": cache_stats["errors"],
+                "hit_rate_percent": round(hit_rate, 2),
+                "total_requests": total_requests,
+                "uptime_seconds": round(time.time() - cache_stats["last_reset"], 1)
+            }
     
     @staticmethod
     def clear_cache() -> None:
         """Clear all cached data."""
-        if cache_instance:
-            cache_instance.clear()
+        with _stats_lock:
+            inst = cache_instance
+        if inst:
+            inst.clear()
             logger.info("Cache cleared")
     
     @staticmethod
     def reset_stats() -> None:
         """Reset cache statistics."""
         global cache_stats
-        cache_stats = {
-            "hits": 0,
-            "misses": 0,
-            "errors": 0,
-            "last_reset": time.time()
-        }
+        with _stats_lock:
+            cache_stats = {
+                "hits": 0,
+                "misses": 0,
+                "errors": 0,
+                "last_reset": time.time()
+            }
         logger.info("Cache statistics reset")
     
     @staticmethod
@@ -103,8 +112,12 @@ class CacheService:
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def wrapper(*args, **kwargs):
-                if not cache_instance:
-                    cache_stats["errors"] += 1
+                with _stats_lock:
+                    inst = cache_instance
+                    if not inst:
+                        cache_stats["errors"] += 1
+                
+                if not inst:
                     return func(*args, **kwargs)
                 
                 # Generate cache key
@@ -112,21 +125,24 @@ class CacheService:
                 
                 try:
                     # Try to get from cache
-                    result = cache_instance.get(cache_key)
+                    result = inst.get(cache_key)
                     if result is not None:
-                        cache_stats["hits"] += 1
+                        with _stats_lock:
+                            cache_stats["hits"] += 1
                         return result
                     
                     # Cache miss - execute function
-                    cache_stats["misses"] += 1
+                    with _stats_lock:
+                        cache_stats["misses"] += 1
                     result = func(*args, **kwargs)
                     
                     # Store in cache
-                    cache_instance.set(cache_key, result, timeout=timeout)
+                    inst.set(cache_key, result, timeout=timeout)
                     return result
                     
                 except Exception as e:
-                    cache_stats["errors"] += 1
+                    with _stats_lock:
+                        cache_stats["errors"] += 1
                     logger.error(f"Cache error for {func.__name__}: {e}")
                     return func(*args, **kwargs)
             

@@ -34,6 +34,14 @@ except Exception:
 
 WEBHOOK_MONITOR_INTERVAL = config.WEBHOOK_MONITOR_INTERVAL
 
+# Event to handle graceful shutdown of background monitor daemon
+shutdown_event = threading.Event()
+
+def stop_csv_monitor() -> None:
+    """Signal the CSV monitor service to stop."""
+    logger.info("WEBHOOK MONITOR: Shutdown signal received.")
+    shutdown_event.set()
+
 def check_csv_for_downloads() -> None:
     """
     Check for new downloads using Webhook as the single data source.
@@ -230,7 +238,7 @@ def csv_monitor_service():
 
     workflow_state = get_workflow_state()
 
-    while True:
+    while not shutdown_event.is_set():
         try:
             workflow_state.update_csv_monitor_status(
                 status="checking",
@@ -248,7 +256,8 @@ def csv_monitor_service():
                     last_check=datetime.now().isoformat(),
                     error=str(check_error)
                 )
-                time.sleep(WEBHOOK_MONITOR_INTERVAL)
+                if shutdown_event.wait(WEBHOOK_MONITOR_INTERVAL):
+                    break
                 continue
 
             workflow_state.update_csv_monitor_status(
@@ -266,4 +275,7 @@ def csv_monitor_service():
                 error=error_msg
             )
             
-        time.sleep(WEBHOOK_MONITOR_INTERVAL)
+        if shutdown_event.wait(WEBHOOK_MONITOR_INTERVAL):
+            break
+
+    logger.info("WEBHOOK MONITOR: Service arrêté proprement.")

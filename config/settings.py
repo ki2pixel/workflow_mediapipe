@@ -235,6 +235,149 @@ class Config:
     
     def __post_init__(self):
         """Post-initialization to ensure paths are Path objects and create directories."""
+        self.reload()
+
+    def reload(self):
+        """Reload all configuration values dynamically from the environment."""
+        # Flask Application Settings
+        self.SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
+        self.DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
+        self.HOST = os.environ.get('FLASK_HOST', '0.0.0.0')
+        self.PORT = int(os.environ.get('FLASK_PORT', '5000'))
+        
+        # Security Tokens (loaded from environment)
+        self.INTERNAL_WORKER_TOKEN = os.environ.get('INTERNAL_WORKER_COMMS_TOKEN')
+        
+        # Webhook JSON Source (single data source for monitoring)
+        self.WEBHOOK_JSON_URL = os.environ.get(
+            'WEBHOOK_JSON_URL',
+            'https://webhook.kidpixel.fr/data/webhook_links.json'
+        )
+        self.WEBHOOK_TIMEOUT = int(os.environ.get('WEBHOOK_TIMEOUT', '10'))
+        self.WEBHOOK_CACHE_TTL = int(os.environ.get('WEBHOOK_CACHE_TTL', '60'))
+        self.WEBHOOK_MONITOR_INTERVAL = int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15'))
+        
+        # Directory Configuration
+        self.BASE_PATH_SCRIPTS = Path(os.environ.get(
+            'BASE_PATH_SCRIPTS_ENV', 
+            os.path.dirname(os.path.abspath(__file__ + '/../'))
+        ))
+        self.CACHE_ROOT_DIR = Path(os.environ.get('CACHE_ROOT_DIR', '/mnt/cache'))
+        self.LOCAL_DOWNLOADS_DIR = Path(os.environ.get(
+            'LOCAL_DOWNLOADS_DIR', 
+            str(Path.home() / 'Téléchargements')
+        ))
+        self.DISABLE_EXPLORER_OPEN = _parse_bool(os.environ.get('DISABLE_EXPLORER_OPEN'), default=False)
+        self.ENABLE_EXPLORER_OPEN = _parse_bool(os.environ.get('ENABLE_EXPLORER_OPEN'), default=False)
+        self.DOWNLOAD_HISTORY_SHARED_GROUP = os.environ.get('DOWNLOAD_HISTORY_SHARED_GROUP')
+        self.DOWNLOAD_HISTORY_DB_PATH = Path(os.environ.get('DOWNLOAD_HISTORY_DB_PATH', ''))
+        
+        # LOGS_DIR will be normalized in _normalize_paths
+        self.LOGS_DIR = Path(os.environ.get('LOGS_DIR', ''))
+        self.VENV_BASE_DIR = Path(os.environ.get('VENV_BASE_DIR', '')) if os.environ.get('VENV_BASE_DIR') else None
+        self.PROJECTS_DIR = Path(os.environ.get('PROJECTS_DIR', '')) if os.environ.get('PROJECTS_DIR') else None
+        self.ARCHIVES_DIR = Path(os.environ.get('ARCHIVES_DIR', '')) if os.environ.get('ARCHIVES_DIR') else None
+        
+        # Python Environment Configuration
+        self.PYTHON_VENV_EXE = os.environ.get('PYTHON_VENV_EXE_ENV', '')
+        
+        # Processing Configuration
+        self.MAX_CPU_WORKERS = int(os.environ.get(
+            'MAX_CPU_WORKERS', 
+            str(max(1, os.cpu_count() - 2 if os.cpu_count() else 2))
+        ))
+        
+        # Polling Intervals
+        self.POLLING_INTERVAL = int(os.environ.get('POLLING_INTERVAL', '1000'))
+        self.LOCAL_DOWNLOAD_POLLING_INTERVAL = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
+        self.SYSTEM_MONITOR_POLLING_INTERVAL = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+        
+        # MediaPipe Configuration
+        self.MP_LANDMARKER_MIN_DETECTION_CONFIDENCE = float(os.environ.get(
+            'MP_LANDMARKER_MIN_DETECTION_CONFIDENCE', '0.5'
+        ))
+        self.MP_LANDMARKER_MIN_TRACKING_CONFIDENCE = float(os.environ.get(
+            'MP_LANDMARKER_MIN_TRACKING_CONFIDENCE', '0.5'
+        ))
+        
+        # GPU Configuration
+        self.ENABLE_GPU_MONITORING = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
+        
+        # Lemonfox API Configuration (STEP4 alternative)
+        self.LEMONFOX_API_KEY = os.environ.get('LEMONFOX_API_KEY')
+        self.LEMONFOX_TIMEOUT_SEC = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
+        self.LEMONFOX_EU_DEFAULT = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
+        self.LEMONFOX_DEFAULT_LANGUAGE = os.environ.get("LEMONFOX_DEFAULT_LANGUAGE")
+        self.LEMONFOX_DEFAULT_PROMPT = os.environ.get("LEMONFOX_DEFAULT_PROMPT")
+        self.LEMONFOX_SPEAKER_LABELS_DEFAULT = _parse_bool(
+            os.environ.get("LEMONFOX_SPEAKER_LABELS_DEFAULT"),
+            default=True,
+        )
+        self.LEMONFOX_DEFAULT_MIN_SPEAKERS = _parse_optional_int(
+            os.environ.get("LEMONFOX_DEFAULT_MIN_SPEAKERS")
+        )
+        self.LEMONFOX_DEFAULT_MAX_SPEAKERS = _parse_optional_int(
+            os.environ.get("LEMONFOX_DEFAULT_MAX_SPEAKERS")
+        )
+        self.LEMONFOX_TIMESTAMP_GRANULARITIES = _parse_csv_list(os.environ.get("LEMONFOX_TIMESTAMP_GRANULARITIES", "word"))
+        self.LEMONFOX_SPEECH_GAP_FILL_SEC = float(os.environ.get("LEMONFOX_SPEECH_GAP_FILL_SEC", "0.15"))
+        self.LEMONFOX_SPEECH_MIN_ON_SEC = float(os.environ.get("LEMONFOX_SPEECH_MIN_ON_SEC", "0.0"))
+        self.LEMONFOX_MAX_UPLOAD_MB = _parse_optional_positive_int(
+            os.environ.get("LEMONFOX_MAX_UPLOAD_MB")
+        )
+        self.LEMONFOX_ENABLE_TRANSCODE = _parse_bool(
+            os.environ.get("LEMONFOX_ENABLE_TRANSCODE"),
+            default=False,
+        )
+        self.LEMONFOX_TRANSCODE_AUDIO_CODEC = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
+        self.LEMONFOX_TRANSCODE_BITRATE_KBPS = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
+        self.STEP4_METHOD = os.environ.get("STEP4_METHOD", "")
+        self.STEP4_USE_LEMONFOX = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+        
+        # DeepInfra API Configuration (STEP4 alternative)
+        self.DEEPINFRA_API_KEY = os.environ.get("DEEPINFRA_API_KEY")
+        self.DEEPINFRA_BASE_URL = os.environ.get("DEEPINFRA_BASE_URL", "https://api.deepinfra.com")
+        self.DEEPINFRA_TRANSCRIPTIONS_ENDPOINT = os.environ.get(
+            "DEEPINFRA_TRANSCRIPTIONS_ENDPOINT",
+            "/v1/openai/audio/transcriptions",
+        )
+        self.DEEPINFRA_TRANSCRIPTIONS_URL = os.environ.get("DEEPINFRA_TRANSCRIPTIONS_URL", "")
+        self.DEEPINFRA_MODEL = os.environ.get("DEEPINFRA_MODEL", "openai/whisper-large-v3")
+        self.DEEPINFRA_TIMEOUT_SEC = int(os.environ.get("DEEPINFRA_TIMEOUT_SEC", "600"))
+        self.DEEPINFRA_CONNECT_TIMEOUT_SEC = int(os.environ.get("DEEPINFRA_CONNECT_TIMEOUT_SEC", "10"))
+        self.DEEPINFRA_MAX_RETRIES = int(os.environ.get("DEEPINFRA_MAX_RETRIES", "2"))
+        self.DEEPINFRA_BACKOFF_SEC = float(os.environ.get("DEEPINFRA_BACKOFF_SEC", "1.5"))
+        self.DEEPINFRA_RESPONSE_FORMAT = os.environ.get("DEEPINFRA_RESPONSE_FORMAT", "verbose_json")
+        self.STEP5_MEDIAPIPE_JAWOPEN_SCALE = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+        self.STEP5_MEDIAPIPE_MAX_WIDTH = _parse_optional_positive_int(
+            os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+        )
+        
+        # Coral TPU Acceleration
+        self.ENABLE_CORAL_TPU_ACCELERATION = os.environ.get('ENABLE_CORAL_TPU_ACCELERATION', 'false').lower() == 'true'
+        self.STEP3_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP3_ENABLE_CORAL_TPU'), default=True)
+        self.STEP4_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP4_ENABLE_CORAL_TPU'), default=True)
+        self.STEP5_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP5_ENABLE_CORAL_TPU'), default=True)
+        
+        # OpenCV 5.0 Experimental
+        self.USE_OPENCV5_STEP3 = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
+        self.USE_OPENCV5_STEP5 = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
+        self.STEP5_CV5_NUM_WORKERS = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
+        
+        # Step 5 default tracking variables (C3/C4)
+        self.TRACKING_DISABLE_GPU = _parse_bool(os.environ.get('TRACKING_DISABLE_GPU'), default=True)
+        self.TRACKING_CPU_WORKERS = _parse_optional_positive_int(os.environ.get('TRACKING_CPU_WORKERS')) or 15
+        self.ROOT_SCAN_DIR = Path(os.environ.get('ROOT_SCAN_DIR', str(self.BASE_PATH_SCRIPTS / "projets_extraits")))
+        self.FOLDER_KEYWORD = os.environ.get('FOLDER_KEYWORD', 'Camille')
+        self.SUBFOLDER_NAME = os.environ.get('SUBFOLDER_NAME', 'docs')
+        
+        # Subprocess default timeout configuration
+        self.SUBPROCESS_TIMEOUT = _parse_optional_positive_int(os.environ.get('SUBPROCESS_TIMEOUT')) or 1800
+        
+        self._normalize_paths()
+
+    def _normalize_paths(self):
+        """Post-initialization path normalization and directory verification."""
         # Ensure all path attributes are Path objects
         if isinstance(self.BASE_PATH_SCRIPTS, str):
             self.BASE_PATH_SCRIPTS = Path(self.BASE_PATH_SCRIPTS)

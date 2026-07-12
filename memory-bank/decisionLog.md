@@ -9,6 +9,20 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 ## Historique synthétique (avant mars 2026)
 
 Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
+
+## Juillet 2026
+
+- [2026-07-12 16:50:00] **Remédiation Finale de l'Audit Technique Backend (Phase 1-5) (COMPLET)**
+  - **Décision** : Sécurisation critique, thread-safety multi-thread gunicorn, durcissement I/O et réorganisation des hooks de cycle de vie (NVML/atexit).
+  - **Raison** : Le second audit technique a relevé 18 failles critiques (dont 5 sans protection d'authentification, doubles initialisations de threads et process bloqués indéfiniment).
+  - **Implémentation** :
+    1. Authentification : Décorateur `@require_internal_worker_token` appliqué à 9 routes d'exécution.
+    2. Concurrence : Verrous `Lock` et `RLock` sur `WebhookService` et `CacheService`.
+    3. Cycle de vie : Remplacement de `time.sleep` par `threading.Event.wait` et enregistrement de callbacks clean via `atexit.register`.
+    4. Subprocess : Timeout forcé avec cascade de signaux `SIGTERM` / `SIGKILL` et rotation manuelle des logs d'étapes (>5MB).
+    5. Config : Restructuration de `Config` dans `settings.py` (méthodes `reload` et `_normalize_paths`) pour éviter les mutations directes et isoler l'exécution.
+  - **Validation** : Création de `test_api_authentication.py`, `test_webhook_concurrency.py`, `test_workflow_executor_timeout.py`, validation de toute la suite avec 451 tests OK.
+
 ## Juin 2026
 
 - [2026-06-14 04:21:00] **Abandon et Nettoyage de l'Optimisation STEP3 Axe A (COMPLET)** : Abandon définitif de la méthode optimisée de décodage GPU TorchCodec + PyTorch compilation en FP16.

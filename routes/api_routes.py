@@ -8,6 +8,7 @@ import time
 from functools import wraps
 from flask import Blueprint, jsonify, request
 from config.security import require_internal_worker_token
+from routes.decorators import measure_api
 from services.monitoring_service import MonitoringService
 from services.workflow_service import WorkflowService
 from services.performance_service import PerformanceService
@@ -19,36 +20,6 @@ logger = logging.getLogger(__name__)
 
 # Create API blueprint
 api_bp = Blueprint('api', __name__)
-
-
-def measure_api(endpoint_name: str):
-    """Decorator to measure API response time and record it via PerformanceService.
-
-    Args:
-        endpoint_name: Logical name of the endpoint for metrics.
-    """
-    def decorator(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            status_code = 200
-            try:
-                resp = fn(*args, **kwargs)
-                # Flask can return a tuple (payload, status)
-                if isinstance(resp, tuple) and len(resp) >= 2:
-                    status_code = resp[1]
-                return resp
-            except Exception:
-                status_code = 500
-                raise
-            finally:
-                elapsed_ms = (time.perf_counter() - start) * 1000.0
-                try:
-                    PerformanceService.record_api_response_time(endpoint_name, elapsed_ms, status_code)
-                except Exception:
-                    logger.debug("Failed to record API performance metric", exc_info=True)
-        return wrapper
-    return decorator
 
 @api_bp.route('/system_monitor', methods=['GET'])
 @measure_api('/api/system_monitor')
@@ -234,6 +205,7 @@ def performance_metrics():
 
 @api_bp.route('/performance/reset', methods=['POST'])
 @measure_api('/api/performance/reset')
+@require_internal_worker_token
 def reset_performance_metrics():
     """
     Reset performance profiling statistics.
@@ -347,6 +319,7 @@ def cache_list_today():
 
 @api_bp.route('/cache/open', methods=['POST'])
 @measure_api('/api/cache/open')
+@require_internal_worker_token
 def cache_open():
     """
     Open a folder path in the system's file explorer (server-side).
@@ -383,6 +356,7 @@ def cache_open():
         return jsonify({"success": False, "message": "Erreur interne pour l'ouverture du dossier"}), 500
 @api_bp.route('/cache/clear', methods=['POST'])
 @measure_api('/api/cache/clear')
+@require_internal_worker_token
 def clear_cache():
     """
     Clear application cache.

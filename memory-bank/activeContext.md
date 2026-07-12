@@ -1,7 +1,7 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Clôture de la dette technique backend et validation finale réussie en production du pipeline complet 1-8 après refactoring.
+- Aucune tâche active. La session de remédiation du second audit de sécurité et d'architecture a été clôturée avec succès.
 
 ## Objectifs
 - Activer et valider les pipelines expérimentaux OpenCV 5.0 pour STEP 3 (Scene Detection) et STEP 5 (Video Tracking).
@@ -10,6 +10,7 @@
 - Préparer pour le développement futur.
 
 ## Décisions Récentes
+- [2026-07-12 16:50:00] **Remédiation du Second Audit Technique Backend (Phase 1-5) (COMPLET)** : Résolution de 19 des 22 faiblesses du second audit technique backend. Implémentation du décorateur `@require_internal_worker_token`, thread-safety (Locks), interruption propre des threads daemons, gestion d'exécution et de rotation log des subprocess sous timeout, rechargement d'environnement propre Config, nettoyage d'initialisation pynvml/env dans app_new.py, et création de tests d'intégration/unitaires (451 tests au vert).
 - [2026-07-04 09:16:00] **Correction de la Résolution Contextuelle de WorkflowService (COMPLET)** : Résolution de l'erreur 'Execution context not available' lors du lancement d'étapes en recherchant dynamiquement `app_new` ou `__main__` dans `sys.modules`, garantissant un fonctionnement parfait en production directe et en exécution de tests.
 - [2026-07-04 09:00:00] **Dépilage et Résolution de la Dette Technique Backend (Phase 1-4) (COMPLET)** : Implémentation du plan d'action de l'audit backend avec : 1. Création des enums typés (`StepKey`, `StepStatus`, `CSVDownloadStatus`) et forçage de `sys.exit` sur erreur de config en production. 2. Hardening des exceptions `ijson` en STEP6/7 et redirection de stdout/stderr vers `logs/step_*.log` avec tailing thread non bloquant pour éviter les deadlocks de `subprocess.PIPE`. 3. Refactoring complet en DAG par extraction des services `csv_downloader`, `csv_monitor`, `workflow_executor`, et `cleanup_monitor` pour supprimer les dépendances circulaires avec `app_new.py`. 4. Intégration de `cleanup_step_logs` pour nettoyer automatiquement les fichiers de logs obsolètes step_*.log (seuil 48h) et harmonisation de la suite de tests unitaires (365 tests passés au vert).
 - [2026-06-17 10:05:00] **Correction OOM TransNetV2 CV5 (COMPLET)** : Implémentation du fallback dynamique CPU (ORTDNNNet) en cas d'erreur mémoire/CUDA (OOM) d'ONNX Runtime, et réduction du batch_size par défaut de 16 à 8 dans STEP3.

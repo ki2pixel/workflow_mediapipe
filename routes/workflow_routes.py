@@ -11,6 +11,8 @@ from services.workflow_service import WorkflowService
 from services.cache_service import CacheService
 from services.performance_service import PerformanceService
 from config.settings import config
+from config.security import require_internal_worker_token, validate_file_path
+from routes.decorators import measure_api
 
 # Configure route logger to capture all debug statements
 logger = logging.getLogger(__name__)
@@ -22,36 +24,6 @@ _STATIC_CACHE_BUSTER = str(int(time.time()))
 
 # Create workflow blueprint
 workflow_bp = Blueprint('workflow', __name__)
-
-
-def measure_api(endpoint_name: str):
-    """Decorator to measure API response time and record it via PerformanceService.
-
-    Args:
-        endpoint_name: Logical name of the endpoint for metrics.
-    """
-    def decorator(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            status_code = 200
-            try:
-                resp = fn(*args, **kwargs)
-                # Flask can return a tuple (payload, status)
-                if isinstance(resp, tuple) and len(resp) >= 2:
-                    status_code = resp[1]
-                return resp
-            except Exception:
-                status_code = 500
-                raise
-            finally:
-                elapsed_ms = (time.perf_counter() - start) * 1000.0
-                try:
-                    PerformanceService.record_api_response_time(endpoint_name, elapsed_ms, status_code)
-                except Exception:
-                    logger.debug("Failed to record API performance metric", exc_info=True)
-        return wrapper
-    return decorator
 
 
 @workflow_bp.route('/', methods=['GET'])
@@ -80,6 +52,7 @@ def index():
 
 @workflow_bp.route('/run/<step_key>', methods=['POST'])
 @measure_api('/workflow/run')
+@require_internal_worker_token
 def run_step(step_key):
     """
     Execute a single workflow step.
@@ -125,6 +98,7 @@ def run_step(step_key):
 
 @workflow_bp.route('/run_custom_sequence', methods=['POST'])
 @measure_api('/workflow/run_custom_sequence')
+@require_internal_worker_token
 def run_custom_sequence():
     """
     Execute a custom sequence of workflow steps.
@@ -212,6 +186,7 @@ def get_status(step_key):
 
 @workflow_bp.route('/stop/<step_key>', methods=['POST'])
 @measure_api('/workflow/stop')
+@require_internal_worker_token
 def stop_step(step_key):
     """
     Stop a running workflow step.
@@ -246,10 +221,13 @@ def stop_step(step_key):
 
 
 @workflow_bp.route('/get_specific_log_test/<step_key>/<int:log_index>', methods=['GET'])
+@require_internal_worker_token
 def get_specific_log_test(step_key, log_index):
     """
     Test version of get specific log that bypasses cache service.
     """
+    if not config.DEBUG:
+        return jsonify({"error": "Bypassing cache is only allowed in debug mode"}), 403
     try:
         result = WorkflowService.get_step_log_file(step_key, log_index)
         return jsonify(result)
@@ -307,6 +285,10 @@ def serve_sound_file(filename):
     """
     try:
         sound_dir = config.BASE_PATH_SCRIPTS / 'sound-design'
+        target_path = sound_dir / filename
+        if not validate_file_path(str(target_path), [str(sound_dir)]):
+            logger.warning(f"File path validation failed for: {filename}")
+            return jsonify({"error": "Access denied"}), 403
         return send_from_directory(sound_dir, filename)
     except Exception as e:
         logger.error(f"Sound file serve error for {filename}: {e}")
@@ -368,6 +350,7 @@ def sequence_status():
 
 @workflow_bp.route('/sequence/stop', methods=['POST'])
 @measure_api('/workflow/sequence/stop')
+@require_internal_worker_token
 def stop_sequence():
     """
     Stop the currently running sequence.
@@ -399,6 +382,7 @@ def stop_sequence():
 
 @workflow_bp.route('/cancel/<step_key>', methods=['POST'])
 @measure_api('/workflow/cancel')
+@require_internal_worker_token
 def cancel_step(step_key):
     """
     Cancel a running workflow step.
@@ -436,45 +420,3 @@ def cancel_step(step_key):
         }), 500
 
 
-# Additional workflow routes that were moved from app_new.py
-# Note: Duplicate routes removed to prevent conflicts
-@workflow_bp.route('/sound-design/<filename>', methods=['GET'])
-def serve_sound_file_blueprint(filename):
-    """
-    Serve sound files from the sound-design directory (moved from app_new.py).
-
-    Args:
-        filename (str): Sound file name
-
-    Returns:
-        Sound file content
-
-    Status Codes:
-        200: Success
-        404: File not found
-    """
-    try:
-        sound_dir = config.BASE_PATH_SCRIPTS / 'sound-design'
-        return send_from_directory(sound_dir, filename)
-    except Exception as e:
-        logger.error(f"Sound file serve error for {filename}: {e}")
-        return jsonify({"error": "Sound file not found"}), 404
-
-
-@workflow_bp.route('/test-sound', methods=['GET'])
-def test_sound_blueprint():
-    """
-    Serve the sound test page (moved from app_new.py).
-
-    Returns:
-        Sound test HTML page
-
-    Status Codes:
-        200: Success
-        404: File not found
-    """
-    try:
-        return send_from_directory(config.BASE_PATH_SCRIPTS, 'test_sound.html')
-    except Exception as e:
-        logger.error(f"Test sound page error: {e}")
-        return jsonify({"error": "Test sound page not found"}), 404

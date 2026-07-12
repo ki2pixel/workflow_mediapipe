@@ -22,12 +22,16 @@ try:
     if config.ENABLE_GPU_MONITORING:
         PYNVML_AVAILABLE = True
         pynvml.nvmlInit()
-        logger.info("GPU monitoring initialized successfully")
+        import atexit
+        atexit.register(pynvml.nvmlShutdown)
+        logger.info("GPU monitoring initialized successfully and shutdown hook registered")
     else:
         logger.info("GPU monitoring disabled by configuration")
 except ImportError:
+    PYNVML_AVAILABLE = False
     logger.warning("pynvml not available. GPU monitoring disabled.")
 except Exception as e:
+    PYNVML_AVAILABLE = False
     logger.error(f"Failed to initialize GPU monitoring: {e}")
 
 
