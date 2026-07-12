@@ -157,7 +157,7 @@ function createPopupOverlay(download) {
  */
 function createWorkflowPromptContent(download) {
     const filename = download.filename || 'Fichier téléchargé';
-    const downloadTime = download.display_timestamp || 'maintenant';
+    const downloadTime = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'maintenant');
     const urlStr = (download && (download.original_url || download.url || ''));
     const isFromSmash = (download && (download.url_type === 'fromsmash' || urlStr.toLowerCase().includes('fromsmash.com')));
     const isSwissTransfer = (download && (download.url_type === 'swisstransfer' || urlStr.toLowerCase().includes('swisstransfer.com')));

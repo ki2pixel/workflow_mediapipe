@@ -1,7 +1,8 @@
 /**
  * Theme Manager - Workflow MediaPipe v4.0
- * Handles dynamic theme switching with localStorage persistence
+ * Handles dynamic theme switching with AppState persistence
  */
+import { appState } from './state/AppState.js';
 
 const THEME_STORAGE_KEY = 'workflow-theme-preference';
 
@@ -59,13 +60,13 @@ class ThemeManager {
      */
     loadTheme() {
         try {
-            const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+            const savedTheme = appState.getStateProperty('ui.theme');
             if (savedTheme && THEMES[savedTheme]) {
                 console.log(`[ThemeManager] Loaded saved theme: ${savedTheme}`);
                 return savedTheme;
             }
         } catch (error) {
-            console.error('[ThemeManager] Error loading theme from localStorage:', error);
+            console.error('[ThemeManager] Error loading theme from AppState:', error);
         }
         
         // Default to dark-pro
@@ -73,15 +74,16 @@ class ThemeManager {
     }
 
     /**
-     * Save theme preference to localStorage
+     * Save theme preference to AppState
      * @param {string} themeId - Theme identifier
      */
     saveTheme(themeId) {
         try {
-            localStorage.setItem(THEME_STORAGE_KEY, themeId);
+            const currentUI = appState.getStateProperty('ui') || {};
+            appState.setState({ ui: { ...currentUI, theme: themeId } }, 'saveTheme');
             console.log(`[ThemeManager] Saved theme preference: ${themeId}`);
         } catch (error) {
-            console.error('[ThemeManager] Error saving theme to localStorage:', error);
+            console.error('[ThemeManager] Error saving theme to AppState:', error);
         }
     }
 

@@ -118,27 +118,6 @@ export function validateDOMStructure() {
     return results;
 }
 
-// Legacy exports for backward compatibility (will be deprecated)
-export const allStepDivs = getAllStepDivs();
-export const allRunButtons = getAllRunButtons();
-export const allCancelButtons = getAllCancelButtons();
-export const allSpecificLogButtons = getAllSpecificLogButtons();
-export const closeLogPanelButton = document.getElementById('close-log-panel');
-
-export const localDownloadsList = document.getElementById('local-downloads-list');
-
-
-
-// ÉLÉMENTS POUR LE CONTRÔLE SONORE
-export const soundToggle = document.getElementById('sound-toggle');
-export const soundStatus = document.getElementById('sound-status');
-export const soundControlWidget = document.getElementById('sound-control-widget');
-
-
-// ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)
-export const settingsToggle = document.getElementById('settings-toggle');
-export const settingsPanel = document.getElementById('settings-panel');
-
 // New getter functions for lazy DOM access
 export const getCloseLogPanelButton = () => byId('close-log-panel');
 export const getLocalDownloadsList = () => byId('local-downloads-list');
@@ -149,7 +128,6 @@ export const getSoundStatus = () => byId('sound-status');
 export const getSoundControlWidget = () => byId('sound-control-widget');
 
 // Toggle auto ouverture logs
-export const logsAutoOpenToggle = document.getElementById('logs-auto-open-toggle');
 export const getLogsAutoOpenToggle = () => byId('logs-auto-open-toggle');
 
 // ÉLÉMENTS POUR LE PANNEAU DE RÉGLAGES (top bar)

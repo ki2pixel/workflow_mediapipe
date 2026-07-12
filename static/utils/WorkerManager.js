@@ -20,7 +20,7 @@ class WorkerManager {
         
         try {
             // Instantiate lazily
-            this.worker = new Worker('/static/utils/parseWorker.js');
+            this.worker = new Worker('/static/utils/parseWorker.js', { type: 'module' });
             this.worker.addEventListener('message', (e) => {
                 const { id, success, result, error } = e.data;
                 const callback = this.callbacks.get(id);

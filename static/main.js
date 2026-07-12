@@ -21,7 +21,7 @@ import { initializeCSVDownloadMonitor } from './csvDownloadMonitor.js';
 import { themeManager } from './themeManager.js';
 import { fetchWithLoadingState } from './apiService.js';
 
-// import { initializeStepDetailsPanel } from './stepDetailsPanel.js';
+
 
 globalThis.addEventListener('unhandledrejection', (event) => {
     console.error('[MAIN] Unhandled promise rejection:', event.reason);
@@ -59,7 +59,8 @@ function setupLocalDownloadsToggle() {
         appState.setState({ ui: { localDownloadsVisible: !current } }, 'downloads_visibility_toggle');
         if (!current) {
             btn.classList.remove('downloads-toggle--alert');
-            try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
+            const currentUI = appState.getStateProperty('ui') || {};
+            appState.setState({ ui: { ...currentUI, localDownloadsAlertedOnce: false } }, 'downloads_visibility_reset');
         }
     });
 
@@ -126,15 +127,19 @@ function updateDownloadsToggleAlert(downloads) {
     if (!visible && inProgress) {
         btn.classList.add('downloads-toggle--alert');
         try {
-            const alerted = localStorage.getItem('ui.localDownloadsAlertedOnce') === 'true';
+            const alerted = !!appState.getStateProperty('ui.localDownloadsAlertedOnce');
             if (!alerted && typeof globalThis.showNotification === 'function') {
                 globalThis.showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
-                localStorage.setItem('ui.localDownloadsAlertedOnce', 'true');
+                const currentUI = appState.getStateProperty('ui') || {};
+                appState.setState({ ui: { ...currentUI, localDownloadsAlertedOnce: true } }, 'downloads_alert_shown');
             }
         } catch (_) {}
     } else {
         btn.classList.remove('downloads-toggle--alert');
-        try { localStorage.removeItem('ui.localDownloadsAlertedOnce'); } catch (_) {}
+        const currentUI = appState.getStateProperty('ui') || {};
+        if (currentUI.localDownloadsAlertedOnce) {
+            appState.setState({ ui: { ...currentUI, localDownloadsAlertedOnce: false } }, 'downloads_alert_reset');
+        }
     }
 }
 
@@ -458,7 +463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupKeyboardShortcuts();
 
-    // initializeStepDetailsPanel();
+
 });
 
 function setupCompactMode() {

@@ -276,19 +276,23 @@ class PollingManager {
      * @private
      */
     _bindCleanupEvents() {
-        globalThis.addEventListener('beforeunload', () => {
-            this.destroy();
-        });
+        if (typeof globalThis.addEventListener === 'function') {
+            globalThis.addEventListener('beforeunload', () => {
+                this.destroy();
+            });
 
-        globalThis.addEventListener('pagehide', () => {
-            this.destroy();
-        });
+            globalThis.addEventListener('pagehide', () => {
+                this.destroy();
+            });
+        }
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                console.debug('Page hidden, polling continues in background');
-            }
-        });
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.debug('Page hidden, polling continues in background');
+                }
+            });
+        }
     }
 
     /**

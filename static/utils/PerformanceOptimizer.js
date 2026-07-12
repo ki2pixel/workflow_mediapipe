@@ -347,13 +347,21 @@ globalThis.addEventListener('beforeunload', () => {
 if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
     globalThis.performanceOptimizer = performanceOptimizer; // Expose for debugging
     
-    // Log performance stats periodically in development
-    setInterval(() => {
-        const stats = performanceOptimizer.getPerformanceStats();
-        if (stats.api.totalCalls > 0 || stats.dom.totalUpdates > 0) {
-            console.debug('[PerformanceOptimizer] Stats:', stats);
+    // Log performance stats periodically in development using PollingManager
+    const startStatsPolling = () => {
+        const pm = globalThis.pollingManager;
+        if (pm) {
+            pm.startPolling('perf-optimizer-stats', () => {
+                const stats = performanceOptimizer.getPerformanceStats();
+                if (stats.api.totalCalls > 0 || stats.dom.totalUpdates > 0) {
+                    console.debug('[PerformanceOptimizer] Stats:', stats);
+                }
+            }, 30000);
+        } else {
+            setTimeout(startStatsPolling, 1000);
         }
-    }, 30000); // Every 30 seconds
+    };
+    startStatsPolling();
 }
 
 export default performanceOptimizer;

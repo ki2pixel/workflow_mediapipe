@@ -6,7 +6,13 @@ class AppState {
             'selectedStepsOrder',
             'ui.localDownloadsVisible',
             'ui.systemMonitorMinimized',
-            'ui.settingsOpen'
+            'ui.settingsOpen',
+            'ui.autoScroll',
+            'ui.sequenceAutoScroll',
+            'ui.soundEnabled',
+            'ui.soundVolume',
+            'ui.theme',
+            'ui.localDownloadsAlertedOnce'
         ];
 
         this.LEGACY_MIGRATIONS = {
@@ -14,7 +20,13 @@ class AppState {
             'ui.compactMode': 'ui.compactMode',
             'ui.localDownloadsVisible': 'ui.localDownloadsVisible',
             'ui.systemMonitorMinimized': 'ui.systemMonitorMinimized',
-            'ui.settingsOpen': 'ui.settingsOpen'
+            'ui.settingsOpen': 'ui.settingsOpen',
+            'workflow-auto-scroll': 'ui.autoScroll',
+            'workflow-sequence-auto-scroll': 'ui.sequenceAutoScroll',
+            'soundEnabled': 'ui.soundEnabled',
+            'soundVolume': 'ui.soundVolume',
+            'theme': 'ui.theme',
+            'localDownloadsAlertedOnce': 'ui.localDownloadsAlertedOnce'
         };
 
         this.state = {
@@ -28,7 +40,13 @@ class AppState {
                 autoOpenLogOverlay: true,
                 localDownloadsVisible: true,
                 systemMonitorMinimized: false,
-                settingsOpen: false
+                settingsOpen: false,
+                autoScroll: true,
+                sequenceAutoScroll: true,
+                soundEnabled: true,
+                soundVolume: 1.0,
+                theme: 'dark',
+                localDownloadsAlertedOnce: false
             },
             
             stepTimers: {},
@@ -338,8 +356,8 @@ class AppState {
                 if (storedValue !== null) {
                     // Try to parse if JSON, otherwise handle boolean string ('true' / 'false')
                     let parsedValue = storedValue;
-                    if (storedValue === 'true') parsedValue = true;
-                    else if (storedValue === 'false') parsedValue = false;
+                    if (storedValue === 'true' || storedValue === 'enabled') parsedValue = true;
+                    else if (storedValue === 'false' || storedValue === 'disabled') parsedValue = false;
                     else {
                         try {
                             parsedValue = JSON.parse(storedValue);

@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Workflow Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
@@ -24,6 +25,7 @@
 </head>
 
 <body>
+    <a href="#workflow-steps" class="skip-link">Passer au contenu principal (Étapes du Workflow)</a>
     <div id="notifications-area" aria-live="assertive"></div>
 
     <div class="topbar-affix" id="topbar-affix">

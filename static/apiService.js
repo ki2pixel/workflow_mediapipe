@@ -1,6 +1,4 @@
-// --- START OF REFACTORED apiService.js ---
-
-import { POLLING_INTERVAL } from './constants.js';
+import { POLLING_INTERVAL, POLLING_INTERVAL_HIGH_FREQUENCY } from './constants.js';
 import * as ui from './uiUpdater.js';
 import * as dom from './domElements.js';
 import { appState } from './state/AppState.js';
@@ -172,7 +170,7 @@ export async function cancelStepAPI(stepKey) {
 export function startPollingAPI(stepKey, isAutoModeHighFrequency = false) {
     stopPollingAPI(stepKey);
 
-    const pollingInterval = isAutoModeHighFrequency ? 200 : POLLING_INTERVAL;
+    const pollingInterval = isAutoModeHighFrequency ? POLLING_INTERVAL_HIGH_FREQUENCY : POLLING_INTERVAL;
     console.log(`[API startPollingAPI] 🚀 Polling démarré pour ${stepKey}. Intervalle: ${pollingInterval}ms ${isAutoModeHighFrequency ? '(AutoMode high-frequency)' : '(normal)'}`);
 
     const performPoll = async () => {

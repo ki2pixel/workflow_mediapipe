@@ -23,30 +23,13 @@ function setSelectedStepsOrder(order) {
     appState.setState({ selectedStepsOrder: safeOrder }, 'selected_steps_order_update');
 }
 
-function resolveElement(getterFn, legacyValue = null) {
-    if (typeof getterFn === 'function') {
-        try {
-            return getterFn();
-        } catch (_) {
-            return legacyValue;
-        }
-    }
-    return legacyValue;
-}
-
-function resolveCollection(getterFn, legacyValue = null) {
-    const resolved = resolveElement(getterFn, legacyValue);
-    if (!resolved) return [];
-    return Array.from(resolved);
-}
-
 export function initializeEventHandlers() {
-    const closeLogButton = resolveElement(dom.getCloseLogPanelButton, dom.closeLogPanelButton);
+    const closeLogButton = dom.getCloseLogPanelButton();
     if (closeLogButton) {
         closeLogButton.addEventListener('click', ui.closeLogPanelUI);
     }
 
-    const runButtons = resolveCollection(dom.getAllRunButtons, dom.allRunButtons);
+    const runButtons = dom.getAllRunButtons() || [];
     runButtons.forEach(button => {
         button.addEventListener('click', async () => {
             try {
@@ -56,7 +39,7 @@ export function initializeEventHandlers() {
                 }
                 const stepKey = button.dataset.step;
                 ui.updateMainLogOutputUI('');
-                const specificLogContainer = resolveElement(dom.getSpecificLogContainerPanel, dom.specificLogContainerPanel);
+                const specificLogContainer = dom.getSpecificLogContainerPanel();
                 if (specificLogContainer) specificLogContainer.style.display = 'none';
                 if (getAutoOpenLogOverlay()) {
                     ui.openLogPanelUI(stepKey, true);
@@ -74,7 +57,7 @@ export function initializeEventHandlers() {
         });
     });
 
-    const cancelButtons = resolveCollection(dom.getAllCancelButtons, dom.allCancelButtons);
+    const cancelButtons = dom.getAllCancelButtons() || [];
     cancelButtons.forEach(button => {
         button.addEventListener('click', async () => {
             try {
@@ -87,7 +70,7 @@ export function initializeEventHandlers() {
         });
     });
 
-    const logsAutoOpenToggle = resolveElement(dom.getLogsAutoOpenToggle, dom.logsAutoOpenToggle);
+    const logsAutoOpenToggle = dom.getLogsAutoOpenToggle();
     if (logsAutoOpenToggle) {
         logsAutoOpenToggle.checked = getAutoOpenLogOverlay();
         // Subscribe to stay in sync if updated elsewhere
@@ -101,12 +84,12 @@ export function initializeEventHandlers() {
         });
     }
 
-    const specificLogButtons = resolveCollection(dom.getAllSpecificLogButtons, dom.allSpecificLogButtons);
+    const specificLogButtons = dom.getAllSpecificLogButtons() || [];
     specificLogButtons.forEach(button => {
         button.addEventListener('click', async () => {
             const stepKey = button.dataset.step;
             const logIndex = button.dataset.logIndex;
-            const workflowWrapper = resolveElement(dom.getWorkflowWrapper, dom.workflowWrapper);
+            const workflowWrapper = dom.getWorkflowWrapper();
 
             if (!workflowWrapper || !workflowWrapper.classList.contains('logs-active') || appState.getStateProperty('activeStepKeyForLogsPanel') !== stepKey) {
                 ui.openLogPanelUI(stepKey, true);
@@ -125,7 +108,7 @@ export function initializeEventHandlers() {
         });
     });
 
-    const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
+    const runAllButton = dom.getRunAllButton();
     if (runAllButton) {
         runAllButton.addEventListener('click', async () => {
             if (getIsAnySequenceRunning()) {
@@ -137,7 +120,7 @@ export function initializeEventHandlers() {
         });
     }
 
-    const customSequenceCheckboxes = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+    const customSequenceCheckboxes = dom.getCustomSequenceCheckboxes() || [];
     customSequenceCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', (event) => {
             const stepKey = event.target.dataset.stepKey;
@@ -168,7 +151,7 @@ export function initializeEventHandlers() {
         });
     });
 
-    const clearCustomSequenceButton = resolveElement(dom.getClearCustomSequenceButton, null);
+    const clearCustomSequenceButton = dom.getClearCustomSequenceButton();
     if (clearCustomSequenceButton) {
         clearCustomSequenceButton.addEventListener('click', () => {
             setSelectedStepsOrder([]);
@@ -183,7 +166,7 @@ export function initializeEventHandlers() {
         });
     }
 
-    const runCustomSequenceButton = resolveElement(dom.getRunCustomSequenceButton, null);
+    const runCustomSequenceButton = dom.getRunCustomSequenceButton();
     if (runCustomSequenceButton) {
         runCustomSequenceButton.addEventListener('click', () => {
             if (getSelectedStepsOrder().length === 0) {
@@ -197,8 +180,8 @@ export function initializeEventHandlers() {
         });
     }
 
-    const confirmRunCustomSequenceButton = resolveElement(dom.getConfirmRunCustomSequenceButton, null);
-    const customSequenceConfirmOverlay = resolveElement(dom.getCustomSequenceConfirmPopupOverlay, dom.customSequenceConfirmPopupOverlay);
+    const confirmRunCustomSequenceButton = dom.getConfirmRunCustomSequenceButton();
+    const customSequenceConfirmOverlay = dom.getCustomSequenceConfirmPopupOverlay();
     if (confirmRunCustomSequenceButton) {
         confirmRunCustomSequenceButton.addEventListener('click', async () => {
             closePopupUI(customSequenceConfirmOverlay);
@@ -222,14 +205,14 @@ export function initializeEventHandlers() {
         });
     }
 
-    const cancelRunCustomSequenceButton = resolveElement(dom.getCancelRunCustomSequenceButton, null);
+    const cancelRunCustomSequenceButton = dom.getCancelRunCustomSequenceButton();
     if (cancelRunCustomSequenceButton) {
         cancelRunCustomSequenceButton.addEventListener('click', () => {
             closePopupUI(customSequenceConfirmOverlay);
         });
     }
-    const closeSummaryPopupButton = resolveElement(dom.getCloseSummaryPopupButton, null);
-    const sequenceSummaryOverlay = resolveElement(dom.getSequenceSummaryPopupOverlay, null);
+    const closeSummaryPopupButton = dom.getCloseSummaryPopupButton();
+    const sequenceSummaryOverlay = dom.getSequenceSummaryPopupOverlay();
     if (closeSummaryPopupButton) {
         closeSummaryPopupButton.addEventListener('click', () => {
             closePopupUI(sequenceSummaryOverlay);
@@ -239,7 +222,7 @@ export function initializeEventHandlers() {
     // Restore custom sequence checkbox state from persisted order
     const initialOrder = getSelectedStepsOrder();
     if (initialOrder.length > 0) {
-        const cbArray = resolveCollection(dom.getCustomSequenceCheckboxes, dom.customSequenceCheckboxes);
+        const cbArray = Array.from(dom.getCustomSequenceCheckboxes() || []);
         initialOrder.forEach((stepKey, idx) => {
             const cb = cbArray.find(checkbox => checkbox.dataset.stepKey === stepKey);
             if (cb) {

@@ -3,6 +3,10 @@ import * as dom from './domElements.js';
 import { appState } from './state/AppState.js';
 import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLogOverlay } from './state.js';
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
+import { pollingManager } from './utils/PollingManager.js';
+import { COMPILED_LOG_PATTERNS, LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN } from './utils/logPatterns.js';
+import { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
+import { updateLocalDownloadsListUI, updateClearCacheGlobalButtonState } from './downloadsListManager.js';
 
 const lastProgressTextByStep = {};
 
@@ -15,8 +19,6 @@ import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
 import { openPopupUI, closePopupUI } from './popupManager.js';
 import { DOMDiff } from './utils/DOMDiff.js';
 import { workerManager } from './utils/WorkerManager.js';
-
-let _stepDetailsPanelModulePromise = null;
 
 const STATUS_UI_MAP = {
     running: { label: 'En cours', badgeClass: 'status-running', chipClass: 'state-running', icon: '⏱️' },
@@ -73,10 +75,10 @@ function resolveElement(getterFn, legacyValue = null) {
         try {
             return getterFn();
         } catch (_) {
-            return legacyValue || null;
+            return null;
         }
     }
-    return legacyValue || null;
+    return null;
 }
 
 function getIsAnySequenceRunning() {
@@ -109,25 +111,7 @@ function setProcessInfo(stepKey, info) {
     appState.setState({ processInfo: { [stepKey]: info } }, 'process_info_update');
 }
 
-function getStepTimers() {
-    return appState.getStateProperty('stepTimers') || {};
-}
 
-function getStepTimer(stepKey) {
-    return getStepTimers()[stepKey];
-}
-
-function setStepTimer(stepKey, timerData, source = 'setStepTimer') {
-    const timers = getStepTimers();
-    appState.setState({ stepTimers: { ...timers, [stepKey]: timerData } }, source);
-}
-
-function deleteStepTimer(stepKey) {
-    const timers = getStepTimers();
-    if (!timers || !Object.hasOwn(timers, stepKey)) return;
-    const { [stepKey]: _removed, ...remaining } = timers;
-    appState.setState({ stepTimers: remaining }, 'deleteStepTimer');
-}
 
 function hideNonActiveSteps(activeStepKey, hidden) {
     try {
@@ -147,7 +131,7 @@ function hideNonActiveSteps(activeStepKey, hidden) {
     }
 }
 
-let previousDownloadIds = new Set();
+
 export function getStepsConfig() {
     return STEPS_CONFIG_FROM_SERVER;
 }
@@ -212,77 +196,7 @@ function updateStepStateChip(stepKey, status) {
     chip.textContent = `${meta.icon} ${meta.label}`;
 }
 
-export function startStepTimer(stepKey) {
-    const existingTimer = getStepTimer(stepKey);
-    if (existingTimer && existingTimer.intervalId) {
-        clearInterval(existingTimer.intervalId);
-    }
 
-    const startTime = Date.now();
-    setStepTimer(stepKey, {
-        startTime: startTime,
-        startTimeDate: new Date(startTime),
-        intervalId: null,
-        elapsedTimeFormatted: "0s"
-    }, 'startStepTimer');
-
-    if (stepKey !== 'clear_disk_cache') {
-        domBatcher.scheduleUpdate(`timer-init-${stepKey}`, () => {
-            const timerEl = document.getElementById(`timer-${stepKey}`);
-            if (timerEl) timerEl.textContent = "(0s)";
-        });
-    }
-
-    const newIntervalId = setInterval(() => {
-        const currentTimer = getStepTimer(stepKey);
-        if (!currentTimer || (!currentTimer.startTime && !currentTimer.startTimeDate)) {
-            if (currentTimer && currentTimer.intervalId) clearInterval(currentTimer.intervalId);
-            return;
-        }
-
-        const startTimeToUse = currentTimer.startTime ? new Date(currentTimer.startTime) : currentTimer.startTimeDate;
-        const elapsedTimeStr = formatElapsedTime(startTimeToUse);
-        setStepTimer(stepKey, { ...currentTimer, elapsedTimeFormatted: elapsedTimeStr }, 'timer_tick');
-
-        if (stepKey !== 'clear_disk_cache') {
-            domBatcher.scheduleUpdate(`timer-update-${stepKey}`, () => {
-                const timerEl = document.getElementById(`timer-${stepKey}`);
-                if (timerEl) timerEl.textContent = `(${elapsedTimeStr})`;
-            });
-        }
-    }, 1000);
-
-    const currentTimerData = getStepTimer(stepKey);
-    if (currentTimerData) {
-        setStepTimer(stepKey, { ...currentTimerData, intervalId: newIntervalId }, 'timer_interval_set');
-    }
-}
-
-export function stopStepTimer(stepKey) {
-    const timerData = getStepTimer(stepKey);
-    if (timerData && timerData.intervalId) {
-        clearInterval(timerData.intervalId);
-        setStepTimer(stepKey, { ...timerData, intervalId: null }, 'timer_interval_cleared');
-    }
-    const updatedTimerData = getStepTimer(stepKey);
-    if (updatedTimerData && (updatedTimerData.startTime || updatedTimerData.startTimeDate)) {
-        const startTimeToUse = updatedTimerData.startTime ? new Date(updatedTimerData.startTime) : updatedTimerData.startTimeDate;
-        const elapsedTimeStr = formatElapsedTime(startTimeToUse);
-        setStepTimer(stepKey, { ...updatedTimerData, elapsedTimeFormatted: elapsedTimeStr }, 'timer_stopped');
-        if (stepKey !== 'clear_disk_cache') {
-            const timerEl = document.getElementById(`timer-${stepKey}`);
-            if (timerEl) timerEl.textContent = `(Terminé en ${elapsedTimeStr})`;
-        }
-    }
-}
-
-export function resetStepTimerDisplay(stepKey) {
-    if (stepKey !== 'clear_disk_cache') {
-        const timerEl = document.getElementById(`timer-${stepKey}`);
-        if (timerEl) timerEl.textContent = "";
-    }
-    deleteStepTimer(stepKey);
-}
 
 export function updateGlobalUIForSequenceState(isRunning) {
     const runAllButton = resolveElement(dom.getRunAllButton, dom.runAllButton);
@@ -739,21 +653,6 @@ export function updateStepCardUI(stepKey, data) {
                     workflowWrapper.removeAttribute('data-active-step');
                 }
             }
-
-            try {
-                if (!_stepDetailsPanelModulePromise) {
-                    _stepDetailsPanelModulePromise = import('./stepDetailsPanel.js');
-                }
-                _stepDetailsPanelModulePromise
-                    .then((mod) => {
-                        if (mod && typeof mod.refreshStepDetailsPanelIfOpen === 'function') {
-                            mod.refreshStepDetailsPanelIfOpen(stepKey);
-                        }
-                    })
-                    .catch((e) => {
-                        console.debug('[UI] Step details module not available:', e);
-                    });
-            } catch (_) {}
         } catch (_) {}
 
         console.groupEnd();
@@ -827,56 +726,8 @@ export async function updateSpecificLogUI(logName, path, content, isError = fals
     }
 }
 
-const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
-
-const _LOG_TIMESTAMP_PATTERN = /^(?:\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2})/;
-const _LOG_ERROR_PATTERN = /(?:erreur|error|échec|failed|exception|critical|fatal|crash)/i;
-const _LOG_WARNING_PATTERN = /(?:warning|attention|avertissement|warn|caution|deprecated)/i;
-const _LOG_SUCCESS_PATTERN = /(?:success|réussi|terminé|completed|finished|done|✓|✔|ok\b)/i;
-const _LOG_INFO_PATTERN = /(?:info|information|démarrage|starting|lancement|initiated|status)/i;
-const _LOG_DEBUG_PATTERN = /(?:debug|trace|verbose|détail)/i;
-const _LOG_COMMAND_PATTERN = /^(?:commande:|command:|executing:|exécution:|\$|>)/i;
-const _LOG_PROGRESS_PATTERN = /(?:\d+%|\d+\/\d+|progress|progression|chargement|loading|téléchargement|downloading)/i;
-
-const _LOG_PATTERNS = [
-    {
-        regex: _LOG_ERROR_PATTERN,
-        type: 'error'
-    },
-    {
-        regex: _LOG_WARNING_PATTERN,
-        type: 'warning'
-    },
-    {
-        regex: _LOG_SUCCESS_PATTERN,
-        type: 'success'
-    },
-    {
-        regex: _LOG_PROGRESS_PATTERN,
-        type: 'progress'
-    },
-    {
-        regex: _LOG_COMMAND_PATTERN,
-        type: 'command'
-    },
-    {
-        regex: _LOG_INFO_PATTERN,
-        type: 'info'
-    },
-    {
-        regex: _LOG_TIMESTAMP_PATTERN,
-        type: 'info'
-    },
-    {
-        regex: _LOG_DEBUG_PATTERN,
-        type: 'debug'
-    }
-];
-
-const _COMPILED_LOG_PATTERNS = _LOG_PATTERNS.map(p => ({
-    ...p,
-    regex: new RegExp(p.regex.source, p.regex.flags)
-}));
+const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN;
+const _COMPILED_LOG_PATTERNS = COMPILED_LOG_PATTERNS;
 
 /**
  * Parse and style log content with CSS classes for different log types.
@@ -940,112 +791,4 @@ export async function updateMainLogOutputUI(htmlContent) {
     }
 }
 
-export function updateLocalDownloadsListUI(downloadsData) {
-    const listEl = dom.getLocalDownloadsList();
-    if (!listEl) return;
-    
-    let htmlContent = '';
-    if (!downloadsData || downloadsData.length === 0) {
-        htmlContent = '<li class="placeholder">Aucune activité de téléchargement locale récente.</li>';
-    } else {
-        const currentDownloadIds = new Set();
-        downloadsData.forEach(download => {
-            if (download.id) {
-                currentDownloadIds.add(download.id);
-                if (!previousDownloadIds.has(download.id) &&
-                    (download.status === 'pending' || download.status === 'downloading')) {
-                    console.log(`[SOUND] New CSV download detected: ${download.filename}`);
-                    soundEvents.csvDownloadInitiation();
 
-                    const filename = download.filename && download.filename !== 'Détermination en cours...'
-                        ? download.filename.substring(0, 30) + (download.filename.length > 30 ? '...' : '')
-                        : 'nouveau fichier';
-                    showNotification(`Mode Auto: Téléchargement démarré - ${filename}`, "info", 5000);
-                }
-            }
-        });
-
-        previousDownloadIds = currentDownloadIds;
-
-        downloadsData.forEach(download => {
-            const escapedOriginalUrl = DOMUpdateUtils.escapeHtml(download.original_url || '');
-            const escapedFilename = DOMUpdateUtils.escapeHtml(download.filename || 'Nom inconnu');
-            const escapedStatus = DOMUpdateUtils.escapeHtml(download.status || '');
-            const escapedDisplayTimestamp = DOMUpdateUtils.escapeHtml(download.display_timestamp || 'N/A');
-
-            const timestampSpan = `<span class="timestamp">${escapedDisplayTimestamp}</span>`;
-            const filenameSpan = `<span class="filename" title="${escapedOriginalUrl}">${escapedFilename}</span>`;
-            let statusText = `Statut: <span class="status-text">${escapedStatus}</span>`;
-            let progressText = '';
-            if (download.status === 'downloading' && typeof download.progress === 'number') {
-                progressText = ` <span class="progress-percentage">(${download.progress}%)</span>`;
-            }
-            if (download.message) {
-                const escapedMessage = DOMUpdateUtils.escapeHtml(download.message);
-                const messagePreview = escapedMessage.substring(0, 50) + (escapedMessage.length > 50 ? '...' : '');
-                statusText += ` <span class="message" title="${escapedMessage}">${messagePreview}</span>`;
-            }
-            
-            const keyAttr = download.id ? ` data-key="${DOMUpdateUtils.escapeHtml(download.id)}"` : '';
-            htmlContent += `<li class="download-status-${download.status}"${keyAttr}>${timestampSpan} - ${filenameSpan} - ${statusText}${progressText}</li>`;
-        });
-    }
-
-    domBatcher.scheduleUpdate('downloads-list-render', () => {
-        const wrapper = listEl.cloneNode(false);
-        wrapper.innerHTML = htmlContent;
-        DOMDiff.morph(listEl, wrapper);
-    });
-}
-
-export function updateClearCacheGlobalButtonState(status, message = '') {
-    if (!dom.clearCacheGlobalButton) return;
-
-    dom.clearCacheGlobalButton.classList.remove('idle', 'running', 'completed', 'failed');
-    const textSpan = dom.clearCacheGlobalButton.querySelector('.button-text');
-    const currentStepInfo = getProcessInfo('clear_disk_cache');
-
-const isOtherSequenceRunning = getIsAnySequenceRunning() && currentStepInfo?.status !== 'running';
-
-
-    switch (status) {
-        case 'idle':
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Vider le Cache";
-            dom.clearCacheGlobalButton.classList.add('idle');
-            break;
-        case 'starting':
-        case 'initiated':
-            dom.clearCacheGlobalButton.disabled = true;
-            if (textSpan) textSpan.textContent = "Lancement...";
-            dom.clearCacheGlobalButton.classList.add('running');
-            break;
-        case 'running':
-            dom.clearCacheGlobalButton.disabled = true;
-            if (textSpan) textSpan.textContent = "Nettoyage...";
-            dom.clearCacheGlobalButton.classList.add('running');
-            break;
-        case 'completed':
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Cache Vidé";
-            dom.clearCacheGlobalButton.classList.add('completed');
-            showNotification("Nettoyage du cache disque terminé avec succès.", "success");
-            setTimeout(() => updateClearCacheGlobalButtonState('idle'), 5000);
-            break;
-        case 'failed':
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Échec Nettoyage";
-            dom.clearCacheGlobalButton.classList.add('failed');
-            let notifMessage = "Échec du nettoyage du cache disque.";
-            if (message && typeof message === 'string' && message.trim() !== '' && !message.startsWith('<')) {
-                notifMessage += ` Détail: ${message.substring(0,100)}`;
-            }
-            showNotification(notifMessage, "error");
-            setTimeout(() => updateClearCacheGlobalButtonState('idle'), 8000);
-            break;
-        default:
-            dom.clearCacheGlobalButton.disabled = isOtherSequenceRunning;
-            if (textSpan) textSpan.textContent = "Vider le Cache";
-            dom.clearCacheGlobalButton.classList.add('idle');
-    }
-}

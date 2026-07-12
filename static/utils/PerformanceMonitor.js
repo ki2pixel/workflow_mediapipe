@@ -75,8 +75,14 @@ class PerformanceMonitor {
         
         // Stop periodic reporting
         if (this.reportingInterval) {
-            clearInterval(this.reportingInterval);
+            pollingManager.stopPolling(this.reportingInterval);
             this.reportingInterval = null;
+        }
+        
+        // Restore original fetch
+        if (this.originalFetch) {
+            globalThis.fetch = this.originalFetch;
+            this.originalFetch = null;
         }
         
         console.info('[PerformanceMonitor] Monitoring stopped');
@@ -138,14 +144,16 @@ class PerformanceMonitor {
      * Monitor API calls by wrapping fetch.
      */
     monitorApiCalls() {
-        const originalFetch = globalThis.fetch;
+        if (!this.originalFetch) {
+            this.originalFetch = globalThis.fetch;
+        }
         
         globalThis.fetch = async (...args) => {
             const startTime = performance.now();
             const url = args[0];
             
             try {
-                const response = await originalFetch(...args);
+                const response = await this.originalFetch(...args);
                 const duration = performance.now() - startTime;
                 
                 this.recordApiCall({
@@ -267,8 +275,8 @@ class PerformanceMonitor {
         
         // Record immediately and then every 10 seconds
         recordMemory();
-        const memoryInterval = setInterval(recordMemory, 10000);
-        this.observers.set('memoryUsage', { disconnect: () => clearInterval(memoryInterval) });
+        pollingManager.startPolling('perf-memory-usage', recordMemory, 10000);
+        this.observers.set('memoryUsage', { disconnect: () => pollingManager.stopPolling('perf-memory-usage') });
     }
     
     /**
@@ -357,9 +365,8 @@ class PerformanceMonitor {
      * Start periodic performance reporting.
      */
     startPeriodicReporting() {
-        this.reportingInterval = setInterval(() => {
-            this.sendPerformanceReport();
-        }, 60000); // Every minute
+        pollingManager.startPolling('perf-periodic-reporting', () => this.sendPerformanceReport(), 60000);
+        this.reportingInterval = 'perf-periodic-reporting';
     }
     
     /**

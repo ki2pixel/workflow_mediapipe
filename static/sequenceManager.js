@@ -6,6 +6,7 @@ import { formatElapsedTime } from './utils.js';
 import { scrollToActiveStep, isSequenceAutoScrollEnabled } from './scrollManager.js';
 
 import { appState } from './state/AppState.js';
+import { pollingManager } from './utils/PollingManager.js';
 
 import { soundEvents } from './soundManager.js';
 
@@ -173,7 +174,7 @@ function waitForStepCompletionInSequence(stepKey) {
         const intervalIdForLog = `wait_${stepKey}_${Date.now()}`;
         console.log(`[SEQ_MGR - ${intervalIdForLog}] Waiting for final status...`);
 
-        const checkInterval = setInterval(() => {
+        pollingManager.startPolling(intervalIdForLog, () => {
             const data = appState.getStateProperty(`processInfo.${stepKey}`);
 
             if (!data) {
@@ -182,13 +183,13 @@ function waitForStepCompletionInSequence(stepKey) {
 
             if (data.status === 'completed') {
                 console.log(`[SEQ_MGR - ${intervalIdForLog}] Resolved as COMPLETED.`);
-                clearInterval(checkInterval);
+                pollingManager.stopPolling(intervalIdForLog);
                 resolve(true);
             } else if (data.status === 'failed' || data.return_code === -9) {
                 console.error(`[SEQ_MGR - ${intervalIdForLog}] Resolved as FAILED or CANCELLED.`);
-                clearInterval(checkInterval);
+                pollingManager.stopPolling(intervalIdForLog);
                 resolve(false);
             }
-            }, POLLING_INTERVAL / 2);
+        }, POLLING_INTERVAL / 2);
     });
 }

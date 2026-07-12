@@ -1,31 +1,10 @@
 // parseWorker.js
 // Web Worker for heavy parsing operations (log syntax highlighting and JSON parsing)
 
-const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = /^\s*$/;
-const _LOG_TIMESTAMP_PATTERN = /^(?:\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2})/;
-const _LOG_ERROR_PATTERN = /(?:erreur|error|échec|failed|exception|critical|fatal|crash)/i;
-const _LOG_WARNING_PATTERN = /(?:warning|attention|avertissement|warn|caution|deprecated)/i;
-const _LOG_SUCCESS_PATTERN = /(?:success|réussi|terminé|completed|finished|done|✓|✔|ok\b)/i;
-const _LOG_INFO_PATTERN = /(?:info|information|démarrage|starting|lancement|initiated|status)/i;
-const _LOG_DEBUG_PATTERN = /(?:debug|trace|verbose|détail)/i;
-const _LOG_COMMAND_PATTERN = /^(?:commande:|command:|executing:|exécution:|\$|>)/i;
-const _LOG_PROGRESS_PATTERN = /(?:\d+%|\d+\/\d+|progress|progression|chargement|loading|téléchargement|downloading)/i;
+import { COMPILED_LOG_PATTERNS, LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN } from './logPatterns.js';
 
-const _LOG_PATTERNS = [
-    { regex: _LOG_ERROR_PATTERN, type: 'error' },
-    { regex: _LOG_WARNING_PATTERN, type: 'warning' },
-    { regex: _LOG_SUCCESS_PATTERN, type: 'success' },
-    { regex: _LOG_PROGRESS_PATTERN, type: 'progress' },
-    { regex: _LOG_COMMAND_PATTERN, type: 'command' },
-    { regex: _LOG_INFO_PATTERN, type: 'info' },
-    { regex: _LOG_TIMESTAMP_PATTERN, type: 'info' },
-    { regex: _LOG_DEBUG_PATTERN, type: 'debug' }
-];
-
-const _COMPILED_LOG_PATTERNS = _LOG_PATTERNS.map(p => ({
-    type: p.type,
-    regex: new RegExp(p.regex.source, p.regex.flags)
-}));
+const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN;
+const _COMPILED_LOG_PATTERNS = COMPILED_LOG_PATTERNS;
 
 /**
  * Fast pure JS HTML escape for Web Workers (without DOM access)

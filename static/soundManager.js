@@ -1,5 +1,6 @@
 // ===== SOUND MANAGER =====
 // Manages audio feedback for user interactions and workflow events
+import { appState } from './state/AppState.js';
 
 /**
  * Sound event types and their corresponding audio files
@@ -26,15 +27,15 @@ let masterVolume = 0.7;
  * Initialize the sound manager
  */
 export function initializeSoundManager() {
-    // Load user preferences from localStorage
-    const savedSoundEnabled = localStorage.getItem('soundEnabled');
-    if (savedSoundEnabled !== null) {
-        soundEnabled = savedSoundEnabled === 'true';
+    // Load user preferences from AppState
+    const savedSoundEnabled = appState.getStateProperty('ui.soundEnabled');
+    if (typeof savedSoundEnabled === 'boolean') {
+        soundEnabled = savedSoundEnabled;
     }
 
-    const savedVolume = localStorage.getItem('soundVolume');
-    if (savedVolume !== null) {
-        masterVolume = parseFloat(savedVolume);
+    const savedVolume = appState.getStateProperty('ui.soundVolume');
+    if (typeof savedVolume === 'number') {
+        masterVolume = savedVolume;
     }
 
     // Preload audio files
@@ -147,8 +148,9 @@ export function playSound(eventType, options = {}) {
  * @param {boolean} enabled - Whether sounds should be enabled
  */
 export function setSoundEnabled(enabled) {
-    soundEnabled = enabled;
-    localStorage.setItem('soundEnabled', enabled.toString());
+    soundEnabled = !!enabled;
+    const currentUI = appState.getStateProperty('ui') || {};
+    appState.setState({ ui: { ...currentUI, soundEnabled: soundEnabled } }, 'setSoundEnabled');
     console.log(`[SOUND] Sound ${enabled ? 'enabled' : 'disabled'}`);
 }
 
@@ -166,7 +168,8 @@ export function isSoundEnabled() {
  */
 export function setMasterVolume(volume) {
     masterVolume = Math.max(0, Math.min(1, volume));
-    localStorage.setItem('soundVolume', masterVolume.toString());
+    const currentUI = appState.getStateProperty('ui') || {};
+    appState.setState({ ui: { ...currentUI, soundVolume: masterVolume } }, 'setMasterVolume');
     
     // Update volume for all cached audio objects
     audioCache.forEach((audio) => {

@@ -45,7 +45,7 @@ class ErrorHandler {
         if (newCount >= 3) {
             this._showErrorNotification(
                 operation,
-                `Unable to update ${operation}. Retrying...`,
+                `Impossible de mettre à jour ${operation}. Nouvelle tentative...`,
                 'warning',
                 context.elementId
             );
@@ -54,7 +54,7 @@ class ErrorHandler {
         if (newCount >= 5) {
             this._showErrorNotification(
                 operation,
-                `${operation} is experiencing persistent issues. Please check your connection.`,
+                `${operation} rencontre des problèmes persistants. Veuillez vérifier votre connexion.`,
                 'error',
                 context.elementId
             );
@@ -110,20 +110,20 @@ class ErrorHandler {
             timestamp: new Date().toISOString()
         });
         
-        let message = 'An unexpected error occurred';
+        let message = 'Une erreur inattendue est survenue';
         let type = 'error';
         
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            message = 'Network connection error. Please check your internet connection.';
+            message = 'Erreur de connexion réseau. Veuillez vérifier votre connexion Internet.';
             type = 'warning';
         } else if (error.message.includes('401')) {
-            message = 'Authentication error. Please refresh the page.';
+            message = 'Erreur d\'authentification. Veuillez rafraîchir la page.';
             type = 'error';
         } else if (error.message.includes('404')) {
-            message = 'Service not found. Please contact support.';
+            message = 'Service non trouvé. Veuillez contacter le support.';
             type = 'error';
         } else if (error.message.includes('500')) {
-            message = 'Server error. Please try again later.';
+            message = 'Erreur serveur. Veuillez réessayer plus tard.';
             type = 'error';
         } else if (error.message) {
             message = error.message;
