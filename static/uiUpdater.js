@@ -5,8 +5,8 @@ import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLo
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
 import { pollingManager } from './utils/PollingManager.js';
 import { COMPILED_LOG_PATTERNS, LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN } from './utils/logPatterns.js';
-import { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
-import { updateLocalDownloadsListUI, updateClearCacheGlobalButtonState } from './downloadsListManager.js';
+export { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
+export { updateLocalDownloadsListUI, updateClearCacheGlobalButtonState } from './downloadsListManager.js';
 
 const lastProgressTextByStep = {};
 

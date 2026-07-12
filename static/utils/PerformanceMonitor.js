@@ -145,7 +145,7 @@ class PerformanceMonitor {
      */
     monitorApiCalls() {
         if (!this.originalFetch) {
-            this.originalFetch = globalThis.fetch;
+            this.originalFetch = globalThis.fetch.bind(globalThis);
         }
         
         globalThis.fetch = async (...args) => {
