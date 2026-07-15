@@ -29,6 +29,10 @@ import logging
 import subprocess
 import signal
 import multiprocessing as mp
+import math
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 import numpy as np
 import cv2
 from pathlib import Path
@@ -246,8 +250,24 @@ class CV5DNNNet:
         return self.net.getUnconnectedOutLayersNames()
 
 
-def load_cv5_model(model_name):
+def normalize_cv5_inference_device(inference_device):
+    normalized_device = str(inference_device or "cpu").strip().lower()
+    return normalized_device if normalized_device in {"cpu", "cuda"} else "cpu"
+
+
+def get_cv5_onnx_runtime_providers(inference_device, available_providers):
+    providers = ["CPUExecutionProvider"]
+    if (
+        normalize_cv5_inference_device(inference_device) == "cuda"
+        and "CUDAExecutionProvider" in available_providers
+    ):
+        providers.insert(0, "CUDAExecutionProvider")
+    return providers
+
+
+def load_cv5_model(model_name, inference_device="cpu"):
     """Charge un modèle ONNX via OpenCV 5.0 DNN avec Fallback ONNX Runtime."""
+    inference_device = normalize_cv5_inference_device(inference_device)
     if os.path.isabs(model_name) or Path(model_name).exists():
         model_path = Path(model_name)
     else:
@@ -260,7 +280,7 @@ def load_cv5_model(model_name):
     w, h = get_onnx_input_shape(model_path)
 
     # 1. Tentative avec OpenCV DNN (uniquement si le moteur OpenCV 5.0 ENGINE_NEW est disponible)
-    if hasattr(cv2.dnn, 'ENGINE_NEW'):
+    if inference_device == "cpu" and hasattr(cv2.dnn, 'ENGINE_NEW'):
         try:
             logging.info(f"Tentative de chargement du modèle {model_name} avec OpenCV 5.0 DNN...")
             net = cv2.dnn.readNetFromONNX(str(model_path))
@@ -274,6 +294,10 @@ def load_cv5_model(model_name):
             return CV5DNNNet(net, model_path, w, h)
         except Exception as dnn_err:
             logging.warning(f"Échec de chargement de {model_name} avec OpenCV DNN ({dnn_err}). Passage au fallback ONNX Runtime...")
+    elif inference_device == "cuda":
+        logging.info(
+            f"Mode CUDA CV5 demandé pour {model_name}; utilisation directe du fallback ONNX Runtime..."
+        )
     else:
         logging.info(f"Moteur OpenCV 5.0 (ENGINE_NEW) non disponible. Utilisation directe du fallback ONNX Runtime pour {model_name}...")
 
@@ -289,10 +313,18 @@ def load_cv5_model(model_name):
                 opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
                 
                 available_providers = ort.get_available_providers()
-                providers = []
-                if os.environ.get('STEP5_ENABLE_GPU', '0') == '1' and 'CUDAExecutionProvider' in available_providers:
-                    providers.append('CUDAExecutionProvider')
-                providers.append('CPUExecutionProvider')
+                if (
+                    inference_device == "cuda"
+                    and "CUDAExecutionProvider" not in available_providers
+                ):
+                    logging.warning(
+                        "CUDAExecutionProvider indisponible pour %s; fallback CPU ONNX Runtime.",
+                        Path(path).name,
+                    )
+                providers = get_cv5_onnx_runtime_providers(
+                    inference_device,
+                    available_providers,
+                )
                 
                 self.session = ort.InferenceSession(str(path), sess_options=opts, providers=providers)
                 active_provider = self.session.get_providers()[0] if hasattr(self.session, 'get_providers') else providers[0]
@@ -635,7 +667,7 @@ def get_video_metadata_ffprobe(video_path):
     try:
         cmd = [
             'ffprobe', '-v', 'error', '-select_streams', 'v:0',
-            '-show_entries', 'stream=width,height,r_frame_rate,nb_frames',
+            '-show_entries', 'stream=width,height,r_frame_rate,nb_frames,duration',
             '-of', 'json', str(video_path)
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -650,7 +682,18 @@ def get_video_metadata_ffprobe(video_path):
         fps = num / den if den > 0 else 25.0
 
         nb_frames_str = stream_info.get('nb_frames')
-        total_frames = int(nb_frames_str) if nb_frames_str else None
+        try:
+            total_frames = int(nb_frames_str) if nb_frames_str else None
+        except (TypeError, ValueError):
+            total_frames = None
+        if total_frames is None:
+            duration_str = stream_info.get('duration')
+            try:
+                duration = float(duration_str)
+                if duration > 0:
+                    total_frames = max(1, int(round(duration * fps)))
+            except (TypeError, ValueError):
+                pass
 
         return width, height, fps, total_frames
     except Exception as e:
@@ -807,7 +850,8 @@ def run_tracking_pipeline_cv5(video_path, blazeface_net, facemesh_net, blendshap
 # =========================================================================
 
 def _worker_process(video_path_str, blazeface_onnx_path, facemesh_onnx_path, blendshapes_tflite_path,
-                    object_detector_onnx_path, width, height, fps, total_frames, output_path, ndjson, result_queue):
+                    object_detector_onnx_path, width, height, fps, total_frames, output_path, ndjson,
+                    inference_device, result_queue):
     """Worker process (spawned) pour le tracking OpenCV 5.0 DNN.
 
     CRITICAL: Ce worker est exécuté dans un processus spawné.
@@ -821,7 +865,8 @@ def _worker_process(video_path_str, blazeface_onnx_path, facemesh_onnx_path, ble
         format='%(asctime)s - %(levelname)s - WORKER_CV5 - %(message)s',
         handlers=[
             logging.FileHandler(log_file_worker, encoding='utf-8')
-        ]
+        ],
+        force=True
     )
 
     # CRITICAL: Throttle threads
@@ -831,10 +876,10 @@ def _worker_process(video_path_str, blazeface_onnx_path, facemesh_onnx_path, ble
 
     try:
         # Charger les modèles dans le worker (spawn = pas de partage)
-        blazeface_net = load_cv5_model(Path(blazeface_onnx_path).name) if blazeface_onnx_path else None
-        facemesh_net = load_cv5_model(Path(facemesh_onnx_path).name) if facemesh_onnx_path else None
+        blazeface_net = load_cv5_model(blazeface_onnx_path, inference_device) if blazeface_onnx_path else None
+        facemesh_net = load_cv5_model(facemesh_onnx_path, inference_device) if facemesh_onnx_path else None
         blendshapes_model = load_tflite_model(blendshapes_tflite_path) if blendshapes_tflite_path else None
-        object_detector_net = load_cv5_model(str(object_detector_onnx_path)) if object_detector_onnx_path else None
+        object_detector_net = load_cv5_model(object_detector_onnx_path, inference_device) if object_detector_onnx_path else None
 
         speaking_detector = EnhancedSpeakingDetector(
             video_path=str(video_path),
@@ -875,6 +920,531 @@ def _worker_process(video_path_str, blazeface_onnx_path, facemesh_onnx_path, ble
         result_queue.put(("error", str(video_path), str(e)))
 
 
+_CV5_CHUNK_WORKER_STATE: Dict[str, Any] = {}
+
+
+@dataclass
+class AdaptiveVideoState:
+    index: int
+    video_path: Path
+    width: int
+    height: int
+    fps: float
+    total_frames: Optional[int]
+    output_path: Path
+    temporary_output_path: Path
+    stream_out: Any
+    speaking_detector: Any
+    temporal_filter: Any
+    decoder: Any
+    active_objects: Dict[str, Any] = field(default_factory=dict)
+    next_id_counter: Dict[str, int] = field(default_factory=lambda: {"value": 0})
+    ready_chunks: Dict[int, List[Dict[str, Any]]] = field(default_factory=dict)
+    next_input_frame: int = 0
+    next_output_frame: int = 0
+    pending_chunks: int = 0
+    decoder_finished: bool = False
+    stream_closed: bool = False
+    failed: bool = False
+    failure_reported: bool = False
+
+
+def calculate_adaptive_worker_count(frame_counts, cpu_budget, max_workers_by_memory, min_frames_per_worker):
+    worker_cap = max(1, min(int(cpu_budget), int(max_workers_by_memory)))
+    frames_per_worker = max(1, int(min_frames_per_worker))
+    work_units = 0
+    for total_frames in frame_counts:
+        if total_frames is None:
+            work_units += 1
+        else:
+            work_units += max(1, int(math.ceil(max(0, int(total_frames)) / frames_per_worker)))
+    return max(1, min(worker_cap, work_units or 1))
+
+
+def calculate_cv5_inference_worker_count(
+    frame_counts,
+    cpu_budget,
+    max_workers_by_memory,
+    min_frames_per_worker,
+    inference_device,
+):
+    worker_count = calculate_adaptive_worker_count(
+        frame_counts,
+        cpu_budget,
+        max_workers_by_memory,
+        min_frames_per_worker,
+    )
+    return 1 if normalize_cv5_inference_device(inference_device) == "cuda" else worker_count
+
+
+def _initialize_cv5_chunk_worker(worker_config):
+    global _CV5_CHUNK_WORKER_STATE
+    log_file_worker = LOG_DIR / f"worker_CPU_cv5_chunk_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.getpid()}.log"
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - WORKER_CV5_CHUNK - %(message)s',
+        handlers=[logging.FileHandler(log_file_worker, encoding='utf-8')],
+        force=True
+    )
+    cv2.setNumThreads(1)
+    try:
+        from utils import tpu_facemesh_utils as face_utils
+    except ImportError:
+        face_utils = None
+    blazeface_onnx_path = worker_config.get("blazeface_onnx_path")
+    facemesh_onnx_path = worker_config.get("facemesh_onnx_path")
+    blendshapes_tflite_path = worker_config.get("blendshapes_tflite_path")
+    object_detector_onnx_path = worker_config.get("object_detector_onnx_path")
+    inference_device = normalize_cv5_inference_device(worker_config.get("inference_device"))
+    _CV5_CHUNK_WORKER_STATE = {
+        "blazeface_net": load_cv5_model(blazeface_onnx_path, inference_device) if blazeface_onnx_path else None,
+        "facemesh_net": load_cv5_model(facemesh_onnx_path, inference_device) if facemesh_onnx_path else None,
+        "blendshapes_model": load_tflite_model(blendshapes_tflite_path) if blendshapes_tflite_path else None,
+        "object_detector_net": load_cv5_model(object_detector_onnx_path, inference_device) if object_detector_onnx_path else None,
+        "enable_object_detection": bool(worker_config.get("enable_object_detection")),
+        "face_utils": face_utils,
+    }
+
+
+def _infer_cv5_frame(image, original_width, original_height):
+    worker_state = _CV5_CHUNK_WORKER_STATE
+    blazeface_net = worker_state.get("blazeface_net")
+    facemesh_net = worker_state.get("facemesh_net")
+    blendshapes_model = worker_state.get("blendshapes_model")
+    object_detector_net = worker_state.get("object_detector_net")
+    face_utils = worker_state.get("face_utils")
+    detection_result = {"face": None, "objects": []}
+    face_result = detect_face_cv5(blazeface_net, image)
+
+    if face_result != (None, None):
+        raw_bbox, eyes = face_result
+        ymin, xmin, ymax, xmax = raw_bbox
+        bbox_xmin = int(xmin * original_width)
+        bbox_ymin = int(ymin * original_height)
+        bbox_width = int((xmax - xmin) * original_width)
+        bbox_height = int((ymax - ymin) * original_height)
+        centroid_x = int(bbox_xmin + bbox_width / 2)
+        centroid_y = int(bbox_ymin + bbox_height / 2)
+
+        if eyes and face_utils is not None:
+            right_eye, left_eye = eyes
+            transform_params = face_utils.get_affine_transform(right_eye, left_eye, output_size=192)
+            face_crop_192 = face_utils.apply_affine_crop(image, transform_params)
+        else:
+            face_crop_192 = cv2.resize(image, (192, 192))
+
+        landmarks = extract_landmarks_cv5(facemesh_net, face_crop_192)
+        raw_blendshapes = extract_blendshapes_cv5(blendshapes_model, landmarks)
+        detection_result["face"] = {
+            "centroid": (centroid_x, centroid_y),
+            "bbox": (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
+            "raw_blendshapes": np.asarray(raw_blendshapes, dtype=np.float32).reshape(-1).tolist(),
+        }
+    elif worker_state.get("enable_object_detection") and object_detector_net is not None:
+        detection_result["objects"] = detect_objects_yolo_cv5(
+            object_detector_net,
+            image,
+            original_width,
+            original_height,
+        )
+
+    return detection_result
+
+
+def _process_cv5_frame_chunk(chunk):
+    start_frame, frame_bytes, frame_count, original_width, original_height = chunk
+    expected_size = frame_count * 256 * 256 * 3
+    if len(frame_bytes) != expected_size:
+        raise ValueError(f"Chunk frame payload has {len(frame_bytes)} bytes; expected {expected_size}")
+    frames = np.frombuffer(frame_bytes, dtype=np.uint8).reshape((frame_count, 256, 256, 3))
+    results = [
+        _infer_cv5_frame(frame, original_width, original_height)
+        for frame in frames
+    ]
+    return start_frame, results
+
+
+def _start_cv5_frame_decoder(video_path, fps):
+    cmd = [
+        'ffmpeg', '-nostdin', '-threads', '1', '-i', str(video_path),
+        '-f', 'image2pipe', '-pix_fmt', 'rgb24', '-s', '256x256', '-r', str(fps),
+        '-vcodec', 'rawvideo', '-loglevel', 'error', '-'
+    ]
+    return subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=10**8,
+    )
+
+
+def _start_adaptive_video_state(index, video_path, width, height, fps, total_frames, ndjson):
+    output_path = video_path.with_suffix('.json')
+    temporary_output_path = output_path.with_suffix(output_path.suffix + '.partial')
+    stream_out = None
+    decoder = None
+    try:
+        if temporary_output_path.exists():
+            temporary_output_path.unlink()
+        metadata = {
+            "video_path": str(video_path),
+            "original_fps": fps,
+            "resolution": {"width": width, "height": height},
+            "total_frames_processed": total_frames,
+            "engine": "opencv5_dnn",
+            "tracking_method": "kdtree_cv5"
+        }
+        stream_out = (
+            StreamingNDJSONOutput(temporary_output_path, metadata)
+            if ndjson
+            else StreamingJSONOutput(temporary_output_path, metadata)
+        )
+        speaking_detector = EnhancedSpeakingDetector(
+            video_path=str(video_path),
+            jaw_threshold=0.08
+        )
+        from utils.one_euro_filter import OneEuroFilterND
+        temporal_filter = OneEuroFilterND(dim=52, rate=fps, min_cutoff=1.0, beta=0.007)
+        decoder = _start_cv5_frame_decoder(video_path, fps)
+        return AdaptiveVideoState(
+            index=index,
+            video_path=video_path,
+            width=width,
+            height=height,
+            fps=fps,
+            total_frames=total_frames,
+            output_path=output_path,
+            temporary_output_path=temporary_output_path,
+            stream_out=stream_out,
+            speaking_detector=speaking_detector,
+            temporal_filter=temporal_filter,
+            decoder=decoder,
+        )
+    except Exception:
+        if decoder is not None and decoder.poll() is None:
+            decoder.terminate()
+            decoder.wait(timeout=10)
+        if stream_out is not None:
+            stream_out.close()
+        if temporary_output_path.exists():
+            temporary_output_path.unlink()
+        raise
+
+
+def _read_cv5_frame_chunk(state, chunk_frames):
+    if state.decoder.stdout is None:
+        raise RuntimeError(f"FFmpeg stdout unavailable for {state.video_path.name}")
+    frame_size = 256 * 256 * 3
+    raw_frames = state.decoder.stdout.read(frame_size * chunk_frames)
+    if not raw_frames:
+        state.decoder_finished = True
+        return None
+    if len(raw_frames) % frame_size:
+        raise RuntimeError(f"Incomplete frame payload received for {state.video_path.name}")
+    frame_count = len(raw_frames) // frame_size
+    start_frame = state.next_input_frame
+    state.next_input_frame += frame_count
+    return start_frame, raw_frames, frame_count, state.width, state.height
+
+
+def _reduce_cv5_frame_result(state, frame_result):
+    current_detections = []
+    face_result = frame_result.get("face")
+    if face_result is not None:
+        smoothed_blendshapes = state.temporal_filter.update(
+            np.asarray(face_result["raw_blendshapes"], dtype=np.float32)
+        ).tolist()
+        current_detections.append({
+            "centroid": face_result["centroid"],
+            "bbox": face_result["bbox"],
+            "blendshapes": dict(zip(
+                ARKIT_52_BLENDSHAPE_NAMES,
+                (float(value) for value in smoothed_blendshapes)
+            )),
+            "source_detector": "face_landmarker",
+            "label": "face",
+            "confidence": 0.95
+        })
+    else:
+        current_detections.extend(frame_result.get("objects", []))
+
+    tracked_objects = apply_tracking_and_management(
+        active_objects=state.active_objects,
+        current_detections=current_detections,
+        next_id_counter=state.next_id_counter,
+        distance_threshold=100.0,
+        frames_unseen_to_deregister=10,
+        speaking_detection_jaw_open_threshold=0.08,
+        enhanced_speaking_detector=state.speaking_detector,
+        current_frame_num=state.next_output_frame + 1
+    )
+    state.stream_out.add_frame({
+        "frame": state.next_output_frame + 1,
+        "tracked_objects": tracked_objects
+    })
+    state.next_output_frame += 1
+
+
+def _flush_cv5_ready_chunks(state):
+    processed_frames = 0
+    while state.next_output_frame in state.ready_chunks:
+        frame_results = state.ready_chunks.pop(state.next_output_frame)
+        for frame_result in frame_results:
+            _reduce_cv5_frame_result(state, frame_result)
+            processed_frames += 1
+    return processed_frames
+
+
+def _complete_cv5_decoder(state):
+    if state.decoder.stdout is not None:
+        state.decoder.stdout.close()
+    return_code = state.decoder.wait(timeout=30)
+    stderr_output = b""
+    if state.decoder.stderr is not None:
+        stderr_output = state.decoder.stderr.read()
+        state.decoder.stderr.close()
+    if return_code != 0:
+        stderr_text = stderr_output.decode('utf-8', errors='replace').strip()
+        raise RuntimeError(f"FFmpeg failed for {state.video_path.name}: {stderr_text or return_code}")
+
+
+def _cleanup_adaptive_video_state(state, remove_temporary_output):
+    if state.decoder is not None:
+        if state.decoder.stdout is not None:
+            try:
+                state.decoder.stdout.close()
+            except Exception:
+                pass
+        if state.decoder.poll() is None:
+            state.decoder.terminate()
+            try:
+                state.decoder.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                state.decoder.kill()
+                state.decoder.wait(timeout=10)
+        if state.decoder.stderr is not None:
+            try:
+                state.decoder.stderr.close()
+            except Exception:
+                pass
+    if not state.stream_closed:
+        try:
+            state.stream_out.close()
+        except Exception:
+            pass
+        state.stream_closed = True
+    if remove_temporary_output and state.temporary_output_path.exists():
+        state.temporary_output_path.unlink()
+
+
+def _report_adaptive_video_failure(state, error):
+    state.failed = True
+    if not state.decoder_finished and state.decoder.poll() is None:
+        state.decoder.terminate()
+    state.decoder_finished = True
+    if state.failure_reported:
+        return
+    state.failure_reported = True
+    logging.error(f"Échec pour {state.video_path.name}: {error}")
+    print(f"Échec: {state.video_path.name} échoué", flush=True)
+
+
+def _finalize_adaptive_video_state(state):
+    if state.pending_chunks:
+        return None
+    if state.failed:
+        _cleanup_adaptive_video_state(state, remove_temporary_output=True)
+        return False
+    if not state.decoder_finished:
+        return None
+    try:
+        _complete_cv5_decoder(state)
+        if state.next_output_frame != state.next_input_frame:
+            raise RuntimeError(
+                f"Missing ordered frame results for {state.video_path.name}: "
+                f"{state.next_output_frame}/{state.next_input_frame}"
+            )
+        state.stream_out.close()
+        state.stream_closed = True
+        state.temporary_output_path.replace(state.output_path)
+        logging.info(f"Succès: {state.output_path.name} créé avec {state.next_output_frame} frames.")
+        print(f"Succès: {state.output_path.name} créé", flush=True)
+        return True
+    except Exception as error:
+        _report_adaptive_video_failure(state, error)
+        _cleanup_adaptive_video_state(state, remove_temporary_output=True)
+        return False
+
+
+def _emit_adaptive_progress(active_states, completed, total_videos):
+    progress_parts = []
+    fractional_progress = completed
+    for state in sorted(active_states, key=lambda item: item.index):
+        if state.failed:
+            continue
+        total_frames = state.total_frames or max(state.next_input_frame, 1)
+        percent = min(100, int((state.next_output_frame / total_frames) * 100))
+        progress_parts.append(
+            f"{state.video_path.name} ({percent}%) ({state.index + 1}/{total_videos})"
+        )
+        fractional_progress += percent / 100.0
+    if progress_parts:
+        print(f"[Progression-MultiLine]{' || '.join(progress_parts)}", flush=True)
+        overall_percent = int((fractional_progress / total_videos) * 100)
+        print(f"INTERNAL_PROGRESS: 0/0 frames ({overall_percent}%) - ", flush=True)
+
+
+def _run_adaptive_tracking_batch(
+    videos,
+    blazeface_onnx,
+    facemesh_onnx,
+    blendshapes_tflite,
+    object_model_path,
+    enable_object_detection,
+    args,
+):
+    valid_jobs = []
+    for index, video_path in enumerate(videos):
+        if not video_path.is_file():
+            logging.error(f"Échec pour {video_path.name}: fichier vidéo introuvable")
+            print(f"Échec: {video_path.name} échoué", flush=True)
+            continue
+        width, height, fps, total_frames = get_video_metadata_ffprobe(video_path)
+        valid_jobs.append((index, video_path, width, height, fps, total_frames))
+
+    if not valid_jobs:
+        return 0
+
+    worker_count = calculate_cv5_inference_worker_count(
+        [job[5] for job in valid_jobs],
+        args.cpu_budget,
+        args.max_workers_by_memory,
+        args.min_frames_per_worker,
+        args.inference_device,
+    )
+    if args.inference_device == "cuda":
+        logging.warning("Le mode CV5 CUDA limite le pool à un worker pour éviter la contention VRAM")
+
+    active_limit = max(1, min(args.max_active_videos, len(valid_jobs)))
+    chunk_frames = max(1, args.chunk_frames)
+    worker_config = {
+        "blazeface_onnx_path": str(blazeface_onnx) if blazeface_onnx.exists() else None,
+        "facemesh_onnx_path": str(facemesh_onnx) if facemesh_onnx.exists() else None,
+        "blendshapes_tflite_path": str(blendshapes_tflite) if blendshapes_tflite.exists() else None,
+        "object_detector_onnx_path": str(object_model_path) if object_model_path else None,
+        "enable_object_detection": enable_object_detection,
+        "inference_device": args.inference_device,
+    }
+    logging.info(
+        "Planificateur CV5 adaptatif: %s workers d'inférence %s, %s vidéo(s) active(s), chunks de %s frames.",
+        worker_count,
+        args.inference_device,
+        active_limit,
+        chunk_frames,
+    )
+
+    pending_jobs = list(valid_jobs)
+    active_states = []
+    futures = {}
+    successful_count = 0
+    completed_count = 0
+    pending_position = 0
+    round_robin_index = 0
+    context = mp.get_context('spawn')
+
+    with ProcessPoolExecutor(
+        max_workers=worker_count,
+        mp_context=context,
+        initializer=_initialize_cv5_chunk_worker,
+        initargs=(worker_config,),
+    ) as executor:
+        while pending_position < len(pending_jobs) or active_states or futures:
+            while len(active_states) < active_limit and pending_position < len(pending_jobs):
+                index, video_path, width, height, fps, total_frames = pending_jobs[pending_position]
+                pending_position += 1
+                logging.info(f"PROCESSING_VIDEO: {video_path.name}")
+                try:
+                    state = _start_adaptive_video_state(
+                        index,
+                        video_path,
+                        width,
+                        height,
+                        fps,
+                        total_frames,
+                        args.ndjson,
+                    )
+                except Exception as error:
+                    logging.exception(f"Échec de l'initialisation de {video_path.name}: {error}")
+                    print(f"Échec: {video_path.name} échoué", flush=True)
+                    continue
+                active_states.append(state)
+
+            while len(futures) < worker_count:
+                candidates = [
+                    state for state in active_states
+                    if not state.failed and not state.decoder_finished
+                ]
+                if not candidates:
+                    break
+                candidates.sort(key=lambda state: (state.pending_chunks, state.index))
+                state = candidates[round_robin_index % len(candidates)]
+                round_robin_index += 1
+                try:
+                    chunk = _read_cv5_frame_chunk(state, chunk_frames)
+                except Exception as error:
+                    _report_adaptive_video_failure(state, error)
+                    continue
+                if chunk is None:
+                    continue
+                start_frame, _, frame_count, _, _ = chunk
+                try:
+                    future = executor.submit(_process_cv5_frame_chunk, chunk)
+                except Exception as error:
+                    _report_adaptive_video_failure(state, error)
+                    continue
+                futures[future] = (state, start_frame, frame_count)
+                state.pending_chunks += 1
+
+            done = set()
+            if futures:
+                done, _ = wait(futures, timeout=0.5, return_when=FIRST_COMPLETED)
+
+            for future in done:
+                state, expected_start_frame, expected_frame_count = futures.pop(future)
+                state.pending_chunks -= 1
+                try:
+                    start_frame, frame_results = future.result()
+                    if start_frame != expected_start_frame:
+                        raise RuntimeError(
+                            f"Unexpected chunk start for {state.video_path.name}: "
+                            f"{start_frame}/{expected_start_frame}"
+                        )
+                    if len(frame_results) != expected_frame_count:
+                        raise RuntimeError(
+                            f"Unexpected chunk frame count for {state.video_path.name}: "
+                            f"{len(frame_results)}/{expected_frame_count}"
+                        )
+                    if not state.failed:
+                        state.ready_chunks[start_frame] = frame_results
+                        _flush_cv5_ready_chunks(state)
+                except Exception as error:
+                    _report_adaptive_video_failure(state, error)
+
+            for state in list(active_states):
+                outcome = _finalize_adaptive_video_state(state)
+                if outcome is None:
+                    continue
+                active_states.remove(state)
+                completed_count += 1
+                if outcome:
+                    successful_count += 1
+
+            if done:
+                _emit_adaptive_progress(active_states, completed_count, len(videos))
+
+    return successful_count
+
+
 # =========================================================================
 # Main
 # =========================================================================
@@ -890,7 +1460,24 @@ def main():
     parser.add_argument("--out", type=str, default="tracking_output.json", help="Chemin sortie JSON")
     parser.add_argument("--ndjson", action="store_true", help="Format de sortie NDJSON")
     parser.add_argument("--num_workers", type=int, default=1, help="Nombre de workers parallèles (défaut: 1)")
+    parser.add_argument("--worker_mode", choices=("auto", "video"), default="auto")
+    parser.add_argument("--inference_device", choices=("cpu", "cuda"), default="cpu")
+    parser.add_argument("--cpu_budget", type=int, default=15)
+    parser.add_argument("--max_active_videos", type=int, default=None)
+    parser.add_argument("--min_frames_per_worker", type=int, default=80)
+    parser.add_argument("--chunk_frames", type=int, default=32)
+    parser.add_argument("--max_workers_by_memory", type=int, default=None)
     args = parser.parse_args()
+    args.inference_device = normalize_cv5_inference_device(args.inference_device)
+    args.num_workers = max(1, args.num_workers)
+    args.cpu_budget = max(1, args.cpu_budget)
+    args.max_active_videos = max(1, args.max_active_videos or args.num_workers)
+    args.min_frames_per_worker = max(1, args.min_frames_per_worker)
+    args.chunk_frames = max(1, args.chunk_frames)
+    args.max_workers_by_memory = max(1, args.max_workers_by_memory or args.cpu_budget)
+    if args.inference_device == "cuda" and args.worker_mode == "video" and args.num_workers > 1:
+        logging.warning("Le mode CV5 CUDA limite le mode vidéo à un worker pour éviter la contention VRAM")
+        args.num_workers = 1
 
     logging.info("--- Démarrage de l'analyse Tracking OpenCV 5.0 DNN ---")
     logging.info(f"OpenCV version: {cv2.__version__}")
@@ -903,12 +1490,10 @@ def main():
     blendshapes_tflite = assets_dir / "face_blendshapes.tflite"
 
     # Vérification des modèles ONNX
-    models_available = True
     for model_path, name in [(blazeface_onnx, "BlazeFace"), (facemesh_onnx, "FaceMesh")]:
         if not model_path.exists():
             logging.warning(f"Modèle ONNX {name} manquant: {model_path}")
-            logging.warning(f"Le tracking fonctionnera en mode dégradé (mock detections)")
-            models_available = False
+            logging.warning("Le tracking fonctionnera en mode dégradé (mock detections)")
 
     if not blendshapes_tflite.exists():
         logging.warning(f"Modèle Blendshapes TFLite manquant: {blendshapes_tflite}")
@@ -987,14 +1572,24 @@ def main():
         except Exception as e_res:
             logging.warning(f"Impossible de résoudre le modèle de détection d'objets ONNX: {e_res}. Fallback sans détection d'objets.")
 
-    if args.num_workers <= 1:
+    if args.worker_mode == "auto":
+        successful_count = _run_adaptive_tracking_batch(
+            videos,
+            blazeface_onnx,
+            facemesh_onnx,
+            blendshapes_tflite,
+            object_model_path,
+            enable_object_detection,
+            args,
+        )
+    elif args.num_workers <= 1:
         # Mode séquentiel (chargement unique des modèles)
         cv2.setNumThreads(1)
 
-        blazeface_net = load_cv5_model("blazeface.onnx")
-        facemesh_net = load_cv5_model("facemesh.onnx")
+        blazeface_net = load_cv5_model("blazeface.onnx", args.inference_device)
+        facemesh_net = load_cv5_model("facemesh.onnx", args.inference_device)
         blendshapes_model = load_tflite_model(str(blendshapes_tflite))
-        object_detector_net = load_cv5_model(str(object_model_path)) if object_model_path else None
+        object_detector_net = load_cv5_model(object_model_path, args.inference_device) if object_model_path else None
 
         for idx, video_path in enumerate(videos):
             logging.info(f"PROCESSING_VIDEO: {video_path.name}")
@@ -1065,7 +1660,7 @@ def main():
                 str(blendshapes_tflite) if blendshapes_tflite.exists() else None,
                 str(object_model_path) if object_model_path else None,
                 vid_width, vid_height, vid_fps, vid_total_frames,
-                str(output_json), args.ndjson, result_queue
+                str(output_json), args.ndjson, args.inference_device, result_queue
             ))
             p.start()
             active_workers.append(p)

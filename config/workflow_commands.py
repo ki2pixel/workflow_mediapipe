@@ -286,7 +286,15 @@ class WorkflowCommandsConfig:
             cmd = [
                 str(config.get_venv_python('tracking_cv5_env')),
                 str(self.base_path / 'workflow_scripts' / 'step5' / 'run_tracking_cv5.py'),
-                "--num_workers", str(getattr(config, 'STEP5_CV5_NUM_WORKERS', 4))
+                "--num_workers", str(getattr(config, 'STEP5_CV5_NUM_WORKERS', 4)),
+                "--worker_mode", str(getattr(config, 'STEP5_CV5_WORKER_MODE', 'auto')),
+                "--inference_device",
+                str(getattr(config, 'STEP5_CV5_INFERENCE_DEVICE', 'cpu')),
+                "--cpu_budget", str(getattr(config, 'STEP5_CV5_CPU_BUDGET', 15)),
+                "--max_active_videos", str(getattr(config, 'STEP5_CV5_MAX_ACTIVE_VIDEOS', 4)),
+                "--min_frames_per_worker", str(getattr(config, 'STEP5_CV5_MIN_FRAMES_PER_WORKER', 80)),
+                "--chunk_frames", str(getattr(config, 'STEP5_CV5_CHUNK_FRAMES', 32)),
+                "--max_workers_by_memory", str(getattr(config, 'STEP5_CV5_MAX_WORKERS_BY_MEMORY', 15))
             ]
             specific_logs = [
                 {

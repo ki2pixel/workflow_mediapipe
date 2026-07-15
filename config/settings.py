@@ -363,6 +363,28 @@ class Config:
         self.USE_OPENCV5_STEP3 = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
         self.USE_OPENCV5_STEP5 = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
         self.STEP5_CV5_NUM_WORKERS = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
+        step5_cv5_worker_mode = os.environ.get('STEP5_CV5_WORKER_MODE', 'auto').strip().lower()
+        self.STEP5_CV5_WORKER_MODE = step5_cv5_worker_mode if step5_cv5_worker_mode in {'auto', 'video'} else 'auto'
+        step5_cv5_inference_device = (
+            os.environ.get('STEP5_CV5_INFERENCE_DEVICE', 'cpu').strip().lower()
+        )
+        self.STEP5_CV5_INFERENCE_DEVICE = (
+            step5_cv5_inference_device if step5_cv5_inference_device in {'cpu', 'cuda'} else 'cpu'
+        )
+        self.STEP5_CV5_CPU_BUDGET = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CPU_BUDGET')) or 15
+        self.STEP5_CV5_MAX_ACTIVE_VIDEOS = (
+            _parse_optional_positive_int(os.environ.get('STEP5_CV5_MAX_ACTIVE_VIDEOS'))
+            or self.STEP5_CV5_NUM_WORKERS
+        )
+        self.STEP5_CV5_MIN_FRAMES_PER_WORKER = (
+            _parse_optional_positive_int(os.environ.get('STEP5_CV5_MIN_FRAMES_PER_WORKER'))
+            or 80
+        )
+        self.STEP5_CV5_CHUNK_FRAMES = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CHUNK_FRAMES')) or 32
+        self.STEP5_CV5_MAX_WORKERS_BY_MEMORY = (
+            _parse_optional_positive_int(os.environ.get('STEP5_CV5_MAX_WORKERS_BY_MEMORY'))
+            or self.STEP5_CV5_CPU_BUDGET
+        )
         
         # Step 5 default tracking variables (C3/C4)
         self.TRACKING_DISABLE_GPU = _parse_bool(os.environ.get('TRACKING_DISABLE_GPU'), default=True)
@@ -888,6 +910,21 @@ class Config:
     USE_OPENCV5_STEP3: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
     USE_OPENCV5_STEP5: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
     STEP5_CV5_NUM_WORKERS: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
+    STEP5_CV5_WORKER_MODE: str = os.environ.get('STEP5_CV5_WORKER_MODE', 'auto').strip().lower()
+    STEP5_CV5_INFERENCE_DEVICE: str = (
+        os.environ.get('STEP5_CV5_INFERENCE_DEVICE', 'cpu').strip().lower()
+        if os.environ.get('STEP5_CV5_INFERENCE_DEVICE', 'cpu').strip().lower() in {'cpu', 'cuda'}
+        else 'cpu'
+    )
+    STEP5_CV5_CPU_BUDGET: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CPU_BUDGET')) or 15
+    STEP5_CV5_MAX_ACTIVE_VIDEOS: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_MAX_ACTIVE_VIDEOS')) or 4
+    STEP5_CV5_MIN_FRAMES_PER_WORKER: int = _parse_optional_positive_int(
+        os.environ.get('STEP5_CV5_MIN_FRAMES_PER_WORKER')
+    ) or 80
+    STEP5_CV5_CHUNK_FRAMES: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CHUNK_FRAMES')) or 32
+    STEP5_CV5_MAX_WORKERS_BY_MEMORY: int = _parse_optional_positive_int(
+        os.environ.get('STEP5_CV5_MAX_WORKERS_BY_MEMORY')
+    ) or 15
 
 
 

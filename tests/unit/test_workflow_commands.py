@@ -6,9 +6,6 @@ Tests the centralized workflow commands configuration.
 """
 
 import pytest
-from pathlib import Path
-import tempfile
-import os
 from unittest.mock import patch
 
 from config.settings import config
@@ -323,6 +320,10 @@ class TestStepConfigurations:
             
             assert 'tracking_cv5_env' in cmd_str
             assert 'run_tracking_cv5.py' in cmd_str
+            assert '--worker_mode auto' in cmd_str
+            assert '--inference_device cpu' in cmd_str
+            assert '--cpu_budget 15' in cmd_str
+            assert '--max_active_videos 4' in cmd_str
 
     
     def test_step5_has_post_completion_message(self, temp_base_path):

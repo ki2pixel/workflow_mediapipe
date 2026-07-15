@@ -12,6 +12,13 @@ Cette section contient le résumé des décisions majeures jusqu'à mars 2026. P
 
 ## Juillet 2026
 
+- [2026-07-15 11:31:24] **Pool Adaptatif CPU STEP5 CV5 et Séparation du Device d'Inférence (COMPLET)**
+  - **Décision** : Utiliser un pool global d'inférence par chunks en mode CV5 `auto`, plafonné par le budget CPU, la limite mémoire et le volume de frames ; maintenir la réduction temporelle et le tracking ordonné dans le processus parent.
+  - **Raison** : Le parallélisme historique par vidéo ne pouvait pas saturer le CPU lorsqu'un lot ne contenait qu'une seule vidéo. Le sweet spot mesuré est de 15 workers sur le système cible.
+  - **Implémentation** : Ajout de `STEP5_CV5_CPU_BUDGET`, `STEP5_CV5_MAX_ACTIVE_VIDEOS`, `STEP5_CV5_MIN_FRAMES_PER_WORKER`, `STEP5_CV5_CHUNK_FRAMES`, `STEP5_CV5_MAX_WORKERS_BY_MEMORY` et du mode `video` de repli. Les sorties sont écrites dans un fichier `.partial` puis renommées après réduction complète.
+  - **Séparation GPU** : `STEP5_CV5_INFERENCE_DEVICE=cpu` force les modèles CV5 et les fallbacks ONNX Runtime sur CPU, sans considérer `STEP5_ENABLE_GPU`, réservé au pipeline InsightFace historique. Le mode CV5 `cuda` passe directement par ONNX Runtime CUDA et limite le pool à un worker pour empêcher la contention VRAM.
+  - **Validation** : Tests ciblés et intégration CV5 réussis ; suite backend : 460 réussites, 28 ignorés ; compilation, lint fatal et typecheck ciblé réussis. Configuration synchronisée dans `.env` et `.env.example`.
+
 - [2026-07-12 16:50:00] **Remédiation Finale de l'Audit Technique Backend (Phase 1-5) (COMPLET)**
   - **Décision** : Sécurisation critique, thread-safety multi-thread gunicorn, durcissement I/O et réorganisation des hooks de cycle de vie (NVML/atexit).
   - **Raison** : Le second audit technique a relevé 18 failles critiques (dont 5 sans protection d'authentification, doubles initialisations de threads et process bloqués indéfiniment).
