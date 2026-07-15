@@ -11,7 +11,7 @@ from services.workflow_service import WorkflowService
 from services.cache_service import CacheService
 from services.performance_service import PerformanceService
 from config.settings import config
-from config.security import require_internal_worker_token, validate_file_path
+from config.security import require_internal_worker_token, validate_file_path, SecurityConfig
 from routes.decorators import measure_api
 
 # Configure route logger to capture all debug statements
@@ -40,10 +40,13 @@ def index():
     try:
         # Use cached configuration for better performance
         frontend_safe_steps_config = CacheService.get_cached_frontend_config()
+        # Retrieve worker token securely
+        worker_token = SecurityConfig().INTERNAL_WORKER_TOKEN or ""
         return render_template(
             'index_new.html',
             steps_config=frontend_safe_steps_config,
             cache_buster=_STATIC_CACHE_BUSTER,
+            worker_token=worker_token,
         )
     except Exception as e:
         logger.error(f"Index page error: {e}")

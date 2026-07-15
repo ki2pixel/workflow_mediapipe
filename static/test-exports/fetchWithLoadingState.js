@@ -6,6 +6,13 @@ export async function fetchWithLoadingState(url, options = {}, buttonElOrId = nu
   } else if (buttonElOrId && buttonElOrId.nodeType === 1) {
     btn = buttonElOrId;
   }
+  if (typeof document !== 'undefined') {
+    const tokenEl = document.querySelector('meta[name="worker-token"]');
+    const token = tokenEl ? tokenEl.getAttribute('content') : '';
+    if (token) {
+      options.headers = Object.assign({}, options.headers, { 'X-Worker-Token': token });
+    }
+  }
   try {
     if (btn) {
       btn.setAttribute('data-loading', 'true');

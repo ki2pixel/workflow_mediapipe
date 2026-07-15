@@ -1,7 +1,12 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active. La session de remédiation de l'audit de sécurité et d'architecture frontend a été clôturée avec succès.
+- Résolution définitive des compteurs et index de progression du workflow :
+  1. Utilisation du décalage (seek) dans `workflow_executor.py` au début de l'exécution courante pour ignorer l'historique accumulé dans les logs d'étapes.
+  2. Intégration de la fonction utilitaire `formatProgressText` dans `uiUpdater.js` qui supprime les doublons d'index d'UI si le suffixe `(courant/total)` est déjà présent.
+- Résolution définitive du non-affichage des barres de progression lors des lancements de workflows STEP 1-8 en conditions réelles. L'erreur provenait d'un import local manquant de `timerManager.js` dans `uiUpdater.js`, ce qui provoquait une `ReferenceError` à chaque tentative d'interaction avec les timers, faisant avorter silencieusement la mise à jour UI.
+- Résolution du problème d'imbrication des blocs conditionnels dans `static/uiUpdater.js` qui empêchait la mise à jour correcte de la barre de progression (progressbar) de chaque STEP. Les conditions de statuts (`completed`, `failed`, `starting`, `progress_total === 0`) et de progression sont maintenant correctement englobées sous le bloc protecteur d'existence des éléments DOM.
+- Résolution de l'erreur d'authentification HTTP 401 sur le frontend lors du lancement de STEP2 en faisant transiter de manière sécurisée et conforme aux directives CSP le jeton `INTERNAL_WORKER_TOKEN` (via le header `X-Worker-Token`) depuis le backend Flask vers le frontend. All tests passing.
 
 ## Objectifs
 - Assurer la conformité, la sécurité (XSS/CSP) et la maintenabilité du frontend JS.

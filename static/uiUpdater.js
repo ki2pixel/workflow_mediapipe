@@ -5,7 +5,8 @@ import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLo
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
 import { pollingManager } from './utils/PollingManager.js';
 import { COMPILED_LOG_PATTERNS, LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN } from './utils/logPatterns.js';
-export { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
+import { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
+export { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer };
 export { updateLocalDownloadsListUI, updateClearCacheGlobalButtonState } from './downloadsListManager.js';
 
 const lastProgressTextByStep = {};
@@ -79,6 +80,18 @@ function resolveElement(getterFn, legacyValue = null) {
         }
     }
     return null;
+}
+
+function formatProgressText(baseText, current, total) {
+    const suffix = `(${current}/${total})`;
+    if (!baseText || baseText.trim() === "") {
+        return suffix;
+    }
+    const trimmed = baseText.trim();
+    if (trimmed.endsWith(suffix) || trimmed.includes(suffix)) {
+        return trimmed;
+    }
+    return `${trimmed} ${suffix}`;
 }
 
 function getIsAnySequenceRunning() {
@@ -464,8 +477,9 @@ export function updateStepCardUI(stepKey, data) {
             let percentage = 0;
 
             if (progressContainer && progressBar && progressTextEl) {
+                let currentProgress = 0;
                 if (data.progress_total > 0) {
-                    let currentProgress = data.progress_current_fractional || data.progress_current;
+                    currentProgress = data.progress_current_fractional || data.progress_current;
 
                     if (data.progress_current_fractional === null && data.progress_text) {
                         const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
@@ -490,7 +504,66 @@ export function updateStepCardUI(stepKey, data) {
                             percentage = Math.min(percentage, 99);
                         }
                     }
+                }
 
+                if (data.status === 'completed') {
+                    progressContainer.style.display = 'block';
+                    progressBar.style.backgroundColor = 'var(--green)';
+                    progressBar.removeAttribute('data-active');
+
+                    if (data.progress_total === 0) {
+                        let noWorkText = "Aucun élément à traiter";
+                        if (data.progress_text && data.progress_text.trim() !== "") {
+                            noWorkText = data.progress_text;
+                        }
+                        progressTextEl.textContent = noWorkText;
+                        progressBar.style.width = '10%';
+                        progressBar.textContent = '✓';
+                        progressBar.setAttribute('aria-valuenow', 0);
+                    } else {
+                        let baseCompletionText = formatProgressText(data.progress_text || "Terminé", data.progress_current, data.progress_total);
+                        const config = STEPS_CONFIG_FROM_SERVER[stepKey];
+                        if (config && config.post_completion_message_ui) {
+                            progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
+                        } else {
+                            progressTextEl.textContent = baseCompletionText;
+                        }
+
+                        progressBar.style.width = '100%';
+                        progressBar.textContent = '100%';
+                        progressBar.setAttribute('aria-valuenow', 100);
+
+                        if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                            const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                            try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
+                        }
+                        delete lastProgressTextByStep[stepKey];
+                    }
+                } else if (data.status === 'failed') {
+                    progressContainer.style.display = 'block';
+                    progressBar.style.backgroundColor = 'var(--red)';
+                    let failureText = `Échec`;
+                    if (data.progress_total > 0) {
+                        failureText = formatProgressText(data.progress_text ? `Échec: ${data.progress_text}` : `Échec`, data.progress_current, data.progress_total);
+                        progressBar.style.width = `${percentage}%`;
+                        progressBar.textContent = `${percentage}%`;
+                        progressBar.setAttribute('aria-valuenow', percentage);
+                    } else {
+                        progressBar.style.width = '100%';
+                        progressBar.textContent = '✗';
+                        progressBar.setAttribute('aria-valuenow', 0);
+                        if (data.progress_text) failureText += `: ${data.progress_text}`;
+                    }
+                    progressTextEl.textContent = failureText;
+                    progressBar.removeAttribute('data-active');
+                    progressTextEl.removeAttribute('data-processing');
+
+                    if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
+                        const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
+                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
+                    }
+                    delete lastProgressTextByStep[stepKey];
+                } else if (data.progress_total > 0 && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
                     console.log(`[PROGRESS CALC] ${stepKey}:`, {
                         progress_current: data.progress_current,
                         progress_current_fractional: data.progress_current_fractional,
@@ -513,18 +586,13 @@ export function updateStepCardUI(stepKey, data) {
                     progressBar.style.width = `${percentage}%`;
                     progressBar.textContent = `${percentage}%`;
                     progressBar.setAttribute('aria-valuenow', percentage);
-
-                    if (['running','starting','initiated'].includes(normalizedStatus)) {
-                        progressBar.setAttribute('data-active', 'true');
-                    } else {
-                        progressBar.removeAttribute('data-active');
-                    }
+                    progressBar.setAttribute('data-active', 'true');
 
                     const candidateText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || '');
                     if (data.progress_text && data.progress_text.trim()) {
                         lastProgressTextByStep[stepKey] = data.progress_text;
                     }
-                    const subText = candidateText ? `${candidateText} (${displayCurrent}/${data.progress_total})` : `${displayCurrent}/${data.progress_total}`;
+                    const subText = formatProgressText(candidateText, displayCurrent, data.progress_total);
                     progressTextEl.textContent = subText;
 
                     const shouldAutoCenter = getIsAnySequenceRunning() && ['running', 'starting', 'initiated'].includes(normalizedStatus);
@@ -552,91 +620,34 @@ export function updateStepCardUI(stepKey, data) {
                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
                         try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${subText}`, percentage, false); } catch (_) {}
                     }
-                } else if (data.status === 'completed' && data.progress_total === 0) {
-                    percentage = 0;
-                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with no work (0%)`);
-                } else if (data.status === 'completed' && data.progress_total > 0) {
-                    percentage = 100;
-                    console.log(`[PROGRESS CALC] ${stepKey}: Completed with work (100%)`);
-                } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
-                    percentage = 0;
-                    console.log(`[PROGRESS CALC] ${stepKey}: Running with no progress tracking (0%)`);
-                }
-            } else if (['running', 'starting', 'initiated'].includes(data.status) && data.progress_total === 0) {
-                progressContainer.style.display = 'block';
-                progressBar.style.backgroundColor = 'var(--blue)';
-                progressBar.setAttribute('data-active', 'true');
-                const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || "En cours d'exécution...");
-                if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
-                progressTextEl.textContent = runningText;
+                } else if (['running', 'starting', 'initiated'].includes(data.status)) {
+                    progressContainer.style.display = 'block';
+                    progressBar.style.backgroundColor = 'var(--blue)';
+                    progressBar.setAttribute('data-active', 'true');
+                    progressBar.style.width = '0%';
+                    progressBar.textContent = '0%';
+                    progressBar.setAttribute('aria-valuenow', 0);
 
-                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                    const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
-                    try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
-                }
-
-                if (runningText && runningText.trim()) {
-                    progressTextEl.setAttribute('data-processing', 'true');
-                } else {
-                    progressTextEl.removeAttribute('data-processing');
-                }
-            } else if (data.status === 'completed') {
-                progressContainer.style.display = 'block';
-                progressBar.style.backgroundColor = 'var(--green)';
-                progressBar.removeAttribute('data-active');
-
-                if (data.progress_total === 0) {
-                    let noWorkText = "Aucun élément à traiter";
-                    if (data.progress_text && data.progress_text.trim() !== "") {
-                        noWorkText = data.progress_text;
-                    }
-                    progressTextEl.textContent = noWorkText;
-                    progressBar.style.width = '10%';
-                    progressBar.textContent = '✓';
-                } else {
-                    let baseCompletionText = `Terminé (${data.progress_current}/${data.progress_total})`;
-                    if (data.progress_text && data.progress_text.toLowerCase() !== "terminé" && data.progress_text.trim() !== "") {
-                        baseCompletionText = `${data.progress_text} (${data.progress_current}/${data.progress_total})`;
-                    }
-                    const config = STEPS_CONFIG_FROM_SERVER[stepKey];
-                    if (config && config.post_completion_message_ui) {
-                        progressTextEl.textContent = `${baseCompletionText}\n${config.post_completion_message_ui}`;
-                    } else {
-                        progressTextEl.textContent = baseCompletionText;
-                    }
+                    const defaultText = (data.status === 'starting' || data.status === 'initiated') ? "Démarrage..." : "En cours d'exécution...";
+                    const runningText = (data.progress_text && data.progress_text.trim()) ? data.progress_text : (lastProgressTextByStep[stepKey] || defaultText);
+                    if (data.progress_text && data.progress_text.trim()) lastProgressTextByStep[stepKey] = data.progress_text;
+                    progressTextEl.textContent = runningText;
 
                     if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
                         const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                        try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: Terminé`, 100, false); } catch (_) {}
+                        const globalText = `${stepNames[stepKey] || stepKey}: ${runningText || 'En cours...'}`;
+                        try { updateGlobalProgressUI(globalText, 0, false); } catch (_) {}
                     }
-                    delete lastProgressTextByStep[stepKey];
-                }
-            } else if (data.status === 'failed') {
-                progressContainer.style.display = 'block';
-                progressBar.style.backgroundColor = 'var(--red)';
-                let failureText = `Échec`;
-                if (data.progress_total > 0) failureText += ` à ${data.progress_current}/${data.progress_total}`;
-                if (data.progress_text) failureText += `: ${data.progress_text}`;
-                progressTextEl.textContent = failureText;
-                progressBar.removeAttribute('data-active');
-                progressTextEl.removeAttribute('data-processing');
 
-                if (['STEP3','STEP4','STEP5'].includes(stepKey)) {
-                    const stepNames = { STEP3: 'Étape 3 — Transitions', STEP4: 'Étape 4 — Audio', STEP5: 'Étape 5 — Tracking' };
-                    try { updateGlobalProgressUI(`${stepNames[stepKey] || stepKey}: ${failureText}`, percentage, true); } catch (_) {}
+                    if (runningText && runningText.trim()) {
+                        progressTextEl.setAttribute('data-processing', 'true');
+                    } else {
+                        progressTextEl.removeAttribute('data-processing');
+                    }
+                } else {
+                    progressContainer.style.display = 'none';
+                    progressBar.setAttribute('aria-valuenow', 0);
                 }
-                delete lastProgressTextByStep[stepKey];
-            } else if (data.status === 'starting' || data.status === 'initiated') {
-                progressContainer.style.display = 'block';
-                progressBar.style.width = `0%`;
-                progressBar.textContent = `0%`;
-                progressBar.style.backgroundColor = 'var(--blue)';
-                progressBar.setAttribute('data-active', 'true');
-                progressTextEl.textContent = "Démarrage...";
-            } else {
-                progressContainer.style.display = 'none';
-                progressBar.setAttribute('aria-valuenow', 0);
             }
 
             const anyRunning = !!document.querySelector('.step[data-status="running"], .step[data-status="starting"], .step[data-status="initiated"]');
@@ -653,7 +664,9 @@ export function updateStepCardUI(stepKey, data) {
                     workflowWrapper.removeAttribute('data-active-step');
                 }
             }
-        } catch (_) {}
+        } catch (err) {
+            console.error('[updateStepCardUI ERROR]', err);
+        }
 
         console.groupEnd();
     });

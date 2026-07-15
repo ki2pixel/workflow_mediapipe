@@ -302,3 +302,25 @@ class TestWorkflowRoutesDryRunCompliance:
                 response = app_client.post('/run/STEP1')
                 
                 assert response.status_code in [200, 202]
+
+
+class TestWorkflowRoutesIndex:
+    """Test GET / route."""
+    
+    def test_index_route_renders_template_with_token(self, app_client, mock_app_new):
+        """Test index route renders template and passes worker_token."""
+        with patch('routes.workflow_routes.SecurityConfig') as MockSecConfig, \
+             patch('routes.workflow_routes.render_template') as mock_render:
+            
+            MockSecConfig.return_value.INTERNAL_WORKER_TOKEN = "test-worker-token-xyz"
+            mock_render.return_value = "Index Content"
+            
+            response = app_client.get('/')
+            
+            assert response.status_code == 200
+            mock_render.assert_called_once()
+            
+            # Check render_template arguments
+            args, kwargs = mock_render.call_args
+            assert args[0] == 'index_new.html'
+            assert kwargs.get('worker_token') == "test-worker-token-xyz"

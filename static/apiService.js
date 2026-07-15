@@ -24,6 +24,16 @@ export async function fetchWithLoadingState(url, options = {}, buttonElOrId = nu
         btn = buttonElOrId;
     }
 
+    // Extract the worker token from the meta tag if present
+    const tokenEl = document.querySelector('meta[name="worker-token"]');
+    const token = tokenEl ? tokenEl.getAttribute('content') : '';
+    if (token) {
+        options.headers = {
+            ...options.headers,
+            'X-Worker-Token': token
+        };
+    }
+
     try {
         if (btn) {
             btn.setAttribute('data-loading', 'true');

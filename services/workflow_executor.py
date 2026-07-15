@@ -184,19 +184,45 @@ def parse_and_update_progress(line: str, step_key: str, step_progress_patterns: 
                 pass
 
     if item_finished:
-        state_vars["current_item_counter"] += 1
-        workflow_state.set_step_field(step_key, 'progress_current', state_vars["current_item_counter"])
-        workflow_state.set_step_field(step_key, 'files_completed', state_vars["current_item_counter"])
-        workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
-        if step_progress_patterns.get("current_item_text_from_success_line") and finished_name:
-            workflow_state.set_step_field(step_key, 'progress_text', html.escape(finished_name))
+        is_duplicate = False
+        if finished_name:
+            completed_set = state_vars.setdefault("completed_items", set())
+            if finished_name in completed_set:
+                is_duplicate = True
+            else:
+                completed_set.add(finished_name)
+
+        if not is_duplicate:
+            state_vars["current_item_counter"] += 1
+            progress_total = workflow_state.get_step_field(step_key, 'progress_total', 0)
+            if progress_total > 0:
+                current_val = min(progress_total, state_vars["current_item_counter"])
+            else:
+                current_val = state_vars["current_item_counter"]
+            workflow_state.set_step_field(step_key, 'progress_current', current_val)
+            workflow_state.set_step_field(step_key, 'files_completed', current_val)
+            workflow_state.set_step_field(step_key, 'progress_current_fractional', None)
+            if step_progress_patterns.get("current_item_text_from_success_line") and finished_name:
+                workflow_state.set_step_field(step_key, 'progress_text', html.escape(finished_name))
 
 
-def tail_log_and_parse_progress(log_path: Path, step_key: str, process: subprocess.Popen, step_progress_patterns: dict, state_vars: dict) -> None:
+def tail_log_and_parse_progress(
+    log_path: Path, 
+    step_key: str, 
+    process: subprocess.Popen, 
+    step_progress_patterns: dict, 
+    state_vars: dict,
+    initial_log_size: int = 0
+) -> None:
     """Tails the step log file and parses its progress in real-time."""
     time.sleep(0.1)  # Allow process to start writing
     try:
         with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            if initial_log_size > 0:
+                try:
+                    f.seek(initial_log_size)
+                except Exception as e_seek:
+                    logger.warning(f"[{step_key}] Failed to seek to initial log size {initial_log_size}: {e_seek}")
             while True:
                 line = f.readline()
                 if not line:
@@ -273,7 +299,7 @@ def _run_process_async_internal(step_key: str):
     workflow_state.append_step_log(step_key, f"Dans: {html.escape(str(step_config['cwd']))}\n\n")
     
     step_progress_patterns = step_config.get("progress_patterns", {})
-    state_vars = {"current_item_counter": 0}
+    state_vars = {"current_item_counter": 0, "completed_items": set()}
 
     # Prepare log path (absolute path via config.LOGS_DIR)
     log_dir = Path(config.LOGS_DIR)
@@ -356,6 +382,14 @@ def _run_process_async_internal(step_key: str):
             except Exception as _e:
                 logger.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
 
+        # Get current log size to skip reading previous content during tailing
+        initial_log_size = 0
+        try:
+            if log_file_path.exists():
+                initial_log_size = log_file_path.stat().st_size
+        except Exception as e_stat:
+            logger.warning(f"[{step_key}] Failed to get log file size: {e_stat}")
+
         # Open log file to redirect output in append mode 'a'
         with open(log_file_path, "a", encoding="utf-8") as log_file:
             process = subprocess.Popen(
@@ -373,7 +407,7 @@ def _run_process_async_internal(step_key: str):
             # Start background tail thread to read log file and update progress in real time
             tail_thread = threading.Thread(
                 target=tail_log_and_parse_progress,
-                args=(log_file_path, step_key, process, step_progress_patterns, state_vars),
+                args=(log_file_path, step_key, process, step_progress_patterns, state_vars, initial_log_size),
                 name=f"Tailing-step-{step_key}"
             )
             tail_thread.daemon = True
