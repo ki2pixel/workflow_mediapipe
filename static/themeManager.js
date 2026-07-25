@@ -181,4 +181,3 @@ const themeManager = new ThemeManager();
 // Export for module usage
 export { themeManager, THEMES };
 
-export const themeManager = new ThemeManager();
