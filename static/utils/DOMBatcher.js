@@ -332,7 +332,6 @@ export { DOMUpdateUtils };
 
 // Development helpers
 if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
-globalThis.domBatcher = domBatcher;
     
     const originalFlush = domBatcher.flushUpdates;
     domBatcher.flushUpdates = function() {

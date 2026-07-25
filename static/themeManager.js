@@ -181,5 +181,4 @@ const themeManager = new ThemeManager();
 // Export for module usage
 export { themeManager, THEMES };
 
-// Also expose globally for non-module scripts
-globalThis.themeManager = themeManager;
+export const themeManager = new ThemeManager();

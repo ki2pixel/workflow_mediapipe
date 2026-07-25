@@ -4,7 +4,7 @@ import { appState } from './state/AppState.js';
 import { setActiveStepKeyForLogs as legacySetActiveStepKeyForLogs, getAutoOpenLogOverlay } from './state.js';
 import { scrollToActiveStep, isAutoScrollEnabled } from './scrollManager.js';
 import { pollingManager } from './utils/PollingManager.js';
-import { COMPILED_LOG_PATTERNS, LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN } from './utils/logPatterns.js';
+import { parseAndStyleLogContent as _parseAndStyleLogContent } from './utils/logParserUtils.js';
 import { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer } from './timerManager.js';
 export { startStepTimer, stopStepTimer, resetStepTimerDisplay, getStepTimer };
 export { updateLocalDownloadsListUI, updateClearCacheGlobalButtonState } from './downloadsListManager.js';
@@ -373,9 +373,6 @@ export function openLogPanelUI(stepKeyToFocus, forceOpen = false) {
 
     // Auto-open disabled: uniquement stocker l'étape active pour une ouverture manuelle ultérieure
     setActiveStepForLogPanelUI(stepKeyToFocus);
-    return;
-
-    // Code inaccessible supprimé - logique redondante ou ancienne version
 }
 
 export function closeLogPanelUI() {
@@ -739,48 +736,15 @@ export async function updateSpecificLogUI(logName, path, content, isError = fals
     }
 }
 
-const _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN = LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN;
-const _COMPILED_LOG_PATTERNS = COMPILED_LOG_PATTERNS;
-
 /**
- * Parse and style log content with CSS classes for different log types.
- * Escapes all HTML to prevent XSS.
- * 
+ * DOM-context wrapper around the shared logParserUtils.parseAndStyleLogContent.
+ * Automatically uses DOMUpdateUtils.escapeHtml for XSS safety.
+ *
  * @param {string} rawContent - Raw log content
  * @returns {string} - Styled HTML content
  */
 export function parseAndStyleLogContent(rawContent) {
-    if (!rawContent || typeof rawContent !== 'string') {
-        return rawContent || '';
-    }
-
-const lines = rawContent.split('\n');
-    const styledLines = new Array(lines.length);
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line === '' || _LOG_LINE_EMPTY_OR_WHITESPACE_PATTERN.test(line)) {
-            styledLines[i] = line;
-            continue;
-        }
-
-        const escapedLine = DOMUpdateUtils.escapeHtml(line);
-
-        let logType = 'default';
-        for (let j = 0; j < _COMPILED_LOG_PATTERNS.length; j++) {
-            const pattern = _COMPILED_LOG_PATTERNS[j];
-            if (pattern.regex.test(line)) {
-                logType = pattern.type;
-                break;
-            }
-        }
-
-        styledLines[i] = logType !== 'default'
-            ? `<span class="log-line log-${logType}">${escapedLine}</span>`
-            : escapedLine;
-    }
-
-    return styledLines.join('\n');
+    return _parseAndStyleLogContent(rawContent, DOMUpdateUtils.escapeHtml);
 }
 
 export async function updateMainLogOutputUI(htmlContent) {

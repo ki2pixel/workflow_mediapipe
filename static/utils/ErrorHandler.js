@@ -5,6 +5,8 @@
  * exponential backoff for repeated errors, and proper error reporting.
  */
 
+import { showNotification } from '../utils.js';
+
 class ErrorHandler {
     constructor() {
         this.consecutiveErrors = new Map();
@@ -245,13 +247,9 @@ class ErrorHandler {
         if (existingTimeout) {
             clearTimeout(existingTimeout);
         }
-        
-        if (typeof globalThis.showNotification === 'function') {
-            globalThis.showNotification(message, type, 5000);
-        } else {
-            console.warn('showNotification function not available');
-        }
-        
+
+        showNotification(message, type);
+
         if (elementId) {
             this.showErrorState(elementId, message);
         }
@@ -340,6 +338,3 @@ const errorHandler = new ErrorHandler();
 
 // Export for use in other modules
 export { ErrorHandler, errorHandler };
-
-// Also make available globally for legacy code
-globalThis.errorHandler = errorHandler;

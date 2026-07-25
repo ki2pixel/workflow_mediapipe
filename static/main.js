@@ -4,8 +4,6 @@ import * as api from './apiService.js';
 import { initializeEventHandlers } from './eventHandlers.js';
 import { POLLING_INTERVAL } from './constants.js';
 import { showNotification } from './utils.js';
-
-globalThis.showNotification = showNotification;
 import { showSequenceSummaryUI } from './popupManager.js';
 import { scrollToStepImmediate } from './scrollManager.js';
 
@@ -19,7 +17,6 @@ import { performanceOptimizer } from './utils/PerformanceOptimizer.js';
 import { appState } from './state/AppState.js';
 import { initializeCSVDownloadMonitor } from './csvDownloadMonitor.js';
 import { themeManager } from './themeManager.js';
-import { fetchWithLoadingState } from './apiService.js';
 
 
 
@@ -128,8 +125,8 @@ function updateDownloadsToggleAlert(downloads) {
         btn.classList.add('downloads-toggle--alert');
         try {
             const alerted = !!appState.getStateProperty('ui.localDownloadsAlertedOnce');
-            if (!alerted && typeof globalThis.showNotification === 'function') {
-                globalThis.showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
+            if (!alerted && typeof showNotification === 'function') {
+                showNotification('Téléchargements', 'Des téléchargements locaux sont en cours. Cliquez pour afficher.');
                 const currentUI = appState.getStateProperty('ui') || {};
                 appState.setState({ ui: { ...currentUI, localDownloadsAlertedOnce: true } }, 'downloads_alert_shown');
             }
@@ -590,7 +587,7 @@ function applySettingsPanel(panel, toggle, open) {
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         // Only handle shortcuts when not typing in inputs
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true')) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable)) {
             return;
         }
 

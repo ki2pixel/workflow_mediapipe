@@ -95,12 +95,12 @@ class WorkerManager {
     async _executeSynchronously(type, payload) {
         switch (type) {
             case 'parseLogs': {
-                // Dynamically import uiUpdater's original synchronous parser
-                const mod = await import('../uiUpdater.js');
+                const mod = await import('./logParserUtils.js');
+                const { DOMUpdateUtils } = await import('./DOMBatcher.js');
                 if (typeof mod.parseAndStyleLogContent !== 'function') {
-                    throw new Error('[WorkerManager] parseAndStyleLogContent is missing in uiUpdater');
+                    throw new Error('[WorkerManager] parseAndStyleLogContent is missing in logParserUtils');
                 }
-                return mod.parseAndStyleLogContent(payload);
+                return mod.parseAndStyleLogContent(payload, DOMUpdateUtils.escapeHtml);
             }
             case 'parseJson':
                 return typeof payload === 'string' ? JSON.parse(payload) : payload;

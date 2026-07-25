@@ -318,5 +318,3 @@ const pollingManager = new PollingManager();
 
 // Export for use in other modules
 export { PollingManager, pollingManager };
-
-globalThis.pollingManager = pollingManager;

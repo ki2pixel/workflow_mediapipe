@@ -34,6 +34,19 @@ export async function fetchWithLoadingState(url, options = {}, buttonElOrId = nu
         };
     }
 
+    // Inject CSRF token for mutative requests (POST, PUT, DELETE)
+    const method = (options.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'DELETE'].includes(method)) {
+        const csrfEl = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+        if (csrfToken) {
+            options.headers = {
+                ...options.headers,
+                'X-CSRF-Token': csrfToken
+            };
+        }
+    }
+
     try {
         if (btn) {
             btn.setAttribute('data-loading', 'true');

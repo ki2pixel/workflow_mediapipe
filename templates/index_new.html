@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="csrf-token" content="{{ csrf_token() if csrf_token else '' }}">
     <title>Workflow Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">
@@ -77,7 +79,7 @@
                     </div>
                 </section>
 
-                        </div>
+            </div>
         </div>
 
     </div>
@@ -235,12 +237,12 @@
                 <div class="log-header">
                     Log Principal (<span id="current-step-log-name-panel">Aucune étape active</span>)
                 </div>
-                <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="true"></div>
+                <div class="log-output" id="main-log-output-panel" aria-live="polite" aria-atomic="false"></div>
             </div>
             <div class="log-container" id="specific-log-container-panel" style="display:none;">
                 <div class="log-header" id="specific-log-header-text-panel">Log Spécifique</div>
                 <div class="specific-log-path" id="specific-log-path-info-panel"></div>
-                <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="true"></div>
+                <div class="specific-log-output" id="specific-log-output-content-panel" aria-live="polite" aria-atomic="false"></div>
             </div>
         </div>
     </div>

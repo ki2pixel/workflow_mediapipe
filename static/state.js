@@ -1,17 +1,12 @@
-// Import new immutable state management
+/**
+ * @deprecated Use constants.js for REMOTE_SEQUENCE_STEP_KEYS and AppState directly for state management.
+ * This file is kept for backward compatibility only.
+ */
 import { appState } from './state/AppState.js';
+import { REMOTE_SEQUENCE_STEP_KEYS, defaultSequenceableStepsKeys } from './constants.js';
 
-// --- MODIFICATION: La liste des étapes est mise à jour pour correspondre au backend ---
-export const REMOTE_SEQUENCE_STEP_KEYS = [
-    "STEP1",
-    "STEP2",
-    "STEP3",
-    "STEP4",
-    "STEP5",
-    "STEP6",
-    "STEP7",
-    "STEP8"
-];
+// Re-export for legacy consumers
+export { REMOTE_SEQUENCE_STEP_KEYS, defaultSequenceableStepsKeys };
 
 // Modern state management functions using AppState
 export function setActiveStepKeyForLogs(key) {

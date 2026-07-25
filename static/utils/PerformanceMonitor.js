@@ -539,9 +539,4 @@ globalThis.addEventListener('beforeunload', () => {
     performanceMonitor.destroy();
 });
 
-// Development helpers
-if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
-    globalThis.performanceMonitor = performanceMonitor; // Expose for debugging
-}
-
 export default performanceMonitor;

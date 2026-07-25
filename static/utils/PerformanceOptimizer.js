@@ -345,21 +345,20 @@ globalThis.addEventListener('beforeunload', () => {
 
 // Development helpers
 if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
-    globalThis.performanceOptimizer = performanceOptimizer; // Expose for debugging
     
     // Log performance stats periodically in development using PollingManager
     const startStatsPolling = () => {
-        const pm = globalThis.pollingManager;
-        if (pm) {
+        // Use dynamic import to avoid circular dependency at module eval time
+        import('./PollingManager.js').then(({ pollingManager: pm }) => {
             pm.startPolling('perf-optimizer-stats', () => {
                 const stats = performanceOptimizer.getPerformanceStats();
                 if (stats.api.totalCalls > 0 || stats.dom.totalUpdates > 0) {
                     console.debug('[PerformanceOptimizer] Stats:', stats);
                 }
             }, 30000);
-        } else {
+        }).catch(() => {
             setTimeout(startStatsPolling, 1000);
-        }
+        });
     };
     startStatsPolling();
 }

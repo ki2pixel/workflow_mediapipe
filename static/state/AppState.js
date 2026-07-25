@@ -433,7 +433,6 @@ globalThis.addEventListener('beforeunload', () => {
 });
 
 if (globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1') {
-    globalThis.appState = appState;
     
     appState.subscribe((newState, oldState, source) => {
         console.debug(`[AppState] Change from ${source}:`, {
