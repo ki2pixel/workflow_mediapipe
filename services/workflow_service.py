@@ -4,7 +4,7 @@ import threading
 import time
 from collections import deque
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Callable
 from pathlib import Path
 
 from config.settings import config
@@ -27,6 +27,25 @@ class WorkflowService:
 
     _initialized = False
     _initialization_lock = threading.Lock()
+    _async_runner: Optional[Callable] = None
+    _sequence_executor: Optional[Callable] = None
+
+    def __init__(
+        self,
+        async_runner: Optional[Callable] = None,
+        sequence_executor: Optional[Callable] = None,
+    ):
+        """
+        Inject execution dependencies to eliminate sys.modules inspection.
+
+        Args:
+            async_runner: Callable(step_key) to execute a single step asynchronously.
+            sequence_executor: Callable(steps, sequence_type) to execute a sequence.
+        """
+        if async_runner is not None:
+            WorkflowService._async_runner = async_runner
+        if sequence_executor is not None:
+            WorkflowService._sequence_executor = sequence_executor
 
     @staticmethod
     def initialize(commands_config: Dict[str, Any]) -> None:
@@ -233,14 +252,11 @@ class WorkflowService:
             }
 
                 
-        import sys
-        app_new = sys.modules.get('app_new') or sys.modules.get('__main__')
-        if not app_new:
-            return {"status": "error", "message": "Execution context not available"}
-        
-        if not hasattr(app_new, 'run_process_async'):
-            logger.error("run_process_async not available in app_new")
-            return {"status": "error", "message": "Execution function not available"}
+        # Resolve async runner: injected > executor module fallback
+        async_runner = WorkflowService._async_runner
+        if async_runner is None:
+            from services.workflow_executor import run_process_async as _fallback_runner
+            async_runner = _fallback_runner
 
         try:
             workflow_state.update_step_status(step_key, 'initiated')
@@ -256,7 +272,7 @@ class WorkflowService:
             )
             
             thread = threading.Thread(
-                target=app_new.run_process_async,
+                target=async_runner,
                 args=(step_key,)
             )
             thread.daemon = True
@@ -303,21 +319,27 @@ class WorkflowService:
                 return {"status": "error", "message": f"Étape inconnue : {step_key}"}
 
                 
-        import sys
-        app_new = sys.modules.get('app_new') or sys.modules.get('__main__')
-        if not app_new or not hasattr(app_new, 'execute_step_sequence_worker'):
-            try:
-                import app_new
-            except ImportError:
-                app_new = None
+        # Resolve sequence executor: injected > app_new.execute_step_sequence_worker
+        sequence_executor = WorkflowService._sequence_executor
+        if sequence_executor is None:
+            import sys
+            app_new = sys.modules.get('app_new') or sys.modules.get('__main__')
+            if not app_new or not hasattr(app_new, 'execute_step_sequence_worker'):
+                try:
+                    import app_new as _app_new_mod
+                    app_new = _app_new_mod
+                except ImportError:
+                    app_new = None
+            if app_new and hasattr(app_new, 'execute_step_sequence_worker'):
+                sequence_executor = app_new.execute_step_sequence_worker
 
-        if not app_new or not hasattr(app_new, 'execute_step_sequence_worker'):
-            logger.error("execute_step_sequence_worker not available in sys.modules or via import")
+        if sequence_executor is None:
+            logger.error("execute_step_sequence_worker not available")
             return {"status": "error", "message": "Execution context not available"}
 
         try:
             thread = threading.Thread(
-                target=app_new.execute_step_sequence_worker,
+                target=sequence_executor,
                 args=(steps, "Custom")
             )
             thread.daemon = True

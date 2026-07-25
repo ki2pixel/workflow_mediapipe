@@ -43,10 +43,78 @@ def validate_environment():
     env_file = Path('.env')
     if env_file.exists():
         print("✅ .env file found")
+        
+        # Validate .env file permissions
+        env_stat = env_file.stat()
+        env_mode = env_stat.st_mode & 0o777
+        if env_mode not in (0o600, 0o640):
+            issues.append(
+                f".env file has insecure permissions ({oct(env_mode)}). "
+                f"Expected 600 or 640 for production."
+            )
+        else:
+            print(f"✅ .env file permissions correct ({oct(env_mode)})")
     else:
         issues.append(".env file not found")
     
     return issues
+
+
+def _check_env_production_tokens(env_path: Path, issues: list, warnings: list) -> None:
+    """Check .env file for default/insecure tokens when running in production."""
+    default_tokens = [
+        "dev-key-change-in-production",
+        "dev-secret-key-change-in-production",
+        "dev-internal-worker-token",
+    ]
+    try:
+        content = env_path.read_text(encoding="utf-8")
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or "=" not in stripped:
+                continue
+            for token in default_tokens:
+                if token in stripped:
+                    issues.append(
+                        f"Default/insecure token found in .env (production mode): "
+                        f"{stripped.split('=')[0]}={token}"
+                    )
+                    break
+    except Exception as e:
+        warnings.append(f"Could not read .env for token check: {e}")
+
+
+def validate_venvs():
+    """Validate that required Python virtual environments exist."""
+    print("\n🐍 Validating virtual environments...")
+    
+    issues = []
+    
+    script_dir = Path(__file__).parent.parent
+    venvs = [
+        "env",
+        "transnet_env",
+        "audio_env",
+        "tracking_env_slim",
+        "insightface_env",
+        "tracking_cv5_env",
+        "transnet_cv5_env",
+        "coral_env",
+    ]
+    
+    for venv_name in venvs:
+        venv_path = script_dir / venv_name
+        if venv_path.exists():
+            venv_python = venv_path / "bin" / "python"
+            if venv_python.exists() or venv_python.with_suffix(".exe").exists():
+                print(f"✅ Virtualenv '{venv_name}' found")
+            else:
+                issues.append(f"Virtualenv '{venv_name}' exists but missing Python binary")
+        else:
+            issues.append(f"Virtualenv '{venv_name}' not found")
+    
+    return issues
+
 
 def validate_configuration():
     """Validate application configuration."""
@@ -84,7 +152,13 @@ def validate_configuration():
                 issues.append(msg)
             else:
                 warnings.append(msg)
-                
+
+        # Check .env for default tokens in production
+        if is_production:
+            env_path = Path('.env')
+            if env_path.exists():
+                _check_env_production_tokens(env_path, issues, warnings)
+        
 
         
     except Exception as e:
@@ -242,6 +316,9 @@ def main():
     issues, warnings = validate_configuration()
     all_issues.extend(issues)
     all_warnings.extend(warnings)
+    
+    issues = validate_venvs()
+    all_issues.extend(issues)
     
     issues = validate_services()
     all_issues.extend(issues)

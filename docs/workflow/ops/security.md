@@ -155,12 +155,13 @@ def validate_extraction_path(extracted_path: str, base_dir: str) -> bool:
 ### Mécanismes en Place
 
 ```javascript
-// Utilitaire d'échappement
-static/utils/DOMUpdateUtils.js
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+// Utilitaire d'échappement (exporté par static/utils/DOMBatcher.js)
+class DOMUpdateUtils {
+    static escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 }
 
 // Application dans les logs
@@ -214,16 +215,34 @@ def require_internal_worker_token(f):
     return decorated
 ```
 
-### Application
+### Application et Transmission Frontend
+
+1. **Backend** : Le décorateur `@require_internal_worker_token` est appliqué sur les routes sensibles (ex. `/api/cache/open`, `/run/<step_key>`).
+2. **Transmission de session** : Lors du chargement de la page principale (GET `/`), Flask récupère `INTERNAL_WORKER_TOKEN` depuis la configuration et l'injecte dans la page via une balise méta CSP-compliant :
+   ```html
+   <meta name="worker-token" content="{{ worker_token }}">
+   ```
+3. **Frontend Request Interception** : Le helper standard `fetchWithLoadingState` (dans `static/apiService.js`) extrait le token de la balise méta au vol et l'attache automatiquement au header `X-Worker-Token` de chaque requête HTTP :
+   ```javascript
+   const tokenEl = document.querySelector('meta[name="worker-token"]');
+   const token = tokenEl ? tokenEl.getAttribute('content') : '';
+   if (token) {
+       options.headers = {
+           ...options.headers,
+           'X-Worker-Token': token
+       };
+   }
+   ```
+
+### Application API
 
 ```python
-@api_bp.route('/api/cache/open', methods=['POST'])
-@require_internal_worker_token
+@api_bp.route('/cache/open', methods=['POST'])
 @measure_api('/api/cache/open')
-def open_cache_folder():
-    """Ouverture explorateur (sécurisé)."""
-    return filesystem_service.open_path_in_explorer(...)
-```
+@require_internal_worker_token
+def cache_open():
+    """Ouverture explorateur sécurisée par Token."""
+    return FilesystemService.open_path_in_explorer(...)
 
 ## Filesystem Robuste
 

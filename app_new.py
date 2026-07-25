@@ -193,6 +193,10 @@ def initialize_services():
                 if not APP_FLASK._services_initialized:
                     CSVService.initialize()
                     WorkflowService.initialize(workflow_commands_config.get_config())
+                    WorkflowService(
+                        async_runner=run_process_async,
+                        sequence_executor=execute_step_sequence_worker,
+                    )
                     PerformanceService.start_background_monitoring()
                     APP_FLASK._services_initialized = True
                     logger.info("All services initialized successfully")
@@ -289,9 +293,6 @@ def init_app():
         _app_initialized = True
         return APP_FLASK
 
-initialize_services()
-
-
 
 
 def format_duration_seconds(seconds_total: float) -> str:
@@ -342,8 +343,6 @@ def execute_step_sequence_worker(steps_to_run_list: list, sequence_type: str ="C
         steps_to_run_list: List of step keys to execute in order
         sequence_type: Type of sequence ('Full', 'Remote', 'Custom', etc.)
     """
-    APP_LOGGER.info("🔥🔥🔥 [SEQUENCE_WORKER_TEST] UPDATED SEQUENCE WORKER WITH DEBUGGING IS RUNNING! 🔥🔥🔥")
-    
     if sequence_type != "InternalPollingCheck" and workflow_state.is_sequence_running():
         APP_LOGGER.warning(f"{sequence_type.upper()} SEQUENCE: Tentative de lancement alors qu'une séquence est déjà en cours.")
         return

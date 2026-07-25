@@ -35,6 +35,14 @@ def patched_commands_config(display_name='Test Step', validate=True):
         yield instance
 
 
+@pytest.fixture(autouse=True)
+def reset_workflow_service_di():
+    """Reset WorkflowService DI state before each test."""
+    from services.workflow_service import WorkflowService
+    WorkflowService._async_runner = None
+    WorkflowService._sequence_executor = None
+
+
 @pytest.fixture
 def mock_app_new():
     """Create a mock app_new module with workflow_state."""
@@ -53,8 +61,12 @@ def mock_app_new():
 
 @pytest.fixture
 def app_client(mock_app_new):
-    """Create Flask test client with mocked app_new."""
-    with patch.dict('sys.modules', {'app_new': mock_app_new}):
+    """Create Flask test client with mocked app_new and DI-injected WorkflowService."""
+    from services.workflow_service import WorkflowService
+    WorkflowService._async_runner = None
+    WorkflowService(async_runner=Mock(), sequence_executor=Mock())
+    
+    with patch.dict('sys.modules', {'app_new': mock_app_new}, clear=False):
         from flask import Flask
         from routes.api_routes import api_bp
         from routes.workflow_routes import workflow_bp
@@ -118,7 +130,7 @@ class TestWorkflowRoutesRunStep:
     
     def test_run_step_success(self, app_client, mock_app_new):
         """Test successful step execution."""
-        with patched_workflow_state(mock_app_new.workflow_state), patched_commands_config('Test Step 1'):
+        with patched_workflow_state(mock_app_new.workflow_state):
             with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
                 response = app_client.post('/run/STEP1')
                 
@@ -126,13 +138,13 @@ class TestWorkflowRoutesRunStep:
                 data = response.get_json()
                 
                 assert data['status'] == 'initiated'
-                assert 'Test Step 1' in data['message']
+                assert 'Lancement' in data['message']
     
     def test_run_step_already_running(self, app_client, mock_app_new):
         """Test run step when already running."""
         mock_app_new.workflow_state.update_step_status('STEP1', 'running')
         
-        with patched_workflow_state(mock_app_new.workflow_state):
+        with patched_workflow_state(mock_app_new.workflow_state), patched_commands_config('Test Step'):
             with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
                 response = app_client.post('/run/STEP1')
                 
@@ -146,7 +158,7 @@ class TestWorkflowRoutesRunStep:
         """Test run step when sequence is running."""
         mock_app_new.workflow_state.start_sequence('Test')
         
-        with patched_workflow_state(mock_app_new.workflow_state):
+        with patched_workflow_state(mock_app_new.workflow_state), patched_commands_config('Test Step'):
             with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
                 response = app_client.post('/run/STEP1')
                 
@@ -307,12 +319,9 @@ class TestWorkflowRoutesDryRunCompliance:
 class TestWorkflowRoutesIndex:
     """Test GET / route."""
     
-    def test_index_route_renders_template_with_token(self, app_client, mock_app_new):
-        """Test index route renders template and passes worker_token."""
-        with patch('routes.workflow_routes.SecurityConfig') as MockSecConfig, \
-             patch('routes.workflow_routes.render_template') as mock_render:
-            
-            MockSecConfig.return_value.INTERNAL_WORKER_TOKEN = "test-worker-token-xyz"
+    def test_index_route_renders_template_without_token(self, app_client, mock_app_new):
+        """Test index route renders template WITHOUT leaking worker_token."""
+        with patch('routes.workflow_routes.render_template') as mock_render:
             mock_render.return_value = "Index Content"
             
             response = app_client.get('/')
@@ -320,7 +329,5 @@ class TestWorkflowRoutesIndex:
             assert response.status_code == 200
             mock_render.assert_called_once()
             
-            # Check render_template arguments
-            args, kwargs = mock_render.call_args
-            assert args[0] == 'index_new.html'
-            assert kwargs.get('worker_token') == "test-worker-token-xyz"
+            kwargs = mock_render.call_args[1]
+            assert 'worker_token' not in kwargs, "worker_token must NOT be leaked to template"

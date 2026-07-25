@@ -169,8 +169,7 @@ function updateLog(content) {
 ### ✅ DOMBatcher + AppState (pattern recommandé)
 ```javascript
 // Approche v4.2 - sécurisée et performante
-import { domBatcher } from './utils/DOMBatcher.js';
-import { DOMUpdateUtils } from './utils/DOMUpdateUtils.js';
+import { domBatcher, DOMUpdateUtils } from './utils/DOMBatcher.js';
 import { appState } from './state/AppState.js';
 
 // Mises à jour groupées et sécurisées
@@ -195,15 +194,15 @@ appState.setState({ activeStepKeyForLogsPanel: 'STEP5' }, 'logs_panel_open');
 
 ```python
 # ❌ Ancienne approche (obsolète)
-@api_bp.route('/api/get_specific_log/<step_key>/<log_index>')
+@workflow_bp.route('/get_specific_log/<step_key>/<log_index>')
 def get_specific_log(step_key, log_index):
     config = COMMANDS_CONFIG[step_key.upper()]
     log_file = os.path.join(config['log_dir'], f"specific_log_{log_index}.txt")
     return {"file_path": log_file}
 
 # ✅ Nouvelle approche (v4.2)
-@api_bp.route('/api/get_specific_log/<step_key>/<log_index>')
-@measure_api('/api/get_specific_log/<step_key>/<log_index>')
+@workflow_bp.route('/get_specific_log/<step_key>/<log_index>')
+@measure_api('/workflow/get_specific_log')
 def get_specific_log(step_key, log_index):
     return WorkflowService.get_step_log_file(step_key, int(log_index))
 ```

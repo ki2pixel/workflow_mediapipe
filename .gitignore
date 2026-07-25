@@ -93,4 +93,9 @@ coral_env/
 # Lib TPU
 tmp_lib/
 libedgetpu.deb
- 
+
+# zencoder
+.zencoder/
+
+# commandcode
+.commandcode/

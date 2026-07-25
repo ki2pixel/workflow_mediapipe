@@ -155,49 +155,73 @@ class TestWorkflowServiceRunStep:
             assert result['status'] == 'error'
             assert 'WorkflowState not available' in result['message']
     
-    def test_run_step_without_run_process_async(self):
-        """Test run_step fails when run_process_async is not available."""
+    def test_run_step_falls_back_to_executor_import(self):
+        """Test run_step uses injected async_runner when set, falls back to executor module."""
+        # Reset the DI state
+        WorkflowService._async_runner = None
         workflow_state = build_workflow_state()
-        mock_app = Mock()
-        # Deliberately do NOT set run_process_async attribute
-        del mock_app.run_process_async
         
         with patched_workflow_state(workflow_state), patched_commands_config():
-            with patch.dict('sys.modules', {'app_new': mock_app}):
-                with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
+            with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
+                with patch('services.workflow_service.threading.Thread') as mock_thread:
                     result = WorkflowService.run_step('STEP1')
                     
-                    assert result['status'] == 'error'
-                    assert 'Execution function not available' in result['message']
+                    assert result['status'] == 'initiated'
+                    # Should have fallen back to importing from workflow_executor
+                    mock_thread.assert_called_once()
+    
+    def test_run_step_with_injected_async_runner(self):
+        """Test run_step uses the injected async_runner callable."""
+        WorkflowService._async_runner = None
+        mock_runner = Mock()
+        WorkflowService(async_runner=mock_runner)
+        workflow_state = build_workflow_state()
+        
+        with patched_workflow_state(workflow_state), patched_commands_config():
+            with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
+                with patch('services.workflow_service.threading.Thread') as mock_thread:
+                    result = WorkflowService.run_step('STEP1')
+                    
+                    assert result['status'] == 'initiated'
+                    # The thread target should be the injected mock_runner
+                    call_args = mock_thread.call_args
+                    assert call_args[1]['target'] is mock_runner
     
     def test_run_step_sequence_running(self):
         """Test run_step refuses when sequence is running."""
+        WorkflowService._async_runner = None
         workflow_state = build_workflow_state(is_sequence_running=True)
-        with patched_workflow_state(workflow_state), patched_commands_config(), patched_app_new(run_process_async=Mock()):
-            result = WorkflowService.run_step('STEP1')
-            
-            assert result['status'] == 'error'
-            assert 'séquence de workflow est en cours' in result['message']
-    
-    def test_run_step_already_running(self):
-        """Test run_step refuses when step is already running."""
-        workflow_state = build_workflow_state(is_step_running=True)
-        with patched_workflow_state(workflow_state), patched_commands_config('Test Step'), patched_app_new(run_process_async=Mock()):
-            result = WorkflowService.run_step('STEP1')
-            
-            assert result['status'] == 'error'
-            assert 'déjà en cours' in result['message']
-    
-    def test_run_step_success(self):
-        """Test successful run_step."""
-        workflow_state = build_workflow_state()
-        run_async = Mock()
-        with patched_workflow_state(workflow_state), patched_commands_config('Test Step'), patched_app_new(run_process_async=run_async):
+        with patched_workflow_state(workflow_state), patched_commands_config():
             with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
                 result = WorkflowService.run_step('STEP1')
                 
-                assert result['status'] == 'initiated'
-                assert 'Test Step' in result['message']
+                assert result['status'] == 'error'
+                assert 'séquence de workflow est en cours' in result['message']
+    
+    def test_run_step_already_running(self):
+        """Test run_step refuses when step is already running."""
+        WorkflowService._async_runner = None
+        workflow_state = build_workflow_state(is_step_running=True)
+        with patched_workflow_state(workflow_state), patched_commands_config('Test Step'):
+            with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
+                result = WorkflowService.run_step('STEP1')
+                
+                assert result['status'] == 'error'
+                assert 'déjà en cours' in result['message']
+    
+    def test_run_step_success(self):
+        """Test successful run_step with injected async runner."""
+        WorkflowService._async_runner = None
+        workflow_state = build_workflow_state()
+        run_async = Mock()
+        WorkflowService(async_runner=run_async)
+        with patched_workflow_state(workflow_state), patched_commands_config('Test Step'):
+            with patch('config.settings.config.BASE_PATH_SCRIPTS', Path('/tmp')):
+                with patch('services.workflow_service.threading.Thread') as mock_thread:
+                    result = WorkflowService.run_step('STEP1')
+                    
+                    assert result['status'] == 'initiated'
+                    assert 'Test Step' in result['message']
 
 
 class TestWorkflowServiceStopStep:

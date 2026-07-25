@@ -49,7 +49,8 @@ def _classify_url_type(url: str) -> str:
         if "/dropbox/" in u and ("workers.dev" in u or "worker" in u):
             return "dropbox"
         return "external"
-    except Exception:
+    except Exception as e:
+        logger.debug(f"WebhookService: _classify_url_type error for url={url}: {e}")
         return "external"
 
 
@@ -64,7 +65,8 @@ def _normalize_timestamp(ts: Optional[str]) -> Optional[str]:
         if not dt.tzinfo:
             return str(ts)
         return dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')
-    except Exception:
+    except Exception as e:
+        logger.debug(f"WebhookService: _normalize_timestamp parse error for '{ts}': {e}")
         return str(ts)
 
 

@@ -50,7 +50,8 @@ def _get_speaker_embeddings_min_segment_sec() -> float:
     try:
         value = float(raw)
         return value if value > 0 else 0.5
-    except Exception:
+    except Exception as e:
+        logger.debug(f"_get_speaker_embeddings_min_segment_sec: parse error for '{raw}': {e}")
         return 0.5
 
 
@@ -61,7 +62,8 @@ def _get_speaker_embeddings_max_segments_per_speaker() -> int:
     try:
         value = int(raw)
         return value if value > 0 else 10
-    except Exception:
+    except Exception as e:
+        logger.debug(f"_get_speaker_embeddings_max_segments_per_speaker: parse error for '{raw}': {e}")
         return 10
 
 

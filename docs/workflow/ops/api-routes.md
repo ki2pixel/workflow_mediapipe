@@ -49,109 +49,118 @@ def run_step(step_key: str):
 ### Pattern Contrôleur Mince
 
 ```python
-@api_bp.route('/api/step/<step_key>/run', methods=['POST'])
-@measure_api('/api/step/<step_key>/run')
+@workflow_bp.route('/run/<step_key>', methods=['POST'])
+@measure_api('/workflow/run')
+@require_internal_worker_token
 def run_step(step_key: str):
     """Déclenche l'exécution d'une étape du pipeline."""
-    payload = request.get_json()
-    validate_step(step_key)  # Validation entrée
-    workflow_service.run_step(step_key, payload)  # Délégation service
-    return jsonify({"status": "queued"})
+    # Validation et exécution déléguées
+    result = WorkflowService.run_step(step_key)
+    return jsonify(result)
 ```
 
 ### Sécurité par Tokens
 
+Le décorateur `@require_internal_worker_token` est appliqué de manière systématique sur les **10 endpoints sensibles** du pipeline (exécution, contrôle et administration système) :
+
+1. **`POST /run/<step_key>`** : Lancement d'une étape.
+2. **`POST /run_custom_sequence`** : Lancement d'une séquence personnalisée.
+3. **`POST /stop/<step_key>`** : Arrêt d'une étape en cours.
+4. **`POST /sequence/stop`** : Arrêt d'une séquence globale.
+5. **`POST /cancel/<step_key>`** : Annulation d'une étape.
+6. **`GET /get_specific_log_test/<step_key>/<log_index>`** : Test de lecture log (mode Debug uniquement).
+7. **`GET /api/ping`** : Diagnostic de communication.
+8. **`POST /api/performance/reset`** : Réinitialisation des métriques.
+9. **`POST /api/cache/open`** : Ouverture de dossier cache sur le serveur.
+10. **`POST /api/cache/clear`** : Nettoyage du cache applicatif.
+
 ```python
 from config.security import require_internal_worker_token
 
-@api_bp.route('/api/cache/open', methods=['POST'])
-@require_internal_worker_token
+@api_bp.route('/cache/open', methods=['POST'])
 @measure_api('/api/cache/open')
-def open_cache_folder():
-    """Ouverture explorateur (sécurisé)."""
-    return filesystem_service.open_path_in_explorer(...)
+@require_internal_worker_token
+def cache_open():
+    """Ouverture explorateur sécurisée par Token."""
+    return FilesystemService.open_path_in_explorer(...)
 ```
 
 ## Contrats API
 
-### POST `/api/step/<step_key>/run`
+### POST `/run/<step_key>`
 
 **Objectif** : Déclencher l'exécution d'une étape du pipeline.
 
-**Entrée** :
-```json
-{
-  "project_name": "projet_camille_001",
-  "video_name": "video1.mp4",
-  "sequence_id": "custom_seq_123"
-}
-```
+**Sécurité** : Nécessite `INTERNAL_WORKER_TOKEN` dans le header `X-Worker-Token`.
+
+**Entrée** : (Aucune payload requise en entrée, les paramètres proviennent de la configuration d'état globale).
 
 **Sortie** :
 ```json
 {
-  "status": "queued",
-  "step_key": "step5",
-  "sequence_id": "custom_seq_123",
-  "timestamp": "2026-02-04T13:45:00Z"
+  "status": "initiated",
+  "message": "Étape step5 initiée"
 }
 ```
 
 **Erreurs** :
-- `400 Bad Request` : step_key invalide ou payload malformé
-- `409 Conflict` : étape déjà en cours
-- `500 Internal Server Error` : échec service
+- `401 Unauthorized` : Token manquant ou invalide.
+- `404 Not Found` : Étape inconnue ou non configurée.
+- `409 Conflict` : Étape déjà en cours ou séquence en cours d'exécution.
+- `500 Internal Server Error` : Échec interne.
 
-### GET `/api/step_status/<step_key>`
+### GET `/status/<step_key>` (Route UI) ou GET `/api/step_status/<step_key>` (Route API)
 
-**Objectif** : Obtenir le statut d'une étape en temps réel.
+**Objectif** : Obtenir le statut détaillé ou l'avancement d'une étape en temps réel.
+
+**Sortie `/api/step_status/<step_key>`** :
+```json
+{
+  "status": "running",
+  "progress_current": 45,
+  "progress_total": 100,
+  "progress_text": "Processing frame 45/100"
+}
+```
+
+### GET `/get_specific_log/<step_key>/<log_index>`
+
+**Objectif** : Lire et récupérer le contenu d'un fichier de log spécifique d'une étape.
+
+**Paramètres** :
+- `step_key` : clé d'étape (ex: `step5`)
+- `log_index` : index du fichier log (0 = log le plus récent)
 
 **Sortie** :
 ```json
 {
-  "status": "running",
-  "progress": 45,
-  "current_file": "video1.mp4",
-  "estimated_completion": "2026-02-04T13:50:00Z"
+  "content": "[2026-07-15 11:30:00] [INFO] Starting face detection...\n[2026-07-15 11:30:02] [PROFILING] Processed 32 frames...",
+  "lines_read": 2,
+  "has_more": false
 }
-```
-
-### GET `/api/get_specific_log/<step_key>/<log_index>`
-
-**Objectif** : Streamer un fichier log avec pagination.
-
-**Paramètres** :
-- `step_key` : clé d'étape (ex: `step5`)
-- `log_index` : index du fichier log (0 = plus récent)
-- `offset` (query) : offset lignes pour pagination
-
-**Sortie** :
-```text
-[2026-02-04 13:45:12] [INFO] Starting video processing...
-[2026-02-04 13:45:13] [PROFILING] Frame 1000, FPS: 28.5
-...
 ```
 
 ### POST `/api/cache/open`
 
-**Objectif** : Ouvrir un dossier cache dans l'explorateur.
+**Objectif** : Ouvrir un dossier du cache sur l'explorateur de fichiers du serveur (server-side).
+
+**Sécurité** : Nécessite `INTERNAL_WORKER_TOKEN` dans le header `X-Worker-Token`.
 
 **Entrée** :
 ```json
 {
-  "folder_number": 5
+  "path": "/mnt/cache/115 Camille",
+  "select_parent": false
 }
 ```
 
 **Sortie** :
 ```json
 {
-  "status": "opened",
-  "path": "/mnt/cache/projets_extraits_20260204_05"
+  "success": true,
+  "message": "Dossier ouvert"
 }
 ```
-
-**Sécurité** : Nécessite `INTERNAL_WORKER_TOKEN` dans header `X-Worker-Token`
 
 ## Trade-offs par Type d'Endpoint
 

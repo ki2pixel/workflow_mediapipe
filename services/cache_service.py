@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 _SAFE_STEP_KEY_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
 
-# Lock to protect access to cache_instance and cache_stats
-_stats_lock = threading.Lock()
+# Reentrant lock to protect access to cache_instance and cache_stats
+_stats_lock = threading.RLock()
 
 # Global cache instance (will be initialized by Flask app)
 cache_instance: Optional[Cache] = None
@@ -209,7 +209,8 @@ class CacheService:
                 try:
                     cached_result = cache_instance.get("frontend_config")
                     if cached_result is not None:
-                        cache_stats["hits"] += 1
+                        with _stats_lock:
+                            cache_stats["hits"] += 1
                         logger.debug("Frontend config cache hit")
                         return cached_result
                 except Exception as cache_error:
@@ -221,7 +222,8 @@ class CacheService:
             commands_config = WorkflowCommandsConfig().get_config()
             if not commands_config:
                 logger.error("WorkflowCommandsConfig is empty or not available")
-                cache_stats["errors"] += 1
+                with _stats_lock:
+                    cache_stats["errors"] += 1
                 return {}
 
             result: Dict[str, Any] = {}
@@ -259,7 +261,8 @@ class CacheService:
             if cache_instance:
                 try:
                     cache_instance.set("frontend_config", result, timeout=300)
-                    cache_stats["misses"] += 1
+                    with _stats_lock:
+                        cache_stats["misses"] += 1
                     logger.debug("Frontend config cached successfully")
                 except Exception as cache_error:
                     logger.warning(f"Failed to cache frontend config: {cache_error}")
@@ -267,7 +270,8 @@ class CacheService:
             return result
         except Exception as e:
             logger.error(f"Frontend config cache error: {e}")
-            cache_stats["errors"] += 1
+            with _stats_lock:
+                cache_stats["errors"] += 1
             return {}
     
     @staticmethod
@@ -291,7 +295,8 @@ class CacheService:
             if cache_instance:
                 cached_result = cache_instance.get(cache_key)
                 if cached_result is not None:
-                    cache_stats["hits"] += 1
+                    with _stats_lock:
+                        cache_stats["hits"] += 1
                     return cached_result
 
             from services.workflow_service import WorkflowService
@@ -301,7 +306,8 @@ class CacheService:
             # Cache the result if cache is available
             if cache_instance:
                 cache_instance.set(cache_key, result, timeout=60)
-                cache_stats["misses"] += 1
+                with _stats_lock:
+                    cache_stats["misses"] += 1
 
             return result
             

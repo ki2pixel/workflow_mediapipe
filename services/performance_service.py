@@ -31,6 +31,7 @@ ALERT_THRESHOLDS = {
     "response_time_ms": 1000.0,
     "error_rate_percent": 5.0
 }
+ALERT_THRESHOLD_LOCK = threading.Lock()
 
 # Background monitoring state
 BACKGROUND_MONITORING_ACTIVE = False
@@ -305,7 +306,9 @@ class PerformanceService:
             
             # Check API response time
             if "response_time_ms" in metric:
-                if metric["response_time_ms"] > ALERT_THRESHOLDS["response_time_ms"]:
+                with ALERT_THRESHOLD_LOCK:
+                    resp_threshold = ALERT_THRESHOLDS["response_time_ms"]
+                if metric["response_time_ms"] > resp_threshold:
                     alerts.append({
                         "type": "slow_response",
                         "message": f"Slow API response: {metric['response_time_ms']}ms for {metric['endpoint']}",
@@ -315,7 +318,8 @@ class PerformanceService:
             
             # Add alerts to queue
             for alert in alerts:
-                PERFORMANCE_ALERTS.append(alert)
+                with PERFORMANCE_LOCK:
+                    PERFORMANCE_ALERTS.append(alert)
                 logger.warning(f"Performance alert: {alert['message']}")
                 
         except Exception as e:
@@ -332,7 +336,11 @@ class PerformanceService:
         try:
             alerts = []
             
-            if metric.get("cpu_percent", 0) > ALERT_THRESHOLDS["cpu_percent"]:
+            with ALERT_THRESHOLD_LOCK:
+                cpu_threshold = ALERT_THRESHOLDS["cpu_percent"]
+                mem_threshold = ALERT_THRESHOLDS["memory_percent"]
+            
+            if metric.get("cpu_percent", 0) > cpu_threshold:
                 alerts.append({
                     "type": "cpu_high",
                     "severity": "warning",
@@ -340,7 +348,7 @@ class PerformanceService:
                     "timestamp": metric["timestamp"]
                 })
             
-            if metric.get("memory_percent", 0) > ALERT_THRESHOLDS["memory_percent"]:
+            if metric.get("memory_percent", 0) > mem_threshold:
                 alerts.append({
                     "type": "memory_high",
                     "severity": "warning",
@@ -372,10 +380,11 @@ class PerformanceService:
         """
         global ALERT_THRESHOLDS
         
-        for key, value in thresholds.items():
-            if key in ALERT_THRESHOLDS:
-                ALERT_THRESHOLDS[key] = value
-                logger.info(f"Updated alert threshold {key} to {value}")
+        with ALERT_THRESHOLD_LOCK:
+            for key, value in thresholds.items():
+                if key in ALERT_THRESHOLDS:
+                    ALERT_THRESHOLDS[key] = value
+                    logger.info(f"Updated alert threshold {key} to {value}")
     
     @staticmethod
     def start_background_monitoring(interval_seconds: int = 30) -> None:

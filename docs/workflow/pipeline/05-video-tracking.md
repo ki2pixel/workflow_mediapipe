@@ -237,18 +237,35 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 
 ## Mode Expérimental OpenCV 5.0 DNN
 
-Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape 5 bascule vers le nouveau mode expérimental basé sur OpenCV 5.0 DNN :
+Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape 5 bascule vers le nouveau mode expérimental basé sur le moteur OpenCV 5.0 DNN :
 
 * **Script d'exécution** : `workflow_scripts/step5/run_tracking_cv5.py`
+* **Architecture de Planification Adaptative** :
+  Le traitement n'utilise plus un parallélisme simpliste par vidéo, mais s'appuie sur un **pool global adaptatif de workers** (`ProcessPoolExecutor` initialisé en mode `spawn`) distribuant des chunks de frames (`STEP5_CV5_CHUNK_FRAMES`, défaut `32`) de manière dynamique.
+  - **Orchestration Parent** : Le processus parent coordonne la lecture des vidéos (décodage), découpe les frames en lots de taille fixe, les envoie au pool de workers, collecte les résultats asynchrones, réassemble les frames dans le bon ordre chronologique (`_flush_cv5_ready_chunks`), applique le lissage temporel (filtres One Euro et Kalman), préserve la continuité du tracking et sérialise les résultats de manière atomique sur le disque.
+  - **Workers autonomes** : Les workers se contentent de réaliser les inférences sur les chunks reçus sans interagir avec l'état global ou le système de fichiers, éliminant ainsi toute contention.
 * **Cascade d'Inférence** :
   1. **Détection (BlazeFace)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `blazeface.onnx`) pour obtenir la boîte englobante et l'emplacement des yeux.
   2. **Alignement Géométrique** : Crop du visage et transformation affine à 192x192 pixels.
   3. **Landmarks (FaceMesh)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `facemesh.onnx`) pour extraire 468 points faciaux 3D.
   4. **Animation (Face Blendshapes)** : Inférence du modèle TFLite `face_blendshapes.tflite` effectuée sur le CPU (en raison du padding 146 points pour l'iris).
-  5. **Lissage Temporel** : Application d'un filtre One Euro et d'un filtre de Kalman à 52 dimensions pour stabiliser les expressions (ARKit).
+  5. **Lissage Temporel (Parent)** : Application des filtres stabilisateurs (One Euro et Kalman) sur les 52 coefficients ARKit par le processus parent.
 * **Détecteur d'Objets Fallback (YOLOv11 ONNX)** : Si `STEP5_ENABLE_OBJECT_DETECTION=1` est activé, YOLOv11 ONNX (`yolo11n.onnx`) prend le relais si aucun visage n'est détecté.
+* **Séparation de Matériel et GPU Decoupling** :
+  - La variable d'environnement `STEP5_CV5_INFERENCE_DEVICE` (valeurs `cpu` ou `cuda`) détermine l'appareil d'inférence d'OpenCV DNN, de manière totalement découplée de `STEP5_ENABLE_GPU` (qui reste réservé pour InsightFace).
+  - En mode **CPU** (`STEP5_CV5_INFERENCE_DEVICE=cpu`), le pool s'exécute en parallèle sous le budget configuré par `STEP5_CV5_CPU_BUDGET`.
+  - En mode **CUDA** (`STEP5_CV5_INFERENCE_DEVICE=cuda`), OpenCV DNN utilise ONNX Runtime CUDA, mais le pool est bridé à **1 seul worker actif** pour éviter la contention de mémoire VRAM et les plantages CUDA.
 * **Multiprocessing spawn-safe** : Le traitement s'appuie sur le multiprocessing de type `spawn` (les modèles ne sont pas partagés entre processus parents/enfants) avec une configuration `cv2.setNumThreads(1)` forcée dans les workers pour éliminer la contention et l'oversubscription CPU.
 * **Consommation Mémoire O(1)** : Utilisation obligatoire des classes `StreamingJSONOutput` ou `StreamingNDJSONOutput` pour sérialiser les frames sur le disque à la volée.
+
+### Paramètres de Planification Adaptative (.env)
+
+* `STEP5_CV5_INFERENCE_DEVICE` (`cpu` | `cuda`) : Périphérique cible pour l'inférence OpenCV DNN (défaut : `cpu`).
+* `STEP5_CV5_CPU_BUDGET` (défaut : `15`) : Budget de workers maximum alloué au pool global CPU.
+* `STEP5_CV5_MAX_ACTIVE_VIDEOS` (défaut : `4`) : Nombre maximum de vidéos décodées simultanément.
+* `STEP5_CV5_MIN_FRAMES_PER_WORKER` (défaut : `80`) : Nombre minimum de frames requises pour allouer un worker.
+* `STEP5_CV5_CHUNK_FRAMES` (défaut : `32`) : Taille de chunk de frames soumise à chaque exécution de worker.
+* `STEP5_CV5_MAX_WORKERS_BY_MEMORY` (défaut : `15`) : Limite de workers calculée selon la mémoire physique disponible.
 
 ## Trade-offs par Configuration Workers
 
@@ -258,7 +275,7 @@ Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape
 | **15** (défaut) | Optimale | Équilibrée | Production standard |
 | **20+** | Maximale | Surcharge CPU | Serveur puissant |
 
-> **Note** : Les workers ne s'appliquent qu'à MediaPipe. InsightFace utilise toujours 1 worker GPU unique.
+> **Note** : Les configurations de workers s'appliquent à MediaPipe (via le pool standard de workers) et à OpenCV 5.0 DNN (via le pool adaptatif avec budget CPU défini par `STEP5_CV5_CPU_BUDGET`). InsightFace utilise toujours 1 worker GPU unique.
 
 ## Analogie : Studio de Capture vs Laboratoire
 

@@ -13,6 +13,7 @@ from services.monitoring_service import MonitoringService
 from services.workflow_service import WorkflowService
 from services.performance_service import PerformanceService
 from services.filesystem_service import FilesystemService
+from services.exceptions import WorkflowError
 from services.lemonfox_audio_service import LemonfoxAudioService
 from services.deepinfra_audio_service import DeepinfraAudioService
 
@@ -515,6 +516,7 @@ def stats_history():
 
 @api_bp.route('/step4/lemonfox_audio', methods=['POST'])
 @measure_api('/api/step4/lemonfox_audio')
+@require_internal_worker_token
 def lemonfox_audio_analysis():
     """
     Process video audio analysis using Lemonfox Speech-to-Text API.
@@ -665,6 +667,7 @@ def lemonfox_audio_analysis():
 
 @api_bp.route('/step4/deepinfra_audio', methods=['POST'])
 @measure_api('/api/step4/deepinfra_audio')
+@require_internal_worker_token
 def deepinfra_audio_analysis():
     """Process video audio analysis using DeepInfra OpenAI-compatible STT API."""
     try:
