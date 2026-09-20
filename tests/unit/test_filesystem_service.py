@@ -215,9 +215,10 @@ def test_format_bytes_human_negative():
     assert result == "0B"
 
 
-def test_find_videos_for_tracking(tmp_path):
+def test_find_videos_for_tracking(tmp_path, monkeypatch):
     """Test finding videos for tracking."""
     # Given: A projects directory with videos, one of which already has a sibling JSON
+    monkeypatch.setenv("SKIP_MOV_FILES", "true")
     projets = tmp_path / "projets_extraits"
     projets.mkdir()
     
@@ -229,9 +230,30 @@ def test_find_videos_for_tracking(tmp_path):
     json2 = projets / "video2.json"
     json2.touch()
 
+    logo = projets / "logo.mov"
+    logo.touch()
+
     # When: Searching for videos needing tracking
     videos = FilesystemService.find_videos_for_tracking(tmp_path, None, None)
 
-    # Then: Only the video without a sibling JSON is returned
+    # Then: Only the video without a sibling JSON is returned, the preserved .mov is skipped
     assert len(videos) == 1
     assert "video1.mp4" in videos[0]
+
+
+def test_find_videos_for_tracking_includes_mov_when_preservation_disabled(tmp_path, monkeypatch):
+    """Test that .mov files are candidates again when SKIP_MOV_FILES is disabled."""
+    # Given: La préservation désactivée et un projet contenant un .mov
+    monkeypatch.setenv("SKIP_MOV_FILES", "false")
+    projets = tmp_path / "projets_extraits"
+    projets.mkdir()
+
+    (projets / "video1.mp4").touch()
+    (projets / "logo.mov").touch()
+
+    # When: Searching for videos needing tracking
+    videos = FilesystemService.find_videos_for_tracking(tmp_path, None, None)
+
+    # Then: Both videos are returned
+    assert len(videos) == 2
+    assert any("logo.mov" in v for v in videos)

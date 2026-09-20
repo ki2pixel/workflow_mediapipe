@@ -53,6 +53,7 @@ try:
     from utils.tracking_optimizations import apply_tracking_and_management
     from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
     from utils import tpu_facemesh_utils as face_utils
+    from utils.media_filters import split_preserved_media
 except ImportError as e:
     logging.critical(f"ERREUR: Impossible d'importer les utilitaires. Vérifiez PYTHONPATH: {e}")
     sys.exit(1)
@@ -885,6 +886,13 @@ def main():
             sys.exit(1)
     else:
         videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}')]
+
+        # Scan de secours : écarter les logos .mov préservés (alpha conservé pour l'étape 8)
+        videos, preserved_logos = split_preserved_media(videos)
+        if preserved_logos:
+            logging.info(
+                f"{len(preserved_logos)} .mov logo(s) préservé(s) ignoré(s) par le tracking (alpha conservé pour l'étape 8)."
+            )
     total_videos = len(videos)
     
     if total_videos == 0:

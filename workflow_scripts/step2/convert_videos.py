@@ -17,6 +17,12 @@ from datetime import datetime
 import concurrent.futures
 import threading
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import is_preserved_media, split_preserved_media
+
 # --- Configuration ---
 WORK_DIR = Path(os.getcwd())
 TARGET_FPS = 25.0
@@ -159,6 +165,14 @@ def find_and_analyze_videos():
             if file.lower().endswith(VIDEO_EXTENSIONS):
                 videos_to_check.append(Path(root) / file)
 
+    videos_to_check, preserved_logos = split_preserved_media(videos_to_check)
+    if preserved_logos:
+        for logo in preserved_logos:
+            logging.info(f"--- Logo .mov préservé (non converti, alpha intact): {logo.name} ---")
+        logging.info(
+            f"{len(preserved_logos)} .mov préservé(s) ignoré(s) par la conversion (alpha conservé pour l'étape 8)."
+        )
+
     logging.info(f"{len(videos_to_check)} vidéo(s) trouvée(s). Analyse FFprobe en parallèle...")
     
     analyzed_videos = []
@@ -178,6 +192,10 @@ def process_single_video(video_info, use_gpu=True, is_fallback=False):
     video_path = video_info['path']
     needs_fps_fix = video_info['needs_fps_fix']
     audio_codec = video_info['audio_codec']
+
+    if is_preserved_media(video_path):
+        logging.info(f"Logo .mov préservé ignoré par le worker: {video_path.name}")
+        return True
     
     worker_type = 'GPU' if use_gpu else 'CPU'
     

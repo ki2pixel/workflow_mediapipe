@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import ijson
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import split_preserved_media
+
 # Constants (Magic Strings)
 KEY_FRAMES_ANALYSIS = "frames_analysis"
 KEY_TRACKED_OBJECTS = "tracked_objects"
@@ -841,6 +847,12 @@ def process_directory(base_path: str, keyword: str = "Camille"):
         logger.info(f"\n--- Traitement du dossier : {docs_path} ---")
 
         video_files = [p for p in docs_path.iterdir() if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS]
+        video_files, preserved_logos = split_preserved_media(video_files)
+        if preserved_logos:
+            logger.info(
+                "  - %d .mov préservé(s) ignoré(s) (logo alpha, conservé pour l'étape 8).",
+                len(preserved_logos),
+            )
         if not video_files:
             logger.info("Aucune vidéo trouvée dans docs/.")
             continue

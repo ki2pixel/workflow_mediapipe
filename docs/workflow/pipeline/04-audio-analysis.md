@@ -227,7 +227,7 @@ Pense à l'analyse audio comme un **studio mixage** vs un **service de transcrip
 ### Vidéos en Entrée
 
 ```python
-# Formats supportés (excluant .mov souvent sans audio)
+# Formats supportés (.mov exclus : logos animés à couche alpha, préservés — règle SKIP_MOV_FILES)
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
 ```
 
@@ -592,7 +592,7 @@ for frame_data in audio_analysis['frames_analysis']:
 **Solution** : Générer token sur https://huggingface.co/settings/tokens et configurer `HUGGINGFACE_HUB_TOKEN`.
 
 ### Piège #3 : Fichiers MOV sans audio
-**Solution** : Les fichiers `.mov` sont automatiquement exclus par le système.
+**Solution** : Les fichiers `.mov` sont automatiquement exclus par le système (règle partagée `SKIP_MOV_FILES`, voir étape 2 : logos animés à couche alpha).
 
 ### Piège #4 : OOM GPU sur vidéos longues
 **Solution** : Configuration `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32` et fallback CPU automatique.

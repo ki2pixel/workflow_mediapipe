@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="csrf-token" content="{{ csrf_token() if csrf_token else '' }}">
+    <meta name="worker-token" content="{{ worker_token if worker_token else '' }}">
     <title>Workflow Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}?v={{ cache_buster }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v={{ cache_buster }}">

@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple, Dict
 from datetime import datetime, date
 
 from config.settings import config
+from utils.media_filters import is_preserved_media
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +328,7 @@ class FilesystemService:
 
         found_videos = 0
         already_processed = 0
+        preserved_media = 0
         
         try:
             for video_file in search_base.rglob("*"):
@@ -334,8 +336,14 @@ class FilesystemService:
                     continue
                 if video_file.suffix.lower() not in video_extensions:
                     continue
-                
+
                 found_videos += 1
+
+                if is_preserved_media(video_file):
+                    preserved_media += 1
+                    logger.debug(f"Preserved media skipped: {video_file}")
+                    continue
+
                 json_file = video_file.with_suffix('.json')
                 
                 if json_file.exists():
@@ -346,10 +354,11 @@ class FilesystemService:
                 logger.debug(f"Video to process found: {video_file}")
 
             logger.info(
-                f"Videos detected: {found_videos}, already processed (exact JSON sibling): {already_processed}, to process: {len(videos_to_process)}"
+                f"Videos detected: {found_videos}, already processed (exact JSON sibling): {already_processed}, "
+                f"preserved .mov skipped: {preserved_media}, to process: {len(videos_to_process)}"
             )
             
-            if len(videos_to_process) == 0 and found_videos > 0 and already_processed == 0:
+            if len(videos_to_process) == 0 and found_videos > 0 and already_processed == 0 and preserved_media == 0:
                 logger.warning(
                     "No <stem>.json found but videos exist. Check write permissions and Step5 output paths."
                 )

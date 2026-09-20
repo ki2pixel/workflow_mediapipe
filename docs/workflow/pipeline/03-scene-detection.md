@@ -157,6 +157,8 @@ STEP3_TORCHSCRIPT=true
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
 ```
 
+⚠️ Les `.mov` sont écartés au filtrage : ce sont des logos animés à couche alpha, préservés par l'étape 2 (règle partagée `SKIP_MOV_FILES`). Aucun CSV de scènes n'est produit pour eux.
+
 ### Spécifications d'Entrée
 
 - **Framerate** : 25.0 FPS (standardisé par STEP2)

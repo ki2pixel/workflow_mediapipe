@@ -10,6 +10,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import is_preserved_media
+
 
 def _configure_file_logger(log_dir: Path) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -26,7 +32,7 @@ def _find_videos_for_audio_analysis(work_dir: Path) -> list[Path]:
     all_videos = [p for ext in video_extensions for p in work_dir.rglob(f"*{ext}")]
 
     for video_path in all_videos:
-        if video_path.suffix.lower() == ".mov":
+        if is_preserved_media(video_path):
             continue
         output_json_path = video_path.with_name(f"{video_path.stem}_audio.json")
         if not output_json_path.exists():

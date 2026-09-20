@@ -67,14 +67,16 @@ python ../workflow_scripts/step2/convert_videos.py
 
 ```
 # Avant conversion
-video_29fps.mov    # 29.97 FPS
+video_29fps.avi    # 29.97 FPS
 video_24fps.mp4    # 24.00 FPS  
 video_25fps.avi    # 25.00 FPS (pas de conversion)
+logo_alpha.mov     # Logo animé à couche alpha (préservé)
 
 # Après conversion
-video_29fps.mov    # 25.00 FPS converti
+video_29fps.avi    # 25.00 FPS converti
 video_24fps.mp4    # 25.00 FPS converti
 video_25fps.avi    # 25.00 FPS (inchangé)
+logo_alpha.mov     # Inchangé : ni converti, ni supprimé (alpha intact)
 ```
 
 ## Configuration Essentielle
@@ -96,6 +98,10 @@ STEP2_AUDIO_BITRATE=192000
 
 # Conversions parallèles maximum
 STEP2_MAX_CONCURRENT=1
+
+# Préservation des logos animés .mov à couche alpha (défaut: true)
+# false = ancien comportement (.mov converti en .mp4, couche alpha perdue)
+SKIP_MOV_FILES=true
 ```
 
 ### Paramètres d'Encodage
@@ -127,6 +133,8 @@ STEP2_MAX_CONCURRENT=1
 VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv')
 ```
 
+⚠️ `.mov` est détecté mais **exclu du traitement par défaut** : ces fichiers sont des logos animés à couche alpha, préservés tels quels (voir « Médias Préservés » ci-dessous).
+
 ### Spécifications de Sortie
 
 - **Framerate** : 25.0 FPS exactement
@@ -134,6 +142,20 @@ VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv')
 - **Qualité** : CRF/CQ 28 (équivalent visuel)
 - **Format pixel** : yuv420p (compatibilité maximale)
 - **Audio** : AAC 192k ou copie directe
+
+## Médias Préservés : Logos `.mov` Alpha
+
+Certaines archives livrent des `.mov` qui ne sont **pas des vidéos du tournage** mais des logos animés à couche alpha, ajoutés manuellement en post-production. Les convertir (encodage H.264 en `yuv420p` + suppression de l'original) détruirait la couche alpha : l'étape 2 les **ignore donc par défaut**.
+
+- Détection : tous les fichiers `.mov` — même règle que l'étape 4, qui les ignorait déjà.
+- Aucun appel `ffprobe`/`ffmpeg` : aucun slot de progression consommé puisque `TOTAL_VIDEOS_TO_PROCESS` ne compte que les vraies vidéos.
+- Ils traversent les étapes 3 à 7 sans être analysés, puis sont copiés tels quels par l'étape 8 dans le `docs/` du projet finalisé.
+- Pour rétablir l'ancien comportement (conversion `.mov` → `.mp4`), mettre `SKIP_MOV_FILES=false`.
+
+```
+--- Logo .mov préservé (non converti, alpha intact): logo_alpha.mov ---
+1 .mov préservé(s) ignoré(s) par la conversion (alpha conservé pour l'étape 8).
+```
 
 ## Trade-offs par Mode de Conversion
 
@@ -441,10 +463,13 @@ ws.update_step_progress("STEP2", current=1, total=5)
 ### Piège #4 : Corruption fichiers
 **Solution** : Remplacement atomique avec fichiers temporaires et nettoyage automatique.
 
+### Piège #5 : Perte de la couche alpha d'un logo `.mov`
+**Solution** : Les `.mov` sont préservés par défaut (`SKIP_MOV_FILES=true`). Ne passer à `false` que si l'alpha peut être sacrifié — la conversion supprime l'original.
+
 L'étape 2 transforme tes vidéos hétérogènes en un ensemble cohérent et optimisé, prêt pour l'analyse automatisée des scènes. La standardisation temporelle garantit que toutes les étapes suivantes travailleront avec des données parfaitement synchronisées.
 
 ---
 
 ## Golden Rule
 
-**Standardiser 25 FPS avant tout traitement ; sinon tu crées des désynchronisations temporelles dans tout le pipeline.**
+**Standardiser 25 FPS avant tout traitement ; sinon tu crées des désynchronisations temporelles dans tout le pipeline.** Seuls les logos `.mov` à couche alpha échappent volontairement à cette règle : ils sont préservés, jamais convertis.

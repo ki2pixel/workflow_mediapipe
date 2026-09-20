@@ -84,11 +84,18 @@ archives/
 ├── projet_camille_001/
 │   └── docs/
 │       ├── video1.mp4
+│       ├── logo_alpha.mov        # logo préservé (non converti, alpha intact)
 │       ├── video1.csv
 │       ├── video1_audio.json
 │       ├── video1_tracking.json
 │       └── video1_ae.json
 ```
+
+### Médias préservés
+
+Les logos animés `.mov` (couche alpha) ne sont ni convertis (étape 2) ni analysés (étapes 3 à 7) : ils traversent le pipeline tels quels et sont copiés dans le `docs/` du projet finalisé (voir `SKIP_MOV_FILES`).
+
+Cas limite : un projet qui ne contiendrait **que** ces `.mov` (aucun `.mp4`) n'est pas considéré comme prêt et reste exposé au nettoyage des orphelins (48 h) — l'avertissement correspondant est journalisé.
 
 ## Configuration Essentielle
 

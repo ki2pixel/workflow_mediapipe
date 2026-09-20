@@ -386,6 +386,9 @@ class Config:
             or self.STEP5_CV5_CPU_BUDGET
         )
         
+        # Médias préservés (logos animés .mov avec couche alpha)
+        self.SKIP_MOV_FILES = _parse_bool(os.environ.get('SKIP_MOV_FILES'), default=True)
+
         # Step 5 default tracking variables (C3/C4)
         self.TRACKING_DISABLE_GPU = _parse_bool(os.environ.get('TRACKING_DISABLE_GPU'), default=True)
         self.TRACKING_CPU_WORKERS = _parse_optional_positive_int(os.environ.get('TRACKING_CPU_WORKERS')) or 15
@@ -909,6 +912,11 @@ class Config:
     # ========================
     USE_OPENCV5_STEP3: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
     USE_OPENCV5_STEP5: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
+
+    # ========================
+    # Médias préservés (logos .mov alpha)
+    # ========================
+    SKIP_MOV_FILES: bool = _parse_bool(os.environ.get('SKIP_MOV_FILES'), default=True)
     STEP5_CV5_NUM_WORKERS: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
     STEP5_CV5_WORKER_MODE: str = os.environ.get('STEP5_CV5_WORKER_MODE', 'auto').strip().lower()
     STEP5_CV5_INFERENCE_DEVICE: str = (

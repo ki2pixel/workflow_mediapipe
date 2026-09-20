@@ -47,6 +47,19 @@ def clean_workflow_state():
     reset_workflow_state()
 
 
+@pytest.fixture(autouse=True)
+def clean_cache_service():
+    """Réinitialise proprement le singleton CacheService avant et après chaque test."""
+    import services.cache_service as cs
+    with cs._stats_lock:
+        cs.cache_instance = None
+    cs.CacheService.reset_stats()
+    yield
+    with cs._stats_lock:
+        cs.cache_instance = None
+    cs.CacheService.reset_stats()
+
+
 @pytest.fixture
 def mock_workflow_state():
     """Mock WorkflowState with sensible defaults."""

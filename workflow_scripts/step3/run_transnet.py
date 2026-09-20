@@ -24,6 +24,12 @@ import time
 import queue
 import threading
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import split_preserved_media
+
 # --- Configuration ---
 WORK_DIR = Path(os.getcwd())
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
@@ -422,6 +428,11 @@ def main():
 
     # Trouver les vidéos à traiter
     videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_suffix('.csv').exists()]
+    videos, preserved_logos = split_preserved_media(videos)
+    if preserved_logos:
+        logging.info(
+            f"{len(preserved_logos)} .mov logo(s) préservé(s) ignoré(s) par la détection de scènes (alpha conservé pour l'étape 8)."
+        )
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
     print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")

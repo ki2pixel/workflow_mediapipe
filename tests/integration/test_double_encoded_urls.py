@@ -21,8 +21,8 @@ def test_double_encoded_urls_no_duplicate_download(tmp_path):
 
     # Clean up module cache
     import sys
-    for mod in list(sys.modules.keys()):
-        if mod.startswith('services.') or mod.startswith('config.'):
+    for mod in ['config.settings', 'services.webhook_service', 'services.download_history_repository', 'services.csv_service']:
+        if mod in sys.modules:
             del sys.modules[mod]
 
     # Import after env setup
@@ -95,8 +95,8 @@ def test_csv_monitoring_dedup_across_batches(tmp_path):
 
     # Clean up module cache
     import sys
-    for mod in list(sys.modules.keys()):
-        if mod.startswith('services.') or mod.startswith('config.'):
+    for mod in ['config.settings', 'services.webhook_service', 'services.download_history_repository', 'services.csv_service']:
+        if mod in sys.modules:
             del sys.modules[mod]
 
     from services.csv_service import CSVService

@@ -87,6 +87,12 @@ except ImportError as e:
     logging.critical(f"ERREUR: scipy ou scikit-learn manquant. Installez-les dans coral_env (pip install scipy scikit-learn). Erreur: {e}")
     sys.exit(1)
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import split_preserved_media
+
 # --- Configuration Globale ---
 WORK_DIR = Path(os.getcwd())
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent
@@ -1070,6 +1076,11 @@ def main():
         sys.exit(1)
 
     videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_name(f"{p.stem}_audio.json").exists()]
+    videos, preserved_logos = split_preserved_media(videos)
+    if preserved_logos:
+        logging.info(
+            f"{len(preserved_logos)} .mov logo(s) préservé(s) ignoré(s) par l'analyse audio (alpha conservé pour l'étape 8)."
+        )
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
 

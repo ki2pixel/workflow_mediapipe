@@ -1,15 +1,14 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active.
+- Diagnostic et résolution de l'erreur d'exécution / blocage STEP2 lors du lancement de séquence.
 
 ## Dernière Session Clôturée
-- [2026-07-25 23:58:00] Remédiation Console & Isolation Bruit Extensions Frontend (COMPLET) :
-  - **Tri & Isolation des Erreurs Console** : Bruit des extensions navigateur tierces (`contentscript.js`, `inpage.js`, `moz-extension://`, `InstallTrigger`, `Window.fullScreen`, `MaxListenersExceededWarning`) identifié et isolé comme non applicatif.
-  - **Correction SyntaxError Critique** : Suppression de la double déclaration `export const themeManager = new ThemeManager();` à la fin de `static/themeManager.js` (lignes 179/184) pour restaurer le pattern Singleton strict sans ré-assignation illégale.
-  - **Audit CSP** : Confirmation de la conformité de `templates/index_new.html` avec `script-src 'self'`. Aucun script inline JavaScript exécutable n'est présent (le seul bloc inline étant un conteneur de données `type="application/json"`).
-  - **Tests & Non-Régression** : Ajout de la suite de tests unitaires `tests/frontend/themeManager.test.mjs` et validation à 100% des 10 suites de tests Node ESM (`npm run test:frontend`).
+- [2026-07-27 10:52:30] Correction Authentification API Frontend HTTP 401 & STEP1/STEP2 (COMPLET) :
+  - **Identification Cause Racine** : L'échec au lancement de la STEP2 (`Erreur HTTP 401` dans `apiService.js`) provenait de l'absence du tag `<meta name="worker-token">` dans `templates/index_new.html`, empêchant le frontend d'envoyer l'en-tête de sécurité `X-Worker-Token` requis par les décorateurs `@require_internal_worker_token` sur `/run/<step_key>` et `/run_custom_sequence`.
+  - **Injecteur de Contexte Security** : Ajout du `@app.context_processor` (`inject_security_context`) dans `app_new.py` fournissant dynamiquement `worker_token` à l'ensemble des templates Jinja2.
+  - **Mise à Jour Template UI** : Insertion de `<meta name="worker-token" content="{{ worker_token if worker_token else '' }}">` dans la section `<head>` de `templates/index_new.html`.
+  - **Validation & Non-Régression** : Succès à 100% des tests unitaires backend (`pytest tests/unit/`, 30/30) et frontend (`npm run test:frontend`).
 
 ## Prochaine Action
-- Aucune action planifiée.
-
+- Lancement et monitoring du workflow complet de la STEP2 à la STEP8 sur le projet '145 Camille'.

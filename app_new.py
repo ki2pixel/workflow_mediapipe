@@ -130,6 +130,13 @@ def create_app(config_class=None):
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(workflow_bp)
 
+    @app.context_processor
+    def inject_security_context():
+        from config.security import SecurityConfig
+        return {
+            'worker_token': SecurityConfig().INTERNAL_WORKER_TOKEN or ''
+        }
+
     logger.info("Flask application created with modular architecture")
     return app
 

@@ -19,9 +19,10 @@ from services.filesystem_service import FilesystemService
 class TestWorkflowServiceSTEP5Integration:
     """Integration tests for STEP5 (tracking) workflow."""
     
-    def test_prepare_tracking_step_with_videos(self, tmp_path):
+    def test_prepare_tracking_step_with_videos(self, tmp_path, monkeypatch):
         """Test STEP5 preparation when videos are found."""
-        # Create test video files without JSON
+        # Given: un projet contenant une vidéo réelle et un logo .mov préservé
+        monkeypatch.setenv("SKIP_MOV_FILES", "true")
         projets_dir = tmp_path / "projets_extraits"
         project_dir = projets_dir / "test_project"
         project_dir.mkdir(parents=True)
@@ -32,16 +33,39 @@ class TestWorkflowServiceSTEP5Integration:
         video1.touch()
         video2.touch()
         
-        # Should find both videos
+        # When: préparation de l'étape de tracking
         videos = WorkflowService.prepare_tracking_step(
             projets_dir,
             keyword="",
             subdir=""
         )
         
+        # Then: seul le .mp4 est retenu, le logo .mov est préservé
+        assert videos is not None
+        assert len(videos) == 1
+        assert any('video1.mp4' in v for v in videos)
+        assert not any('video2.mov' in v for v in videos)
+
+    def test_prepare_tracking_step_includes_mov_when_preservation_disabled(self, tmp_path, monkeypatch):
+        """Test STEP5 preparation keeps .mov candidates when preservation is off."""
+        # Given: la préservation désactivée et un projet mixte
+        monkeypatch.setenv("SKIP_MOV_FILES", "false")
+        projets_dir = tmp_path / "projets_extraits"
+        project_dir = projets_dir / "test_project"
+        project_dir.mkdir(parents=True)
+        (project_dir / "video1.mp4").touch()
+        (project_dir / "video2.mov").touch()
+
+        # When: préparation de l'étape de tracking
+        videos = WorkflowService.prepare_tracking_step(
+            projets_dir,
+            keyword="",
+            subdir=""
+        )
+
+        # Then: les deux vidéos sont candidates
         assert videos is not None
         assert len(videos) == 2
-        assert any('video1.mp4' in v for v in videos)
         assert any('video2.mov' in v for v in videos)
     
     def test_prepare_tracking_step_no_videos(self, tmp_path):

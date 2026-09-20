@@ -25,6 +25,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from config.settings import config
 from services.results_archiver import ResultsArchiver, SCENES_SUFFIX, AUDIO_SUFFIX, TRACKING_SUFFIX, VIDEO_METADATA_NAME
+from utils.media_filters import is_preserved_media
 
 # --- Configuration ---
 WORK_DIR = Path(os.getcwd())
@@ -45,6 +46,18 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+
+def _has_preserved_media_only(project_dir: Path) -> bool:
+    """Vrai si le projet ne contient que des médias préservés (.mov) et aucune vidéo exploitable."""
+    try:
+        has_preserved = any(is_preserved_media(p) for p in project_dir.rglob("*") if p.is_file())
+        if not has_preserved:
+            return False
+        return not any(project_dir.rglob("*.mp4"))
+    except Exception as e:
+        logging.debug(f"Analyse des médias préservés impossible pour '{project_dir}': {e}")
+        return False
 
 
 def find_projects_to_finalize():
@@ -83,6 +96,11 @@ def find_projects_to_finalize():
             projects.append(project_dir)
         else:
             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
+            if _has_preserved_media_only(project_dir):
+                logging.warning(
+                    f"Projet '{project_dir.name}' : uniquement des .mov préservés (logos alpha), aucune vidéo .mp4. "
+                    "Il ne sera pas finalisé et reste exposé au nettoyage des orphelins."
+                )
 
     return projects
 

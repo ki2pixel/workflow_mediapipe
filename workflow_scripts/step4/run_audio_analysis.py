@@ -33,6 +33,12 @@ import torch
 from pathlib import Path
 from datetime import datetime
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import split_preserved_media
+
 # --- Configuration ---
 WORK_DIR = Path(os.getcwd())
 VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm')
@@ -79,13 +85,11 @@ def find_videos_for_audio_analysis():
 
     all_videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}')]
 
-    skipped_mov = 0
-    filtered_videos = []
-    for video_path in all_videos:
-        if video_path.suffix.lower() == '.mov':
-            skipped_mov += 1
-            continue
-        filtered_videos.append(video_path)
+    filtered_videos, preserved_logos = split_preserved_media(all_videos)
+    if preserved_logos:
+        logging.info(
+            f"{len(preserved_logos)} .mov logo(s) préservé(s) ignoré(s) par l'analyse audio (alpha conservé pour l'étape 8)."
+        )
 
     for video_path in filtered_videos:
         output_json_path = video_path.with_name(f"{video_path.stem}{OUTPUT_SUFFIX}")

@@ -278,7 +278,7 @@ def _run_process_async_internal(step_key: str):
             
             if not videos_to_process:
                 logger.info(f"{step_key}: No videos require tracking, completing immediately")
-                workflow_state.append_step_log(step_key, "Toutes les vidéos candidates semblent déjà traitées (aucun .mp4/.mov/... sans .json trouvé). Étape terminée.\n")
+                workflow_state.append_step_log(step_key, "Toutes les vidéos candidates semblent déjà traitées (aucun .mp4/.avi/... sans .json trouvé). Étape terminée.\n")
                 workflow_state.update_step_info(step_key, status=StepStatus.COMPLETED.value, return_code=0)
                 start_time = workflow_state.get_step_field(step_key, 'start_time_epoch')
                 workflow_state.set_step_field(step_key, 'duration_str', WorkflowService.calculate_step_duration(start_time))

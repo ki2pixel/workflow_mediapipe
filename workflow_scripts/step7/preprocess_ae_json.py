@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import ijson
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from utils.media_filters import split_preserved_media
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -525,6 +531,9 @@ def _iter_videos_in_docs(docs_dir: Path) -> List[Path]:
     for p in docs_dir.iterdir():
         if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
             videos.append(p)
+    videos, preserved_logos = split_preserved_media(videos)
+    if preserved_logos:
+        logger.info("%d .mov préservé(s) ignoré(s) (logo alpha, conservé pour l'étape 8).", len(preserved_logos))
     return videos
 
 def _resolve_tracking_paths(docs_dir: Path, stem: str) -> Tuple[Optional[Path], Optional[Path]]:
