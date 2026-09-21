@@ -45,8 +45,8 @@ def system_monitor():
         500: Server error
     """
     try:
-        # Thin controller: delegate to service layer
-        status = MonitoringService.get_system_status()
+        # Thin controller: serve the background snapshot (never blocks on psutil/NVML)
+        status = MonitoringService.get_system_status_cached()
         return jsonify(status)
     except Exception as e:
         logger.error(f"System monitor error: {e}")

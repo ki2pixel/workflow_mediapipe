@@ -267,9 +267,11 @@ async function pollSystemMonitor() {
     }
 
     try {
+        const fetchStartedAt = performance.now();
         const response = await fetch('/api/system_monitor');
+        const fetchDurationMs = performance.now() - fetchStartedAt;
         if (!response.ok) {
-            console.warn(`[MAIN] System monitor API failed: ${response.status}`);
+            console.warn(`[MAIN] System monitor API failed: ${response.status} (after ${fetchDurationMs.toFixed(0)}ms)`);
             monitorWidget.style.opacity = '0.5';
             return;
         }
@@ -277,6 +279,10 @@ async function pollSystemMonitor() {
         console.debug('[MAIN] System monitor data received:', data);
 
         domBatcher.scheduleUpdate('system-monitor-update', () => {
+            const lagMs = performance.now() - fetchStartedAt;
+            if (lagMs > 1000) {
+                console.warn(`[MAIN] System monitor update lag: fetch=${fetchDurationMs.toFixed(0)}ms, repaint=${lagMs.toFixed(0)}ms`);
+            }
             const cpuBar = document.getElementById('cpu-monitor-bar');
             const cpuValue = document.getElementById('cpu-monitor-value');
             if (cpuBar && cpuValue) {

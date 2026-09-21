@@ -5,6 +5,7 @@ Shared decorator utilities for route blueprints.
 import time
 import logging
 from functools import wraps
+from config.settings import config
 from services.performance_service import PerformanceService
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,12 @@ def measure_api(endpoint_name: str):
                 raise
             finally:
                 elapsed_ms = (time.perf_counter() - start) * 1000.0
+                threshold_ms = float(getattr(config, 'SLOW_API_THRESHOLD_MS', 1000))
+                if threshold_ms > 0 and elapsed_ms > threshold_ms:
+                    logger.warning(
+                        f"SLOW_API {endpoint_name} took {elapsed_ms:.0f}ms "
+                        f"(threshold {threshold_ms:.0f}ms, status={status_code})"
+                    )
                 try:
                     PerformanceService.record_api_response_time(endpoint_name, elapsed_ms, status_code)
                 except Exception:

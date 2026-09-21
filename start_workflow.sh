@@ -40,6 +40,7 @@ FLASK_PORT=5003
 export LOGS_BASE_DIR="$BASE_PATH_SCRIPTS/logs"
 UNIFIED_LOG_FILE="$LOGS_BASE_DIR/app.log"
 STARTUP_LOG_FILE="$LOGS_BASE_DIR/startup.log"
+STDOUT_LOG_FILE="$LOGS_BASE_DIR/stdout.log"
 mkdir -p "$LOGS_BASE_DIR"
 
 # --- 5. Variables Flask ---
@@ -125,6 +126,7 @@ export PYTHON_VENV_EXE_ENV="$PYTHON_VENV_EXE"
 # Rotation logs au démarrage
 rotate_logs "$UNIFIED_LOG_FILE" 50 3
 rotate_logs "$STARTUP_LOG_FILE" 10 2
+rotate_logs "$STDOUT_LOG_FILE" 10 2
 
 # Initialisation logs
 log_with_timestamp "=== WORKFLOW APPLICATION STARTUP ===" "$STARTUP_LOG_FILE"
@@ -177,8 +179,11 @@ echo "Tous les logs sont capturés dans: $UNIFIED_LOG_FILE"
 log_with_timestamp "Starting Flask application with unified logging" "$STARTUP_LOG_FILE"
 log_with_timestamp "Command: cd $APP_DIR && $PYTHON_VENV_EXE $APP_SCRIPT_PATH" "$STARTUP_LOG_FILE"
 
-# Démarrage Flask avec capture logs (stdout+stderr vers app.log)
-cd "$APP_DIR" && "$PYTHON_VENV_EXE" "$APP_SCRIPT_PATH" >> "$UNIFIED_LOG_FILE" 2>&1 &
+# Démarrage Flask avec capture logs (stdout+stderr vers stdout.log)
+# NOTE: app.log est écrit par le RotatingFileHandler de l'application
+# (écrivain unique) ; rediriger stdout vers app.log produisait deux écrivains
+# concurrents sur le même fichier (écritures partielles / octets NUL).
+cd "$APP_DIR" && "$PYTHON_VENV_EXE" "$APP_SCRIPT_PATH" >> "$STDOUT_LOG_FILE" 2>&1 &
 FLASK_PID=$!
 
 log_with_timestamp "Flask application started with PID: $FLASK_PID" "$STARTUP_LOG_FILE"

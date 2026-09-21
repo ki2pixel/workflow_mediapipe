@@ -138,6 +138,22 @@ class Config:
     LOCAL_DOWNLOAD_POLLING_INTERVAL: int = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
 
     SYSTEM_MONITOR_POLLING_INTERVAL: int = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+
+    # Download reliability (Cloudflare R2 worker proxy / Dropbox)
+    DOWNLOAD_CHUNK_SIZE_BYTES: int = int(os.environ.get('DOWNLOAD_CHUNK_SIZE_BYTES', str(512 * 1024)))
+    DOWNLOAD_CONNECT_TIMEOUT_S: int = int(os.environ.get('DOWNLOAD_CONNECT_TIMEOUT_S', '15'))
+    DOWNLOAD_CHUNK_TIMEOUT_S: int = int(os.environ.get('DOWNLOAD_CHUNK_TIMEOUT_S', '60'))
+    DOWNLOAD_PROBE_TIMEOUT_S: int = int(os.environ.get('DOWNLOAD_PROBE_TIMEOUT_S', '10'))
+    DOWNLOAD_MAX_ATTEMPTS: int = int(os.environ.get('DOWNLOAD_MAX_ATTEMPTS', '3'))
+    DOWNLOAD_RETRY_BACKOFF_S: float = float(os.environ.get('DOWNLOAD_RETRY_BACKOFF_S', '1.0'))
+    DOWNLOAD_PROGRESS_MIN_INTERVAL_S: float = float(os.environ.get('DOWNLOAD_PROGRESS_MIN_INTERVAL_S', '1.0'))
+    DOWNLOAD_MIN_ZIP_SIZE_BYTES: int = int(os.environ.get('DOWNLOAD_MIN_ZIP_SIZE_BYTES', '1000000'))
+    DOWNLOAD_VALIDATE_ZIP: bool = _parse_bool(os.environ.get('DOWNLOAD_VALIDATE_ZIP'), default=True)
+    DOWNLOAD_COOLDOWN_MAX_S: int = int(os.environ.get('DOWNLOAD_COOLDOWN_MAX_S', '3600'))
+
+    # System metrics snapshot (keeps the HTTP request path non-blocking)
+    SYSTEM_SNAPSHOT_INTERVAL_S: float = float(os.environ.get('SYSTEM_SNAPSHOT_INTERVAL_S', '2.0'))
+    SLOW_API_THRESHOLD_MS: int = int(os.environ.get('SLOW_API_THRESHOLD_MS', '1000'))
     
     # MediaPipe Configuration
     MP_LANDMARKER_MIN_DETECTION_CONFIDENCE: float = float(os.environ.get(
@@ -291,6 +307,22 @@ class Config:
         self.POLLING_INTERVAL = int(os.environ.get('POLLING_INTERVAL', '1000'))
         self.LOCAL_DOWNLOAD_POLLING_INTERVAL = int(os.environ.get('LOCAL_DOWNLOAD_POLLING_INTERVAL', '3000'))
         self.SYSTEM_MONITOR_POLLING_INTERVAL = int(os.environ.get('SYSTEM_MONITOR_POLLING_INTERVAL', '5000'))
+
+        # Download reliability (Cloudflare R2 worker proxy / Dropbox)
+        self.DOWNLOAD_CHUNK_SIZE_BYTES = int(os.environ.get('DOWNLOAD_CHUNK_SIZE_BYTES', str(512 * 1024)))
+        self.DOWNLOAD_CONNECT_TIMEOUT_S = int(os.environ.get('DOWNLOAD_CONNECT_TIMEOUT_S', '15'))
+        self.DOWNLOAD_CHUNK_TIMEOUT_S = int(os.environ.get('DOWNLOAD_CHUNK_TIMEOUT_S', '60'))
+        self.DOWNLOAD_PROBE_TIMEOUT_S = int(os.environ.get('DOWNLOAD_PROBE_TIMEOUT_S', '10'))
+        self.DOWNLOAD_MAX_ATTEMPTS = int(os.environ.get('DOWNLOAD_MAX_ATTEMPTS', '3'))
+        self.DOWNLOAD_RETRY_BACKOFF_S = float(os.environ.get('DOWNLOAD_RETRY_BACKOFF_S', '1.0'))
+        self.DOWNLOAD_PROGRESS_MIN_INTERVAL_S = float(os.environ.get('DOWNLOAD_PROGRESS_MIN_INTERVAL_S', '1.0'))
+        self.DOWNLOAD_MIN_ZIP_SIZE_BYTES = int(os.environ.get('DOWNLOAD_MIN_ZIP_SIZE_BYTES', '1000000'))
+        self.DOWNLOAD_VALIDATE_ZIP = _parse_bool(os.environ.get('DOWNLOAD_VALIDATE_ZIP'), default=True)
+        self.DOWNLOAD_COOLDOWN_MAX_S = int(os.environ.get('DOWNLOAD_COOLDOWN_MAX_S', '3600'))
+
+        # System metrics snapshot (keeps the HTTP request path non-blocking)
+        self.SYSTEM_SNAPSHOT_INTERVAL_S = float(os.environ.get('SYSTEM_SNAPSHOT_INTERVAL_S', '2.0'))
+        self.SLOW_API_THRESHOLD_MS = int(os.environ.get('SLOW_API_THRESHOLD_MS', '1000'))
         
         # MediaPipe Configuration
         self.MP_LANDMARKER_MIN_DETECTION_CONFIDENCE = float(os.environ.get(

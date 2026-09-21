@@ -2,8 +2,9 @@ import logging
 import os
 import shutil
 import sqlite3
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from config.settings import config
 
@@ -33,6 +34,19 @@ class DownloadHistoryRepository:
         with self._connect() as conn:
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS download_history (url TEXT PRIMARY KEY, timestamp TEXT NOT NULL DEFAULT '')"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS download_failures (
+                  url             TEXT PRIMARY KEY,
+                  kind            TEXT NOT NULL DEFAULT '',
+                  status_code     INTEGER,
+                  attempts        INTEGER NOT NULL DEFAULT 0,
+                  last_error      TEXT NOT NULL DEFAULT '',
+                  first_seen_at   TEXT NOT NULL DEFAULT '',
+                  last_attempt_at TEXT NOT NULL DEFAULT ''
+                )
+                """
             )
         self._ensure_shared_permissions(self._db_path)
         self._ensure_shared_permissions(self._db_path.with_name(self._db_path.name + "-wal"))
@@ -109,6 +123,101 @@ class DownloadHistoryRepository:
         self.initialize()
         with self._connect() as conn:
             conn.execute("DELETE FROM download_history")
+
+    def record_failure(
+        self,
+        url: str,
+        kind: str,
+        status_code: Optional[int] = None,
+        error: str = '',
+    ) -> None:
+        """Record (or refresh) a failed download attempt for a normalized URL."""
+        self.initialize()
+        url = str(url)
+        if not url:
+            return
+        now = datetime.now().isoformat(timespec='seconds')
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO download_failures(url, kind, status_code, attempts, last_error, first_seen_at, last_attempt_at)
+                VALUES (?, ?, ?, 1, ?, ?, ?)
+                ON CONFLICT(url) DO UPDATE SET
+                  kind = excluded.kind,
+                  status_code = excluded.status_code,
+                  attempts = download_failures.attempts + 1,
+                  last_error = excluded.last_error,
+                  last_attempt_at = excluded.last_attempt_at
+                """,
+                (url, str(kind or ''), status_code if status_code is None else int(status_code), str(error or '')[:500], now, now),
+            )
+        self._ensure_shared_permissions(self._db_path)
+
+    def clear_failure(self, url: str) -> None:
+        """Drop the failure record once a URL finally succeeded."""
+        self.initialize()
+        with self._connect() as conn:
+            conn.execute("DELETE FROM download_failures WHERE url = ?", (str(url),))
+
+    def get_failure(self, url: str) -> Optional[Dict[str, Any]]:
+        """Return the failure record for a URL, if any."""
+        self.initialize()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT url, kind, status_code, attempts, last_error, first_seen_at, last_attempt_at "
+                "FROM download_failures WHERE url = ?",
+                (str(url),),
+            ).fetchone()
+        return self._row_to_failure(row)
+
+    def list_failures(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return the most recently failed URLs, newest first."""
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT url, kind, status_code, attempts, last_error, first_seen_at, last_attempt_at "
+                "FROM download_failures ORDER BY last_attempt_at DESC LIMIT ?",
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [entry for entry in (self._row_to_failure(row) for row in rows) if entry]
+
+    def get_failure_map(self) -> Dict[str, Dict[str, Any]]:
+        """Return every failure indexed by URL (cooldown lookups)."""
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT url, kind, status_code, attempts, last_error, first_seen_at, last_attempt_at "
+                "FROM download_failures"
+            ).fetchall()
+        result: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            entry = self._row_to_failure(row)
+            if entry:
+                result[str(entry['url'])] = entry
+        return result
+
+    def failure_count(self) -> int:
+        """Number of URLs currently flagged as failed."""
+        self.initialize()
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM download_failures").fetchone()
+        if not row:
+            return 0
+        return int(row[0] or 0)
+
+    @staticmethod
+    def _row_to_failure(row: Optional[Sequence[Any]]) -> Optional[Dict[str, Any]]:
+        if not row:
+            return None
+        return {
+            'url': str(row[0] or ''),
+            'kind': str(row[1] or ''),
+            'status_code': None if row[2] is None else int(row[2]),
+            'attempts': int(row[3] or 0),
+            'last_error': str(row[4] or ''),
+            'first_seen_at': str(row[5] or ''),
+            'last_attempt_at': str(row[6] or ''),
+        }
 
     def replace_all(self, entries: Sequence[Tuple[str, str]]) -> None:
         self.initialize()

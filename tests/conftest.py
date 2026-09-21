@@ -77,6 +77,25 @@ def mock_app(mock_workflow_state):
     return app
 
 
+@pytest.fixture
+def make_zip_bytes():
+    """Build a real (valid) ZIP archive in memory for download tests.
+
+    DownloadService refuses payloads that are not readable ZIP archives, so
+    mocked HTTP responses must serve genuine archives instead of filler bytes.
+    """
+    import io
+    import zipfile
+
+    def _make(payload_size: int = 4096, entry_name: str = 'payload.bin') -> bytes:
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as archive:
+            archive.writestr(entry_name, b'\0' * max(0, payload_size))
+        return buffer.getvalue()
+
+    return _make
+
+
 @pytest.fixture(scope="session")
 def transnet_env_info():
     """Information about TransNet environment for STEP3 tests."""

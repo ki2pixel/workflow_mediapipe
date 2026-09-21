@@ -205,6 +205,7 @@ def initialize_services():
                         sequence_executor=execute_step_sequence_worker,
                     )
                     PerformanceService.start_background_monitoring()
+                    MonitoringService.start_snapshot_sampler()
                     APP_FLASK._services_initialized = True
                     logger.info("All services initialized successfully")
 
@@ -240,12 +241,27 @@ def init_app():
         file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s [in %(pathname)s:%(lineno)d]')
         file_handler.setFormatter(file_formatter)
 
-        console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
-        console_handler.setFormatter(console_formatter)
+
+        # Single writer guard: when stdout already targets app.log (launcher
+        # redirection), a second handler would append concurrently to the same
+        # file and corrupt it (torn writes / NUL bytes).
+        stdout_is_log_file = False
+        try:
+            stdout_is_log_file = os.path.samefile('/proc/self/fd/1', log_file_path)
+        except Exception:
+            stdout_is_log_file = False
+
+        console_handler = None
+        if not stdout_is_log_file:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(console_formatter)
 
         APP_LOGGER.addHandler(file_handler)
-        APP_LOGGER.addHandler(console_handler)
+        if console_handler is not None:
+            APP_LOGGER.addHandler(console_handler)
+        else:
+            APP_LOGGER.info("stdout already redirected to app.log: console handler disabled")
         APP_LOGGER.propagate = False
 
         is_debug_mode = os.environ.get("FLASK_DEBUG") == "1"
@@ -261,7 +277,17 @@ def init_app():
         root_logger.setLevel(logging.DEBUG)
         if not root_logger.handlers:
             root_logger.addHandler(file_handler)
-            root_logger.addHandler(console_handler)
+            if console_handler is not None:
+                root_logger.addHandler(console_handler)
+
+        # Hot-path loggers stay at INFO: per-download-chunk DEBUG records used to
+        # flood app.log (~1700 lines per GB) and contend on the logging locks.
+        for noisy_logger_name in (
+            'services.download_service',
+            'services.csv_downloader',
+            'services.csv_service',
+        ):
+            logging.getLogger(noisy_logger_name).setLevel(logging.INFO)
 
         APP_LOGGER.info("Workflow launcher initialized (Ubuntu profile)")
 

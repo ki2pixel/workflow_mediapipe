@@ -73,7 +73,7 @@ class PerformanceService:
             return {
                 "profiling_stats": profiling_data,
                 "cache_stats": CacheService.get_cache_stats(),
-                "system_performance": MonitoringService.get_system_status(),
+                "system_performance": MonitoringService.get_system_status_cached(),
                 "performance_history": history_data,
                 "alerts": alerts_data,
                 "timestamp": datetime.now(timezone.utc).isoformat()

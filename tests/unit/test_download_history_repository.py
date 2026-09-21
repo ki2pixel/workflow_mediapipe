@@ -172,6 +172,106 @@ class TestDownloadHistoryRepositoryConcurrency:
         assert len(exceptions) == 0
 
 
+class TestDownloadHistoryRepositoryFailures:
+    """Test the download_failures table (missing R2 objects, stalled links)."""
+
+    def test_schema_creates_failures_table(self, repo):
+        # Given / When
+        conn = sqlite3.connect(str(repo.db_path))
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='download_failures'"
+        )
+        found = cursor.fetchone()
+        conn.close()
+
+        # Then
+        assert found is not None
+
+    def test_record_failure_increments_attempts(self, repo):
+        # Given
+        url = "https://server.kidpixel.workers.dev/dropbox/a/b/file"
+
+        # When
+        repo.record_failure(url, "not_found", 404, "HTTP 404 (not_found) for url: ...")
+        repo.record_failure(url, "not_found", 404, "HTTP 404 (not_found) for url: ...")
+
+        # Then
+        failure = repo.get_failure(url)
+        assert failure is not None
+        assert failure['kind'] == 'not_found'
+        assert failure['status_code'] == 404
+        assert failure['attempts'] == 2
+        assert failure['first_seen_at']
+        assert repo.failure_count() == 1
+
+    def test_clear_failure_removes_entry(self, repo):
+        # Given
+        url = "https://server.kidpixel.workers.dev/dropbox/a/b/file"
+        repo.record_failure(url, "stalled", None, "Download stalled")
+
+        # When
+        repo.clear_failure(url)
+
+        # Then
+        assert repo.get_failure(url) is None
+        assert repo.failure_count() == 0
+
+    def test_list_failures_returns_newest_first(self, repo):
+        # Given
+        repo.record_failure("https://a.com/one.zip", "network", None, "boom")
+        repo.record_failure("https://a.com/two.zip", "invalid_payload", 200, "html")
+
+        # When
+        failures = repo.list_failures(limit=10)
+
+        # Then
+        assert len(failures) == 2
+        assert {entry['url'] for entry in failures} == {"https://a.com/one.zip", "https://a.com/two.zip"}
+
+    def test_get_failure_map_indexes_by_url(self, repo):
+        # Given
+        repo.record_failure("https://a.com/one.zip", "network")
+
+        # When
+        failure_map = repo.get_failure_map()
+
+        # Then
+        assert "https://a.com/one.zip" in failure_map
+        assert failure_map["https://a.com/one.zip"]['kind'] == 'network'
+
+    def test_failure_and_history_are_independent(self, repo):
+        # Given — a URL can be in history while a *different* one failed
+        repo.upsert("https://a.com/ok.zip", "2025-01-01")
+        repo.record_failure("https://a.com/broken.zip", "not_found", 404, "missing")
+
+        # When / Then
+        assert repo.count() == 1
+        assert repo.failure_count() == 1
+        assert "https://a.com/broken.zip" not in repo.get_urls()
+
+    def test_concurrent_failure_records(self, repo):
+        # Given
+        exceptions = []
+
+        def worker(base_idx):
+            try:
+                for i in range(5):
+                    repo.record_failure(f"https://a.com/f_{base_idx}_{i}.zip", "network")
+            except Exception as e:
+                exceptions.append(e)
+
+        # When
+        threads = [threading.Thread(target=worker, args=(t,)) for t in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Then
+        assert len(exceptions) == 0
+        assert repo.failure_count() == 25
+
+
 class TestDownloadHistoryRepositorySQLInjection:
     """Test protection against SQL injection in parameterized queries."""
 

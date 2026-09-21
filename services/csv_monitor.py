@@ -11,7 +11,7 @@ import logging
 import threading
 import urllib.parse
 from datetime import datetime
-from typing import Set, Optional
+from typing import Any, Dict, Set, Optional
 
 from config.settings import config
 
@@ -42,6 +42,28 @@ def stop_csv_monitor() -> None:
     logger.info("WEBHOOK MONITOR: Shutdown signal received.")
     shutdown_event.set()
 
+
+def _cooldown_remaining_s(failure: Dict[str, Any]) -> float:
+    """Seconds still to wait before retrying a previously failed URL.
+
+    Delay grows exponentially with the number of failed attempts and is capped
+    by DOWNLOAD_COOLDOWN_MAX_S, so a missing R2 object is no longer re-attempted
+    on every monitor cycle.
+    """
+    attempts = max(1, int(failure.get('attempts') or 1))
+    base = max(1, int(WEBHOOK_MONITOR_INTERVAL))
+    max_cooldown = max(base, int(getattr(config, 'DOWNLOAD_COOLDOWN_MAX_S', 3600)))
+    delay = min(base * (2 ** (attempts - 1)), max_cooldown)
+
+    try:
+        last_attempt = datetime.fromisoformat(str(failure.get('last_attempt_at') or ''))
+    except (TypeError, ValueError):
+        return 0.0
+
+    elapsed = (datetime.now() - last_attempt).total_seconds()
+    return max(0.0, delay - elapsed)
+
+
 def check_csv_for_downloads() -> None:
     """
     Check for new downloads using Webhook as the single data source.
@@ -70,6 +92,10 @@ def check_csv_for_downloads() -> None:
 
         # Get current download history (normalized URLs)
         download_history = CSVService.get_download_history()
+
+        # URLs that already failed: retried with an exponential cooldown instead
+        # of being re-armed on every cycle (missing R2 objects, unreachable links).
+        failure_map = CSVService.get_download_failure_map()
 
         workflow_state = get_workflow_state()
         active_downloads = workflow_state.get_active_csv_downloads_dict()
@@ -145,6 +171,25 @@ def check_csv_for_downloads() -> None:
                         f"(preferred={norm_url}, fallback={norm_fallback_url})"
                     )
                 continue
+
+            failure = failure_map.get(norm_url)
+            if failure is None and norm_fallback_url:
+                failure = failure_map.get(norm_fallback_url)
+            if failure is not None:
+                remaining_s = _cooldown_remaining_s(failure)
+                if remaining_s > 0:
+                    logger.debug(
+                        f"{source_type} MONITOR: Cooldown {remaining_s:.0f}s for {url} "
+                        f"(kind={failure.get('kind')}, attempts={failure.get('attempts')})"
+                    )
+                    handled_in_this_pass.add(norm_url)
+                    if norm_fallback_url:
+                        handled_in_this_pass.add(norm_fallback_url)
+                    continue
+                logger.info(
+                    f"{source_type} MONITOR: Retrying previously failed URL {url} "
+                    f"(kind={failure.get('kind')}, attempts={failure.get('attempts')})"
+                )
 
             try:
                 parsed_primary = urllib.parse.urlsplit(url or '')

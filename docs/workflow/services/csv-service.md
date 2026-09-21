@@ -1,7 +1,16 @@
 # CSV Service Documentation
 
+> [!NOTE]
+> Depuis l'audit du 2026-09-21 (`docs/audits/audit_telechargement_r2.md`), les téléchargements sont
+> **repris via `.part` + `Range`**, **validés** (rejet des pages HTML/JSON servies en 200), typés
+> (`DownloadResult.error_kind`) et suivis dans la table `download_failures` avec un cooldown exponentiel.
+> Les copies R2 côté worker sont **éphémères** : le repli sur `source_url` (Dropbox) est le chemin nominal
+> pour toute archive non récupérée le jour même.
+
 ## TL;DR
-Le CSV Service gère la surveillance et le téléchargement automatique des fichiers CSV depuis des sources webhook, avec normalisation URL complexe pour éviter les doublons et logique de filtrage strict pour les téléchargements automatiques (Dropbox uniquement).
+Le CSV Service gère la surveillance et le téléchargement automatique des archives depuis le webhook, avec
+normalisation d'URL pour éviter les doublons, filtrage strict des téléchargements automatiques (sources
+Dropbox / proxy worker R2) et repli automatique sur le lien Dropbox d'origine.
 
 ## Contexte Métier
 Le service traite des flux de données CSV provenant de webhooks externes, contenant des URLs de fichiers multimédia (vidéos, audio). Le défi principal est de détecter les nouveaux téléchargements éligibles tout en évitant les doublons dus aux variations d'URLs (encodage HTML, paramètres query, etc.).
@@ -37,8 +46,9 @@ Le service traite des flux de données CSV provenant de webhooks externes, conte
 - Encodage HTML dans CSV (`&amp;dl=1`)
 - Variations ports/casse dans hostnames
 
-#### `_check_csv_for_downloads(data, source_type, dry_run=False)` (Complexité F)
-**Rôle** : Analyse les données CSV pour identifier les nouveaux téléchargements éligibles.
+#### `check_csv_for_downloads() -> None` (Complexité F) — `services/csv_monitor.py`
+**Rôle** : Analyse les enregistrements du webhook pour identifier les nouveaux téléchargements éligibles.
+(`CSVService._check_csv_for_downloads()` reste un simple wrapper de compatibilité pour les tests.)
 
 **Logique de filtrage** :
 1. **Validation base** : URL présente, non déjà trackée, scheme HTTP/HTTPS
@@ -50,12 +60,24 @@ Le service traite des flux de données CSV provenant de webhooks externes, conte
    - Type Dropbox-like uniquement
    - Ressemble à une archive (`.zip`, `/scl/fo/`, filename `.zip`)
    - Présence hints nouveau schéma (`original_filename`, `fallback_url`, proxy URL)
+4. **Cooldown des échecs** : une URL présente dans `download_failures` est ignorée pendant
+   `min(15 s × 2^(tentatives-1), DOWNLOAD_COOLDOWN_MAX_S)` avant nouvel essai
 
 **Stratégies anti-duplication** :
 - Normalisation URL avec `_normalize_url`
-- Comparaison avec historique existant
-- Gestion URLs de fallback
+- Comparaison avec l'historique existant
+- Gestion des URLs de fallback
 - Tracking des URLs traitées par passe
+
+#### Chaîne de téléchargement (`services/csv_downloader.py` → `services/download_service.py`)
+1. `r2_url` (proxy worker) est tenté en premier, `source_url` (Dropbox) sert de repli — et passe en premier
+   si le R2 est déjà connu comme manquant (`error_kind='not_found'` enregistré).
+2. `DownloadService.download_dropbox_file()` écrit dans `<nom>.part`, reprend via HTTP `Range`, et ne renomme
+   en `<nom>.zip` qu'après contrôle de taille **et** validation ZIP (rejet des pages HTML/JSON en 200).
+3. `DownloadResult.error_kind` ∈ `not_found | auth | http_error | network | stalled | invalid_payload |
+   incomplete | local_io`, avec `status_code`, `attempts`, `resumed_from`.
+4. Succès → historique (`download_history`) + purge de `download_failures` ; échec définitif →
+   `download_failures` + message UI.
 
 ## Gestion Erreurs
 
@@ -68,8 +90,9 @@ Le service traite des flux de données CSV provenant de webhooks externes, conte
 - **Logging** : Debug level pour diagnostics
 
 ### Échecs téléchargement
-- **Comportement** : Thread daemon, échec isolé
-- **Logging** : Erreur avec stack trace
+- **Comportement** : Thread daemon, échec isolé, reprise possible au cycle suivant (`.part` conservé)
+- **Typage** : `error_kind` + `status_code` ; un objet R2 expiré (`not_found`) bascule immédiatement sur Dropbox
+- **Logging** : `CSV DOWNLOAD: R2_MISSING …` (WARNING), `DOWNLOAD [CSV-DL-…]: … FAILED after N attempt(s)` (ERROR)
 
 ## Optimisations Performance
 
@@ -110,57 +133,72 @@ Le service traite des flux de données CSV provenant de webhooks externes, conte
 ### Variables d'Environnement
 
 ```bash
-# Monitoring (activé par défaut)
-CSV_DOWNLOAD_ENABLED=1
-CSV_POLLING_INTERVAL=30
-CSV_CACHE_TTL=300
+# Source de données
+WEBHOOK_JSON_URL=https://webhook.kidpixel.fr/webhook_proxy.php
+WEBHOOK_TIMEOUT=10
+WEBHOOK_CACHE_TTL=60
+WEBHOOK_MONITOR_INTERVAL=15
 
-# Sécurité
-DROPBOX_PROXY_ENABLED=1
+# Fiabilité des téléchargements (cf. .env.example sections 13 et 14)
+DOWNLOAD_MAX_ATTEMPTS=3
+DOWNLOAD_CHUNK_TIMEOUT_S=60          # watchdog de stall
+DOWNLOAD_VALIDATE_ZIP=true
+DOWNLOAD_PROGRESS_MIN_INTERVAL_S=1.0
+DOWNLOAD_COOLDOWN_MAX_S=3600
+
+# Sécurité / divers
+DRY_RUN_DOWNLOADS=false
 DISABLE_EXPLORER_OPEN=1
 
-# Performance
-DRY_RUN_DOWNLOADS=false
-WEBHOOK_TIMEOUT=10
-```
-
-### Configuration WorkflowCommandsConfig
-
-```python
-# Accès à la configuration
-config = WorkflowCommandsConfig()
-csv_config = config.get_step_config('csv_monitoring')
-
-# Variables disponibles
-webhook_url = config.get('WEBHOOK_JSON_URL')
-cache_ttl = config.get('WEBHOOK_CACHE_TTL')
-polling_interval = config.get('CSV_POLLING_INTERVAL')
+# Métriques système (widget CPU/GPU/RAM)
+SYSTEM_SNAPSHOT_INTERVAL_S=2.0
+SLOW_API_THRESHOLD_MS=1000
 ```
 
 ### Configuration Webhook
 
 ```python
-# Configuration webhook
+# config/settings.py
 webhook_config = {
-    'url': 'https://webhook.kidpixel.fr/data/webhook_links.json',
-    'timeout': 10,
-    'cache_ttl': 60,
-    'monitor_interval': 15
+    'url': os.environ.get('WEBHOOK_JSON_URL'),
+    'timeout': int(os.environ.get('WEBHOOK_TIMEOUT', '10')),
+    'cache_ttl': int(os.environ.get('WEBHOOK_CACHE_TTL', '60')),
+    'monitor_interval': int(os.environ.get('WEBHOOK_MONITOR_INTERVAL', '15')),
 }
 ```
 
 ## Résolution de Problèmes
 
+### Objets R2 manquants (404) côté worker
+
+```bash
+# Diagnostic : liste les r2_url indisponibles (lecture seule, aucune écriture)
+python scripts/check_r2_objects.py --show-ok
+
+# Interprétation
+# - Les copies R2 sont éphémères : seuls les objets récents répondent 200.
+# - Une archive [EN ATTENTE] manquante est récupérée automatiquement via le lien Dropbox
+#   (message UI « R2 absent - repli Dropbox utilisé »).
+# - Une archive [déjà traité] en 404 est normale (objet expiré après récupération).
+```
+
+### Téléchargement interrompu / repris
+
+```bash
+ls -la ~/Téléchargements/*.part          # reliquat conservé pour la reprise
+grep "resuming at" logs/app.log          # la reprise repart de l'octet atteint
+grep "R2_MISSING\|FAILED after" logs/app.log
+```
+
 ### Webhook Indisponible
 
 ```bash
 # Diagnostic
-curl -s https://webhook.kidpixel.fr/data/webhook_links.json
+curl -s "$WEBHOOK_JSON_URL"
 
 # Solutions
 # 1. Vérifier la connectivité réseau
-# 2. Vérifier la configuration WEBHOOK_JSON_URL
-# 3. Activer CSV_DOWNLOAD_ENABLED=1
+# 2. Vérifier WEBHOOK_JSON_URL (.env)
 ```
 
 ### SQLite Corrompu

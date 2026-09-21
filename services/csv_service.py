@@ -161,6 +161,8 @@ class CSVService:
             "csv_monitor": monitor_status,
             "data_source": "webhook",
             "monitor_interval": config.WEBHOOK_MONITOR_INTERVAL,
+            "failed_urls": CSVService.get_download_failures(limit=20),
+            "failed_urls_count": download_history_repository.failure_count(),
             "webhook": webhook_status()
         }
 
@@ -535,6 +537,68 @@ class CSVService:
         """
         history = CSVService.get_download_history()
         return CSVService._normalize_url(url) in history
+
+    @staticmethod
+    def record_download_failure(
+        url: str,
+        kind: str,
+        status_code: Optional[int] = None,
+        error: str = '',
+    ) -> bool:
+        """Persist a failed download attempt for a normalized URL.
+
+        Failures are otherwise invisible (the history table only stores
+        successes), which used to hide missing R2 objects and re-arm the same
+        broken link on every monitor cycle.
+
+        Args:
+            url: URL that failed (normalized before storage)
+            kind: Typed failure category from DownloadService
+            status_code: Last HTTP status code, when known
+            error: Last error message (truncated on storage)
+
+        Returns:
+            True when the failure has been persisted
+        """
+        norm_url = CSVService._normalize_url(url) if url else ''
+        if not norm_url:
+            return False
+        try:
+            download_history_repository.record_failure(norm_url, kind, status_code, error)
+            logger.info(f"Download failure recorded: {norm_url} ({kind}, status={status_code})")
+            return True
+        except Exception as e:
+            logger.error(f"Unable to record download failure for {norm_url}: {e}")
+            return False
+
+    @staticmethod
+    def clear_download_failure(url: str) -> None:
+        """Drop the failure record for a URL that finally succeeded."""
+        norm_url = CSVService._normalize_url(url) if url else ''
+        if not norm_url:
+            return
+        try:
+            download_history_repository.clear_failure(norm_url)
+        except Exception as e:
+            logger.error(f"Unable to clear download failure for {norm_url}: {e}")
+
+    @staticmethod
+    def get_download_failures(limit: int = 20) -> List[Dict[str, Any]]:
+        """List recent download failures (newest first) for diagnostics and UI."""
+        try:
+            return download_history_repository.list_failures(limit)
+        except Exception as e:
+            logger.error(f"Unable to list download failures: {e}")
+            return []
+
+    @staticmethod
+    def get_download_failure_map() -> Dict[str, Dict[str, Any]]:
+        """Return every recorded failure indexed by normalized URL."""
+        try:
+            return download_history_repository.get_failure_map()
+        except Exception as e:
+            logger.error(f"Unable to load download failures: {e}")
+            return {}
     
     @staticmethod
     def get_csv_downloads_status() -> Dict[str, Any]:

@@ -15,6 +15,8 @@ class PollingManager {
         this.isDestroyed = false;
         this.pendingResumes = new Map();
         this.errorCounts = new Map();
+        this.inFlight = new Set();
+        this.skippedTicks = new Map();
         this.maxErrorCount = 5;
         
         this._bindCleanupEvents();
@@ -53,33 +55,24 @@ class PollingManager {
                 return;
             }
 
+            // Anti-pile-up: never overlap two runs of the same poller. A slow
+            // response (e.g. while a large download saturates the server) used
+            // to stack requests and starve the browser connection pool, which
+            // froze unrelated widgets until the backlog drained.
+            if (this.inFlight.has(name)) {
+                this.skippedTicks.set(name, (this.skippedTicks.get(name) || 0) + 1);
+                console.debug(`Skipped tick for ${name}: previous run still in flight`);
+                return;
+            }
+
+            this.inFlight.add(name);
+
             try {
                 const result = await callback();
                 this.errorCounts.set(name, 0);
 
                 if (typeof result === 'number' && result > 0) {
-                    const existing = this.intervals.get(name);
-                    if (existing) {
-                        clearInterval(existing.id);
-                        this.intervals.delete(name);
-                    }
-                    if (this.pendingResumes.has(name)) {
-                        clearTimeout(this.pendingResumes.get(name));
-                    }
-                    const resumeId = setTimeout(() => {
-                        if (!this.isDestroyed && !this.intervals.has(name)) {
-                            const newIntervalId = setInterval(wrappedCallback, interval);
-                            this.intervals.set(name, {
-                                id: newIntervalId,
-                                callback: wrappedCallback,
-                                interval: interval,
-                                startTime: Date.now()
-                            });
-                            this.pendingResumes.delete(name);
-                            console.debug(`Resumed polling: ${name} after ${result}ms backoff`);
-                        }
-                    }, result);
-                    this.pendingResumes.set(name, resumeId);
+                    this._reschedule(name, wrappedCallback, interval, result);
                     return;
                 }
             } catch (error) {
@@ -87,13 +80,18 @@ class PollingManager {
                 this.errorCounts.set(name, errorCount);
                 
                 console.error(`Polling error in ${name} (attempt ${errorCount}):`, error);
-                
+
+                // Transient failures must not kill a poller for the rest of the
+                // session: back off, then resume. The error is only reported
+                // once the consecutive-error budget is exhausted.
+                const backoffMs = Math.min(interval * Math.pow(2, errorCount), 30000);
+                this._reschedule(name, wrappedCallback, interval, backoffMs);
+
                 if (errorCount >= maxErrors) {
-                    console.error(`Stopping polling ${name} due to ${errorCount} consecutive errors`);
-                    this.stopPolling(name);
-                    
                     this._dispatchPollingError(name, error, errorCount);
                 }
+            } finally {
+                this.inFlight.delete(name);
             }
         };
 
@@ -114,6 +112,41 @@ class PollingManager {
     }
 
     /**
+     * Pause a poller and resume it after a delay (backoff).
+     * 
+     * @param {string} name - Polling operation name
+     * @param {Function} callback - Wrapped callback to resume
+     * @param {number} interval - Original interval in milliseconds
+     * @param {number} delayMs - Delay before resuming
+     * @private
+     */
+    _reschedule(name, callback, interval, delayMs) {
+        const existing = this.intervals.get(name);
+        if (existing) {
+            clearInterval(existing.id);
+            this.intervals.delete(name);
+        }
+        if (this.pendingResumes.has(name)) {
+            clearTimeout(this.pendingResumes.get(name));
+        }
+
+        const resumeId = setTimeout(() => {
+            if (!this.isDestroyed && !this.intervals.has(name)) {
+                const newIntervalId = setInterval(callback, interval);
+                this.intervals.set(name, {
+                    id: newIntervalId,
+                    callback: callback,
+                    interval: interval,
+                    startTime: Date.now()
+                });
+                this.pendingResumes.delete(name);
+                console.debug(`Resumed polling: ${name} after ${delayMs}ms backoff`);
+            }
+        }, delayMs);
+        this.pendingResumes.set(name, resumeId);
+    }
+
+    /**
      * Stop a specific polling operation.
      * 
      * @param {string} name - Name of the polling operation to stop
@@ -121,20 +154,23 @@ class PollingManager {
      */
     stopPolling(name) {
         const pollingInfo = this.intervals.get(name);
+        const wasPending = this.pendingResumes.has(name) || this.inFlight.has(name);
+        if (!pollingInfo && !wasPending) {
+            return false;
+        }
         if (pollingInfo) {
             clearInterval(pollingInfo.id);
             this.intervals.delete(name);
-            this.errorCounts.delete(name);
-            if (this.pendingResumes.has(name)) {
-                clearTimeout(this.pendingResumes.get(name));
-                this.pendingResumes.delete(name);
-            }
-            
             const duration = Date.now() - pollingInfo.startTime;
             console.debug(`Stopped polling: ${name} (ran for ${duration}ms)`);
-            return true;
         }
-        return false;
+        this.errorCounts.delete(name);
+        this.skippedTicks.delete(name);
+        if (this.pendingResumes.has(name)) {
+            clearTimeout(this.pendingResumes.get(name));
+            this.pendingResumes.delete(name);
+        }
+        return true;
     }
 
     /**
@@ -210,7 +246,8 @@ class PollingManager {
                 name,
                 interval: info.interval,
                 runningTime: now - info.startTime,
-                errorCount: this.errorCounts.get(name) || 0
+                errorCount: this.errorCounts.get(name) || 0,
+                skippedTicks: this.skippedTicks.get(name) || 0
             })),
             timeouts: Array.from(this.timeouts.entries()).map(([name, info]) => ({
                 name,
@@ -260,6 +297,8 @@ class PollingManager {
         this.timeouts.clear();
 
         this.errorCounts.clear();
+        this.skippedTicks.clear();
+        this.inFlight.clear();
 
         this.pendingResumes.forEach((timeoutId, name) => {
             clearTimeout(timeoutId);

@@ -6,6 +6,7 @@ Provides centralized system resource monitoring (CPU, RAM, GPU).
 import logging
 import time
 import sys
+import threading
 import platform
 import subprocess
 import psutil
@@ -33,6 +34,14 @@ except ImportError:
 except Exception as e:
     PYNVML_AVAILABLE = False
     logger.error(f"Failed to initialize GPU monitoring: {e}")
+
+# Background snapshot state: the HTTP request path must never call psutil/NVML.
+_SNAPSHOT_LOCK = threading.Lock()
+_SYSTEM_SNAPSHOT: Optional[Dict[str, Any]] = None
+_SNAPSHOT_MONOTONIC: float = 0.0
+_SAMPLER_THREAD: Optional[threading.Thread] = None
+_SAMPLER_STOP = threading.Event()
+_SAMPLER_INTERVAL_S: float = max(0.5, float(getattr(config, 'SYSTEM_SNAPSHOT_INTERVAL_S', 2.0)))
 
 
 class MonitoringService:
@@ -69,14 +78,17 @@ class MonitoringService:
     
     @staticmethod
     def get_cpu_usage() -> float:
-        """
-        Get current CPU usage percentage.
-        
+        """Get current CPU usage percentage.
+
+        Non-blocking: the delta is computed against the previous call, so the
+        first sample after a cold start is meaningless (0.0). The background
+        sampler in :meth:`start_snapshot_sampler` keeps the value fresh.
+
         Returns:
             CPU usage percentage (0-100)
         """
         try:
-            return round(psutil.cpu_percent(interval=0.1), 1)
+            return round(psutil.cpu_percent(interval=None), 1)
         except Exception as e:
             logger.error(f"CPU usage error: {e}")
             return 0.0
@@ -195,10 +207,20 @@ class MonitoringService:
             }
     
     @staticmethod
+    def _ensure_projects_dir() -> None:
+        """Create the projects directory once, off the HTTP request path."""
+        try:
+            (config.BASE_PATH_SCRIPTS / 'projets_extraits').mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Unable to create projects directory: {e}")
+
+    @staticmethod
     def get_system_status() -> Dict[str, Any]:
-        """
-        Get comprehensive system status including CPU, memory, GPU, and disk.
-        
+        """Sample the system once (CPU, memory, GPU, disk).
+
+        Called from background workers only: every call hits psutil/NVML.
+        HTTP handlers must use :meth:`get_system_status_cached`.
+
         Returns:
             System status dictionary:
             {
@@ -210,12 +232,8 @@ class MonitoringService:
             }
         """
         try:
-            # Ensure projects directory exists
-            projects_dir = config.BASE_PATH_SCRIPTS / 'projets_extraits'
-            projects_dir.mkdir(parents=True, exist_ok=True)
-            
             from datetime import datetime, timezone
-            
+
             return {
                 "cpu_percent": MonitoringService.get_cpu_usage(),
                 "memory": MonitoringService.get_memory_usage(),
@@ -226,6 +244,87 @@ class MonitoringService:
         except Exception as e:
             logger.error(f"System status error: {e}")
             raise
+
+    @staticmethod
+    def refresh_snapshot() -> Optional[Dict[str, Any]]:
+        """Sample the system and publish the result as the shared snapshot."""
+        global _SYSTEM_SNAPSHOT, _SNAPSHOT_MONOTONIC
+
+        try:
+            status = MonitoringService.get_system_status()
+        except Exception as e:
+            logger.error(f"Snapshot refresh failed: {e}")
+            return None
+
+        with _SNAPSHOT_LOCK:
+            _SYSTEM_SNAPSHOT = status
+            _SNAPSHOT_MONOTONIC = time.monotonic()
+        return status
+
+    @staticmethod
+    def get_system_status_cached() -> Dict[str, Any]:
+        """Return the last published snapshot without touching psutil/NVML.
+
+        Falls back to a single synchronous sample when the sampler has not
+        published anything yet (first seconds after startup).
+        """
+        global _SYSTEM_SNAPSHOT, _SNAPSHOT_MONOTONIC
+
+        with _SNAPSHOT_LOCK:
+            snapshot = _SYSTEM_SNAPSHOT
+            age_s = (time.monotonic() - _SNAPSHOT_MONOTONIC) if snapshot else None
+
+        if snapshot is None:
+            snapshot = MonitoringService.refresh_snapshot()
+            if snapshot is None:
+                raise RuntimeError("System snapshot unavailable")
+            with _SNAPSHOT_LOCK:
+                age_s = time.monotonic() - _SNAPSHOT_MONOTONIC
+
+        payload = dict(snapshot)
+        payload["snapshot_age_s"] = round(age_s, 2) if age_s is not None else None
+        return payload
+
+    @staticmethod
+    def start_snapshot_sampler(interval_s: Optional[float] = None) -> None:
+        """Start the daemon thread publishing system snapshots.
+
+        Args:
+            interval_s: Sampling interval in seconds (defaults to SYSTEM_SNAPSHOT_INTERVAL_S)
+        """
+        global _SAMPLER_THREAD, _SAMPLER_INTERVAL_S
+
+        with _SNAPSHOT_LOCK:
+            if _SAMPLER_THREAD is not None and _SAMPLER_THREAD.is_alive():
+                logger.debug("System snapshot sampler already running")
+                return
+
+        _SAMPLER_INTERVAL_S = max(0.5, float(interval_s or getattr(config, 'SYSTEM_SNAPSHOT_INTERVAL_S', 2.0)))
+        _SAMPLER_STOP.clear()
+        MonitoringService._ensure_projects_dir()
+        # Prime the non-blocking CPU delta and publish a first snapshot immediately
+        psutil.cpu_percent(interval=None)
+        MonitoringService.refresh_snapshot()
+
+        def sampler_loop():
+            while not _SAMPLER_STOP.wait(_SAMPLER_INTERVAL_S):
+                try:
+                    MonitoringService.refresh_snapshot()
+                except Exception as e:
+                    logger.error(f"System snapshot sampler error: {e}")
+
+        _SAMPLER_THREAD = threading.Thread(
+            target=sampler_loop,
+            name="SystemSnapshotSampler",
+            daemon=True,
+        )
+        _SAMPLER_THREAD.start()
+        logger.info(f"System snapshot sampler started (interval: {_SAMPLER_INTERVAL_S}s)")
+
+    @staticmethod
+    def stop_snapshot_sampler() -> None:
+        """Signal the snapshot sampler to stop."""
+        _SAMPLER_STOP.set()
 
     @staticmethod
     def get_environment_info() -> Dict[str, Any]:
