@@ -2,23 +2,26 @@
 # -*- coding: utf-8 -*-
 
 """
-Script d'analyse des transitions vidéo avec TransNetV2 via OpenCV 5.0 DNN (ONNX)
-Version Expérimentale - Étape 3 (Alternative au pipeline PyTorch)
+Script d'analyse des transitions vidéo avec TransNetV2 (ONNX) - Étape 2
 
-Ce script remplace le runtime PyTorch par le moteur DNN orienté graphe d'OpenCV 5.0
-pour l'inférence TransNetV2. Avantages attendus :
+Inférence TransNetV2 sur deux backends possibles :
+  - moteur DNN orienté graphe d'OpenCV 5.x, tenté uniquement si la version installée expose ENGINE_NEW
+  - ONNX Runtime (CUDA, repli CPU) dans tous les autres cas — chemin nominal de cette installation
+
+Atouts du backend ONNX Runtime :
   - Empreinte mémoire réduite (~200 Mo vs ~2 Go pour PyTorch)
   - Démarrage instantané (pas de JIT/compilation CUDA)
-  - Dispatching HAL SIMD automatique (AVX2/AVX-512/NEON via KleidiCV)
+  - Exécution GPU via CUDAExecutionProvider (injection LD_LIBRARY_PATH des paquets nvidia du venv)
 
 Prérequis :
   - Le modèle ONNX (transnetv2.onnx) doit être placé dans assets/models/onnx/
-  - Le venv transnet_cv5_env doit être activé (opencv-python-headless>=5.0.0)
+  - Le venv transnet_cv5_env doit être activé (opencv-python-headless + onnxruntime-gpu)
 
 Activation : USE_OPENCV5_STEP2=true dans .env
 """
 
 import os
+import re
 import sys
 import csv
 import argparse
@@ -75,7 +78,7 @@ def get_video_fps(video_path):
 
 
 def validate_onnx_slice_operator(net, window_size=100):
-    """Validation de l'opérateur Slice d'OpenCV 5.0 DNN pour TransNetV2.
+    """Validation pré-vol du graphe TransNetV2 (opérateur Slice) sur le backend chargé.
 
     Le rapport de faisabilité identifie le Slice comme point de défaillance
     potentiel. Ce test envoie une entrée synthétique et vérifie que la sortie
@@ -119,11 +122,37 @@ def validate_onnx_slice_operator(net, window_size=100):
         return False
 
 
+_IMPORTER_NODE_RE = re.compile(r"Node \[([A-Za-z0-9_]+)@ai\.onnx\]")
+
+
+def graph_engine_available():
+    """Indique si OpenCV expose le moteur DNN orienté graphe (OpenCV 5.x)."""
+    return hasattr(cv2.dnn, "DNN_ENGINE_NEW") or hasattr(cv2.dnn, "ENGINE_NEW")
+
+
+def activate_graph_engine(net):
+    """Active le moteur DNN orienté graphe ; retourne False si l'API n'est pas exposée."""
+    try:
+        if hasattr(cv2.dnn, "DNN_ENGINE_NEW"):
+            net.set(cv2.dnn.DNN_ENGINE_NEW, True)
+        elif hasattr(cv2.dnn, "ENGINE_NEW"):
+            net.setEngineType(cv2.dnn.ENGINE_NEW)
+        else:
+            return False
+        return True
+    except Exception as e:
+        logging.warning(f"Moteur DNN orienté graphe non activé, moteur classique conservé: {e}")
+        return False
+
+
 class ORTDNNNet:
     """Wrapper imitant l'API cv2.dnn.Net pour un remplacement transparent par ONNX Runtime."""
     def __init__(self, path, force_cpu=False):
         import onnxruntime as ort
+        # Seules les erreurs du runtime remontent : le détail (découverte GPU, merge de shapes) est bruité
+        ort.set_default_logger_severity(3)
         opts = ort.SessionOptions()
+        opts.log_severity_level = 3
         
         env_force_cpu = os.environ.get("STEP2_CV5_FORCE_CPU", "false").lower() == "true"
         effective_force_cpu = force_cpu or env_force_cpu
@@ -152,6 +181,10 @@ class ORTDNNNet:
         
         # Journalisation du provider actif pour confirmation
         active_providers = self.session.get_providers()
+        self.backend_label = (
+            "ONNX Runtime (CUDA)" if "CUDAExecutionProvider" in active_providers
+            else "ONNX Runtime (CPU)"
+        )
         logging.info(f"Session ONNX Runtime initialisée avec les providers actifs : {active_providers}")
         
         self.input_name = self.session.get_inputs()[0].name
@@ -170,42 +203,56 @@ class ORTDNNNet:
             return outputs[0] if len(outputs) == 1 else outputs
 
 
+def backend_label(net):
+    """Libellé du backend d'inférence réellement chargé."""
+    if isinstance(net, ORTDNNNet):
+        return net.backend_label
+    return f"OpenCV DNN {cv2.__version__}"
+
+
 def load_opencv_dnn_model(model_path):
-    """Charge le modèle TransNetV2 ONNX via OpenCV 5.0 DNN avec Fallback ONNX Runtime."""
+    """Charge le modèle TransNetV2 ONNX : OpenCV DNN si le moteur graphe existe, sinon ONNX Runtime."""
     model_path = Path(model_path)
     if not model_path.exists():
         logging.critical(f"Modèle ONNX non trouvé: {model_path}")
         return None
 
-    # 1. Tentative avec OpenCV DNN
-    try:
-        logging.info("Tentative de chargement du modèle ONNX avec OpenCV DNN...")
-        net = cv2.dnn.readNetFromONNX(str(model_path))
+    # 1. OpenCV DNN : pertinent uniquement avec le moteur DNN orienté graphe (OpenCV 5.x)
+    if not graph_engine_available():
+        logging.info(
+            f"OpenCV {cv2.__version__} n'expose pas le moteur DNN orienté graphe (ENGINE_NEW) : "
+            "chargement direct via ONNX Runtime."
+        )
+    else:
+        try:
+            logging.info("Tentative de chargement du modèle ONNX avec OpenCV DNN...")
+            net = cv2.dnn.readNetFromONNX(str(model_path))
 
-        # Configurer le backend OpenCV CPU avec le nouveau moteur orienté graphe
-        net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-        net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+            # Configurer le backend OpenCV CPU avec le nouveau moteur orienté graphe
+            net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+            net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
-        # Tenter d'activer le moteur DNN orienté graphe (ENGINE_NEW)
-        # si disponible dans cette version d'OpenCV 5.0
-        if hasattr(cv2.dnn, 'ENGINE_NEW'):
-            try:
-                net.setEngineType(cv2.dnn.ENGINE_NEW)
+            if activate_graph_engine(net):
                 logging.info("ENGINE_NEW (moteur DNN orienté graphe) activé.")
-            except Exception as e:
-                logging.warning(f"ENGINE_NEW non applicable, fallback moteur classique: {e}")
-        else:
-            logging.info("ENGINE_NEW non disponible dans cette version d'OpenCV. Utilisation du moteur DNN classique.")
 
-        logging.info(f"Modèle ONNX chargé avec OpenCV DNN: {model_path.name} (OpenCV {cv2.__version__})")
-        return net
-    except Exception as dnn_err:
-        logging.warning(f"Échec de chargement avec OpenCV DNN ({dnn_err}). Passage au fallback ONNX Runtime...")
+            logging.info(f"Modèle ONNX chargé avec OpenCV DNN: {model_path.name} (OpenCV {cv2.__version__})")
+            return net
+        except Exception as dnn_err:
+            # Graphe non importable (opérateur non supporté par l'importeur) : cas attendu, pas une panne
+            unsupported = _IMPORTER_NODE_RE.search(str(dnn_err))
+            if unsupported:
+                logging.info(
+                    f"Modèle non importable par OpenCV DNN (opérateur '{unsupported.group(1)}' non supporté) : "
+                    "inférence via ONNX Runtime."
+                )
+                logging.debug(f"Détail de l'import OpenCV DNN: {dnn_err}")
+            else:
+                logging.warning(f"Échec de chargement avec OpenCV DNN ({dnn_err}). Passage au fallback ONNX Runtime...")
 
-    # 2. Fallback ONNX Runtime
+    # 2. ONNX Runtime : chemin nominal quand le moteur graphe d'OpenCV est absent ou inutilisable
     try:
         net = ORTDNNNet(model_path)
-        logging.info(f"Modèle ONNX chargé via ONNX Runtime (fallback) : {model_path.name}")
+        logging.info(f"Modèle ONNX chargé via {net.backend_label} : {model_path.name}")
         return net
     except Exception as ort_err:
         logging.critical(f"Erreur fatale : Impossible de charger le modèle via OpenCV DNN ou ONNX Runtime. Erreur ORT: {ort_err}")
@@ -213,7 +260,7 @@ def load_opencv_dnn_model(model_path):
 
 
 def detect_scenes_cv5(video_path, net, model_path, threshold=0.5):
-    """Détection de scènes avec OpenCV 5.0 DNN et streaming FFmpeg.
+    """Détection de scènes avec TransNetV2 (ONNX) et streaming FFmpeg.
 
     Pipeline :
       1. FFmpeg -> frames brutes 48x27 RGB à 25 FPS (streaming asynchrone)
@@ -500,7 +547,7 @@ def process_single_video(idx, total, video_path, net, model_path, cfg):
 
         logging.info(
             f"Succès: {output_csv_path.name} créé avec {len(scenes)} scènes "
-            f"({elapsed:.2f}s, OpenCV 5.0 DNN)"
+            f"({elapsed:.2f}s, {backend_label(net)})"
         )
         return True, net
 
@@ -512,22 +559,37 @@ def process_single_video(idx, total, video_path, net, model_path, cfg):
 def setup_cuda_paths():
     """Recherche les répertoires de bibliothèques NVIDIA (CUDA/cuDNN) dans le venv
     courant et les injecte dans LD_LIBRARY_PATH pour permettre le chargement GPU par ONNX Runtime.
+
+    ld.so fige LD_LIBRARY_PATH au démarrage du processus : l'injection n'est visible par dlopen
+    qu'après ré-exécution, d'où le re-exec unique gardé par STEP2_CV5_CUDA_ENV_READY. Le lanceur
+    applicatif (services/workflow_executor) fournit déjà ces chemins au sous-processus : aucun
+    re-exec n'a alors lieu.
     """
     try:
         # Trouver le répertoire site-packages du venv courant
         venv_site_packages = Path(sys.executable).parent.parent / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
-        if venv_site_packages.exists():
-            # Trouver les dossiers nvidia/*/lib
-            nvidia_dirs = list(venv_site_packages.glob("nvidia/*/lib"))
-            if nvidia_dirs:
-                paths = [str(d) for d in nvidia_dirs]
-                current_ld = os.environ.get("LD_LIBRARY_PATH", "")
-                if current_ld:
-                    paths.append(current_ld)
-                # Injecter dans le processus courant
-                new_ld = ":".join(paths)
-                os.environ["LD_LIBRARY_PATH"] = new_ld
-                logging.info(f"CUDA_PATH_SETUP: LD_LIBRARY_PATH configuré avec les packages nvidia du venv: {len(nvidia_dirs)} répertoires ajoutés.")
+        if not venv_site_packages.exists():
+            return
+
+        # Trouver les dossiers nvidia/*/lib
+        nvidia_dirs = [str(d) for d in venv_site_packages.glob("nvidia/*/lib")]
+        if not nvidia_dirs:
+            return
+
+        current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        current_entries = [entry for entry in current_ld.split(":") if entry]
+        missing_dirs = [d for d in nvidia_dirs if d not in current_entries]
+        if not missing_dirs:
+            return
+
+        os.environ["LD_LIBRARY_PATH"] = ":".join(missing_dirs + current_entries)
+        logging.info(f"CUDA_PATH_SETUP: LD_LIBRARY_PATH enrichi avec les packages nvidia du venv: {len(missing_dirs)} répertoires ajoutés.")
+
+        if os.environ.get("STEP2_CV5_CUDA_ENV_READY") != "1":
+            os.environ["STEP2_CV5_CUDA_ENV_READY"] = "1"
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os.execv(sys.executable, [sys.executable] + sys.argv)
     except Exception as e:
         logging.warning(f"CUDA_PATH_SETUP_WARNING: Impossible d'injecter automatiquement les chemins CUDA du venv: {e}")
 
@@ -535,7 +597,7 @@ def setup_cuda_paths():
 def main():
     setup_cuda_paths()
     parser = argparse.ArgumentParser(
-        description="Analyse des transitions vidéo avec TransNetV2 (OpenCV 5.0 DNN ONNX)."
+        description="Analyse des transitions vidéo avec TransNetV2 (ONNX, OpenCV DNN ou ONNX Runtime)."
     )
     parser.add_argument(
         "--model", type=str, default=None,
@@ -611,13 +673,15 @@ def main():
         f"window={WINDOW_SIZE}, stride={WINDOW_STRIDE}, padding={PADDING_FRAMES}, "
         f"ffmpeg_threads={FFMPEG_THREADS}, batch_size={BATCH_SIZE}"
     )
-    logging.info(f"OpenCV version: {cv2.__version__}")
-    logging.info(f"Backend: OpenCV DNN (ONNX), Engine: {'ENGINE_NEW' if hasattr(cv2.dnn, 'ENGINE_NEW') else 'LEGACY'}")
+    logging.info(
+        f"OpenCV version: {cv2.__version__} | "
+        f"moteur DNN orienté graphe (ENGINE_NEW): {'disponible' if graph_engine_available() else 'indisponible'}"
+    )
 
     # Résolution du chemin modèle
     model_path = Path(args.model) if args.model else ONNX_MODEL_PATH
 
-    logging.info("--- Démarrage de l'analyse des transitions (OpenCV 5.0 DNN) ---")
+    logging.info("--- Démarrage de l'analyse des transitions (TransNetV2 ONNX) ---")
 
     # Charger le modèle
     net = load_opencv_dnn_model(model_path)
@@ -625,11 +689,11 @@ def main():
         sys.exit(1)
 
     # Validation de l'opérateur Slice
-    logging.info("Validation de l'opérateur Slice ONNX...")
+    logging.info(f"Validation de l'opérateur Slice ONNX (backend {backend_label(net)})...")
     if not validate_onnx_slice_operator(net, window_size=WINDOW_SIZE):
         logging.critical(
-            "L'opérateur Slice n'est pas supporté correctement. "
-            "Vérifiez la version d'OpenCV et le modèle ONNX."
+            f"Validation pré-vol échouée avec le backend {backend_label(net)}. "
+            "Vérifiez le modèle ONNX et le moteur d'inférence."
         )
         sys.exit(1)
 

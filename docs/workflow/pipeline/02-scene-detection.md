@@ -1,6 +1,6 @@
 # Détection de Scènes
 
-**TL;DR** : Analyse automatique des vidéos avec TransNetV2. Décodage asynchrone FFmpeg (Threading + Queue), pruning glissant de la RAM (O(1) constant) et batching GPU (taille 16) pour une performance maximale avec fallback CPU. Supporte également l'accélération optionnelle via Google Coral Edge TPU (MobileNetV2 Siamois + Cosine Distance CPU) et le mode expérimental OpenCV 5.0 DNN (graphe optimisé). Sortie CSV standardisée.
+**TL;DR** : Analyse automatique des vidéos avec TransNetV2. Décodage asynchrone FFmpeg (Threading + Queue), pruning glissant de la RAM (O(1) constant) et batching GPU (taille 16) pour une performance maximale avec fallback CPU. Supporte également l'accélération optionnelle via Google Coral Edge TPU (MobileNetV2 Siamois + Cosine Distance CPU) et le mode expérimental OpenCV DNN / ONNX Runtime (moteur graphe OpenCV 5.x lorsqu'il est disponible). Sortie CSV standardisée.
 
 ## Le Problème : Segmentation Manuelle Fastidieuse
 
@@ -197,7 +197,7 @@ No,Timecode In,Timecode Out,Frame In,Frame Out
 | **GPU CUDA** | 5-10× plus rapide (TransNetV2) | 2-4GB VRAM | OOM sur vidéos longues | Production avec GPU dédié |
 | **CPU** | Lent mais stable (TransNetV2) | 0GB VRAM | Timeout sur longues vidéos | Développement, laptop |
 | **Edge TPU** | Très rapide et économique (MobileNetV2 Siamois) | 0GB VRAM (SRAM 8MB) | Requiert matériel Coral et `coral_env` | Postes Edge sans GPU dédié (consommation 2-4W) |
-| **OpenCV 5.0 DNN** | Rapide et stable (ONNX TransNetV2) | Très faible (~200MB RAM) | Pas de multiprocessing parallèle | Edge/Desktop sans GPU, limitation de ressources RAM |
+| **OpenCV DNN / ONNX Runtime** | Rapide et stable (ONNX TransNetV2) | Très faible (~200MB RAM) | Pas de multiprocessing parallèle | Edge/Desktop sans GPU, limitation de ressources RAM |
 | **Hybrid** | Auto-fallback | Variable | Complexité configuration | Environnements mixtes |
 
 ## Accélération Google Coral Edge TPU
@@ -215,16 +215,18 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
   7. **Double Seuil (Twin-Comparison)** : Détection des transitions graduelles (fondus, balayages) à l'aide d'un double seuil adaptatif ($k_{high}=3.5, k_{low}=2.0$).
   8. **Export CSV** : Écriture du fichier `.csv` de découpage avec timecodes au format standard `HH:MM:SS.mmm` identique au GPU et période réfractaire de 12 frames (0.5s à 25fps) pour éliminer les doublons.
 
-## Mode Expérimental OpenCV 5.0 DNN
+## Mode Expérimental OpenCV DNN / ONNX Runtime
 
-Lorsque `USE_OPENCV5_STEP2=true` est configuré dans le fichier `.env`, l'étape 2 bascule du runtime lourd PyTorch vers le moteur DNN orienté graphe d'OpenCV 5.0 pour l'inférence TransNetV2 :
+Lorsque `USE_OPENCV5_STEP2=true` est configuré dans le fichier `.env`, l'étape 2 bascule du runtime lourd PyTorch vers l'inférence TransNetV2 ONNX :
 
 * **Script d'exécution** : `workflow_scripts/step2/run_transnet_cv5.py`
-* **Moteur Graphique** : Utilisation de `cv2.dnn.ENGINE_NEW` qui compile le graphe à la volée pour optimiser les performances et le dispatching des instructions vectorielles (AVX2/AVX-512/NEON).
+* **Moteur Graphique** : `cv2.dnn.ENGINE_NEW` n'est tenté que si la version d'OpenCV installée l'expose (le venv `transnet_cv5_env` embarque OpenCV 4.13, qui ne l'a pas). Le modèle `transnetv2.onnx` contient deux nœuds `Flatten` (`axis` égal au rang du tenseur) refusés par l'importeur OpenCV, puis un nœud `Mul` non supporté : le moteur graphe d'OpenCV 5.x est la seule voie OpenCV DNN envisageable.
+* **Backend Nominal** : ONNX Runtime, avec `CUDAExecutionProvider` lorsque les bibliothèques NVIDIA du venv sont visibles, sinon `CPUExecutionProvider`. Le backend réellement actif est journalisé au chargement, à la validation pré-vol et sur chaque ligne de succès (`Succès: … (Xs, ONNX Runtime (CUDA))`).
 * **Gestion Mémoire Constante** : Intègre un système de pruning glissant de la RAM; les frames lues en continu par FFmpeg sont purgées après inférence du lot glissant, limitant la RAM à ~200 Mo (contre ~2 Go sous PyTorch).
-* **Validation Pré-vol** : Une inférence synthétique (`validate_onnx_slice_operator`) est lancée au démarrage pour vérifier le support correct de l'opérateur Slice d'ONNX dans OpenCV.
-* **Fallback Silencieux** : Si le moteur OpenCV DNN échoue lors du chargement, le système bascule automatiquement vers ONNX Runtime (avec détection automatique de l'accélération GPU/CPU).
-* **Parallélisme Linéaire** : Traitement séquentiel sans multiprocessing (l'inférence OpenCV DNN n'étant pas thread-safe dans les processus clonés); la vitesse reste élevée grâce à la vectorisation matérielle native.
+* **Validation Pré-vol** : Une inférence synthétique (`validate_onnx_slice_operator`) est lancée au démarrage sur le backend chargé pour vérifier que la sortie n'est ni vide ni dégénérée.
+* **Diagnostic des Échecs** : Un graphe refusé par l'importeur OpenCV (opérateur non supporté, cas attendu) est journalisé en `INFO` avec le nom de l'opérateur ; les autres échecs restent en `WARNING` avant la bascule ONNX Runtime.
+* **Injection CUDA** : `setup_cuda_paths()` place les répertoires `nvidia/*/lib` du venv dans `LD_LIBRARY_PATH`. L'éditeur de liens figeant cet environnement au démarrage du processus, le script se ré-exécute une fois (garde `STEP2_CV5_CUDA_ENV_READY`) lorsque les chemins manquaient ; le lanceur applicatif (`services/workflow_executor`) fournissant déjà ces chemins au sous-processus, la production ne se ré-exécute pas. Sans cette injection, ONNX Runtime bascule silencieusement sur CPU (mesuré ~8× plus lent).
+* **Parallélisme Linéaire** : Traitement séquentiel sans multiprocessing (l'inférence DNN n'étant pas thread-safe dans les processus clonés); la vitesse reste élevée grâce à la vectorisation matérielle native et à l'exécution GPU.
 
 ## Benchmarks d'Optimisation VRAM (GPU 4 Go)
 
