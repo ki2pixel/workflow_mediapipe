@@ -36,7 +36,6 @@ try:
 except ImportError:
     print('❌ opencv manquant')
     exit(1)
-    print('ℹ️  Environment tracking_env_slim allégé (MediaPipe CPU) validé')
 "
 
 if [ $? -ne 0 ]; then
@@ -47,6 +46,12 @@ fi
 # Exécuter les tests
 echo "🧪 Exécution des tests STEP4..."
 export DRY_RUN_DOWNLOADS=true
-pytest tests/unit/test_step4_*.py tests/unit/test_tracking_optimizations_*.py -v --tb=short
+python -m pytest tests/unit/test_step4_*.py tests/unit/test_tracking_optimizations_*.py -v --tb=short
+status=$?
+
+if [ $status -ne 0 ]; then
+    echo "❌ Tests STEP4 en échec (code $status)"
+    exit $status
+fi
 
 echo "✅ Tests STEP4 terminés"

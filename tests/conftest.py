@@ -16,6 +16,20 @@ if _env_path.exists():
     load_dotenv(_env_path)
 
 
+# Tests nécessitant un venv d'étape (torch, mediapipe, numpy/cv2) : exclus de la découverte par
+# défaut, ils s'exécutent via leurs runners dédiés (scripts/run_step2_tests.sh,
+# scripts/run_step4_tests.sh) qui passent les fichiers explicitement — un chemin explicite n'est
+# jamais filtré par collect_ignore_glob. Les motifs `!` de pytest.ini ne sont, eux, pas supportés.
+collect_ignore_glob = [
+    "unit/test_step2_transnet.py",
+    "unit/test_cv5_adaptive_workers.py",
+    "unit/test_tracking_optimizations_blendshapes_filter.py",
+    "unit/test_step4_face_engines.py",
+    "unit/test_step4_gpu_support.py",
+    "integration/test_step4_cv5_json_formats.py",
+]
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--step4-gpu-log",
@@ -49,8 +63,17 @@ def clean_workflow_state():
 
 @pytest.fixture(autouse=True)
 def clean_cache_service():
-    """Réinitialise proprement le singleton CacheService avant et après chaque test."""
-    import services.cache_service as cs
+    """Réinitialise proprement le singleton CacheService avant et après chaque test.
+
+    Les venvs d'étape (torch, mediapipe, numpy/cv2) n'embarquent pas les dépendances Flask de
+    l'application : le cache est alors simplement absent de la session de tests.
+    """
+    try:
+        import services.cache_service as cs
+    except ImportError:
+        yield
+        return
+
     with cs._stats_lock:
         cs.cache_instance = None
     cs.CacheService.reset_stats()

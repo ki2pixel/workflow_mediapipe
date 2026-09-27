@@ -274,4 +274,7 @@ ainsi que l'absence de support. Le patch fait passer la reprise de « utile sur 
    répertoire est passé explicitement, d'où des erreurs de collecte `numpy`/`cv2` dans l'environnement `env`
    (indépendant de cet audit, à traiter séparément si souhaité). Pollution connexe : `tests/integration/test_workflow_routes.py:15`
    force `DRY_RUN_DOWNLOADS=true` à l'import, ce qui affecte toute la session de tests.
+   → *Traité le 2026-09-27 : les motifs `!` de `python_files` n'étaient pas une syntaxe pytest (donc jamais
+   appliqués) ; les tests concernés sont désormais exclus via `collect_ignore_glob` dans `tests/conftest.py`, ce qui
+   laisse intacts les runners dédiés qui passent un chemin explicite.*
 

@@ -90,18 +90,22 @@ done
 echo "5. Vérification de pytest.ini..."
 if [ -f "pytest.ini" ]; then
     echo "✅ pytest.ini existe"
-    if grep -q "test_step2_transnet.py" pytest.ini; then
-        echo "✅ Exclusions STEP2 configurées"
-    else
-        echo "⚠️ Exclusions STEP2 non trouvées"
-    fi
-    if grep -q "test_step4_" pytest.ini; then
-        echo "✅ Exclusions STEP4 configurées"
-    else
-        echo "⚠️ Exclusions STEP4 non trouvées"
-    fi
 else
     echo "❌ pytest.ini manquant"
+fi
+
+echo "6. Vérification des exclusions de tests (tests/conftest.py)..."
+if [ -f "tests/conftest.py" ] && grep -q "collect_ignore_glob" tests/conftest.py; then
+    echo "✅ collect_ignore_glob configuré"
+    for pattern in "test_step2_transnet.py" "test_step4_"; do
+        if grep -q "$pattern" tests/conftest.py; then
+            echo "✅ Exclusion $pattern configurée"
+        else
+            echo "⚠️ Exclusion $pattern non trouvée"
+        fi
+    done
+else
+    echo "❌ collect_ignore_glob absent de tests/conftest.py"
 fi
 
 echo "=== Diagnostic terminé ==="

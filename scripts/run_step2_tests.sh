@@ -13,6 +13,10 @@ fi
 echo "🔄 Activation de l'environnement transnet_env..."
 source /mnt/venv_ext4/transnet_env/bin/activate
 
+# Le module transnetv2_pytorch vit dans workflow_scripts/step2 (import local, pas un paquet pip)
+PROJECT_ROOT="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )"
+export PYTHONPATH="${PROJECT_ROOT}/workflow_scripts/step2${PYTHONPATH:+:${PYTHONPATH}}"
+
 # Vérifier les dépendances critiques
 echo "🔍 Vérification des dépendances..."
 python -c "
@@ -39,6 +43,12 @@ fi
 # Exécuter les tests
 echo "🧪 Exécution des tests STEP2..."
 export DRY_RUN_DOWNLOADS=true
-pytest tests/unit/test_step2_transnet.py -v --tb=short
+python -m pytest tests/unit/test_step2_transnet.py -v --tb=short
+status=$?
+
+if [ $status -ne 0 ]; then
+    echo "❌ Tests STEP2 en échec (code $status)"
+    exit $status
+fi
 
 echo "✅ Tests STEP2 terminés"

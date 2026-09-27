@@ -37,7 +37,7 @@ python -m venv env && source env/bin/activate && pip install -r requirements_env
 pytest tests/unit tests/integration                  # backend default
 npm run test:frontend                                # Node ESM frontend
 ./scripts/run_tests.sh                               # full coverage
-PYTHONPATH=transnet_env ./scripts/run_step2_tests.sh # scene detection only
+./scripts/run_step2_tests.sh                         # scene detection only (sets PYTHONPATH)
 ./scripts/run_step4_tests.sh                         # tracking only
 ./scripts/diagnose_tests.sh                          # drift diagnostics
 python scripts/validate_startup.py                   # blocks prod on default secrets
@@ -67,9 +67,10 @@ Authoritative rules: `./.agents/rules/codingstandards.md` (mirrored in
 ## Testing Guidelines
 
 - `pytest.ini` restricts default discovery to `tests/unit` and
-  `tests/integration`; excluded files (`test_step3_transnet.py`,
-  `test_step5_*.py`, `test_tracking_optimizations_*.py`) run via their
-  dedicated scripts with the matching venv on `PYTHONPATH`.
+  `tests/integration`; tests needing a step-specific venv (torch, mediapipe,
+  numpy/cv2) are excluded via `collect_ignore_glob` in `tests/conftest.py` and
+  run with their dedicated scripts and the matching venv — explicit paths are
+  never filtered by the exclusion.
 - Frontend tests live in `tests/frontend/*.test.{js,mjs}` and import
   `./tests/frontend/setup.mjs`.
 - Each test carries `// Given / When / Then` markers. Aim for ≥ failure-case

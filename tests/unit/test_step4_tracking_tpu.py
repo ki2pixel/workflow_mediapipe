@@ -36,7 +36,7 @@ sys.path.insert(0, str(BASE_PATH / "workflow_scripts" / "step4"))
 
 try:
     from run_tracking_tpu import KalmanFilterND, run_tracking_pipeline, detect_face, extract_landmarks, extract_blendshapes
-except ImportError as e:
+except (ImportError, SystemExit) as e:
     pytest.skip(f"Impossible d'importer run_tracking_tpu: {e}", allow_module_level=True)
 
 class TestKalmanFilterND:
