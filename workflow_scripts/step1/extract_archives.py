@@ -4,6 +4,11 @@
 """
 Script d'extraction d'archives pour le workflow de traitement vidéo
 Version Ubuntu - Étape 1 (Logique métier de la version originale préservée)
+
+Depuis la suppression de l'étape de conversion, ce script porte également la
+normalisation vidéo (MP4 / H.264 / 25 fps / yuv420p) des projets extraits, via
+`utils.media_normalizer`. Le mode `--normalize-only` permet de rattraper les
+projets extraits avant ce changement.
 """
 
 import os
@@ -22,6 +27,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from utils.filename_security import FilenameSanitizer, validate_extraction_path
+from utils.media_normalizer import is_normalization_enabled, normalize_videos_in
 
 # --- Configuration des chemins et du logger ---
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent
@@ -373,7 +379,11 @@ def secure_extract_tar(tar_path, temp_extract_dir, sanitizer):
 
 
 def extract_archive(archive_path, destination_base_dir):
-    """Extrait une archive de manière sécurisée, gère les sous-dossiers et nettoie."""
+    """Extrait une archive de manière sécurisée, gère les sous-dossiers et nettoie.
+
+    Returns:
+        Path: dossier `docs/` du projet extrait en cas de succès, `None` sinon.
+    """
     project_folder_name = get_project_folder_name(archive_path.name)
     # Calcule un nom de dossier projet unique
     unique_project_dir = compute_unique_project_dir(project_folder_name, destination_base_dir)
@@ -409,11 +419,11 @@ def extract_archive(archive_path, destination_base_dir):
             total_security_issues += security_issues
         else:
             logging.warning(f"Format non supporté: {archive_path}")
-            return False
+            return None
 
         if not extraction_success:
             logging.error(f"Échec de l'extraction sécurisée pour {archive_path.name}")
-            return False
+            return None
 
         # Log security statistics
         stats = sanitizer.get_stats()
@@ -429,7 +439,7 @@ def extract_archive(archive_path, destination_base_dir):
         extracted_items = list(temp_extract_dir.rglob('*'))
         if not extracted_items:
             logging.warning(f"Aucun fichier extrait de {archive_path.name}")
-            return False
+            return None
 
         # 2. Nettoyer les fichiers inutiles de l'extraction (ex: __MACOSX)
         macosx_junk = temp_extract_dir / "__MACOSX"
@@ -457,14 +467,14 @@ def extract_archive(archive_path, destination_base_dir):
             shutil.move(str(item_to_move), str(target_path))
 
         logging.info(f"Extraction terminée pour {archive_path.name}")
-        return True
+        return final_destination
 
     except (zipfile.BadZipFile, rarfile.BadRarFile, tarfile.ReadError) as e:
         logging.exception(f"Erreur: Fichier archive corrompu ou invalide - {archive_path.name}: {e}")
-        return False
+        return None
     except Exception as e:
         logging.exception(f"Erreur inattendue lors de l'extraction de {archive_path.name}: {e}")
-        return False
+        return None
     finally:
         # 5. Nettoyer le dossier temporaire
         if temp_extract_dir.exists():
@@ -495,16 +505,30 @@ def find_archives_to_process(source_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Script d'extraction d'archives intelligent.")
-    parser.add_argument('--source-dir', type=str, required=True,
+    parser.add_argument('--source-dir', type=str, required=False,
                         help="Spécifie le répertoire où chercher les archives.")
+    parser.add_argument('--normalize-only', action='store_true',
+                        help="Ne pas extraire : normaliser les vidéos déjà présentes dans projets_extraits.")
+    parser.add_argument('--force', action='store_true',
+                        help="Avec --normalize-only : ré-encoder aussi les vidéos déjà conformes.")
     args = parser.parse_args()
+
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+
+    if args.normalize_only:
+        logging.info("--- Démarrage de la normalisation seule (rattrapage) ---")
+        logging.info(f"Dossier de destination des projets: {WORK_DIR.resolve()}")
+        summary = normalize_videos_in(WORK_DIR, force=args.force)
+        logging.info(f"Résumé normalisation: {summary}")
+        sys.exit(0 if summary.is_success else 1)
+
+    if not args.source_dir:
+        parser.error("--source-dir est requis hors mode --normalize-only")
 
     source_archives_dir = Path(args.source_dir)
     logging.info(f"--- Démarrage du script d'extraction d'archives ---")
     logging.info(f"Dossier source: {source_archives_dir.resolve()}")
     logging.info(f"Dossier de destination des projets: {WORK_DIR.resolve()}")
-
-    WORK_DIR.mkdir(parents=True, exist_ok=True)
 
     # Réinitialisation mensuelle du fichier des archives traitées (si nécessaire)
     try:
@@ -526,14 +550,20 @@ def main():
         return
 
     successful_count = 0
+    normalization_failures = 0
     for i, archive in enumerate(archives):
         logging.info(f"--- Traitement {i + 1}/{total_to_process}: {archive.name} ---")
 
-        success = extract_archive(archive, WORK_DIR)
+        final_destination = extract_archive(archive, WORK_DIR)
 
-        if success:
+        if final_destination is not None:
             successful_count += 1
             mark_archive_as_processed(str(archive.resolve()))
+
+            if is_normalization_enabled() and final_destination.exists():
+                summary = normalize_videos_in(final_destination)
+                normalization_failures += summary.failed
+
             if DELETE_ARCHIVE_AFTER_SUCCESS:
                 try:
                     archive.unlink()
@@ -545,8 +575,10 @@ def main():
 
     logging.info(f"--- Traitement terminé ---")
     logging.info(f"Résumé: {successful_count}/{total_to_process} archive(s) extraite(s) avec succès.")
+    if normalization_failures:
+        logging.error(f"Résumé: {normalization_failures} vidéo(s) non normalisée(s) — relancer avec --normalize-only.")
 
-    if successful_count < total_to_process:
+    if successful_count < total_to_process or normalization_failures > 0:
         sys.exit(1)  # Quitter avec un code d'erreur s'il y a eu des échecs
 
 

@@ -71,7 +71,7 @@ class WorkflowCommandsConfig:
         }
     
     def _get_step1_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 1: Archive Extraction.
+        """Get configuration for Step 1: Archive Extraction and video normalization.
         
         Returns:
             Step 1 configuration dictionary
@@ -79,7 +79,7 @@ class WorkflowCommandsConfig:
         step1_log_dir = self.logs_base_dir / "step1"
         
         return {
-            "display_name": "1. Extraction des archives",
+            "display_name": "1. Extraction et normalisation des archives",
             "cmd": [
                 str(config.get_venv_python("env")),
                 str(self.base_path / "workflow_scripts" / "step1" / "extract_archives.py"),
@@ -106,8 +106,14 @@ class WorkflowCommandsConfig:
                 "current_success_line_pattern": re.compile(
                     r"Extraction terminée pour (.*?)$", re.IGNORECASE
                 ),
-                "current_item_text_from_success_line": True
-            }
+                "current_item_text_from_success_line": True,
+                # Progression de la normalisation vidéo (post-extraction)
+                "internal": re.compile(
+                    r"INTERNAL_PROGRESS:\s*(\d+)/(\d+)\s*vidéos\s*\((\d+)%\)\s*-\s*(.*)",
+                    re.IGNORECASE
+                ),
+            },
+            "post_completion_message_ui": "Extraction et normalisation terminées."
         }
     
     def _get_step2_config(self) -> Dict[str, Any]:

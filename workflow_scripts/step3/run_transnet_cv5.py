@@ -37,6 +37,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from utils.media_filters import split_preserved_media
+from utils.media_normalizer import check_fps_conformance
 
 # --- Configuration ---
 WORK_DIR = Path(os.getcwd())
@@ -642,6 +643,11 @@ def main():
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
     print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
+
+    # Garde-fou : le pipeline suppose des vidéos normalisées (MP4 / H.264 / 25 fps).
+    # Un fichier non normalisé désynchronise les index de frames et les timecodes en aval.
+    for video_path in videos:
+        check_fps_conformance(video_path)
 
     if total_videos == 0:
         return

@@ -130,7 +130,7 @@ class TestStepSpecificMethods:
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
         name = commands.get_step_display_name('STEP1')
-        assert name == "1. Extraction des archives"
+        assert name == "1. Extraction et normalisation des archives"
         
         name = commands.get_step_display_name('STEP5')
         assert name == "5. Analyse du tracking"
