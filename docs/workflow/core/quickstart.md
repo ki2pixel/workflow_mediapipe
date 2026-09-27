@@ -53,7 +53,7 @@ pip install pyannote.audio  # Versions incompatibles
 ```bash
 # Approche sûre - environnements isolés
 ./start_workflow.sh  # Gère tout automatiquement
-# Ou manuellement avec les venv dédiés (voir étape 3)
+# Ou manuellement avec les venv dédiés (voir étape 2)
 ```
 
 **Crée ton fichier `.env`** :
@@ -150,7 +150,7 @@ projets_extraits/
 ### Lance le Pipeline Complet
 
 Dans l'interface web :
-1. Sélectionne toutes les étapes (STEP1 à STEP8)
+1. Sélectionne toutes les étapes (STEP1 à STEP7)
 2. Clique sur "Exécuter la séquence"
 3. Regarde la progression en temps réel
 
@@ -164,8 +164,8 @@ mon_projet_001/
 ├── video1.mp4              # Original
 ├── video1.csv              # Scènes (STEP3)
 ├── video1_audio.json       # Audio (STEP4)
-├── video1_tracking.json    # Tracking optimisé pour AE (STEP6)
-└── video1_ae.json          # Pré-traitement AE (STEP7)
+├── video1_tracking.json    # Tracking optimisé pour AE (STEP5)
+└── video1_ae.json          # Pré-traitement AE (STEP6)
 ```
 
 ## Configuration Essentielle par Étape
@@ -185,7 +185,7 @@ LEMONFOX_API_KEY=ta_cle_api
 LEMONFOX_DEFAULT_LANGUAGE=fr
 ```
 
-### STEP5 - Tracking Vidéo
+### STEP4 - Tracking Vidéo
 
 **MediaPipe CPU (défaut recommandé)** :
 ```bash
@@ -202,7 +202,7 @@ STEP5_GPU_ENGINES=insightface
 STEP5_GPU_MAX_VRAM_MB=2048     # Ajuste selon ta carte
 ```
 
-### STEP6 - Réduction JSON
+### STEP5 - Réduction JSON
 
 ```bash
 STEP6_INCLUDE_TRACKING_ANALYTICS=1
@@ -224,7 +224,7 @@ curl http://localhost:5000/api/step_status/STEP1
 tail -f logs/app.log
 
 # Logs d'une étape spécifique
-tail -f logs/step4/*.log
+tail -f logs/step3/*.log
 ```
 
 ### Gestion des Problèmes

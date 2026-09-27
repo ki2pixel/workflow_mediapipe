@@ -22,17 +22,17 @@ export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32
 
 ## 3. Script de smoke test
 ```bash
-audio_env/bin/python workflow_scripts/step4/run_audio_analysis_lemonfox.py \
-  --log_dir logs/step4 \
+audio_env/bin/python workflow_scripts/step3/run_audio_analysis_lemonfox.py \
+  --log_dir logs/step3 \
   --input sound-design/smoke_tests/lemonfox_smoke.json \
   --max_files 1
 ```
 - Utiliser un fichier court pour vérifier la stack sans consommer tout le pipeline.
 
 ## 4. Analyse des logs
-- `grep -n "AUDIO PROFILE" logs/step4/*.log` → confirme profil appliqué.
-- `grep -n "Fallback Pyannote" logs/step4/*.log` → vérifier les transitions Lemonfox → Pyannote.
-- `grep -n "OOM" logs/step4/*.log` → coupler avec `PYTORCH_CUDA_ALLOC_CONF`.
+- `grep -n "AUDIO PROFILE" logs/step3/*.log` → confirme profil appliqué.
+- `grep -n "Fallback Pyannote" logs/step3/*.log` → vérifier les transitions Lemonfox → Pyannote.
+- `grep -n "OOM" logs/step3/*.log` → coupler avec `PYTORCH_CUDA_ALLOC_CONF`.
 
 ## 5. Actions correctives
 | Symptôme | Action |

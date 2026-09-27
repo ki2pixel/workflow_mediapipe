@@ -453,8 +453,8 @@ def _validate_project_name(project_name: str) -> bool:
 graph LR
     A[STEP3 Scènes] --> B[ResultsArchiver]
     C[STEP4 Audio] --> B
-    D[STEP5 Tracking] --> B
-    E[STEP8 Finalisation] --> B
+    D[STEP4 Tracking] --> B
+    E[STEP7 Finalisation] --> B
     
     subgraph "Archives"
         F[archives/]

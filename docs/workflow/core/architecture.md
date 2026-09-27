@@ -1,25 +1,24 @@
 # Architecture du Workflow MediaPipe
 
-**TL;DR** : Un pipeline vidéo en 8 étapes avec Flask + JavaScript natif, où chaque étape tourne dans son environnement Python isolé. L'état est centralisé via `WorkflowState`, la configuration via `WorkflowCommandsConfig`, et les données arrivent par un webhook JSON unique.
+**TL;DR** : Un pipeline vidéo en 7 étapes avec Flask + JavaScript natif, où chaque étape tourne dans son environnement Python isolé. L'état est centralisé via `WorkflowState`, la configuration via `WorkflowCommandsConfig`, et les données arrivent par un webhook JSON unique.
 
 ## Le Problème que Nous Résolvons
 
 Tu dois analyser des vidéos pour la post-production After Effects, mais chaque outil (détection de scènes, analyse audio, tracking facial) demande des bibliothèques Python différentes et souvent incompatibles. Lancer manuellement chaque étape est chronophage, et les résultats sont difficiles à synchroniser.
 
-## Notre Solution : Le Pipeline à 8 Étapes
+## Notre Solution : Le Pipeline à 7 Étapes
 
 Nous avons construit un pipeline où chaque étape est un script Python indépendant, orchestré par une interface web. Tu lances une étape, tu regardes la progression en temps réel, et les résultats sont automatiquement disponibles pour After Effects.
 
 ```mermaid
 graph TD
-    A[Archives ZIP/RAR] --> B[Étape 1: Extraction]
-    B --> C[Étape 2: Conversion Vidéo]
-    C --> D[Étape 3: Détection de Scènes]
-    D --> E[Étape 4: Analyse Audio]
-    E --> F[Étape 5: Suivi Vidéo]
-    F --> G[Étape 6: Réduction JSON]
-    G --> H[Étape 7: Pré-traitement AE]
-    H --> I[Étape 8: Finalisation]
+    A[Archives ZIP/RAR] --> B[Étape 1: Extraction + normalisation]
+    B --> D[Étape 2: Détection de Scènes]
+    D --> E[Étape 3: Analyse Audio]
+    E --> F[Étape 4: Suivi Vidéo]
+    F --> G[Étape 5: Réduction JSON]
+    G --> H[Étape 6: Pré-traitement AE]
+    H --> I[Étape 7: Finalisation]
     I --> J[Résultats Finaux]
 ```
 
@@ -53,19 +52,19 @@ def run_step(step_key):
 ### Les Services Essentiels
 
 **WorkflowState** (`services/workflow_state.py`) - La source de vérité unique
-- Gère l'état des 8 étapes de manière thread-safe
+- Gère l'état des 7 étapes de manière thread-safe
 - Singleton accessible via `get_workflow_state()`
 - Méthodes atomiques : `update_step_status()`, `update_step_progress()`, `append_step_log()`
 
 **WorkflowService** (`services/workflow_service.py`) - Le point d'entrée unique
 - Exécute les étapes et séquences
 - Récupère les logs spécifiques
-- Prépare les fichiers temporaires pour STEP5
+- Prépare les fichiers temporaires pour STEP4
 - Instrumenté avec `@measure_api` pour les métriques
 
 **WorkflowCommandsConfig** (`config/workflow_commands.py`) - La configuration centralisée
 - Commandes, répertoires de travail, patterns de logs pour chaque étape
-- Gestion du token Hugging Face pour STEP4
+- Gestion du token Hugging Face pour STEP3
 - Crée automatiquement les répertoires de logs
 
 **CSVService** (`services/csv_service.py`) - Le monitoring des téléchargements
@@ -123,32 +122,31 @@ domBatcher.scheduleUpdate(() => {
 ### Timeline Connectée - L'Interface Moderne
 
 Une timeline visuelle avec :
-- Spine lumineuse connectant les 8 étapes
+- Spine lumineuse connectant les 7 étapes
 - Nœuds d'état dynamiques (idle, running, completed, error)
 - Auto-scroll déterministe pendant les séquences
 - Panneau de logs en overlay synchronisé
 
-## Les 8 Étapes du Pipeline
+## Les 7 Étapes du Pipeline
 
-### Étape 1 : Extraction (`env/`)
+### Étape 1 : Extraction et normalisation (`env/`)
 Extrait les archives ZIP/RAR/TAR avec sécurité :
 - Protection contre path traversal
 - Nettoyage des noms de fichiers
 - Sortie dans `projets_extraits/`
 
-### Étape 2 : Conversion Vidéo (`env/`)
-Normalise les vidéos à 25 FPS avec FFmpeg :
-- Support GPU/CPU automatique
-- Copie audio intelligente
-- Sortie prête pour les étapes suivantes
+Puis normalise les vidéos extraites à 25 FPS avec FFmpeg (`utils/media_normalizer.py`) :
+- Contrat MP4 / H.264 / yuv420p / 25 fps avant toute analyse aval
+- Support GPU/CPU automatique, copie audio intelligente
+- Mode `--normalize-only` pour rattraper les projets extraits antérieurement
 
-### Étape 3 : Détection de Scènes (`transnet_env/`)
+### Étape 2 : Détection de Scènes (`transnet_env/`)
 Identifie les changements de scène avec TransNetV2 :
 - PyTorch optimisé avec AMP optionnel
 - Décodage FFmpeg en streaming
-- Configuration via `config/step3_transnet.json`
+- Configuration via `config/step2_transnet.json`
 
-### Étape 4 : Analyse Audio (`audio_env/`)
+### Étape 3 : Analyse Audio (`audio_env/`)
 Diarisation et analyse des locuteurs :
 - **Pyannote.audio 3.1** par défaut (profil TV optimisé)
 - **Lemonfox** en fallback si `STEP4_USE_LEMONFOX=1`
@@ -162,7 +160,7 @@ HF_AUTH_TOKEN=your_token     # Token Hugging Face
 STEP4_USE_LEMONFOX=0         # Activer Lemonfox
 ```
 
-### Étape 5 : Suivi Vidéo (`tracking_env_slim/` ou `insightface_env/`)
+### Étape 4 : Suivi Vidéo (`tracking_env_slim/` ou `insightface_env/`)
 Détection faciale et tracking d'objets :
 
 **Architecture simplifiée (v4.3)** :
@@ -182,7 +180,7 @@ STEP5_ENABLE_PROFILING=0        # Logs détaillés toutes les 20 frames
 - MediaPipe reste forcé en CPU même si GPU activé
 - Fallback automatique CPU si GPU indisponible
 
-### Étape 6 : Réduction JSON (`env/`)
+### Étape 5 : Réduction JSON (`env/`)
 Optimise les données pour After Effects :
 - Sortie primaire : `*_tracking.json` (consommé par les scripts AE)
 - Enrichissement : `tracking_analytics`, `expression_summary`, `temporal_alignment`
@@ -195,13 +193,13 @@ STEP6_INCLUDE_EXPRESSION_SUMMARY=1
 STEP6_EXPRESSION_KEYS=key1,key2,key3
 ```
 
-### Étape 7 : Pré-traitement AE (`env/`)
+### Étape 6 : Pré-traitement AE (`env/`)
 Prépare les données optimisées pour After Effects :
 - Génération de `*_ae.json` (structures compactes)
 - Filtrage par frames pour les compositions AE
 - Pont Python pour les scripts ExtendScript via `system.callSystem()`
 
-### Étape 8 : Finalisation (`env/`)
+### Étape 7 : Finalisation (`env/`)
 Archive et consolide les résultats :
 - Validation d'intégrité SHA-256
 - Organisation hiérarchique dans `archives/`
@@ -254,10 +252,10 @@ STEP6_INCLUDE_EXPRESSION_SUMMARY=1
 Chaque étape utilise son environnement Python dédié :
 
 - `env/` : Flask + étapes 1, 2, 6, 7, 8
-- `transnet_env/` : PyTorch + TransNetV2 (étape 3)
-- `audio_env/` : Pyannote + Lemonfox (étape 4)
-- `tracking_env_slim/` : MediaPipe CPU (étape 5 par défaut)
-- `insightface_env/` : InsightFace GPU (étape 5 optionnel)
+- `transnet_env/` : PyTorch + TransNetV2 (étape 2)
+- `audio_env/` : Pyannote + Lemonfox (étape 3)
+- `tracking_env_slim/` : MediaPipe CPU (étape 4 par défaut)
+- `insightface_env/` : InsightFace GPU (étape 4 optionnel)
 
 **VENV_BASE_DIR** permet de déplacer tous les environnements sans modifier le code.
 
@@ -279,7 +277,7 @@ if (result.status === 'initiated') {
 
 ### 3. Séquence complète
 ```javascript
-const steps = ['STEP1','STEP2','STEP3','STEP4','STEP5','STEP6','STEP7','STEP8'];
+const steps = ['STEP1','STEP2','STEP3','STEP4','STEP5','STEP6','STEP7'];
 await apiService.runCustomSequence(steps);
 ```
 
@@ -305,7 +303,7 @@ Pense à l'architecture comme un **chef d'orchestre**. Les **services** sont les
 
 ## Conclusion
 
-Cette architecture transforme un problème complexe (pipeline vidéo multi-technologies) en une solution maintenable où chaque composant a une responsabilité claire. Les 8 étapes s'exécutent de manière prévisible, l'état est centralisé et cohérent, et l'interface offre une visibilité complète en temps réel.
+Cette architecture transforme un problème complexe (pipeline vidéo multi-technologies) en une solution maintenable où chaque composant a une responsabilité claire. Les 7 étapes s'exécutent de manière prévisible, l'état est centralisé et cohérent, et l'interface offre une visibilité complète en temps réel.
 
 ---
 

@@ -99,7 +99,7 @@ def cache_open():
 ```json
 {
   "status": "initiated",
-  "message": "Étape step5 initiée"
+  "message": "Étape STEP4 initiée"
 }
 ```
 
@@ -128,7 +128,7 @@ def cache_open():
 **Objectif** : Lire et récupérer le contenu d'un fichier de log spécifique d'une étape.
 
 **Paramètres** :
-- `step_key` : clé d'étape (ex: `step5`)
+- `step_key` : clé d'étape (ex: `STEP4`)
 - `log_index` : index du fichier log (0 = log le plus récent)
 
 **Sortie** :
@@ -250,7 +250,7 @@ def endpoint_handler():
   "endpoint": "/api/step5/run",
   "status_code": 200,
   "duration_ms": 1245.67,
-  "tags": ["step5", "workflow", "v4.2"]
+  "tags": ["STEP4", "workflow", "v4.2"]
 }
 ```
 
@@ -435,8 +435,8 @@ curl -X POST http://localhost:5000/api/invalid_step/run -H "Content-Type: applic
 
 # Solution
 # Vérifier les étapes disponibles
-curl http://localhost:5000/api/step_status/step5
-# Utiliser une clé d'étape valide (step1-8)
+curl http://localhost:5000/api/step_status/STEP4
+# Utiliser une clé d'étape valide (step1-7)
 ```
 
 ### Timeout Endpoint
@@ -518,7 +518,7 @@ graph LR
     B --> F[FilesystemService]
     
     subgraph "Pipeline"
-        G[STEP1-8] --> C
+        G[STEP1-7] --> C
         H[Monitoring] --> E
     end
 ```
@@ -536,7 +536,7 @@ request → validate_step() → workflow_service.run_step() → step_execution
 **Solution** : Configurer `INTERNAL_WORKLER_TOKEN` et l'envoyer dans le header `X-Worker-Token`.
 
 ### Piège #2 : Step Key Invalide
-**Solution** : Utiliser les clés valides (step1-8) et valider via `WorkflowCommandsConfig`.
+**Solution** : Utiliser les clés valides (step1-7) et valider via `WorkflowCommandsConfig`.
 
 ### Piège #3 : Timeout sur Endpoints Lourds
 **Solution** : Activer sampling, mettre en cache les réponses statiques, utiliser async.

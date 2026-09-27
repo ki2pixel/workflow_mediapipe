@@ -46,19 +46,19 @@ alwaysApply: true
 - **State Sync**: PollingManager met à jour AppState via WorkflowState.
 
 ## 5. Pipeline
-- **STEP2 (Conversion)**: NVENC parallèle (max 3 workers) + Fallback CPU `libx264`.
-- **STEP3 (Transitions)**:
+- **STEP1 (Extraction + normalisation)**: extraction sécurisée puis normalisation vidéo MP4/H.264/yuv420p/25 fps via `utils/media_normalizer.py` (NVENC parallèle max 3 workers + fallback CPU `libx264`). Contrat obligatoire pour toutes les étapes aval.
+- **STEP2 (Transitions)**:
   - GPU/CPU: TransNetV2 (batch=8, `mixed_precision=true`, O(1) RAM).
   - TPU: MobileNetV2 INT8 (GAP 1280D ou logits 1000D fallback) avec architecture Producer-Consumer (FFmpeg I/O asynchrone) + EMA embeddings (α=0.8) + Post-traitements JIT Numba (Filtre Médian 1D + Seuillage adaptatif Dugad μ+k·σ + Twin-Comparison FSM). Timecode `HH:MM:SS.mmm`.
-- **STEP4 (Audio)**:
+- **STEP3 (Audio)**:
   - GPU/CPU: Lemonfox/Whisper + Fallback Pyannote. Isolement GPU (`AUDIO_GPU_ISOLATION=1`) en sous-processus. `AUDIO_PROFILE=gpu_fp32`.
   - TPU: YAMNet INT8 (fenêtrage glissant overlap 50%, hop 0.48s) + Filtre Médian VAD + FSM Hangover (1.0s) + AHC (Agglomerative Hierarchical Clustering) avec distance cosine (seuil calibré 0.32) + réassignation des locuteurs mineurs (<7.0s) + estimation optionnelle par Spectral Clustering (Eigen-gap/Silhouette) + extraction d-vectors ECAPA-TDNN Float32 CPU (XNNPACK) avec fallback embeddings YAMNet 1024D. Seuil VAD calibré 0.20.
-- **STEP5 (Tracking)**:
+- **STEP4 (Tracking)**:
   - CPU: MediaPipe (`tracking_env_slim`), multiprocessing obligatoire + `cv2.setNumThreads(0)`.
   - GPU: InsightFace (`insightface_env`, activé via `STEP5_ENABLE_GPU=1`).
   - TPU: Cascade séquentielle TFLite (BlazeFace + FaceMesh sans `half_pixel_centers` + Face Blendshapes) + Filtre One-Euro (OneEuroFilterND @njit 52 dimensions) CPU par défaut (Kalman de secours). Support optionnel des modèles co-compilés dans la SRAM partagée (8 Mo).
   - **Obligatoire**: `StreamingJSONOutput` pour export O(1).
-- **STEP6 & 7**: `ijson` obligatoire. Scripts AE priorisent `*_ae.json`.
+- **STEP4, 6 & 7**: `ijson` obligatoire. Scripts AE priorisent `*_ae.json`.
 
 ## 6. After Effects & CEP (ExtendScript ES3)
 - **Moteur ES3**: `var`, boucles `for` classiques, polyfill `JSON2`. **Interdit**: ES6 (`const`, `let`, `=>`, `map`, `filter`, templates). Encapsulation IIFE systématique.

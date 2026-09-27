@@ -1,6 +1,6 @@
 # Finalisation
 
-**TL;DR** : Archive les résultats, copie les projets vers la destination finale, et nettoie les dossiers temporaires. Dernière étape du pipeline 8 étapes.
+**TL;DR** : Archive les résultats, copie les projets vers la destination finale, et nettoie les dossiers temporaires. Dernière étape du pipeline 7 étapes.
 
 ## Le Problème : Organisation et Nettoyage Final
 
@@ -43,10 +43,10 @@ def finalize_projects():
 
 ```bash
 # Via l'interface web
-# Clique sur "Étape 8 : Finalisation" dans l'interface
+# Clique sur "Étape 7 : Finalisation" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP8
+curl -X POST http://localhost:5000/run/STEP7
 
 # Dans une séquence complète
 const steps = ['STEP1', '2', '3', '4', '5', '6', '7', '8'];
@@ -61,10 +61,10 @@ source env/bin/activate
 
 # Exécution depuis projets_extraits
 cd projets_extraits
-python ../workflow_scripts/step8/finalize_and_copy.py
+python ../workflow_scripts/step7/finalize_and_copy.py
 
 # Monitoring des logs
-tail -f logs/step8/finalize_*.log
+tail -f logs/step7/finalize_*.log
 ```
 
 ### Résultat Attendu
@@ -209,7 +209,7 @@ Pense à la finalisation comme un **bibliothécaire** vs un **déménageur**. Le
 ### Structure des Logs
 
 ```
-logs/step8/
+logs/step7/
 └── finalize_and_copy_20240120_143022.log
 ```
 
@@ -297,7 +297,7 @@ chmod -R 755 /mnt/cache/projets_extraits/
 
 # Solution
 # Utiliser FALLBACK_OUTPUT_DIR si OUTPUT_DIR inaccessible
-FALLBACK_OUTPUT_DIR=/tmp/projets_extraits python workflow_scripts/step8/finalize_and_copy.py
+FALLBACK_OUTPUT_DIR=/tmp/projets_extraits python workflow_scripts/step7/finalize_and_copy.py
 ```
 
 ### Espace Disque Insuffisant
@@ -331,7 +331,7 @@ for project in Path('projets_extraits').iterdir():
 
 # Solution
 # Basculer vers mode lenient ou corriger les projets incomplets
-FINALIZE_MODE=lenient python workflow_scripts/step8/finalize_and_copy.py
+FINALIZE_MODE=lenient python workflow_scripts/step7/finalize_and_copy.py
 ```
 
 ### Fichiers Manquants
@@ -361,7 +361,7 @@ cp sample_tracking.json test_final/docs/
 # Exécuter finalisation
 source env/bin/activate
 cd test_final
-python ../workflow_scripts/step8/feliz_and_copy.py
+python ../workflow_scripts/step7/feliz_and_copy.py
 
 # Vérifier résultats
 ls -la archives/
@@ -371,7 +371,7 @@ ls -la /mnt/cache/projets_extraits/
 ### Validation Automatique
 
 ```python
-def validate_step8_output():
+def validate_step7_output():
     """Vérifie que la finalisation est complète."""
     import json
     from pathlib import Path
@@ -402,7 +402,7 @@ def validate_step8_output():
 
 ```bash
 # Mesurer temps de traitement
-time python workflow_scripts/step8/finalize_and_copy.py
+time python workflow_scripts/step7/finalize_and_copy.py
 
 # Comparer tailles avant/après
 du -sh projets_extraits/
@@ -415,8 +415,8 @@ du -sh archives/
 
 ```mermaid
 graph LR
-    A[STEP6 Réduction] --> B[STEP7 Pré-traitement AE]
-    B --> C[STEP8 Finalisation]
+    A[STEP5 Réduction] --> B[STEP6 Pré-traitement AE]
+    B --> C[STEP7 Finalisation]
     C --> D[Archive + Copie + Nettoyage]
 ```
 
@@ -425,9 +425,9 @@ graph LR
 ```python
 # Intégration avec l'état centralisé
 ws = get_workflow_state()
-ws.update_step_status("STEP8", "running")
-ws.set_step_field("STEP8", "current_project", "projet_camille_001")
-ws.update_step_progress("STEP8", current=1, total=3)
+ws.update_step_status("STEP7", "running")
+ws.set_step_field("STEP7", "current_project", "projet_camille_001")
+ws.update_step_progress("STEP7", current=1, total=3)
 ```
 
 ### Flux Complet 8 Étapes
@@ -437,10 +437,10 @@ graph TD
     A[STEP1 Extraction] --> B[STEP2 Conversion]
     B --> C[STEP3 Scènes]
     C --> D[STEP4 Audio]
-    D --> E[STEP5 Tracking]
-    E --> F[STEP6 Réduction]
-    F --> G[STEP7 Pré-traitement AE]
-    G --> H[STEP8 Finalisation]
+    D --> E[STEP4 Tracking]
+    E --> F[STEP5 Réduction]
+    F --> G[STEP6 Pré-traitement AE]
+    G --> H[STEP7 Finalisation]
     H --> I[Archive + Copie + Nettoyage]
 ```
 
@@ -461,7 +461,7 @@ graph TD
 ### Piège #5 : Fichiers corrompus dans les archives
 **Solution** : Les fichiers corrompus sont ignorés mais journalisés, les archives restent valides.
 
-L'étape 8 transforme l'espace de travail temporaire en une archive organisée et une copie finale propre, garantissant que toutes les analyses importantes sont préservées tout en préparant le système pour le prochain traitement. Le système offre une flexibilité maximale avec ses trois modes (lenient, strict, videos) pour s'adapter à différents cas d'usage.
+L'étape 7 transforme l'espace de travail temporaire en une archive organisée et une copie finale propre, garantissant que toutes les analyses importantes sont préservées tout en préparant le système pour le prochain traitement. Le système offre une flexibilité maximale avec ses trois modes (lenient, strict, videos) pour s'adapter à différents cas d'usage.
 
 ---
 

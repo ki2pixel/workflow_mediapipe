@@ -1,3 +1,8 @@
+---
+name: json-query-expert
+description: Expert en manipulation de données JSON massives via le pattern "Sniper". Stratégie | Ne jamais charger un fichier > 1000 lignes. Inspection via json_query_query_json. Édition via edit_file.
+---
+
 # JSON Query Expert
 
 > **Expertise** : Manipulation chirurgicale de JSON massifs, extraction précise via JSONPath, optimisation token pour fichiers de configuration.
@@ -139,7 +144,7 @@ json_query_jsonpath massive_i18n.json "$.fr.common.buttons[*]"
 json_query_search_keys massive_i18n.json "fr.common"
 ```
 
-De plus, pour le traitement backend Python (ex: STEP6/STEP7), l'utilisation de `ijson` est OBLIGATOIRE pour un parsing en streaming O(1) RAM. Le chargement via `json.load()` est strictement interdit pour les fichiers de tracking volumineux.
+De plus, pour le traitement backend Python (ex: STEP5/STEP6), l'utilisation de `ijson` est OBLIGATOIRE pour un parsing en streaming O(1) RAM. Le chargement via `json.load()` est strictement interdit pour les fichiers de tracking volumineux.
 
 ### JSONPath syntax errors
 

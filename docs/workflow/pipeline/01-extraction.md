@@ -315,12 +315,24 @@ Pense à l'extraction comme un **sas de décontamination**. Les archives entrent
 
 ## Intégration Pipeline
 
-### Entrée pour STEP2
+### Entrée pour STEP2 (analyse des transitions)
 
-L'étape 1 prépare les fichiers pour l'étape 2 (conversion vidéo) :
+L'étape 1 prépare **et normalise** les fichiers pour l'étape 2 (analyse des transitions) :
 - Les vidéos sont dans `projets_extraits/<projet>/docs/`
+- Chaque vidéo respecte le contrat **MP4 / H.264 / yuv420p / 25 fps** (via `utils/media_normalizer.py`)
 - La structure est cohérente pour le reste du pipeline
 - Les métadonnées sont journalisées pour traçabilité
+
+> ⚠️ La normalisation est ce qui garantit l'alignement frame/timecode des étapes aval
+> (transitions, audio, tracking, JSON, AE), qui indexent leurs résultats par numéro de frame.
+
+### Rattrapage des projets déjà extraits
+
+```bash
+source env/bin/activate
+python workflow_scripts/step1/extract_archives.py --normalize-only            # ignore les fichiers déjà conformes
+python workflow_scripts/step1/extract_archives.py --normalize-only --force    # ré-encode tout
+```
 
 ### Monitoring via WorkflowState
 
@@ -346,10 +358,10 @@ ws.update_step_progress("STEP1", current=1, total=5)
 ### Piège #4 : Espace disque insuffisant
 **Solution** : Vérification préalable et nettoyage automatique des temporaires.
 
-L'étape 1 transforme une opération manuelle risquée en un processus automatisé, sécurisé et traçable. Tes vidéos sont prêtes pour la conversion en toute sécurité.
+L'étape 1 transforme une opération manuelle risquée en un processus automatisé, sécurisé, normalisé et traçable.
 
 ---
 
 ## Golden Rule
 
-**Toujours filtrer, sanitiser, archiver avant conversion ; sinon tu exposes ton système à des attaques path traversal.**
+**Toujours filtrer, sanitiser, normaliser à 25 fps avant analyse ; sinon tu exposes ton système à des attaques path traversal et tu désynchronises les index de frames en aval.**

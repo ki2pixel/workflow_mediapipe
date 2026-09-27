@@ -49,7 +49,7 @@ def detect_scenes_adaptive(video, base_threshold=0.5):
 
 ```bash
 # Via l'interface web
-# Clique sur "Étape 3 : Détection de scènes" dans l'interface
+# Clique sur "Étape 2 : Détection de scènes" dans l'interface
 
 # Via API
 curl -X POST http://localhost:5000/run/STEP3
@@ -67,10 +67,10 @@ source transnet_env/bin/activate
 
 # Exécution depuis projets_extraits
 cd projets_extraits
-python ../workflow_scripts/step3/run_transnet.py
+python ../workflow_scripts/step2/run_transnet.py
 
 # Monitoring des logs
-tail -f logs/step3/transnet_*.log
+tail -f logs/step2/transnet_*.log
 ```
 
 ### Résultat Attendu
@@ -202,9 +202,9 @@ No,Timecode In,Timecode Out,Frame In,Frame Out
 
 ## Accélération Google Coral Edge TPU
 
-Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 3 bascule du modèle lourd TransNetV2 vers une architecture optimisée pour les puces TPU Coral Edge (M.2 PCIe ou USB) :
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 2 bascule du modèle lourd TransNetV2 vers une architecture optimisée pour les puces TPU Coral Edge (M.2 PCIe ou USB) :
 
-* **Script d'exécution** : `workflow_scripts/step3/run_scene_detect_tpu.py`
+* **Script d'exécution** : `workflow_scripts/step2/run_scene_detect_tpu.py`
 * **Fonctionnement** :
   1. **Décodage vidéo** : Extraction des frames à 25 FPS au format RGB 224x224 via FFmpeg.
   2. **Inférence TPU** : Utilisation d'un modèle Siamois MobileNetV2 INT8 quantifié exécuté sur l'Edge TPU pour extraire les embeddings spatiaux structurels (couche GAP à 1280 dimensions, avec repli automatique sur les logits à 1000 dimensions).
@@ -217,9 +217,9 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 
 ## Mode Expérimental OpenCV 5.0 DNN
 
-Lorsque `USE_OPENCV5_STEP3=true` est configuré dans le fichier `.env`, l'étape 3 bascule du runtime lourd PyTorch vers le moteur DNN orienté graphe d'OpenCV 5.0 pour l'inférence TransNetV2 :
+Lorsque `USE_OPENCV5_STEP3=true` est configuré dans le fichier `.env`, l'étape 2 bascule du runtime lourd PyTorch vers le moteur DNN orienté graphe d'OpenCV 5.0 pour l'inférence TransNetV2 :
 
-* **Script d'exécution** : `workflow_scripts/step3/run_transnet_cv5.py`
+* **Script d'exécution** : `workflow_scripts/step2/run_transnet_cv5.py`
 * **Moteur Graphique** : Utilisation de `cv2.dnn.ENGINE_NEW` qui compile le graphe à la volée pour optimiser les performances et le dispatching des instructions vectorielles (AVX2/AVX-512/NEON).
 * **Gestion Mémoire Constante** : Intègre un système de pruning glissant de la RAM; les frames lues en continu par FFmpeg sont purgées après inférence du lot glissant, limitant la RAM à ~200 Mo (contre ~2 Go sous PyTorch).
 * **Validation Pré-vol** : Une inférence synthétique (`validate_onnx_slice_operator`) est lancée au démarrage pour vérifier le support correct de l'opérateur Slice d'ONNX dans OpenCV.
@@ -247,7 +247,7 @@ Pense à la détection de scènes comme un **monteur cinéma expert**. Le **GPU*
 ### Structure des Logs
 
 ```
-logs/step3/
+logs/step2/
 └── transnet_pytorch_20240120_143022.log
 ```
 
@@ -360,10 +360,10 @@ python -c "import torch; print(torch.cuda.memory_allocated()/1024**3)"
 
 # Solutions
 # 1. Réduire batch_size
-STEP3_BATCH_SIZE=1 python workflow_scripts/step3/run_transnet.py
+STEP3_BATCH_SIZE=1 python workflow_scripts/step2/run_transnet.py
 
 # 2. Forcer CPU
-STEP3_DEVICE=cpu python workflow_scripts/step3/run_transnet.py
+STEP3_DEVICE=cpu python workflow_scripts/step2/run_transnet.py
 ```
 
 ### Modèle Non Trouvé
@@ -416,7 +416,7 @@ mv test_25fps.mp4 test_scenes/docs/
 # Exécuter détection
 source transnet_env/bin/activate
 cd test_scenes
-python ../workflow_scripts/step3/run_transnet.py
+python ../workflow_scripts/step2/run_transnet.py
 
 # Vérifier résultat
 head docs/test_25fps.csv
@@ -463,10 +463,10 @@ def validate_step3_output():
 ```bash
 # Test GPU
 source transnet_env/bin/activate
-time python workflow_scripts/step3/run_transnet.py
+time python workflow_scripts/step2/run_transnet.py
 
 # Test CPU (désactiver GPU)
-CUDA_VISIBLE_DEVICES="" time python workflow_scripts/step3/run_transnet.py
+CUDA_VISIBLE_DEVICES="" time python workflow_scripts/step2/run_transnet.py
 ```
 
 ## Architecture Technique
@@ -523,7 +523,7 @@ def detect_scene_boundaries(predictions, threshold=0.5):
 
 ### Entrée pour STEP4
 
-L'étape 3 prépare les données temporelles pour l'analyse audio :
+L'étape 2 prépare les données temporelles pour l'analyse audio :
 - **Scènes segmentées** : CSV avec timecodes précis
 - **Frames identifiées** : Numéros de début/fin pour chaque scène
 - **Format standardisé** : Compatible avec les outils de post-production
@@ -567,7 +567,7 @@ ws.update_step_progress("STEP3", current=1, total=3)
 ### Piège #4 : Seuil inadapté
 **Solution** : Ajustement du threshold selon la vidéo (0.3-0.7 typiquement).
 
-L'étape 3 transforme tes vidéos en segments temporels précis, créant une base solide pour l'analyse audio synchronisée. La détection automatique des scènes élimine le travail manuel et garantit une cohérence parfaite avec le reste du pipeline.
+L'étape 2 transforme tes vidéos en segments temporels précis, créant une base solide pour l'analyse audio synchronisée. La détection automatique des scènes élimine le travail manuel et garantit une cohérence parfaite avec le reste du pipeline.
 
 ---
 

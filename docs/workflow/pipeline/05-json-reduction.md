@@ -1,10 +1,10 @@
 # STEP6 JSON Reduction Documentation
 
 ## TL;DR
-STEP6 réduit les JSON volumineux de STEP4/STEP5 en format optimisé After Effects, calculant analytics tracking, alignement temporel, et statistiques expressions tout en préservant compatibilité STEP7.
+STEP5 réduit les JSON volumineux de STEP4/STEP4 en format optimisé After Effects, calculant analytics tracking, alignement temporel, et statistiques expressions tout en préservant compatibilité STEP6.
 
 ## Contexte Métier
-Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes détaillés) inutiles pour post-production. STEP6 optimise pour After Effects : réduction objets trackés, calculs agrégés, alignement audio/vidéo.
+Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes détaillés) inutiles pour post-production. STEP5 optimise pour After Effects : réduction objets trackés, calculs agrégés, alignement audio/vidéo.
 
 ## Architecture Pipeline
 
@@ -19,7 +19,7 @@ Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes dé
 ### Fonctions Clés
 
 #### `stream_reduce_video_json(tracking_in, tracking_out, legacy_path, audio_meta)` (Complexité F)
-**Rôle** : Réduit en flux continu le JSON volumineux de tracking de STEP5 en format After Effects-compatible tout en conservant une empreinte RAM stable de O(1).
+**Rôle** : Réduit en flux continu le JSON volumineux de tracking de STEP4 en format After Effects-compatible tout en conservant une empreinte RAM stable de O(1).
 
 **Algorithme détaillé** :
 1. **Parsing itératif (`ijson.parse`)** : Lecture du fichier d'entrée sous forme de flux d'événements SAX pour extraire les métadonnées (FPS, total_frames) sans charger le JSON en mémoire.
@@ -95,17 +95,17 @@ Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes dé
 - **Bénéfice** : Pipeline robuste, évolutif
 
 ## Golden Rule
-**Les JSON réduits doivent rester compatibles STEP7** : modifications schéma nécessitent tests régression complets et mise à jour scripts consommateurs.
+**Les JSON réduits doivent rester compatibles STEP6** : modifications schéma nécessitent tests régression complets et mise à jour scripts consommateurs.
 
 ## Configuration Essentielle
 
 ### Variables d'Environnement
 
 ```bash
-# Contrôle verbosité STEP5 (impact sur réduction)
+# Contrôle verbosité STEP4 (impact sur réduction)
 STEP5_EXPORT_VERBOSE_FIELDS=0        # 0 = optimisé (défaut), 1 = verbose
 
-# Options STEP6
+# Options STEP5
 STEP6_INCLUDE_TRACKING_ANALYTICS=1   # Analytics confidence/statistiques
 STEP6_INCLUDE_EXPRESSION_SUMMARY=1    # Résumé blendshapes
 STEP6_EXPRESSION_KEYS=jawOpen,mouthSmileLeft,mouthSmileRight  # Blendshapes à inclure
@@ -191,7 +191,7 @@ mkdir -p test_reduction/docs
 # Exécuter réduction
 source env/bin/activate
 cd test_reduction
-python ../workflow_scripts/step6/json_reducer.py
+python ../workflow_scripts/step5/json_reducer.py
 
 # Vérifier réduction
 du -h docs/video1_tracking.json
@@ -253,7 +253,7 @@ def validate_step6_output():
 
 ```bash
 # Mesurer temps de traitement
-time python workflow_scripts/step6/json_reducer.py
+time python workflow_scripts/step5/json_reducer.py
 
 # Comparer tailles avant/après
 du -sh projets_extraits/*/*_tracking.json.bak  # Avant
@@ -262,9 +262,9 @@ du -sh projets_extraits/*/*_tracking.json      # Après
 
 ## Intégration Pipeline
 
-### Entrée pour STEP7
+### Entrée pour STEP6
 
-L'étape 6 prépare les données optimisées pour After Effects :
+L'étape 5 prépare les données optimisées pour After Effects :
 - **JSON standardisé** : Format compatible avec scripts AE
 - **Analytics** : Métriques de confidence et expressions
 - **Taille réduite** : Chargement rapide dans AE
@@ -275,9 +275,9 @@ L'étape 6 prépare les données optimisées pour After Effects :
 ```python
 # Intégration avec l'état centralisé
 ws = get_workflow_state()
-ws.update_step_status("STEP6", "running")
-ws.set_step_field("STEP6", "current_project", "projet_camille_001")
-ws.update_step_progress("STEP6", current=1, total=3)
+ws.update_step_status("STEP5", "running")
+ws.set_step_field("STEP5", "current_project", "projet_camille_001")
+ws.update_step_progress("STEP5", current=1, total=3)
 ```
 
 ### Compatibilité After Effects
@@ -299,4 +299,3 @@ for (var i = 0; i < trackingData.tracked_objects.length; i++) {
     }
 }
 ```</content>
-<parameter name="path">/home/kidpixel/workflow_mediapipe/docs/workflow/pipeline/step6-json-reduction.md

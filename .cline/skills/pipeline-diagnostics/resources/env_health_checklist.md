@@ -1,6 +1,6 @@
 # Pipeline Diagnostics — Environnement & Matériel
 
-> **Objectif** : valider rapidement que les variables `.env`, les environnements virtuels et le matériel sont prêts avant d’exécuter STEP1→STEP8.
+> **Objectif** : valider rapidement que les variables `.env`, les environnements virtuels et le matériel sont prêts avant d’exécuter STEP1→STEP6.
 
 ## 1. Variables critiques (`.env`)
 ```bash
@@ -26,7 +26,7 @@ PY
 | `transnet_env/` | `transnet_env/bin/python - <<'PY'\nimport torch; import transnetv2_pytorch\nprint('TransNet OK')\nPY` | Import sans exception |
 | `audio_env/` | `audio_env/bin/python - <<'PY'\nimport torch; print(torch.__version__)\nPY` | 1.12.1+cu113 |
 | `tracking_env_slim/` | `tracking_env_slim/bin/python - <<'PY'\nimport mediapipe; print('MediaPipe OK')\nPY` | Import sans exception (MediaPipe CPU) |
-| `insightface_env/` (si STEP5 GPU) | `insightface_env/bin/python - <<'PY'\nimport onnxruntime\nPY` | Pas d’exception |
+| `insightface_env/` (si STEP4 GPU) | `insightface_env/bin/python - <<'PY'\nimport onnxruntime\nPY` | Pas d’exception |
 
 ## 3. Matériel & binaires
 ```bash
@@ -34,7 +34,7 @@ nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
 ffmpeg -hide_banner | head -n 1
 ```
 - Driver ≥ 515 recommandé.
-- `ffmpeg` doit correspondre à la version documentée (`docs/workflow/pipeline/STEP2_CONVERSION_VIDEO.md`).
+- `ffmpeg` doit être disponible dans le PATH (normalisation vidéo STEP1) et correspondre à la version documentée (`docs/workflow/pipeline/01-extraction.md`).
 
 ## 4. SQLite healthcheck
 ```bash
@@ -52,11 +52,11 @@ PY
 ## 5. Checklist finale
 - [ ] Toutes les venvs répondent et importent leurs dépendances clés.
 - [ ] `tracking_env_slim` allégé présent (MediaPipe CPU) et `insightface_env` pour GPU.
-- [ ] GPU détecté (`nvidia-smi`) lorsque STEP5 InsightFace requis.
+- [ ] GPU détecté (`nvidia-smi`) lorsque STEP4 InsightFace requis.
 - [ ] Variables `.env` concordent avec les profils attendus (CPU vs GPU, DRY_RUN, chemins).
 - [ ] `download_history.sqlite3` sain et accessible.
 - [ ] Répertoires `CACHE_ROOT_DIR`, `ARCHIVES_DIR`, `logs/step*` existent avec permissions écriture.
 - [ ] `requirements-tracking-env-lite.txt` utilisé pour `tracking_env_slim`.
-- [ ] Scripts STEP7 (`preprocess_ae_json.py`) et STEP8 (`finalize_and_copy.py`) accessibles et exécutables.
+- [ ] Scripts STEP5 (`preprocess_ae_json.py`) et STEP6 (`finalize_and_copy.py`) accessibles et exécutables.
 
 > **Astuce** : conserver ce fichier localement pendant les astreintes pour gagner du temps avant un run complet.

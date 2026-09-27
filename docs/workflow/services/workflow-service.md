@@ -4,7 +4,7 @@
 
 ## Le Problème : Coordination Complexe du Pipeline
 
-Tu as 8 étapes distinctes avec des environnements différents, des dépendances variées et des états à synchroniser. La coordination manuelle est complexe et source d'erreurs. Tu as besoin d'un orchestrateur centralisé qui gère tout automatiquement.
+Tu as 7 étapes distinctes avec des environnements différents, des dépendances variées et des états à synchroniser. La coordination manuelle est complexe et source d'erreurs. Tu as besoin d'un orchestrateur centralisé qui gère tout automatiquement.
 
 ## Notre Solution : Orchestrateur Centralisé avec Injection de Dépendances
 
@@ -134,7 +134,7 @@ class WorkflowService:
 
 ### Routage et Orchestration Matérielle Coral Edge TPU
 
-Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est activé, l'exécution des étapes concernées (STEP3, STEP4, STEP5) n'est pas lancée directement en sous-processus concurrents. Elles sont acheminées vers le **CoralTPUOrchestrator** (`services/coral_tpu_orchestrator.py`).
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est activé, l'exécution des étapes concernées (STEP3, STEP4, STEP4) n'est pas lancée directement en sous-processus concurrents. Elles sont acheminées vers le **CoralTPUOrchestrator** (`services/coral_tpu_orchestrator.py`).
 
 Cet orchestrateur implémente un patron **Singleton** qui :
 - Gère une **file d'attente asynchrone (asyncio.Queue)** dans un thread démon dédié (`CoralTPU_AsyncLoop`).
@@ -188,9 +188,9 @@ from services.workflow_state import get_workflow_state
 
 # Utilisation dans les services
 ws = get_workflow_state()
-ws.update_step_status("STEP5", "running")
-ws.set_step_field("STEP5", "current_video", "video1.mp4")
-ws.update_step_progress("STEP5", current=1, total=5)
+ws.update_step_status("STEP4", "running")
+ws.set_step_field("STEP4", "current_video", "video1.mp4")
+ws.update_step_progress("STEP4", current=1, total=5)
 ```
 
 ### PerformanceService Integration
@@ -224,9 +224,9 @@ step_times = {
     'STEP2': 120.8,
     'STEP3': 89.3,
     'STEP4': 156.7,
-    'STEP5': 234.1,
-    'STEP6': 12.3,
-    'STEP7': 8.5
+    'STEP4': 234.1,
+    'STEP5': 12.3,
+    'STEP6': 8.5
 }
 
 # Monitoring système
@@ -272,10 +272,10 @@ echo $VIRTUAL_ENV
 # Solution
 # Vérifier que les bons environnements sont activés
 source env/bin/activate  # Pour l'application principale
-source tracking_env_slim/bin/activate  # Pour STEP5 (CPU)
+source tracking_env_slim/bin/activate  # Pour STEP4 (CPU)
 source audio_env/bin/activate      # Pour STEP4 (GPU/CPU)
 source transnet_env/bin/activate     # Pour STEP3 (GPU/CPU)
-source coral_env/bin/activate       # Pour les étapes TPU (STEP3, STEP4, STEP5) si activé
+source coral_env/bin/activate       # Pour les étapes TPU (STEP3, STEP4, STEP4) si activé
 ```
 
 ### Permissions Insuffisantes
@@ -337,7 +337,7 @@ def test_pipeline_complete():
     
     # Exécution complète
     service.run_custom_sequence([
-        "STEP1", "STEP2", "STEP3", "STEP4", "STEP5", "STEP6", "STEP7", "STEP8"
+        "STEP1", "STEP2", "STEP3", "STEP4", "STEP4", "STEP5", "STEP6", "STEP7"
     ])
     
     # Validation finale
@@ -346,11 +346,11 @@ def test_pipeline_complete():
     
     # Vérification de la cohérence des données
     ws = get_workflow_state()
-    for step in ["STEP1", "STEP2", "STEP3", "STEP4", "STEP5", "STEP6", "STEP7", "STEP8"]:
+    for step in ["STEP1", "STEP2", "STEP3", "STEP4", "STEP4", "STEP5", "STEP6", "STEP7"]:
         assert ws.get_step_status(step)["status"] == "completed"
 ```
 
-L'étape 8 transforme le chaos des étapes multiples en un système orchestré et fiable. Le service WorkflowService garantit que chaque étape s'exécute dans le bon environnement, avec un état cohérent et une instrumentation complète. Le système est maintenant prêt pour la section suivante de la migration.
+L'étape 7 transforme le chaos des étapes multiples en un système orchestré et fiable. Le service WorkflowService garantit que chaque étape s'exécute dans le bon environnement, avec un état cohérent et une instrumentation complète. Le système est maintenant prêt pour la section suivante de la migration.
 
 ---
 

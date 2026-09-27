@@ -10,6 +10,26 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## Septembre 2026
+
+- [2026-09-27 20:55:00] **Suppression de l'étape « 2. Conversion des vidéos » et renumérotation STEP1→STEP7 (COMPLET)**
+  - **Décision** : supprimer définitivement l'étape de conversion et déplacer sa responsabilité réelle — la normalisation vidéo **MP4 / H.264 / yuv420p / 25 fps** — dans STEP1, via un module partagé `utils/media_normalizer.py` appelé après chaque extraction d'archive. Les clés d'étapes sont renumérotées en continu : STEP1 (extraction + normalisation), STEP2 (analyse des transitions), STEP3 (analyse audio), STEP4 (analyse du tracking), STEP5 (réduction JSON), STEP6 (pré-traitement AE), STEP7 (finalisation).
+  - **Raison** : l'ancienne STEP2 n'était pas un simple transcodage mais le **garant du contrat 25 fps** dont dépendent toutes les étapes aval. L'analyse des transitions code en dur `get_video_fps() = 25.0` (`r=25` sur le pipe FFmpeg), l'analyse audio utilise `DEFAULT_FPS = 25`, et les étapes JSON/AE indexent leurs résultats par numéro de frame. Supprimer l'étape sans déplacer la normalisation aurait provoqué une désynchronisation frame/timecode silencieuse (source 23,976/29,97/50/60 fps ré-échantillonnée à la volée).
+  - **Alternatives rejetées** :
+    1. **Adaptation du framerate réel dans STEP3/STEP4/STEP5** (suppression sans compensation) : refonte large et risque élevé, l'alignement frame/timecode étant la clé de jointure de tout l'aval jusqu'à After Effects.
+    2. **Bypass cosmétique** (tuile STEP2 conservée mais désactivée, séquence 1→3) : la normalisation n'aurait plus été exécutée tout en laissant croire le contraire dans l'UI.
+    3. **Renommage sémantique des clés** (SCENE_DETECT, AUDIO, …) : écarté au profit d'une renumérotation numérique continue, moins intrusive pour l'UI, les URLs et les tests.
+  - **Implémentation** :
+    1. `utils/media_normalizer.py` : reprise du script `workflow_scripts/step2/convert_videos.py` (analyse ffprobe, encodage NVENC avec fallback CPU `libx264`, copie audio intelligente, préservation des logos `.mov` alpha), enrichie de `is_conformant()`, `normalize_videos_in(root, force)` et `check_fps_conformance()`.
+    2. `workflow_scripts/step1/extract_archives.py` : normalisation post-extraction + modes `--normalize-only` et `--normalize-only --force` pour rattraper les projets extraits antérieurement.
+    3. Renumérotation en bloc : `config/workflow_commands.py`, `services/types.py`, `services/workflow_executor.py`, `app_new.py`, dossiers `workflow_scripts/stepN`, dossiers `logs/stepN`, `config/stepN_*.json`, fichiers de tests, `pytest.ini`, runners `run_step2_tests.sh` / `run_step4_tests.sh`.
+    4. Frontend : timeline à 7 tuiles, liste `defaultSequenceableStepsKeys` réduite, et **purge one-shot de `selectedStepsOrder`** dans `AppState` — sans elle, une sélection persistée contenant l'ancien `"STEP2"` aurait silencieusement lancé l'analyse des transitions.
+    5. Garde-fou : avertissement non bloquant de framerate non conforme dans les trois entrées d'analyse des transitions (`run_transnet.py`, `run_transnet_cv5.py`, `run_scene_detect_tpu.py`).
+  - **Décision annexe — variables d'environnement non renommées** : `STEP3_ENABLE_CORAL_TPU`, `USE_OPENCV5_STEP3`, `STEP4_USE_LEMONFOX`, `STEP5_CV5_*`, `STEP5_ENABLE_GPU`, etc. conservent leur numérotation historique. Un renommage ferait retomber silencieusement un `.env` existant sur les valeurs par défaut et changerait le comportement d'exécution sans erreur visible. Une table de correspondance est documentée dans `.env.example`, `docs/workflow/README.md` et `.agents/skills/workflow-operator/`.
+  - **Décision annexe — endpoints audio `/api/step4/*` inchangés** : ce sont des déclencheurs externes documentés (exemples `curl` dans `docs/deployment/tls-reverse-proxy.md`) ; leur renommage casserait une automatisation externe sans gain fonctionnel.
+  - **Impact** : STEP1 devient plus long (transcode) mais les projets déjà normalisés sont ignorés en mode rattrapage ; les logs de l'ancienne conversion ont été archivés dans `logs/_archive_step2_conversion/` pour ne pas remonter dans le panneau Logs de la nouvelle étape 2.
+  - **Validation** : suite backend complète (unit + intégration) et suites frontend Node ESM au vert ; `docs/workflow/**`, `AGENTS.md`, `.agents/rules/codingstandards.md` et les skills alignés (`docs/audits`, `docs/WIP`, `docs/recherches` gelés).
+
 ## Juillet 2026
 
 - [2026-07-15 11:31:24] **Pool Adaptatif CPU STEP5 CV5 et Séparation du Device d'Inférence (COMPLET)**

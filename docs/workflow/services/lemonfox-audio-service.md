@@ -1,7 +1,7 @@
 # Lemonfox Audio Service Documentation
 
 ## TL;DR
-Le Lemonfox Audio Service orchestre l'analyse audio via l'API Lemonfox pour STEP4, générant des JSON compatibles STEP5/STEP6 avec transcription, diarization locuteurs, et embeddings optionnels Pyannote.
+Le Lemonfox Audio Service orchestre l'analyse audio via l'API Lemonfox pour STEP4, générant des JSON compatibles STEP4/STEP5 avec transcription, diarization locuteurs, et embeddings optionnels Pyannote.
 
 ## Contexte Métier
 STEP4 transforme les vidéos en données audio structurées : transcription texte, timestamps mots/phrases, identification locuteurs, et embeddings vectoriels pour analyses avancées (clustering, reconnaissance).
@@ -60,7 +60,7 @@ STEP4 transforme les vidéos en données audio structurées : transcription text
 
 ### Problèmes embeddings
 - **Comportement** : Skip silencieux, log warning, continuation pipeline
-- **Fallback** : Timeline sans embeddings (compatible STEP5/STEP6)
+- **Fallback** : Timeline sans embeddings (compatible STEP4/STEP5)
 
 ### Erreurs écriture JSON
 - **Comportement** : Cleanup temp files, retour échec
@@ -101,7 +101,7 @@ STEP4 transforme les vidéos en données audio structurées : transcription text
 - **Bénéfice** : Cohérence traitement, gestion edge cases complète
 
 ## Golden Rule
-**Les sorties JSON doivent rester compatibles STEP5/STEP6** : tout changement format nécessite migration des scripts consommateurs et tests de régression complets.
+**Les sorties JSON doivent rester compatibles STEP4/STEP5** : tout changement format nécessite migration des scripts consommateurs et tests de régression complets.
 
 ## Configuration Essentielle
 
@@ -146,29 +146,29 @@ lemonfox_config = {
 
 ```bash
 # Diagnostic
-grep "timeout" logs/step4/lemonfox_*.log
+grep "timeout" logs/step3/lemonfox_*.log
 curl -I https://api.lemonfox.ai/v1  # Test connectivité
 
 # Solutions
 # 1. Augmenter timeout
-LEMONFOX_REQUEST_TIMEOUT=60 python workflow_scripts/step4/run_audio_analysis.py
+LEMONFOX_REQUEST_TIMEOUT=60 python workflow_scripts/step3/run_audio_analysis.py
 
 # 2. Réduire taille fichier
-LEMONFOX_CHUNK_SIZE_MB=10 python workflow_scripts/step4/run_audio_analysis.py
+LEMONFOX_CHUNK_SIZE_MB=10 python workflow_scripts/step3/run_audio_analysis.py
 ```
 
 ### Quota Dépassé
 
 ```bash
 # Diagnostic
-grep "quota" logs/step4/lemonfox_*.log
+grep "quota" logs/step3/lemonfox_*.log
 curl -H "Authorization: Bearer $LEMONFOX_API_KEY" \
      https://api.lemonfox.ai/v1/usage  # Vérifier quota
 
 # Solutions
 # 1. Attendre reset quota (généralement minuit UTC)
 # 2. Utiliser fallback Pyannote
-LEMONFOX_FALLBACK_ENABLED=1 python workflow_scripts/step4/run_audio_analysis.py
+LEMONFOX_FALLBACK_ENABLED=1 python workflow_scripts/step3/run_audio_analysis.py
 ```
 
 ### Fallback Pyannote Lent
@@ -180,25 +180,25 @@ nvidia-smi  # Vérifier si GPU disponible
 
 # Solutions
 # 1. Activer GPU Pyannote
-PYANNOTE_DEVICE=cuda python workflow_scripts/step4/run_audio_analysis.py
+PYANNOTE_DEVICE=cuda python workflow_scripts/step3/run_audio_analysis.py
 
 # 2. Réduire batch size
-PYANNOTE_BATCH_SIZE=16 python workflow_scripts/step4/run_audio_analysis.py
+PYANNOTE_BATCH_SIZE=16 python workflow_scripts/step3/run_audio_analysis.py
 ```
 
 ### Embeddings Échouent
 
 ```bash
 # Diagnostic
-grep "embedding" logs/step4/embeddings_*.log
+grep "embedding" logs/step3/embeddings_*.log
 python -c "import pyannote.audio; print('Embeddings available')" || exit 1
 
 # Solutions
 # 1. Désactiver embeddings
-AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=0 python workflow_scripts/step4/run_audio_analysis.py
+AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=0 python workflow_scripts/step3/run_audio_analysis.py
 
 # 2. Augmenter segment minimum
-AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC=1.0 python workflow_scripts/step4/run_audio_analysis.py
+AUDIO_SPEAKER_EMBEDDINGS_MIN_SEGMENT_SEC=1.0 python workflow_scripts/step3/run_audio_analysis.py
 ```
 
 ## Tests et Validation
@@ -285,9 +285,9 @@ def validate_step4_output():
 
 ## Intégration Pipeline
 
-### Entrée pour STEP5
+### Entrée pour STEP4
 
-L'étape 4 prépare les données audio pour le tracking facial :
+L'étape 3 prépare les données audio pour le tracking facial :
 - **Timeline frame-by-frame** : Synchronisation avec 25 FPS vidéo
 - **Identification locuteurs** : `SPEAKER_00`, `SPEAKER_01`, etc.
 - **Transcription mot par mot** : Pour analyse sémantique
@@ -303,11 +303,11 @@ ws.set_step_field("STEP4", "current_video", "video1.mp4")
 ws.update_step_progress("STEP4", current=1, total=3)
 ```
 
-### Compatibilité STEP5
+### Compatibilité STEP4
 
-Le format JSON audio est optimisé pour STEP5 :
+Le format JSON audio est optimisé pour STEP4 :
 ```python
-# Utilisation dans STEP5
+# Utilisation dans STEP4
 audio_data = load_audio_analysis("video1_audio.json")
 speakers = audio_data['audio_analysis']['speakers']
 transcription = audio_data['audio_analysis']['transcription']

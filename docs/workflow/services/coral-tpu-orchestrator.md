@@ -4,7 +4,7 @@
 
 ## Le Problème: Blocage Matériel et Éviction de Cache de la SRAM
 
-Vous lancez le pipeline complet pour traiter plusieurs vidéos en parallèle. L'application Flask tente d'exécuter la détection de scènes (STEP3) et le tracking (STEP5) simultanément sur le module Google Coral TPU. Le système se fige soudainement; le noyau Linux génère des erreurs de pilote Gasket (`gasket: apex: driver error`) et le périphérique `/dev/apex_0` devient indisponible.
+Vous lancez le pipeline complet pour traiter plusieurs vidéos en parallèle. L'application Flask tente d'exécuter la détection de scènes (STEP3) et le tracking (STEP4) simultanément sur le module Google Coral TPU. Le système se fige soudainement; le noyau Linux génère des erreurs de pilote Gasket (`gasket: apex: driver error`) et le périphérique `/dev/apex_0` devient indisponible.
 
 La puce Google Coral Edge TPU possède une mémoire SRAM extrêmement restreinte (seulement 8 Mo). Contrairement à un GPU de production, elle n'est pas conçue pour la multi-programmation ou le contexte partagé :
 1. **Saturation de la SRAM** : Le chargement simultané de plusieurs modèles (ex: YAMNet et BlazeFace/FaceMesh) dépasse la capacité de stockage physique du cache rapide de la puce.
@@ -45,7 +45,7 @@ Le service `CoralTPUOrchestrator` résout ces contraintes grâce à une architec
 ```mermaid
 graph TD
     A[Flask Thread STEP3] -->|submit_task| B(tpu_orchestrator)
-    C[Flask Thread STEP5] -->|submit_task| B
+    C[Flask Thread STEP4] -->|submit_task| B
     B -->|_enqueue| D[asyncio.Queue]
     D -->|Worker séquentiel| E{Traitement en cours?}
     E -->|Non| F[Exécution de la tâche]

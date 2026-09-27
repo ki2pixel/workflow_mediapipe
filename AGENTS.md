@@ -1,11 +1,11 @@
 # Repository Guidelines
 
 Flask + native-JS pipeline that turns raw video archives into After Effects-ready
-artifacts through eight sequential steps (extraction → conversion → scene
-detection → audio diarization → tracking → JSON reduction → AE preprocessing →
-finalization). Each step runs in its own Python virtualenv so incompatible
-dependencies (PyTorch, MediaPipe, InsightFace, Coral TPU) coexist. Docs are
-French (`docs/workflow/`); commits and PRs are English.
+artifacts through seven sequential steps (extraction + video normalization →
+scene detection → audio diarization → tracking → JSON reduction → AE
+preprocessing → finalization). Each step runs in its own Python virtualenv so
+incompatible dependencies (PyTorch, MediaPipe, InsightFace, Coral TPU) coexist.
+Docs are French (`docs/workflow/`); commits and PRs are English.
 
 ## Project Structure & Module Organization
 
@@ -17,8 +17,8 @@ French (`docs/workflow/`); commits and PRs are English.
 - `./routes/` — thin Flask blueprints; only validation + service call,
   decorated with `@measure_api`.
 - `./config/` — `settings.py`, `workflow_commands.py`, `security.py`,
-  `step3_transnet.json`, `step3_tpu.json`. No hardcoded paths or secrets.
-- `./workflow_scripts/step{1..8}/` — per-step executables. Venvs live at
+  `step2_transnet.json`, `step2_tpu.json`. No hardcoded paths or secrets.
+- `./workflow_scripts/step{1..7}/` — per-step executables. Venvs live at
   `${VENV_BASE_DIR:-.}/{env,transnet_env,audio_env,tracking_env_slim,insightface_env,tracking_cv5_env,transnet_cv5_env,coral_env}`.
 - `./static/utils/` — `DOMBatcher.js`, `AppState.js`, `PollingManager.js`,
   `DOMDiff.js`, `WorkerManager.js`, `PerformanceMonitor.js`.
@@ -37,8 +37,8 @@ python -m venv env && source env/bin/activate && pip install -r requirements_env
 pytest tests/unit tests/integration                  # backend default
 npm run test:frontend                                # Node ESM frontend
 ./scripts/run_tests.sh                               # full coverage
-PYTHONPATH=transnet_env ./scripts/run_step3_tests.sh # step-3 only
-./scripts/run_step5_tests.sh                         # step-5 only
+PYTHONPATH=transnet_env ./scripts/run_step2_tests.sh # scene detection only
+./scripts/run_step4_tests.sh                         # tracking only
 ./scripts/diagnose_tests.sh                          # drift diagnostics
 python scripts/validate_startup.py                   # blocks prod on default secrets
 ```

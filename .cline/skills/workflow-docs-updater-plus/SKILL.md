@@ -15,7 +15,7 @@ description: Docs Updater (Context-Aware with Code Verification)
    - Lire Memory Bank (`productContext`, `progress`, `decisionLog`) pour comprendre les évolutions récentes.
    - Inspecter les fichiers code concernés (services, routes, frontend) via `grep_search`/`read_file`.
 2. **Identifier docs impactées**
-   - Mapper la fonctionnalité modifiée → doc(s) correspondantes (ex: pipeline STEP5 → `STEP5_SUIVI_VIDEO.md`).
+   - Mapper la fonctionnalité modifiée → doc(s) correspondantes (ex: pipeline STEP4 → `STEP5_SUIVI_VIDEO.md`).
 3. **Mettre à jour la doc**
    - Respecter le format existant (titres, sections numérotées).
    - Mentionner les variables `.env`, scripts, workflows pertinents.
@@ -26,7 +26,7 @@ description: Docs Updater (Context-Aware with Code Verification)
 5. **Memory Bank**
    - Ajouter une entrée dans `decisionLog.md` et `progress.md` si la doc reflète une décision/avancement majeur.
  6. **Rappel rapide**
-    - Utiliser `/home/kidpixel/workflow_mediapipe/.cline/skills/workflow-docs-updater-plus/resources/docs_sync_checklist.md` pour cocher chaque étape (préparation, collecte, mise à jour, validation, sortie).
+    - Utiliser `resources/docs_sync_checklist.md` pour cocher chaque étape (préparation, collecte, mise à jour, validation, sortie).
 
 ## Checklist finale
 - [ ] Reference aux audits (`docs/workflow/audits/...`) mise à jour si besoin.

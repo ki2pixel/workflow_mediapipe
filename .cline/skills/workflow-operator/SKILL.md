@@ -13,14 +13,13 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 
 | Étape | Dossier | Environnement (VENV) | Service Clé |
 | :--- | :--- | :--- | :--- |
-| **STEP 1** (Extract) | `step1/` | `env/` | `FilesystemService` |
-| **STEP 2** (Convert) | `step2/` | `env/` | `ffmpeg` (via subprocess) |
-| **STEP 3** (TransNet) | `step3/` | `transnet_env/` | `WorkflowService` |
-| **STEP 4** (Audio) | `step4/` | `audio_env/` | `LemonfoxAudioService` |
-| **STEP 5** (Tracking) | `step5/` | `tracking_env_slim/` (CPU) / `insightface_env/` (GPU) | `InsightFaceEngine (GPU-only) + factory` |
-| **STEP 6** (Reducer) | `step6/` | `env/` | N/A |
-| **STEP 7** (AE Preprocess) | `step7/` | `env/` | N/A |
-| **STEP 8** (Finalize) | `step8/` | `env/` | `ResultsArchiver` |
+| **STEP 1** (Extract + Normalize) | `step1/` | `env/` | `FilesystemService` + `utils/media_normalizer.py` (ffmpeg) |
+| **STEP 2** (TransNet) | `step2/` | `transnet_env/` | `WorkflowService` (Async I/O, GPU Batch Inference) |
+| **STEP 3** (Audio) | `step3/` | `audio_env/` | `LemonfoxAudioService` |
+| **STEP 4** (Tracking) | `step4/` | `tracking_env_slim/` (CPU) / `insightface_env/` (GPU) | `InsightFaceEngine (GPU-only) + factory` |
+| **STEP 5** (Reducer) | `step5/` | `env/` | Streaming `ijson` (RAM O(1)) via `json_reducer.py` |
+| **STEP 6** (AE Preprocess) | `step6/` | `env/` | Streaming `ijson` (RAM O(1)) via `preprocess_ae_json.py` |
+| **STEP 7** (Finalize) | `step7/` | `env/` | `ResultsArchiver` |
 
 **Chemins des Venvs (interpréteurs montés sous `/mnt/venv_ext4`) :**
 - Base : `env/bin/python`
@@ -33,63 +32,64 @@ Le pipeline est segmenté. **Règle d'or :** Toujours utiliser l'interpréteur P
 
 Ces commandes doivent être lancées depuis la racine du projet **tout en ciblant les interpréteurs situés dans `/mnt/venv_ext4/<venv>/bin/python`** (pas le Python système).
 
-> 🔎 **Raccourci** : consultez `/home/kidpixel/workflow_mediapipe/.cline/skills/workflow-operator/resources/step_command_matrix.md` pour une vue tabulaire des 8 étapes (interpréteur, commande, logs, prérequis). Gardez le fichier ouvert pendant les interventions d'astreinte.
+> 🔎 **Raccourci** : consultez `resources/step_command_matrix.md` pour une vue tabulaire des 7 étapes (interpréteur, commande, logs, prérequis). Gardez le fichier ouvert pendant les interventions d'astreinte.
 
-### Step 1 : Extraction Sécurisée
+### Step 1 : Extraction Sécurisée + Normalisation (Standard: 25 fps)
 ```bash
 env/bin/python workflow_scripts/step1/extract_archives.py --source-dir "/chemin/vers/downloads"
+# Rattrapage d'un projet extrait avant la migration :
+env/bin/python workflow_scripts/step1/extract_archives.py --normalize-only
 ```
+La normalisation (MP4 / H.264 / yuv420p / 25 fps, `utils/media_normalizer.py`) est le contrat
+d'entrée de toutes les étapes aval : sans elle, les index de frames et timecodes divergent.
 
-### Step 2 : Conversion (Standard: 25fps)
+### Step 2 : Analyse Scènes (TransNetV2)
 ```bash
-env/bin/python workflow_scripts/step2/convert_videos.py
+transnet_env/bin/python workflow_scripts/step2/run_transnet.py
 ```
 
-### Step 3 : Analyse Scènes (TransNetV2)
-```bash
-transnet_env/bin/python workflow_scripts/step3/run_transnet.py
-```
-
-### Step 4 : Analyse Audio (Standard: Lemonfox)
+### Step 3 : Analyse Audio (Standard: Lemonfox)
 Le standard v4.1 privilégie Lemonfox avec fallback Pyannote. Le script détecte la config via `config/settings.py`.
 ```bash
-audio_env/bin/python workflow_scripts/step4/run_audio_analysis_lemonfox.py --log_dir logs/step4
+audio_env/bin/python workflow_scripts/step3/run_audio_analysis_lemonfox.py --log_dir logs/step3
 ```
 
-### Step 5 : Tracking (Standard: CPU MediaPipe via tracking_env_slim, GPU InsightFace-only)
-**Standard CPU** : Mode MediaPipe par défaut via `tracking_env_slim` avec multiprocessing (15 workers) et fallback object detector optionnel.
+### Step 4 : Tracking (Standard: CPU MediaPipe via tracking_env_slim, GPU InsightFace-only)
+**Standard CPU** : Mode MediaPipe par défaut via `tracking_env_slim` avec multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
 **GPU InsightFace** : Mode GPU exclusivement pour InsightFace (`STEP5_ENABLE_GPU=1`, `STEP5_TRACKING_ENGINE=insightface`) via `insightface_env`.
-**Process** : Warmup `cap.read()`, chunking adaptatif interne, JSON dense (`tracked_objects: []` si vide).
+**Modèles Interdits** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar. Lightning et Vultr sont abandonnés.
+**Process** : Warmup `cap.read()`, chunking adaptatif interne.
+**Export JSON** : Obligation absolue d'utiliser `StreamingJSONOutput` pour écrire en streaming (O(1) RAM).
 
 ```bash
 # Mode CPU standard (MediaPipe) - via tracking_env_slim
 echo '["/chemin/absolu/vers/video.mp4"]' > temp_tracking.json
-TRACKING_DISABLE_GPU=1 tracking_env_slim/bin/python workflow_scripts/step5/run_tracking_manager.py \
+TRACKING_DISABLE_GPU=1 tracking_env_slim/bin/python workflow_scripts/step4/run_tracking_manager.py \
   --videos_json_path temp_tracking.json \
   --cpu_internal_workers 15 \
   --disable_gpu
 
 # Mode GPU InsightFace (uniquement si moteur InsightFace sélectionné)
 echo '["/chemin/absolu/vers/video.mp4"]' > temp_tracking.json
-STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python workflow_scripts/step5/run_tracking_manager.py \
+STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python workflow_scripts/step4/run_tracking_manager.py \
   --videos_json_path temp_tracking.json \
   --tracking_engine insightface
 ```
 
-### Step 6 : Réduction JSON
+### Step 5 : Réduction JSON
 ```bash
-env/bin/python workflow_scripts/step6/json_reducer.py --log_dir logs/step6 --work_dir projets_extraits
+env/bin/python workflow_scripts/step5/json_reducer.py --log_dir logs/step5 --work_dir projets_extraits
 ```
 
-### Step 7 : Pré-traitement After Effects (AE)
+### Step 6 : Pré-traitement After Effects (AE)
 ```bash
-env/bin/python workflow_scripts/step7/preprocess_ae_json.py --log_dir logs/step7 --work_dir projets_extraits
+env/bin/python workflow_scripts/step6/preprocess_ae_json.py --log_dir logs/step6 --work_dir projets_extraits
 ```
 
-### Step 8 : Finalisation (Avec Archivage)
+### Step 7 : Finalisation (Avec Archivage)
 ```bash
 # Vérifier OUTPUT_DIR dans .env avant
-env/bin/python workflow_scripts/step8/finalize_and_copy.py
+env/bin/python workflow_scripts/step7/finalize_and_copy.py
 ```
 
 ## 3. Diagnostic & État
@@ -97,7 +97,7 @@ env/bin/python workflow_scripts/step8/finalize_and_copy.py
 ### Source de Vérité (State)
 L'état n'est pas dans les fichiers logs, mais dans la mémoire du backend via `WorkflowState`.
 Pour diagnostiquer un état incohérent :
-1. Interroger l'API : `curl http://localhost:5000/api/step_status/STEP5`
+1. Interroger l'API : `curl http://localhost:5000/api/step_status/STEP4`
 2. Vérifier si `is_any_sequence_running` est cohérent avec les logs.
 
 ### Logs & Monitoring
@@ -116,11 +116,12 @@ Pour diagnostiquer un état incohérent :
 3. **Tracking** : Si le tracking plante, vérifier que `config.settings.py` charge bien les modèles depuis le `InsightFaceEngine` (factory `create_face_engine()`) et non des chemins en dur. Confirmer que `STEP5_TRACKING_ENGINE` est vide (MediaPipe via `tracking_env_slim`) ou `insightface` (GPU via `insightface_env`).
 4. **Scripts** : Les subprocess doivent utiliser `utils.resource_manager` pour la gestion des verrous et ressources.
 5. **Tests** : Environnement de test `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour CI.
+6. **Sécurité Démarrage** : Le script `validate_startup.py` est obligatoire. En mode `DEBUG=False`, l'application Flask crashe si des secrets par défaut (`dev-*`) sont détectés.
 
 ## 4. Frontend & UX Rappels (Standards §3)
 
 Si vous intervenez sur l'interface ou devez valider un comportement UI :
-- **DOM** : Les mises à jour doivent passer par `DOMBatcher.scheduleUpdate()`. Jamais d'insertion directe `innerHTML` sans échappement.
+- **DOM** : Les mises à jour doivent passer par `DOMBatcher.scheduleUpdate()`. Jamais d'insertion directe `innerHTML` sans échappement. Le JS respecte la norme ES11 (complexité cognitive réduite).
 - **Sécurité** : Toujours échapper avec `DOMUpdateUtils.escapeHtml()` avant toute insertion dynamique (Anti-XSS).
 - **Polling** : Utiliser le `PollingManager` centralisé (backoff adaptatif) pour les requêtes périodiques.
 - **Composants** : 

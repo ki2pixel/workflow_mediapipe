@@ -33,7 +33,7 @@ for (var frame = 1; frame <= totalFrames; frame++) {
 
 ### Flux de Pré-traitement AE
 
-1. **Analyse en flux continu (`ijson`)** : Lecture itérative progressive des fichiers réduits de STEP6 (tracking + audio) pour maintenir une consommation de RAM stable en O(1).
+1. **Analyse en flux continu (`ijson`)** : Lecture itérative progressive des fichiers réduits de STEP5 (tracking + audio) pour maintenir une consommation de RAM stable en O(1).
 2. **Indexation frame-précise** : Construction de l'index `dataByFrame` en streaming pour un accès direct instantané côté After Effects.
 3. **Enrichissement AE** : Calculs à la volée de `center_x/center_y` et injection des couleurs hexadécimales associées aux labels.
 4. **Mode analyzer** : Support de l'analyse sélective et délégations de calculs géométriques complexes.
@@ -45,10 +45,10 @@ for (var frame = 1; frame <= totalFrames; frame++) {
 
 ```bash
 # Via l'interface web
-# Clique sur "Étape 7 : Pré-traitement AE" dans l'interface
+# Clique sur "Étape 6 : Pré-traitement AE" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP7
+curl -X POST http://localhost:5000/run/STEP6
 
 # Dans une séquence complète
 const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', '5', 'STEP6', 'STEP7'];
@@ -70,7 +70,7 @@ var manifest = {
 
 // Appel Python depuis ExtendScript
 var result = system.callSystem(
-  'env/bin/python workflow_scripts/step7/preprocess_ae_json.py ' +
+  'env/bin/python workflow_scripts/step6/preprocess_ae_json.py ' +
   '--manifest_path ' + tempManifest + ' ' +
   '--output_path ' + tempResult
 );
@@ -85,10 +85,10 @@ applyRecentrage(result);
 # Mode pipeline standard
 source env/bin/activate
 cd projets_extraits
-python ../workflow_scripts/step7/preprocess_ae_json.py
+python ../workflow_scripts/step6/preprocess_ae_json.py
 
 # Mode analyzer avec manifest
-python ../workflow_scripts/step7/preprocess_ae_json.py \
+python ../workflow_scripts/step6/preprocess_ae_json.py \
   --manifest_path manifest.json \
   --output_path results.json
 ```
@@ -269,9 +269,9 @@ pythonCutsSnapFactor = 1.0;
 
 Les scripts AE suivent cette hiérarchie automatique :
 
-1. `*_ae.json` (pré-traité STEP7) - **priorité maximale**
-2. `*_tracking.json` (réduit STEP6) - fallback
-3. `*.json` (legacy STEP5) - streaming dernier recours
+1. `*_ae.json` (pré-traité STEP6) - **priorité maximale**
+2. `*_tracking.json` (réduit STEP5) - fallback
+3. `*.json` (legacy STEP4) - streaming dernier recours
 
 ### Script AE Supporté
 
@@ -352,7 +352,7 @@ Pense au pré-traitement AE comme un **livre indexé** vs une **calculatrice sci
 ### Structure des Logs
 
 ```
-logs/step7/
+logs/step6/
 └── preprocess_ae_20240120_143022.log
 ```
 
@@ -398,7 +398,7 @@ projets_extraits/
 ├── projet_camille_001/
 │   └── docs/
 │       ├── video1.mp4
-│       ├── video1_tracking.json    # Généré par STEP6
+│       ├── video1_tracking.json    # Généré par STEP5
 │       └── video1_audio.json        # Généré par STEP4/6
 ```
 
@@ -452,7 +452,7 @@ try {
 ```bash
 # Diagnostic
 du -sh projets_extraits/*/*_ae.json
-time python workflow_scripts/step7/preprocess_ae_json.py
+time python workflow_scripts/step6/preprocess_ae_json.py
 
 # Solutions
 # Réduire taille vidéos
@@ -467,13 +467,13 @@ time python workflow_scripts/step7/preprocess_ae_json.py
 ```bash
 # Créer fichiers test
 mkdir -p test_ae/docs
-# Créer video1_tracking.json (réduit STEP6)
+# Créer video1_tracking.json (réduit STEP5)
 # Créer video1_audio.json
 
 # Exécuter pré-traitement
 source env/bin/activate
 cd test_ae
-python ../workflow_scripts/step7/preprocess_ae_json.py
+python ../workflow_scripts/step6/preprocess_ae_json.py
 
 # Vérifier résultat
 ls -la docs/video1_ae.json
@@ -495,7 +495,7 @@ cat > manifest.json << EOF
 EOF
 
 # Exécuter analyzer
-python ../workflow_scripts/step7/preprocess_ae_json.py \
+python ../workflow_scripts/step6/preprocess_ae_json.py \
   --manifest_path manifest.json \
   --output_path analyzer_result.json
 
@@ -560,9 +560,9 @@ def validate_step7_output():
 
 ## Intégration Pipeline
 
-### Entrée pour STEP8
+### Entrée pour STEP7
 
-L'étape 7 prépare les données finales pour la finalisation :
+L'étape 6 prépare les données finales pour la finalisation :
 - **JSON AE-ready** : Format optimisé pour scripts AE
 - **Indexation** : Accès direct frame-précise
 - **Analytics** : Métriques pour post-production
@@ -573,25 +573,25 @@ L'étape 7 prépare les données finales pour la finalisation :
 ```python
 # Intégration avec l'état centralisé
 ws = get_workflow_state()
-ws.update_step_status("STEP7", "running")
-ws.set_step_field("STEP7", "current_project", "projet_camille_001")
-ws.update_step_progress("STEP7", current=1, total=3)
+ws.update_step_status("STEP6", "running")
+ws.set_step_field("STEP6", "current_project", "projet_camille_001")
+ws.update_step_progress("STEP6", current=1, total=3)
 ```
 
 ### Flux Complet 8 Étapes
 
 ```mermaid
 graph LR
-    A[STEP6 Réduction] --> B[STEP7 Pré-traitement AE]
-    B --> C[STEP8 Finalisation]
+    A[STEP5 Réduction] --> B[STEP6 Pré-traitement AE]
+    B --> C[STEP7 Finalisation]
     
-    subgraph "STEP6 → STEP7"
+    subgraph "STEP5 → STEP6"
         D[*_tracking.json] --> E[preprocess_ae_json.py]
         F[*_audio.json] --> E
         E --> G[*_ae.json]
     end
     
-    subgraph "STEP7 → AE"
+    subgraph "STEP6 → AE"
         G --> H[Analyse-Écart-X.jsx]
         H --> I[Media-Solution.jsx]
     end
@@ -614,7 +614,7 @@ graph LR
 ### Piège #5 Incohérence frame/data
 **Solution** : Validation automatique de la structure AE et cohérence des numéros de frame.
 
-L'étape 7 transforme les données de tracking en un format parfaitement optimisé pour After Effects, réduisant drastiquement les temps de traitement tout en offrant des fonctionnalités avancées comme le mode analyzer pour les calculs complexes. Les scripts AE peuvent maintenant traiter les données instantanément avec un accès direct frame-précise.
+L'étape 6 transforme les données de tracking en un format parfaitement optimisé pour After Effects, réduisant drastiquement les temps de traitement tout en offrant des fonctionnalités avancées comme le mode analyzer pour les calculs complexes. Les scripts AE peuvent maintenant traiter les données instantanément avec un accès direct frame-précise.
 
 ---
 

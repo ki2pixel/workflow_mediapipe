@@ -1,4 +1,4 @@
-# Contexte Produit : Workflow MediaPipe v4.3
+# Contexte Produit : Workflow MediaPipe v4.4
 
 ## Objectif du Produit
 Le projet est une application web complète qui automatise le traitement et l'analyse de fichiers vidéo à travers un pipeline modulaire en plusieurs étapes. Le système est conçu pour être robuste, performant et facilement maintenable.
@@ -6,35 +6,39 @@ Le projet est une application web complète qui automatise le traitement et l'an
 ## Architecture Générale
 Le système est composé d'un backend **Flask** et d'un frontend **JavaScript** natif. Il suit une **architecture orientée services** où la logique métier est découplée de l'API.
 
+### Note de version (v4.4) — Septembre 2026
+- Pipeline 7 étapes : suppression de l'étape de conversion et migration de la normalisation vidéo (**MP4 / H.264 / yuv420p / 25 fps**) dans l'étape d'extraction via `utils/media_normalizer.py`, avec rattrapage possible par `extract_archives.py --normalize-only`.
+- Renumérotation continue des clés (`STEP1` → `STEP7`) et des artefacts associés : dossiers `workflow_scripts/stepN`, `logs/stepN`, `config/stepN_*.json`, tests, runners et documentation. Les noms de variables d'environnement `STEPn_*` restent volontairement inchangés (voir `decisionLog.md`).
+- Frontend : timeline à 7 tuiles et purge one-shot de la sélection d'étapes persistée (`selectedStepsOrder`) pour éviter toute correspondance ambiguë avec l'ancienne numérotation.
+
 ### Note de version (v4.3) — Février 2026
-- Pipeline 8 étapes : introduction du STEP7 « Pré-traitement After Effects » (Python) et renumérotation de la finalisation en STEP8. Le script AE consomme désormais les fichiers `*_ae.json` produits par STEP7 avec fallback contrôlé.
+- Pipeline 8 étapes : introduction du STEP7 « Pré-traitement After Effects » (Python) et renumérotation de la finalisation en STEP8. Le script AE consomme désormais les fichiers `*_ae.json` produits par STEP7 avec fallback contrôlé.
 - STEP5 simplifié : MediaPipe Landmarker sur CPU (via `tracking_env_slim`) devient le moteur par défaut; InsightFace est l’unique moteur GPU supporté via `insightface_env`. Tous les anciens moteurs (OpenCV, OpenSeeFace, EOS) et options avancées ont été retirés.
 - Ponts After Effects : `preprocess_ae_json.py` est réutilisable depuis les scripts ExtendScript (Media-Solution) pour le recentrage et la génération des coupes CSV via `media_solution_bridge.py` (exécution `system.callSystem()`).
 - UI pipeline : Timeline connectée, overlay de logs Phase 4 et paramètres consolidés. Le panneau Step Details a été supprimé (2026-02-04) pour alléger l’interface, mais l’overlay de logs reste synchronisé avec AppState et les séquences.
 
 ### Maintenabilité v4.1 (documentée)
 - État centralisé avec `WorkflowState` (thread-safe via RLock; API étapes, séquences, téléchargements).
-- Configuration centralisée avec `WorkflowCommandsConfig` (8 étapes, patterns regex, gestion token HF).
+- Configuration centralisée avec `WorkflowCommandsConfig` (7 étapes, patterns regex, gestion token HF).
 - Extraction de la logique de téléchargements dans `DownloadService` (callbacks, validation, dataclass `DownloadResult`).
 - Réduction de la complexité: `execute_csv_download_worker()` ~230 → ~85 lignes (-63%); `run_process_async()` simplifié (~-40 lignes) avec helpers dans `WorkflowService`.
 - Références documentation: `docs/PHASE1_FOUNDATIONS.md`, `docs/PHASE3_PLAN.md`, `docs/REFACTORING_SUMMARY.md`, `docs/COMPLETE_REFACTORING_REPORT.md`, `docs/FINAL_REFACTORING_REPORT.md`.
 - Statut: documenté; validation codebase en cours côté `WorkflowService` (voir `docs/MIGRATION_STATUS.md`).
 
 ### Pipeline de Traitement
-Le cœur du système est un pipeline en 8 étapes, chacune isolée dans son environnement Python :
-1.  **Extraction** (`env/`) : Extraction sécurisée des apports (ZIP/RAR/TAR) via `FilesystemService`, avec cache relocalisable (`CACHE_ROOT_DIR`).
-2.  **Conversion Vidéo** (`env/`) : Normalisation FFmpeg (25 FPS, profil GPU si disponible) et instrumentation de progression.
-3.  **Détection de Scènes** (`transnet_env/`) : TransNetV2 PyTorch pour les coupures, avec skips conditionnels documentés lorsque les modèles manquent.
-4.  **Analyse Audio** (`audio_env/`) : Pipeline Lemonfox + Pyannote (fallback) avec embeddings locuteurs optionnels (`AUDIO_INCLUDE_SPEAKER_EMBEDDINGS`).
-5.  **Suivi Vidéo** (`tracking_env_slim/`, `insightface_env/`) : MediaPipe Landmarker CPU-only en multiprocessing (valeur par défaut). InsightFace GPU est disponible uniquement si `STEP5_ENABLE_GPU=1` et `STEP5_TRACKING_ENGINE=insightface`, sinon fallback CPU automatique.
-6.  **Réduction JSON** (`env/`) : `json_reducer.py` produit `*_tracking.json` (source primaire AE) avec analytics et `temporal_alignment`.
-7.  **Pré-traitement AE** (`env/`) : `preprocess_ae_json.py` génère `*_ae.json` optimisés, utilisables directement par le script AE et par `Media-Solution` via manifest.
-8.  **Finalisation** (`env/`) : `finalize_and_copy.py` archive les sorties (ResultsArchiver) et publie les artefacts.
+Le cœur du système est un pipeline en 7 étapes, chacune isolée dans son environnement Python :
+1.  **Extraction + normalisation** (`env/`) : Extraction sécurisée des apports (ZIP/RAR/TAR) via `FilesystemService` (cache relocalisable `CACHE_ROOT_DIR`), puis normalisation FFmpeg des vidéos extraites (MP4 / H.264 / yuv420p / 25 fps) via `utils/media_normalizer.py` — contrat obligatoire pour toutes les étapes aval.
+2.  **Détection de Scènes** (`transnet_env/`) : TransNetV2 PyTorch pour les coupures, avec skips conditionnels documentés lorsque les modèles manquent.
+3.  **Analyse Audio** (`audio_env/`) : Pipeline Lemonfox + Pyannote (fallback) avec embeddings locuteurs optionnels (`AUDIO_INCLUDE_SPEAKER_EMBEDDINGS`).
+4.  **Suivi Vidéo** (`tracking_env_slim/`, `insightface_env/`) : MediaPipe Landmarker CPU-only en multiprocessing (valeur par défaut). InsightFace GPU est disponible uniquement si `STEP5_ENABLE_GPU=1` et `STEP5_TRACKING_ENGINE=insightface`, sinon fallback CPU automatique.
+5.  **Réduction JSON** (`env/`) : `json_reducer.py` produit `*_tracking.json` (source primaire AE) avec analytics et `temporal_alignment`.
+6.  **Pré-traitement AE** (`env/`) : `preprocess_ae_json.py` génère `*_ae.json` optimisés, utilisables directement par le script AE et par `Media-Solution` via manifest.
+7.  **Finalisation** (`env/`) : `finalize_and_copy.py` archive les sorties (ResultsArchiver) et publie les artefacts.
 
 ### Intégrations Clés
 -   **Webhook JSON** : Source unique pour le monitoring temps réel (`CSVMonitorService` + `download_history.sqlite3`).
 -   **FromSmash / Dropbox / SwissTransfer** : Parcours validé avec ouverture manuelle sécurisée lorsqu’un téléchargement automatique est impossible.
--   **NVIDIA GPU** : Exploité pour FFmpeg (STEP2), InsightFace (STEP5) et profils audio `gpu_fp32`. La validation GPU passe par `Config.check_gpu_availability()` (pynvml + `nvidia-smi`).
+-   **NVIDIA GPU** : Exploité pour la normalisation vidéo FFmpeg (STEP1, NVENC avec fallback `libx264`), InsightFace (STEP4) et profils audio `gpu_fp32`. La validation GPU passe par `Config.check_gpu_availability()` (pynvml + `nvidia-smi`).
 
 ### Interface Utilisateur
 Le frontend (vanilla JS + DOMBatcher/AppState) offre :

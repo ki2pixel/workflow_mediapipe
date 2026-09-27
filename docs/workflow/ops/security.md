@@ -248,7 +248,7 @@ def cache_open():
 
 ### Gestion NTFS/FUSE
 
-La finalisation (STEP8) fonctionne même sur les montages NTFS via FUSE où `chmod` échoue.
+La finalisation (STEP7) fonctionne même sur les montages NTFS via FUSE où `chmod` échoue.
 
 ```python
 # Détection support chmod
@@ -422,7 +422,7 @@ def test_webhook_security():
 graph TD
     A[Webhook JSON] --> B[CSVService]
     B --> C[SQLite Repository]
-    D[STEP1-8] --> E[FilesystemService]
+    D[STEP1-7] --> E[FilesystemService]
     
     subgraph "Sécurité"
         F[FilenameSanitizer]

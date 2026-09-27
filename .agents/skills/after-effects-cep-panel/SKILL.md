@@ -13,7 +13,7 @@ Cette skill couvre le développement, le débogage et la maintenance des extensi
 Les extensions CEP remplacent les scripts ExtendScript traditionnels par des panels modernes HTML/CSS/JS intégrés à After Effects :
 
 ```
-Pipeline MediaPipe → STEP7 (fichiers *_ae.json)
+Pipeline MediaPipe → STEP6 (fichiers *_ae.json)
 ↓
 Panel CEP (Media Solution v12.0) → Interface moderne dans AE
 ↓

@@ -38,7 +38,7 @@ else:
 4. **Détection faciale** : Identification des visages par frame
 5. **Extraction landmarks** : 468 points faciaux précis
 6. **Génération blendshapes** : 52 coefficients ARKit pour animation 3D
-7. **Export JSON** : Structure dense optimisée pour STEP6
+7. **Export JSON** : Structure dense optimisée pour STEP5
 
 ## Utilisation Rapide
 
@@ -46,10 +46,10 @@ else:
 
 ```bash
 # Via l'interface web
-# Clique sur "Étape 5 : Tracking vidéo" dans l'interface
+# Clique sur "Étape 4 : Tracking vidéo" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP5
+curl -X POST http://localhost:5000/run/STEP4
 
 # Dans une séquence complète
 const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6'];
@@ -62,15 +62,15 @@ await apiService.runCustomSequence(steps);
 # Mode MediaPipe CPU (défaut)
 source tracking_env_slim/bin/activate
 cd projets_extraits
-python ../workflow_scripts/step5/run_tracking_manager.py
+python ../workflow_scripts/step4/run_tracking_manager.py
 
 # Mode InsightFace GPU (optionnel)
-STEP5_TRACKING_ENGINE=insightface python ../workflow_scripts/step5/run_tracking_manager.py
+STEP5_TRACKING_ENGINE=insightface python ../workflow_scripts/step4/run_tracking_manager.py
 
 # Mode Edge TPU (optionnel, nécessite coral_env)
 source coral_env/bin/activate
 cd projets_extraits
-python ../workflow_scripts/step5/run_tracking_tpu.py
+python ../workflow_scripts/step4/run_tracking_tpu.py
 ```
 
 ### Résultat Attendu
@@ -223,9 +223,9 @@ STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 
 ## Accélération Google Coral Edge TPU
 
-Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 5 bascule vers une cascade pure TFLite séquentielle optimisée pour les puces TPU Coral Edge :
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 4 bascule vers une cascade pure TFLite séquentielle optimisée pour les puces TPU Coral Edge :
 
-* **Script d'exécution** : `workflow_scripts/step5/run_tracking_tpu.py`
+* **Script d'exécution** : `workflow_scripts/step4/run_tracking_tpu.py`
 * **Cascade d'Inférence** :
   1. **Détection (BlazeFace)** : Inférence de `blazeface_front_quantized_edgetpu.tflite` pour isoler la boîte englobante (bounding box) et les coordonnées des yeux.
   2. **Alignement Affine** : Recadrage géométrique et alignement affine du visage à 192x192 pixels.
@@ -237,9 +237,9 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 
 ## Mode Expérimental OpenCV 5.0 DNN
 
-Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape 5 bascule vers le nouveau mode expérimental basé sur le moteur OpenCV 5.0 DNN :
+Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape 4 bascule vers le nouveau mode expérimental basé sur le moteur OpenCV 5.0 DNN :
 
-* **Script d'exécution** : `workflow_scripts/step5/run_tracking_cv5.py`
+* **Script d'exécution** : `workflow_scripts/step4/run_tracking_cv5.py`
 * **Architecture de Planification Adaptative** :
   Le traitement n'utilise plus un parallélisme simpliste par vidéo, mais s'appuie sur un **pool global adaptatif de workers** (`ProcessPoolExecutor` initialisé en mode `spawn`) distribuant des chunks de frames (`STEP5_CV5_CHUNK_FRAMES`, défaut `32`) de manière dynamique.
   - **Orchestration Parent** : Le processus parent coordonne la lecture des vidéos (décodage), découpe les frames en lots de taille fixe, les envoie au pool de workers, collecte les résultats asynchrones, réassemble les frames dans le bon ordre chronologique (`_flush_cv5_ready_chunks`), applique le lissage temporel (filtres One Euro et Kalman), préserve la continuité du tracking et sérialise les résultats de manière atomique sur le disque.
@@ -383,7 +383,7 @@ STEP5_BLENDSHAPES_PROFILE=none    # Désactive blendshapes
 ### Structure des Logs
 
 ```
-logs/step5/
+logs/step4/
 ├── manager_tracking_20240120_143022.log
 ├── worker_1_20240120_143022.log
 ├── worker_2_20240120_143022.log
@@ -494,7 +494,7 @@ python -c "import onnxruntime as ort; print('GPU:', 'GPU' in ort.get_available_p
 
 # Solutions
 # 1. Forcer CPU
-STEP5_ENABLE_GPU=0 python workflow_scripts/step5/run_tracking_manager.py
+STEP5_ENABLE_GPU=0 python workflow_scripts/step4/run_tracking_manager.py
 
 # 2. Vérifier drivers CUDA
 sudo apt install nvidia-driver-470
@@ -510,10 +510,10 @@ ps aux | grep python | wc -l  # Compter processus
 
 # Solution
 # Réduire workers
-TRACKING_CPU_WORKERS=8 python workflow_scripts/step5/run_tracking_manager.py
+TRACKING_CPU_WORKERS=8 python workflow_scripts/step4/run_tracking_manager.py
 
 # Ou augmenter si machine puissante
-TRACKING_CPU_WORKERS=20 python workflow_scripts/step5/run_tracking_manager.py
+TRACKING_CPU_WORKERS=20 python workflow_scripts/step4/run_tracking_manager.py
 ```
 
 ### OOM GPU
@@ -525,7 +525,7 @@ python -c "import torch; print(torch.cuda.memory_allocated()/1024**3)"
 
 # Solutions
 # 1. Fallback CPU automatique
-STEP5_GPU_FALLBACK_AUTO=1 python workflow_scripts/step5/run_tracking_manager.py
+STEP5_GPU_FALLBACK_AUTO=1 python workflow_scripts/step4/run_tracking_manager.py
 
 # 2. Réduire concurrents
 # Arrêter autres processus GPU
@@ -554,7 +554,7 @@ mv test_face.mp4 test_tracking/docs/
 # Exécuter tracking
 source tracking_env_slim/bin/activate
 cd test_tracking
-python ../workflow_scripts/step5/run_tracking_manager.py
+python ../workflow_scripts/step4/run_tracking_manager.py
 
 # Vérifier résultat
 head docs/test_face_tracking.json | jq '.tracked_objects[0].faces[0].blendshapes'
@@ -568,10 +568,10 @@ STEP5_TRACKING_ENGINE=insightface source insightface_env/bin/activate
 
 # Exécuter tracking
 cd test_tracking
-python ../workflow_scripts/step5/run_tracking_manager.py
+python ../workflow_scripts/step4/run_tracking_manager.py
 
 # Vérifier GPU utilisé
-grep "ONNX providers" logs/step5/manager_*.log
+grep "ONNX providers" logs/step4/manager_*.log
 ```
 
 ### Validation Automatique
@@ -628,9 +628,9 @@ def validate_step5_output():
 
 ## Intégration Pipeline
 
-### Entrée pour STEP6
+### Entrée pour STEP5
 
-L'étape 5 prépare les données brutes pour la réduction JSON :
+L'étape 4 prépare les données brutes pour la réduction JSON :
 - **Landmarks 3D** : 468 points par visage
 - **Blendshapes ARKit** : 52 coefficients pour animation 3D
 - **Head pose** : Rotation et translation 3D
@@ -641,16 +641,16 @@ L'étape 5 prépare les données brutes pour la réduction JSON :
 ```python
 # Intégration avec l'état centralisé
 ws = get_workflow_state()
-ws.update_step_status("STEP5", "running")
-ws.set_step_field("STEP5", "current_video", "video1.mp4")
-ws.update_step_progress("STEP5", current=1, total=3)
+ws.update_step_status("STEP4", "running")
+ws.set_step_field("STEP4", "current_video", "video1.mp4")
+ws.update_step_progress("STEP4", current=1, total=3)
 ```
 
-### Compatibilité STEP6
+### Compatibilité STEP5
 
-Le format JSON dense est optimisé pour STEP6 :
+Le format JSON dense est optimisé pour STEP5 :
 ```python
-# Utilisation dans STEP6
+# Utilisation dans STEP5
 for frame_data in tracking_data['tracked_objects']:
     frame_num = frame_data['frame']
     faces = frame_data.get('faces', [])
@@ -686,7 +686,7 @@ for frame_data in tracking_data['tracked_objects']:
 ### Piège #7 : Variables obsolètes
 **Solution** : Supprimer les variables `STEP5_ENABLE_OBJECT_DETECTION` et `STEP5_*ENGINE_*` des fichiers `.env`.
 
-L'étape 5 transforme les vidéos en données faciales 3D précises avec une architecture simplifiée et fiable. La double approche CPU/GPU garantit que le système fonctionne dans tous les environnements tout en offrant une haute précision quand les ressources le permettent. Le retrait des moteurs historiques simplifie la maintenance et élimine les points de défaillance.
+L'étape 4 transforme les vidéos en données faciales 3D précises avec une architecture simplifiée et fiable. La double approche CPU/GPU garantit que le système fonctionne dans tous les environnements tout en offrant une haute précision quand les ressources le permettent. Le retrait des moteurs historiques simplifie la maintenance et élimine les points de défaillance.
 
 ---
 
@@ -715,7 +715,7 @@ L'étape 5 transforme les vidéos en données faciales 3D précises avec une arc
 2. **Détection visages** : MediaPipe FaceLandmarker
 3. **Extraction landmarks** : 478 points 3D + head pose
 4. **Calcul blendshapes** : 52 coefficients ARKit (throttling configurable)
-5. **Structuration données** : Format STEP6-compatible avec métriques
+5. **Structuration données** : Format STEP5-compatible avec métriques
 
 **Gestion erreurs** :
 - Skip frames corrompus

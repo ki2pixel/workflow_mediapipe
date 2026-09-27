@@ -13,8 +13,8 @@ description: Operate STEP4 audio analysis (Lemonfox + Pyannote fallback). Use wh
 
 ## Exécution Standard
 ```bash
-audio_env/bin/python workflow_scripts/step4/run_audio_analysis_lemonfox.py \
-  --log_dir logs/step4 \
+audio_env/bin/python workflow_scripts/step3/run_audio_analysis_lemonfox.py \
+  --log_dir logs/step3 \
   --input videos_to_track.json
 ```
 - Lemonfox est prioritaire (profil GPU FP32). Pyannote sert de fallback automatique.
@@ -24,7 +24,7 @@ audio_env/bin/python workflow_scripts/step4/run_audio_analysis_lemonfox.py \
 2. **OOM Handling** : Utiliser `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32`, `torch.cuda.empty_cache()` entre fichiers en cas de crash.
 3. **Import isolé** : charger Lemonfox via `importlib` (`services/lemonfox_audio_service.py`) pour éviter les dépendances Flask.
 4. **Success partiel** : poser `AUDIO_PARTIAL_SUCCESS_OK=1` pour ne pas bloquer la pipeline quand un fichier audio échoue.
-5. **Logs** : surveiller `logs/step4/*.log` pour `is_speech_present`, vérifier smoothing Lemonfox.
+5. **Logs** : surveiller `logs/step3/*.log` pour `is_speech_present`, vérifier smoothing Lemonfox.
 
 ## Résolution incidents
 - `ModuleNotFoundError: torch` → réinstaller via `audio_env/bin/pip install -r requirements.txt`.

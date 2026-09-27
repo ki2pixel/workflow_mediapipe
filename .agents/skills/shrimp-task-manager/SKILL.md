@@ -74,7 +74,7 @@ analyze_task(summary="Analyse tâche", initialConcept="Solution", previousAnalys
 # Étape 2 : Revue critique
 reflect_task(summary="Résumé", analysis="Résultats analyse")
 
-# Étape 3 : Décomposition
+# Étape 2 : Décomposition
 split_tasks(updateMode="overwrite", tasksRaw="[tâches]")
 ```
 

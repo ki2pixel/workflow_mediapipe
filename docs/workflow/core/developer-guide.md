@@ -19,9 +19,9 @@ from services.workflow_state import get_workflow_state
 ws = get_workflow_state()
 
 # Étapes (atomiques et thread-safe)
-ws.update_step_status("STEP5", "running")
-ws.update_step_info("STEP5", progress_current=1, progress_total=6)
-ws.set_step_field("STEP5", "progress_text", "video1.mp4")
+ws.update_step_status("STEP4", "running")
+ws.update_step_info("STEP4", progress_current=1, progress_total=6)
+ws.set_step_field("STEP4", "progress_text", "video1.mp4")
 
 # Séquences (avec RLock intégré)
 ws.start_sequence("Full")
@@ -46,7 +46,7 @@ def update_step_status(step_key, status):
 ```python
 from config.settings import config
 python_env = config.get_venv_python("tracking_env_slim")
-subprocess.run([python_env, "workflow_scripts/step5/run_tracking_manager.py"])
+subprocess.run([python_env, "workflow_scripts/step4/run_tracking_manager.py"])
 ```
 
 > **Pourquoi `tracking_env_slim` ?** Depuis la décision du 2026‑02‑03, l'environnement `tracking_env` a été officiellement remplacé par `tracking_env_slim` pour MediaPipe CPU. InsightFace GPU reste dans `insightface_env`. Voir `decisionLog.md` pour l'historique complet.
@@ -181,7 +181,7 @@ domBatcher.scheduleUpdate(() => {
 });
 
 // État immutable garantissant la cohérence
-appState.setState({ activeStepKeyForLogsPanel: 'STEP5' }, 'logs_panel_open');
+appState.setState({ activeStepKeyForLogsPanel: 'STEP4' }, 'logs_panel_open');
 ```
 
 **Règle XSS** : Tout contenu dynamique doit passer par `DOMUpdateUtils.escapeHtml()`.
@@ -237,13 +237,13 @@ function parseAndStyleLogContent(content) {
 ```python
 # ❌ Ancienne approche
 from config.workflow_commands import COMMANDS_CONFIG
-command = COMMANDS_CONFIG["STEP5"]["command"]
+command = COMMANDS_CONFIG["STEP4"]["command"]
 
 # ✅ Nouvelle approche
 from config.workflow_commands import WorkflowCommandsConfig
 config = WorkflowCommandsConfig()
-command = config.get_step_command("STEP5")
-cwd = config.get_step_cwd("STEP5")
+command = config.get_step_command("STEP4")
+cwd = config.get_step_cwd("STEP4")
 ```
 
 ## API Endpoints Essentiels
@@ -269,7 +269,7 @@ GET /api/system/diagnostics
 }
 ```
 
-## STEP5 - Tracking Spécifique
+## STEP4 - Tracking Spécifique
 
 ### Moteurs Supportés
 
@@ -325,9 +325,9 @@ Ne plus utiliser ces fonctions (retirées le 2026-01-18) :
 - Chunking : valeurs par défaut automatiques
 - Mode compact : maintenu sans fonctionnalités avancées
 
-## Trade-offs par Moteur STEP5
+## Trade-offs par Moteur STEP4
 
-| Moteur STEP5 | Avantages | Risques | Environnement Requis |
+| Moteur STEP4 | Avantages | Risques | Environnement Requis |
 |--------------|-----------|---------|----------------------|
 | **MediaPipe (CPU)** | Stable, pas de GPU requis, 478 landmarks | Plus lent sur vidéos longues | `tracking_env_slim` (Python 3.10) |
 | **InsightFace (GPU)** | 5-10× plus rapide, précision supérieure | Nécessite GPU NVIDIA, VRAM limitée | `insightface_env` (CUDA 11.x) |
@@ -344,7 +344,7 @@ Ne plus utiliser ces fonctions (retirées le 2026-01-18) :
 
 ## Analogie : Tour de Contrôle
 
-Pense au développement comme une **tour de contrôle aérienne**. **WorkflowState** est le radar principal qui voit tous les avions (étapes). **AppState** est l'écran des contrôleurs avec les vols prioritaires. **DOMBatcher** est le système de communication qui coordonne les messages sans brouillage (reflows). Les **tests** sont les simulations d'urgence qui vérifient que même si un moteur (STEP5) tombe en panne, les autres continuent de fonctionner.
+Pense au développement comme une **tour de contrôle aérienne**. **WorkflowState** est le radar principal qui voit tous les avions (étapes). **AppState** est l'écran des contrôleurs avec les vols prioritaires. **DOMBatcher** est le système de communication qui coordonne les messages sans brouillage (reflows). Les **tests** sont les simulations d'urgence qui vérifient que même si un moteur (STEP4) tombe en panne, les autres continuent de fonctionner.
 
 ## Tests et Validation
 

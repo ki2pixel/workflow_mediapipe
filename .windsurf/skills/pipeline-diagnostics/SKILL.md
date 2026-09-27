@@ -1,24 +1,25 @@
 ---
 name: pipeline-diagnostics
-description: Checklists and scripts to validate env vars, venv availability, and hardware readiness before launching Workflow MediaPipe steps (STEP1-STEP8). Use when pre-run sanity checks or root-cause hunts point to configuration drift.
+description: Checklists and scripts to validate env vars, venv availability, and hardware readiness before launching Workflow MediaPipe steps (STEP1-STEP7). Use when pre-run sanity checks or root-cause hunts point to configuration drift.
 ---
 
 # Pipeline Diagnostics Skill
 
 ## Quick Start
 1. Lire `.env` via `config/settings.py` (`python - <<'PY' ...`) pour afficher les variables critiques (`CACHE_ROOT_DIR`, `STEP5_*`, `DOWNLOAD_HISTORY_DB_PATH`).
-2. Valider l'existence des venv spécialisés (`env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
+2. Valider l'existence des venv spécialisés (`env/`, `coral_env/`, `transnet_env/`, `audio_env/`, `tracking_env_slim/`, `insightface_env/`).
 3. Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
-4. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP5 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
-5. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur, y compris les vérifications STEP7/STEP8.
+4. Vérifier les binaires GPU/CPU (`nvidia-smi`, `ffmpeg -version`, `onnxruntime_test`) selon l'étape cible. Pour STEP4 GPU, vérifier `insightface_env/bin/python` et `onnxruntime-gpu`.
+5. Consulter `resources/env_health_checklist.md` pour dérouler l'audit complet (commandes `.env`, imports venv, `nvidia-smi`, PRAGMA SQLite) avant chaque run majeur, y compris les vérifications STEP6/STEP7.
 
 ## Procédure Complète
 1. **Sanity `.env`**
    - Charger via `python3 config/settings.py --print` (si script dispo) ou `python - <<'PY'` pour inspecter `config.settings.config`.
-   - Contrôler : chemins cache, flags `DRY_RUN_DOWNLOADS`, `STEP5_ENABLE_GPU`, `AUDIO_PROFILE`, URLs webhook. (Note: les variables Vultr et Lightning doivent être supprimées).
+   - Contrôler : chemins cache, flags `DRY_RUN_DOWNLOADS`, `STEP5_ENABLE_GPU`, `AUDIO_PROFILE`, URLs webhook. (Note: les variables Vultr et Lightning doivent être supprimées). Vérifier la configuration de taille de batch pour la STEP3 GPU si applicable.
 2. **Venv Readiness**
-   - `ls env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env_slim/bin/python insightface_env/bin/python`.
+   - `ls env/bin/python coral_env/bin/python transnet_env/bin/python audio_env/bin/python tracking_env_slim/bin/python insightface_env/bin/python`.
    - `python -V` dans chaque venv (ex: `env/bin/python -V`).
+   - Vérifier la présence de `ijson` dans l'environnement de base (`env/`) pour garantir l'exécution de STEP5/7 en O(1) RAM.
    - Pour `tracking_env_slim`, vérifier `requirements-tracking-env-lite.txt` (packages allégés).
 3. **Hardware & Drivers**
    - `nvidia-smi` (GPU dispo, driver version ≥ 515).
@@ -26,8 +27,8 @@ description: Checklists and scripts to validate env vars, venv availability, and
    - `insightface_env/bin/python - <<'PY'` pour importer `onnxruntime` et vérifier `get_available_providers()` (GPU).
 5. **Filesystem & Permissions**
    - Vérifier `CACHE_ROOT_DIR`, `ARCHIVES_DIR`, `logs/stepX` existent et sont accessibles (`FilesystemService` doit être utilisé côté code; ici on vérifie les répertoires).
-   - Pour STEP7, vérifier l'accès aux fichiers `*_tracking.json` en entrée.
-   - Pour STEP8, vérifier les permissions d'écriture dans `OUTPUT_DIR` et `ARCHIVES_DIR`.
+   - Pour STEP6, vérifier l'accès aux fichiers `*_tracking.json` en entrée.
+   - Pour STEP7, vérifier les permissions d'écriture dans `OUTPUT_DIR` et `ARCHIVES_DIR`.
 6. **SQLite Health**
    - `python - <<'PY'` pour ouvrir `download_history.sqlite3`, lancer `PRAGMA integrity_check;`.
 
@@ -40,4 +41,4 @@ description: Checklists and scripts to validate env vars, venv availability, and
 - `codingstandards.md` (rappel : utiliser les venv spécialisés).
 - `memory-bank/productContext.md` (section Pipeline de Traitement) pour cartographier les étapes.
 
-**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'memory-bank'.
+**Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.

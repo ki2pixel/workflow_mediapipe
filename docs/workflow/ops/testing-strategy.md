@@ -1,10 +1,10 @@
 # Stratégie de Tests - Backend, Intégration et Frontend
 
-**TL;DR** : Tests robustes pour les zones critiques (STEP5 workers, CSV service) avec pytest et Node ESM. Couverture 89% sur 173 tests.
+**TL;DR** : Tests robustes pour les zones critiques (STEP4 workers, CSV service) avec pytest et Node ESM. Couverture 89% sur 173 tests.
 
 ## Le Problème : Tests Inexistants et Zones Critiques Non Couvertes
 
-Tu as des zones critiques dans le codebase (STEP5 workers, CSV service) avec une complexité radon F, mais les tests sont inexistants ou incomplets. Tu as besoin d'une stratégie de tests complète qui couvre les points chauds critiques et garantit la qualité du système.
+Tu as des zones critiques dans le codebase (STEP4 workers, CSV service) avec une complexité radon F, mais les tests sont inexistants ou incomplets. Tu as besoin d'une stratégie de tests complète qui couvre les points chauds critiques et garantit la qualité du système.
 
 ## Notre Solution : Tests Multi-Niveaux Robustes
 
@@ -13,10 +13,10 @@ Nous utilisons une approche en couches avec pytest pour le backend et Node ESM p
 ### ❌ Tests inexistents (anti-pattern)
 ```python
 # Approche risquée - pas de tests sur zones critiques
-def run_step5():
+def run_step4():
     # Code complexe avec multiprocessing, GPU, workers
     # Aucun test !
-    subprocess.run(['python', 'step5_script.py'])
+    subprocess.run(['python', 'step4_script.py'])
 # Résultat : régressions non détectées, production à risque
 ```
 
@@ -67,7 +67,7 @@ tests/
 
 ## Tests Prioritaires (Basé sur Radon Analysis)
 
-### STEP5 Workers (Score F)
+### STEP4 Workers (Score F)
 
 **Complexité critique**: `process_video_worker.py` et `run_tracking_manager.py`
 
@@ -79,7 +79,7 @@ tests/
 - Tests de concurrence multi-threading
 
 ```python
-# tests/unit/test_step5_gpu_support.py
+# tests/unit/test_step4_gpu_support.py
 def test_insightface_requires_gpu_flag():
     """Vérifie que l'initialisation du moteur InsightFace requiert le flag GPU."""
     # Instanciation de l'Engine Factory
@@ -140,8 +140,8 @@ addopts = -v --tb=short
 def test_workflow_service_run_step():
     """Test exécution étape via WorkflowService."""
     with patch('services.workflow_service.WorkflowService.run_step') as mock_run:
-        workflow_service.run_step('step5', {'project_name': 'test'})
-        mock_run.assert_called_once_with('step5', {'project_name': 'test'})
+        workflow_service.run_step('STEP4', {'project_name': 'test'})
+        mock_run.assert_called_once_with('STEP4', {'project_name': 'test'})
 ```
 
 ### Tests d'Intégration
@@ -149,16 +149,16 @@ def test_workflow_service_run_step():
 ```python
 # tests/integration/test_workflow_integration.py
 def test_workflow_integration():
-    """Tests couvrant STEP5, parsing progression, gestion séquence."""
+    """Tests couvrant STEP4, parsing progression, gestion séquence."""
     # 9 tests couvrant le workflow complet
     # Validation de la concurrence
     # Tests des états WorkflowState
 ```
 
-### Tests STEP5 Spécifiques
+### Tests STEP4 Spécifiques
 
 ```python
-# tests/unit/test_step5_face_engines.py
+# tests/unit/test_step4_face_engines.py
 def test_create_face_engine_insightface_requires_gpu_flag():
     """Vérifie que l'initialisation d'InsightFace requiert explicitement le flag GPU."""
     # Test de la factory face engine
@@ -252,14 +252,14 @@ pytest tests/unit/ tests/integration/
 npm run test:frontend
 
 # Performance benchmarks
-pytest --benchmark tests/unit/test_step5_performance.py
+pytest --benchmark tests/unit/test_step4_performance.py
 ```
 
 ### Scripts Spécifiques
 
 ```bash
-# Tests STEP5
-python -m pytest tests/unit/test_step5_face_engines.py -v
+# Tests STEP4
+python -m pytest tests/unit/test_step4_face_engines.py -v
 
 # Tests CSV service
 python -m pytest tests/unit/test_csv_service_url_normalization.py -v
@@ -293,7 +293,7 @@ addopts = -v --tb=short
 ```python
 # tests/integration/test_workflow_integration.py
 def test_step5_concurrency_and_workers():
-    """Valide la concurrence des workers STEP5."""
+    """Valide la concurrence des workers STEP4."""
     # Simulation de charge avec configurations de workers dynamiques
     # Monitoring de l'occupation CPU/VRAM
     # Validation de la robustesse sous charge
@@ -358,7 +358,7 @@ def test_filename_sanitizer():
 
 ```bash
 # Diagnostic
-pytest tests/unit/test_step5_workers.py -v
+pytest tests/unit/test_step4_workers.py -v
 pytest tests/integration/test_workflow_integration.py -v
 
 # Solutions
@@ -371,7 +371,7 @@ pytest tests/integration/test_workflow_integration.py -v
 
 ```bash
 # Diagnostic
-pytest --benchmark tests/unit/test_step5_performance.py
+pytest --benchmark tests/unit/test_step4_performance.py
 
 # Solutions
 # Réduire la taille des données de test
@@ -402,7 +402,7 @@ graph TD
     E[Tests Frontend] --> F[Frontend]
     
     subgraph "Tests Critiques"
-        G[STEP5 Workers]
+        G[STEP4 Workers]
         H[CSV Service]
         I[Lemonfox Audio]
     end

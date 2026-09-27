@@ -1,19 +1,19 @@
 ---
 name: after-effects-scripts
-description: Expert spécialisé dans les scripts After Effects (ExtendScript) et les ponts Python pour la post-production MediaPipe. Opère les scripts AE, les ponts system.callSystem() et le pré-traitement STEP7.
+description: Expert spécialisé dans les scripts After Effects (ExtendScript) et les ponts Python pour la post-production MediaPipe. Opère les scripts AE, les ponts system.callSystem() et le pré-traitement STEP6.
 ---
 
 # After Effects Scripts Expert (Post-Production MediaPipe v4.3)
 
-Cette skill couvre l'exploitation des scripts After Effects (ExtendScript) et des ponts Python pour la post-production créative après le pipeline MediaPipe 8 étapes.
+Cette skill couvre l'exploitation des scripts After Effects (ExtendScript) et des ponts Python pour la post-production créative après le pipeline MediaPipe 7 étapes.
 
 ## 1. Contexte & Positionnement
 
 ### Rôle dans le Pipeline
-Les scripts After Effects interviennent **offline sur Windows** (car AE n'existe pas sur Linux) comme phase de post-production créative **après STEP7** :
+Les scripts After Effects interviennent **offline sur Windows** (car AE n'existe pas sur Linux) comme phase de post-production créative **après STEP6** :
 
 ```
-STEP7 (Pré-traitement AE) → Fichiers *_ae.json optimisés
+STEP6 (Pré-traitement AE) → Fichiers *_ae.json optimisés
 ↓
 Scripts AE (Windows) → Post-production créative
 ```
@@ -22,7 +22,7 @@ Scripts AE (Windows) → Post-production créative
 | Script | Objectif | Fichiers consommés | Sorties |
 |---|---|---|---|
 | **Media-Solution-v11.2-production.jsx** | Création automatisée de projets AE | `*_ae.json`, CSV scènes, vidéos | Projets AEP avec découpes |
-| **Analyse-Écart-X-depuis-JSON-et-Label-Vidéo36_good.jsx** | Recentrage intelligent basé sur tracking | `*_tracking.json` (prioritaire) ou `*.json` (STEP5) | Calques recentrés, analytics |
+| **Analyse-Écart-X-depuis-JSON-et-Label-Vidéo36_good.jsx** | Recentrage intelligent basé sur tracking | `*_tracking.json` (prioritaire) ou `*.json` (STEP4) | Calques recentrés, analytics |
 | **media_solution_bridge.py** | Pont Python pour CSV cuts & analyzer | Manifestes `ms_cuts_*`, `ms_analyzer_*` | Segments, recentrage batch |
 
 ## 2. Prérequis & Environnement
@@ -33,8 +33,8 @@ Scripts AE (Windows) → Post-production créative
 - **Python 3.10+** (pour les ponts `system.callSystem()`)
 
 ### Fichiers Requis
-- `*_ae.json` (sortie STEP7 optimisée pour AE)
-- `*_tracking.json` (sortie STEP6, source primaire)
+- `*_ae.json` (sortie STEP6 optimisée pour AE)
+- `*_tracking.json` (sortie STEP5, source primaire)
 - `*_audio.json` (données diarisation STEP4)
 - CSV des scènes (STEP3) pour Media-Solution
 - Vidéos sources dans `docs/` du projet
@@ -57,7 +57,7 @@ PYTHON_EXECUTABLE=python3          # Chemin Python pour system.callSystem()
 ## 3. Procédures d'Opération
 
 ### 3.1 Lancement Standard Media-Solution
-1. **Préparation** : Vérifier que STEP7 est terminé avec `*_ae.json` générés
+1. **Préparation** : Vérifier que STEP6 est terminé avec `*_ae.json` générés
 2. **Ouverture AE** : Lancer After Effects et ouvrir un nouveau projet
 3. **Exécution** : `File > Scripts > Run Script File > Media-Solution-v11.2-production.jsx`
 4. **Sélection** : Choisir le dossier projet dans `CACHE_ROOT_DIR/`
@@ -65,11 +65,11 @@ PYTHON_EXECUTABLE=python3          # Chemin Python pour system.callSystem()
 
 ### 3.2 Recentrage Intelligent Analyse-Écart-X
 1. **Détection automatique** : Le script cherche par ordre :
-   - `*_tracking.json` (STEP6 - prioritaire, stable)
-   - `*.json` (STEP5 - fallback streaming si massif)
+   - `*_tracking.json` (STEP5 - prioritaire, stable)
+   - `*.json` (STEP4 - fallback streaming si massif)
 2. **Parsing optimisé O(1) RAM** : 
-   - Backend Python (STEP6/STEP7) : L'utilisation de la bibliothèque `ijson` est OBLIGATOIRE pour parser les fichiers JSON itérativement sans les charger entièrement en mémoire (`json.load()` interdit).
-   - Scripts AE : Lecture directe pour STEP6 (léger), ou Streaming `readln()` + buffer pour STEP5 (évite crashs mémoire).
+   - Backend Python (STEP5/STEP6) : L'utilisation de la bibliothèque `ijson` est OBLIGATOIRE pour parser les fichiers JSON itérativement sans les charger entièrement en mémoire (`json.load()` interdit).
+   - Scripts AE : Lecture directe pour STEP5 (léger), ou Streaming `readln()` + buffer pour STEP4 (évite crashs mémoire).
 3. **Application** : Recentrage automatique sur les calques sélectionnés
 4. **Logs** : Vérifier la console AE pour les métriques `[PY]` et analytics
 
@@ -79,7 +79,7 @@ PYTHON_EXECUTABLE=python3          # Chemin Python pour system.callSystem()
 ```javascript
 // Depuis Media-Solution.jsx
 var pythonResult = system.callSystem(
-    'python3 workflow_scripts/step7/preprocess_ae_json.py ' +
+    'python3 workflow_scripts/step6/preprocess_ae_json.py ' +
     '--manifest_path "' + manifestPath + '" ' +
     '--output_path "' + outputPath + '" ' +
     '--mode analyzer'
@@ -100,23 +100,23 @@ var cutsResult = system.callSystem(
 ## 4. Diagnostic & Dépannage
 
 ### Points de Vigilance
-1. **Mémoire AE** : Les JSON STEP5 complets (plusieurs MB) provoquent des crashs
-   - **Solution** : Prioriser STEP6 ou utiliser parsing streaming
+1. **Mémoire AE** : Les JSON STEP4 complets (plusieurs MB) provoquent des crashs
+   - **Solution** : Prioriser STEP5 ou utiliser parsing streaming
 2. **Désalignement temporel** : Audio/vidéo décalé
    - **Diagnostic** : Vérifier `temporal_alignment` dans `*_tracking.json`
 3. **Ponts Python** : Échec `system.callSystem()`
    - **Vérifier** : `PYTHON_EXECUTABLE` accessible, permissions
 4. **Fichiers manquants** : `*_ae.json` ou `*_tracking.json` absent
-   - **Action** : Relancer STEP6/STEP7, vérifier logs
+   - **Action** : Relancer STEP5/STEP6, vérifier logs
 
 ### Logs & Monitoring
 - **Console AE** : Messages `[PY]` pour les ponts Python
-- **Logs STEP7** : `logs/step7/preprocess_ae_*.log`
+- **Logs STEP6** : `logs/step6/preprocess_ae_*.log`
 - **Logs Bridge** : Sortie directe dans console AE via `system.callSystem()`
 
 ### Checklist Validation
-- [ ] STEP7 terminé avec `*_ae.json` présents
-- [ ] `*_tracking.json` (STEP6) disponible et valide
+- [ ] STEP6 terminé avec `*_ae.json` présents
+- [ ] `*_tracking.json` (STEP5) disponible et valide
 - [ ] Python accessible via `PYTHON_EXECUTABLE`
 - [ ] After Effects redémarré après mise à jour des scripts
 - [ ] Console AE visible pour les logs `[PY]`
@@ -125,7 +125,7 @@ var cutsResult = system.callSystem(
 
 ### 5.1 Pipeline Standard
 ```
-STEP7 → *_ae.json → Media-Solution.jsx → Création AEPs
+STEP6 → *_ae.json → Media-Solution.jsx → Création AEPs
 ↓
 Analyse-Écart-X.jsx → Recentrage intelligent
 ↓
@@ -155,13 +155,13 @@ Segments générés + fallback ExtendScript si erreur
 ### Tests Unitaires Associés
 ```bash
 # STEP7 - Pré-traitement AE
-pytest -q tests/unit/test_step7_preprocess_ae_json.py
+pytest -q tests/unit/test_step6_preprocess_ae_json.py
 
 # Pont Python cuts
 pytest -q tests/unit/test_media_solution_bridge.py
 
 # STEP6 - Sortie tracking
-pytest -q tests/unit/test_step6_json_reducer.py
+pytest -q tests/unit/test_step5_json_reducer.py
 ```
 
 ### Validation Manuelle
@@ -175,12 +175,12 @@ pytest -q tests/unit/test_step6_json_reducer.py
 ### Sécurité & Robustesse
 - **Jamais de secrets** dans les scripts ExtendScript
 - **Validation des chemins** avant `system.callSystem()`
-- **Fallback automatique** : STEP5 → STEP6 si erreur
+- **Fallback automatique** : STEP4 → STEP5 si erreur
 - **Redémarrage AE** requis après mise à jour des scripts
 
 ### Performance
-- **Prioriser STEP6** : JSON léger vs STEP5 massif
-- **Parsing streaming** : Pour les gros fichiers STEP5
+- **Prioriser STEP5** : JSON léger vs STEP4 massif
+- **Parsing streaming** : Pour les gros fichiers STEP4
 - **Batch processing** : Utiliser les ponts Python pour les opérations répétitives
 - **Monitoring mémoire** : Surveiller consommation AE
 
@@ -192,17 +192,17 @@ pytest -q tests/unit/test_step6_json_reducer.py
 ## 8. Références Techniques
 
 ### Documentation Projet
-- `docs/workflow/pipeline/07-ae-preprocessing.md` - Spécifications STEP7
+- `docs/workflow/pipeline/07-ae-preprocessing.md` - Spécifications STEP6
 - `codingstandards.md` - Règles de codage et architecture
 
 ### Scripts Clés
-- `workflow_scripts/step7/preprocess_ae_json.py` - Moteur STEP7
+- `workflow_scripts/step6/preprocess_ae_json.py` - Moteur STEP6
 - `scripts/after_effects/media_solution_bridge.py` - Pont Python
 - `scripts/after_effects/Media-Solution-v11.2-production.jsx` - Script principal
 - `scripts/after_effects/Analyse-Écart-X-depuis-JSON-et-Label-Vidéo36_good.jsx` - Recentrage
 
 ### Conformité
 - **Architecture Services/State** respectée via les ponts Python
-- **Environnements virtuels** : `env/` pour STEP7, ponts Python autonomes
+- **Environnements virtuels** : `env/` pour STEP6, ponts Python autonomes
 - **Sécurité** : Pas de secrets en dur, validation des entrées
 - **Tests** : Suite unitaire complète pour les composants critiques

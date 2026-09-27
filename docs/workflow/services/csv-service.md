@@ -250,7 +250,7 @@ echo "https://dl.dropbox.com/s/file1.mp4,downloaded,2024-01-20T14:30:22" >> test
 # Exécuter monitoring
 source env/bin/activate
 cd test_csv
-python ../workflow_scripts/step7/csv_monitor.py
+python ../workflow_scripts/step6/csv_monitor.py
 
 # Vérifier résultats
 sqlite3 download_history.sqlite3 "SELECT COUNT(*) FROM downloads"
@@ -276,10 +276,10 @@ def validate_csv_service():
 
 ```mermaid
 graph LR
-    A[STEP4 Audio] --> B[STEP5 Tracking]
-    B --> C[STEP6 Réduction]
-    C --> D[STEP7 Pré-traitement AE]
-    D --> E[STEP8 Finalisation]
+    A[STEP4 Audio] --> B[STEP4 Tracking]
+    B --> C[STEP5 Réduction]
+    C --> D[STEP6 Pré-traitement AE]
+    D --> E[STEP7 Finalisation]
     
     subgraph "Monitoring"
         F[Webhook JSON] --> G[CSVService]

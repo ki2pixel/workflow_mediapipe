@@ -1,6 +1,6 @@
 # Workflow MediaPipe - Documentation
 
-**TL;DR** : Pipeline vidéo 8 étapes avec tracking facial, analyse audio et préparation After Effects. Architecture Flask + Python avec environnements spécialisés.
+**TL;DR** : Pipeline vidéo 7 étapes avec tracking facial, analyse audio et préparation After Effects. Architecture Flask + Python avec environnements spécialisés.
 
 ## Pourquoi ce Projet ?
 
@@ -13,23 +13,22 @@ Tu dois transformer des vidéos brutes en données d'animation 3D pour After Eff
 - Synchroniser manuellement les résultats
 
 ### ✅ Notre pipeline intégré
-- Un seul clic pour lancer les 8 étapes
+- Un seul clic pour lancer les 7 étapes
 - Environnements isolés automatiquement
 - Progression visible en temps réel
 - Résultats optimisés pour After Effects
 
 ## Comment Ça Marche ?
 
-Le pipeline traite les vidéos en 8 étapes séquentielles, chacune dans son environnement virtuel optimisé :
+Le pipeline traite les vidéos en 7 étapes séquentielles, chacune dans son environnement virtuel optimisé :
 
-1. **Extraction** : Archives ZIP/RAR/TAR avec sécurité renforcée
-2. **Conversion** : Vidéos standardisées à 25 FPS avec GPU optimisé
-3. **Scènes** : Détection automatique des changements de scène
-4. **Audio** : Analyse diarisation avec Pyannote/Lemonfox
-5. **Tracking** : Détection faciale MediaPipe (CPU) ou InsightFace (GPU)
-6. **Réduction** : JSON optimisé avec analytics enrichis
-7. **Pré-traitement AE** : Format optimisé pour After Effects
-8. **Finalisation** : Archivage et copie vers destination
+1. **Extraction** : Archives ZIP/RAR/TAR avec sécurité renforcée, puis normalisation vidéo (MP4/H.264/25 fps)
+2. **Scènes** : Détection automatique des changements de scène
+3. **Audio** : Analyse diarisation avec Pyannote/Lemonfox
+4. **Tracking** : Détection faciale MediaPipe (CPU) ou InsightFace (GPU)
+5. **Réduction** : JSON optimisé avec analytics enrichis
+6. **Pré-traitement AE** : Format optimisé pour After Effects
+7. **Finalisation** : Archivage et copie vers destination
 
 ## Démarrage Rapide
 
@@ -57,14 +56,13 @@ python app_new.py
 - **[Developer Guide](core/developer-guide.md)** : Guide pour développeurs
 
 ### 🔄 **Pipeline** - Étapes de Traitement
-- **[01 Extraction](pipeline/01-extraction.md)** : Extraction d'archives sécurisée
-- **[02 Conversion](pipeline/02-conversion.md)** : Conversion vidéo 25 FPS
-- **[03 Scene Detection](pipeline/03-scene-detection.md)** : Détection scènes TransNetV2
-- **[04 Audio Analysis](pipeline/04-audio-analysis.md)** : Analyse audio Pyannote/Lemonfox
-- **[05 Video Tracking](pipeline/05-video-tracking.md)** : Tracking MediaPipe/InsightFace
-- **[06 JSON Reduction](pipeline/06-json-reduction.md)** : Réduction JSON avec analytics
-- **[07 AE Preprocessing](pipeline/07-ae-preprocessing.md)** : Préparation After Effects
-- **[08 Finalization](pipeline/08-finalization.md)** : Archivage et finalisation
+- **[01 Extraction](pipeline/01-extraction.md)** : Extraction d'archives sécurisée + normalisation vidéo 25 FPS
+- **[02 Scene Detection](pipeline/02-scene-detection.md)** : Détection scènes TransNetV2
+- **[03 Audio Analysis](pipeline/03-audio-analysis.md)** : Analyse audio Pyannote/Lemonfox
+- **[04 Video Tracking](pipeline/04-video-tracking.md)** : Tracking MediaPipe/InsightFace
+- **[05 JSON Reduction](pipeline/05-json-reduction.md)** : Réduction JSON avec analytics
+- **[06 AE Preprocessing](pipeline/06-ae-preprocessing.md)** : Préparation After Effects
+- **[07 Finalization](pipeline/07-finalization.md)** : Archivage et finalisation
 
 ### ⚙️ **Services** - Composants Métier
 - **[CSV Service](services/csv-service.md)** : Monitoring téléchargements webhook
@@ -105,7 +103,7 @@ python app_new.py
 
 ```bash
 env/                    # Application principale
-├── tracking_env_slim/   # MediaPipe CPU (STEP5)
+├── tracking_env_slim/   # MediaPipe CPU (STEP4)
 ├── audio_env/           # Analyse audio (STEP4)
 ├── transnet_env/        # Détection scènes (STEP3)
 ├── coral_env/           # Détection scènes/audio/tracking sur Coral TPU (optionnel)
@@ -153,7 +151,7 @@ SYSTEM_MONITOR_POLLING_INTERVAL=2000
 | **Démonstration** | Montrer rapidement le pipeline | `./start_workflow.sh` + UI web | GPU indisponible = fallback CPU |
 | **Développement** | Tester et améliorer le système | `pytest` + `npm run test:frontend` | Dépendances manquantes dans venv |
 | **Production** | Traitement batch de vidéos | Séquences complètes + monitoring | Espace disque sur workflows longs |
-| **Post-production** | Export optimisé pour AE | Focus STEP6/STEP7 + scripts AE | Crash AE si JSON trop volumineux |
+| **Post-production** | Export optimisé pour AE | Focus STEP5/STEP6 + scripts AE | Crash AE si JSON trop volumineux |
 
 ## Analogie : Sprint vs Marathon
 

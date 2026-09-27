@@ -15,7 +15,7 @@ description: Docs Updater (Context-Aware with Code Verification)
    - Lire Memory Bank (`productContext`, `progress`, `decisionLog`) pour comprendre les évolutions récentes.
    - Inspecter les fichiers code concernés (services, routes, frontend) via `grep_search`/`read_file`.
 2. **Identifier docs impactées**
-   - Mapper la fonctionnalité modifiée → doc(s) correspondantes (ex: pipeline STEP5 → `STEP5_SUIVI_VIDEO.md`).
+   - Mapper la fonctionnalité modifiée → doc(s) correspondantes (ex: pipeline STEP4 → `STEP5_SUIVI_VIDEO.md`).
 3. **Mettre à jour la doc**
    - Respecter le format existant (titres, sections numérotées).
    - Mentionner les variables `.env`, scripts, workflows pertinents.

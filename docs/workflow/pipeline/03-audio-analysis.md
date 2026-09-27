@@ -1,6 +1,6 @@
 # Analyse Audio
 
-**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Supporte également l'accélération matérielle basse consommation Google Coral Edge TPU. Quatre méthodes compatibles : **Pyannote** (défaut local GPU/CPU), **Lemonfox** (cloud diarisation), **DeepInfra** (cloud STT), et **Edge TPU** (YAMNet local + Spectral Clustering CPU). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP5/STEP6.
+**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Supporte également l'accélération matérielle basse consommation Google Coral Edge TPU. Quatre méthodes compatibles : **Pyannote** (défaut local GPU/CPU), **Lemonfox** (cloud diarisation), **DeepInfra** (cloud STT), et **Edge TPU** (YAMNet local + Spectral Clustering CPU). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP4/STEP5.
 
 ## Le Problème : Analyse Audio Manuelle Inefficace
 
@@ -30,7 +30,7 @@ AUDIO_PROFILE=gpu_fp32  # FP32 pur, pas d'AMP
 2. **Diarisation** : Pyannote/Lemonfox identifie les segments de parole par locuteur
 3. **Timeline mapping** : Conversion temps → frames (25 FPS)
 4. **Post-traitement** : Lissage des détections et comblement des trous
-5. **Export JSON** : Format standardisé pour STEP5
+5. **Export JSON** : Format standardisé pour STEP4
 
 ## Utilisation Rapide
 
@@ -38,7 +38,7 @@ AUDIO_PROFILE=gpu_fp32  # FP32 pur, pas d'AMP
 
 ```bash
 # Via l'interface web
-# Clique sur "Étape 4 : Analyse audio" dans l'interface
+# Clique sur "Étape 3 : Analyse audio" dans l'interface
 
 # Via API
 curl -X POST http://localhost:5000/run/STEP4
@@ -56,10 +56,10 @@ source audio_env/bin/activate
 
 # Exécution depuis projets_extraits
 cd projets_extraits
-python ../workflow_scripts/step4/run_audio_analysis.py
+python ../workflow_scripts/step3/run_audio_analysis.py
 
 # Monitoring des logs
-tail -f logs/step4/audio_analysis_*.log
+tail -f logs/step3/audio_analysis_*.log
 ```
 
 ### Résultat Attendu
@@ -203,9 +203,9 @@ STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 
 ## Accélération Google Coral Edge TPU
 
-Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 4 bascule vers un pipeline de traitement audio local ultra-léger et économe :
+Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.env`, l'étape 3 bascule vers un pipeline de traitement audio local ultra-léger et économe :
 
-* **Script d'exécution** : `workflow_scripts/step4/run_audio_diarization_tpu.py`
+* **Script d'exécution** : `workflow_scripts/step3/run_audio_diarization_tpu.py`
 * **Fonctionnement** :
   1. **Extraction audio** : FFmpeg convertit la vidéo en fichier audio WAV 16kHz mono.
   2. **VAD par fenêtrage glissant (Edge TPU)** : Inférence séquentielle du modèle quantifié YAMNet INT8 sur le Coral TPU avec 50% de recouvrement (hop size de 0.48s pour une fenêtre d'analyse de 0.96s), préservant la sensibilité pour les interjections et mots courts.
@@ -216,7 +216,7 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
      - Clustering par Agglomération Hiérarchique (AHC) avec liaison moyenne et seuil de distance optimal de 0.32.
      - Estimation automatique du nombre de locuteurs par Eigen-gap et Silhouette Score (évitant la division fictive des monologues).
      - Réassignation des locuteurs mineurs (durée cumulée de parole < 7.0s) vers les locuteurs majeurs.
-  6. **Timeline & Export JSON Standardisé** : Alignement des segments de voix détectés à 25 fps et écriture du JSON en streaming. Pour une compatibilité structurelle totale avec STEP5/6, le fichier JSON contient la clé racine `speaker_stats` (durée et pourcentage par locuteur) et la clé `num_distinct_speakers_audio` dans `audio_info`.
+  6. **Timeline & Export JSON Standardisé** : Alignement des segments de voix détectés à 25 fps et écriture du JSON en streaming. Pour une compatibilité structurelle totale avec STEP4/6, le fichier JSON contient la clé racine `speaker_stats` (durée et pourcentage par locuteur) et la clé `num_distinct_speakers_audio` dans `audio_info`.
 
 ## Analogie : Studio Mixage vs Transcription Cloud
 
@@ -311,7 +311,7 @@ temp_dir = Path("/dev/shm") / "audio_analysis_temp"
 ### Structure des Logs
 
 ```
-logs/step4/
+logs/step3/
 └── audio_analysis_20240120_143022.log
 ```
 
@@ -415,10 +415,10 @@ python -c "import torch; print(torch.cuda.memory_allocated()/1024**3)"
 
 # Solutions
 # 1. Réduire batch size
-PYANNOTE_BATCH_SIZE=1 python workflow_scripts/step4/run_audio_analysis.py
+PYANNOTE_BATCH_SIZE=1 python workflow_scripts/step3/run_audio_analysis.py
 
 # 2. Forcer CPU
-AUDIO_DISABLE_GPU=1 python workflow_scripts/step4/run_audio_analysis.py
+AUDIO_DISABLE_GPU=1 python workflow_scripts/step3/run_audio_analysis.py
 
 # 3. Configuration mémoire
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32
@@ -489,7 +489,7 @@ mv test_speech.mp4 test_audio/docs/
 # Exécuter analyse
 source audio_env/bin/activate
 cd test_audio
-python ../workflow_scripts/step4/run_audio_analysis.py
+python ../workflow_scripts/step3/run_audio_analysis.py
 
 # Vérifier résultat
 head docs/test_speech_audio.json | jq '.frames_analysis[0].audio_info'
@@ -544,17 +544,17 @@ def validate_step4_output():
 ```bash
 # Test GPU
 source audio_env/bin/activate
-time python workflow_scripts/step4/run_audio_analysis.py
+time python workflow_scripts/step3/run_audio_analysis.py
 
 # Test CPU
-AUDIO_DISABLE_GPU=1 time python workflow_scripts/step4/run_audio_analysis.py
+AUDIO_DISABLE_GPU=1 time python workflow_scripts/step3/run_audio_analysis.py
 ```
 
 ## Intégration Pipeline
 
-### Entrée pour STEP5
+### Entrée pour STEP4
 
-L'étape 4 prépare les données audio pour le tracking vidéo :
+L'étape 3 prépare les données audio pour le tracking vidéo :
 - **Timeline synchronisée** : `is_speech_present` par frame
 - **Identification locuteurs** : `active_speaker_labels` uniques
 - **Embeddings optionnels** : Vecteurs par locuteur pour analyses avancées
@@ -569,9 +569,9 @@ ws.set_step_field("STEP4", "current_video", "video1.mp4")
 ws.update_step_progress("STEP4", current=1, total=3)
 ```
 
-### Compatibilité STEP5
+### Compatibilité STEP4
 
-Le format JSON est parfaitement compatible avec STEP5 :
+Le format JSON est parfaitement compatible avec STEP4 :
 ```python
 # Utilisation dans enhanced_speaking_detection.py
 for frame_data in audio_analysis['frames_analysis']:
@@ -600,7 +600,7 @@ for frame_data in audio_analysis['frames_analysis']:
 ### Piège #5 : Lemonfox API coûteuse
 **Solution** : Surveiller l'utilisation et basculer vers Pyannote local si nécessaire.
 
-L'étape 4 transforme l'audio brut en intelligence structurée, identifiant précisément qui parle et quand. La timeline frame-précise permet une synchronisation parfaite avec le tracking vidéo, créant une base riche pour l'analyse multimodale.
+L'étape 3 transforme l'audio brut en intelligence structurée, identifiant précisément qui parle et quand. La timeline frame-précise permet une synchronisation parfaite avec le tracking vidéo, créant une base riche pour l'analyse multimodale.
 
 ---
 

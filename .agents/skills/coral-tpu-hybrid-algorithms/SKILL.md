@@ -24,7 +24,7 @@ Avant d'optimiser le code algorithmique :
 
 ## 🚑 Checklist Diagnostique & Résolution
 
-### Incident 1 : Jittering extrême (Tremblement) sur le Tracking (STEP5)
+### Incident 1 : Jittering extrême (Tremblement) sur le Tracking (STEP4)
 - **Symptôme** : Les points de repère faciaux générés par le modèle quantisé BlazeFace/FaceMesh tremblent fortement par rapport à la version FP32 CPU.
 - **Action** : Valider que le filtre One-Euro (`OneEuroFilterND`) est activé par défaut. Ajuster ses paramètres `min_cutoff` (seuil de coupure minimum pour stabiliser à basse vitesse) et `beta` (sensibilité à la vitesse pour éviter la traînée/décalage). En cas de fallback sur le Filtre de Kalman vectorisé, ajuster les matrices de covariance de bruit de processus ($Q$) et de bruit de mesure ($R$) pour lisser le bruit quantique spécifique à l'INT8.
 
@@ -33,4 +33,4 @@ Avant d'optimiser le code algorithmique :
 - **Action** : Depuis la migration d'ECAPA-TDNN vers ONNX Runtime CPU, les d-vectors extraits ne souffrent plus de la dégradation causée par la quantification INT8. Le rôle des algorithmes CPU (clustering AHC avec distance cosine, linkage average, seuil 0.32 et filtrage à 7.0s) reste indispensable pour structurer proprement la diarisation et fusionner les faux locuteurs générés par les bruits ambiants. Si l'estimation adaptative du nombre de locuteurs par Spectral Clustering (Eigen-gap/Silhouette) est activée, paramétrer le solveur de `scikit-learn` (ex: `n_jobs=-1`) ou restreindre l'analyse aux `max_speakers` autorisés pour soulager le CPU.
 
 ## ⚠️ Séparation des Responsabilités
-Se concentre purement sur la viabilité et la performance des algorithmes mathématiques CPU. Intervient "après" le TPU, là où l'ASIC s'arrête, sans se substituer aux orchestrateurs globaux de STEP4 ou STEP5.
+Se concentre purement sur la viabilité et la performance des algorithmes mathématiques CPU. Intervient "après" le TPU, là où l'ASIC s'arrête, sans se substituer aux orchestrateurs globaux de STEP4 ou STEP4.
