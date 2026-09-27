@@ -57,22 +57,22 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
 ### Suivi Vidéo (STEP5) — 2026-02-03
 - **Moteurs supportés** :
   - `mediapipe` (valeur vide) : moteur par défaut CPU-only exécuté dans `tracking_env_slim`. Fournit 478 landmarks + 52 blendshapes ARKit via MediaPipe Tasks. Import lazy pour éviter TensorFlow.
-  - `insightface` : unique moteur GPU autorisé (ONNX Runtime) exécuté dans `insightface_env`. Nécessite `STEP5_ENABLE_GPU=1`, `STEP5_TRACKING_ENGINE=insightface` et présence dans `STEP5_GPU_ENGINES`. Toute autre valeur est rejetée par `run_tracking_manager.py`.
+  - `insightface` : unique moteur GPU autorisé (ONNX Runtime) exécuté dans `insightface_env`. Nécessite `STEP4_ENABLE_GPU=1`, `STEP4_TRACKING_ENGINE=insightface` et présence dans `STEP4_GPU_ENGINES`. Toute autre valeur est rejetée par `run_tracking_manager.py`.
   - Tous les moteurs historiques (OpenCV, OpenSeeFace, EOS, pyfeat) et options UI avancées ont été supprimés.
 
 - **Multiprocessing / workers** :
   - MediaPipe utilise `process_video_worker_multiprocessing.py` (workers CPU). `TRACKING_CPU_WORKERS` est injecté via `_EnvConfig`; chaque worker initialise `FaceLandmarker` + `ObjectDetector` via `ObjectDetectorRegistry`.
-  - InsightFace est GPU-only; aucun worker CPU n’est lancé lorsque ce moteur est sélectionné. Si la validation GPU échoue (`Config.check_gpu_availability()`), le manager tombe en erreur (ou fallback CPU si `STEP5_GPU_FALLBACK_AUTO=1`).
+  - InsightFace est GPU-only; aucun worker CPU n’est lancé lorsque ce moteur est sélectionné. Si la validation GPU échoue (`Config.check_gpu_availability()`), le manager tombe en erreur (ou fallback CPU si `STEP4_GPU_FALLBACK_AUTO=1`).
   - Les snapshots d’environnement (`_log_env_snapshot()`) et la gestion `resource_worker_loop` s’assurent que GPU/CPU ne tournent que lorsque le moteur choisi le permet.
 
 - **Format de sortie** :
-  - STEP5 produit toujours un JSON dense frame-by-frame (`tracked_objects[]`, blendshapes/throttles configurables). `STEP5_EXPORT_VERBOSE_FIELDS` reste un flag de debugging.
+  - STEP5 produit toujours un JSON dense frame-by-frame (`tracked_objects[]`, blendshapes/throttles configurables). `STEP4_EXPORT_VERBOSE_FIELDS` reste un flag de debugging.
   - STEP6 `json_reducer.py` produit la source de vérité `*_tracking.json` (analytics, `temporal_alignment`). Les scripts AE consomment STEP6 en priorité.
 
 ### STEP5 — Profiling & Performance (v4.3)
 - `_EnvConfig` centralise la lecture des variables (workers, GPU flags, throttle). Les workers héritent d’un `args_dict` complet pour garantir que les throttles (`blendshapes_throttle_n`, `mediapipe_max_width`, `mediapipe_jawopen_scale`) sont appliqués.
 - `ObjectDetectorRegistry` est la source unique pour les modèles EfficientDet (résolution, overrides). Toute erreur de résolution stoppe le worker.
-- Le manager journalise la validation GPU (pynvml + `nvidia-smi`). InsightFace est strictement GPU-only : si `STEP5_ENABLE_GPU=0` ou `insightface` n’est pas listé dans `STEP5_GPU_ENGINES`, l’exécution est refusée.
+- Le manager journalise la validation GPU (pynvml + `nvidia-smi`). InsightFace est strictement GPU-only : si `STEP4_ENABLE_GPU=0` ou `insightface` n’est pas listé dans `STEP4_GPU_ENGINES`, l’exécution est refusée.
 - `tracking_env_slim` embarque uniquement Mediapipe + dépendances minimales : toute tentative d’activer YuNet/OpenCV doit être considérée comme non supportée.
 
 ### STEP5 — GPU Support (2025-12-22)
@@ -81,7 +81,7 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
 - **Configuration LD_LIBRARY_PATH** : Injection automatique des chemins CUDA `nvidia/cublas/lib` etc. dans `run_tracking_manager.py` pour les sous-processus ONNX Runtime.
 
 ### STEP5 — Réduction taille exports JSON (2025-12-20)
-- **Variable STEP5_EXPORT_VERBOSE_FIELDS** : false (défaut) désactive l'export des landmarks et eos pour les moteurs non-MediaPipe; true pour debugging complet.
+- **Variable STEP4_EXPORT_VERBOSE_FIELDS** : false (défaut) désactive l'export des landmarks et eos pour les moteurs non-MediaPipe; true pour debugging complet.
 - **Logging upscale** : Logs DEBUG pour confirmer le rescale des coordonnées dans YuNet, OpenSeeFace, EOS lors de downscale.
 
 ### Frontend (JavaScript)

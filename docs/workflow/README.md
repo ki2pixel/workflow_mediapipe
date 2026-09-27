@@ -119,8 +119,8 @@ INTERNAL_WORKER_TOKEN=your-worker-token
 
 # Pipeline
 WEBHOOK_JSON_URL=https://webhook.kidpixel.fr/data/webhook_links.json
-STEP5_TRACKING_ENGINE=mediapipe  # ou insightface
-STEP4_USE_LEMONFOX=0              # ou 1 pour SaaS
+STEP4_TRACKING_ENGINE=mediapipe  # ou insightface
+STEP3_USE_LEMONFOX=0              # ou 1 pour SaaS
 
 # Monitoring
 ENABLE_GPU_MONITORING=true

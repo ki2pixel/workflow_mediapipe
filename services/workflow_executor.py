@@ -499,11 +499,11 @@ def run_process_async(step_key: str):
     """
     is_tpu_step = False
     if step_key == StepKey.STEP2.value:
-        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP3_ENABLE_CORAL_TPU", True)
+        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP2_ENABLE_CORAL_TPU", True)
     elif step_key == StepKey.STEP3.value:
-        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP4_ENABLE_CORAL_TPU", True)
+        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP3_ENABLE_CORAL_TPU", True)
     elif step_key == StepKey.STEP4.value:
-        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP5_ENABLE_CORAL_TPU", True)
+        is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP4_ENABLE_CORAL_TPU", True)
 
     if is_tpu_step:
         from services.coral_tpu_orchestrator import tpu_orchestrator

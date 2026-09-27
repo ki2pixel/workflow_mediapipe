@@ -332,9 +332,9 @@ def stream_reduce_video_json(
         logger.warning(f"Aucun tableau 'frames' trouvé en streaming pour {input_path}")
         return None
         
-    tracking_analytics_enabled = os.environ.get("STEP6_INCLUDE_TRACKING_ANALYTICS", "1").strip().lower() in {"1", "true", "yes", "on"}
-    expression_summary_enabled = os.environ.get("STEP6_INCLUDE_EXPRESSION_SUMMARY", "0").strip().lower() in {"1", "true", "yes", "on"}
-    expression_keys_raw = os.environ.get("STEP6_EXPRESSION_KEYS", "jawOpen").strip()
+    tracking_analytics_enabled = os.environ.get("STEP5_INCLUDE_TRACKING_ANALYTICS", "1").strip().lower() in {"1", "true", "yes", "on"}
+    expression_summary_enabled = os.environ.get("STEP5_INCLUDE_EXPRESSION_SUMMARY", "0").strip().lower() in {"1", "true", "yes", "on"}
+    expression_keys_raw = os.environ.get("STEP5_EXPRESSION_KEYS", "jawOpen").strip()
     expression_keys = [k.strip() for k in expression_keys_raw.split(",") if k.strip()]
     
     expression_stats: Dict[str, Dict[str, Any]] = {}
@@ -448,8 +448,8 @@ def reduce_video_json(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     
     new_frames_data = []
     max_frame_seen = 0
-    expression_summary_enabled = os.environ.get("STEP6_INCLUDE_EXPRESSION_SUMMARY", "0").strip().lower() in {"1", "true", "yes", "on"}
-    expression_keys_raw = os.environ.get("STEP6_EXPRESSION_KEYS", "jawOpen").strip()
+    expression_summary_enabled = os.environ.get("STEP5_INCLUDE_EXPRESSION_SUMMARY", "0").strip().lower() in {"1", "true", "yes", "on"}
+    expression_keys_raw = os.environ.get("STEP5_EXPRESSION_KEYS", "jawOpen").strip()
     expression_keys = [k.strip() for k in expression_keys_raw.split(",") if k.strip()]
     expression_stats = {}
     

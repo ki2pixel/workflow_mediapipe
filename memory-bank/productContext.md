@@ -30,7 +30,7 @@ Le cœur du système est un pipeline en 7 étapes, chacune isolée dans son envi
 1.  **Extraction + normalisation** (`env/`) : Extraction sécurisée des apports (ZIP/RAR/TAR) via `FilesystemService` (cache relocalisable `CACHE_ROOT_DIR`), puis normalisation FFmpeg des vidéos extraites (MP4 / H.264 / yuv420p / 25 fps) via `utils/media_normalizer.py` — contrat obligatoire pour toutes les étapes aval.
 2.  **Détection de Scènes** (`transnet_env/`) : TransNetV2 PyTorch pour les coupures, avec skips conditionnels documentés lorsque les modèles manquent.
 3.  **Analyse Audio** (`audio_env/`) : Pipeline Lemonfox + Pyannote (fallback) avec embeddings locuteurs optionnels (`AUDIO_INCLUDE_SPEAKER_EMBEDDINGS`).
-4.  **Suivi Vidéo** (`tracking_env_slim/`, `insightface_env/`) : MediaPipe Landmarker CPU-only en multiprocessing (valeur par défaut). InsightFace GPU est disponible uniquement si `STEP5_ENABLE_GPU=1` et `STEP5_TRACKING_ENGINE=insightface`, sinon fallback CPU automatique.
+4.  **Suivi Vidéo** (`tracking_env_slim/`, `insightface_env/`) : MediaPipe Landmarker CPU-only en multiprocessing (valeur par défaut). InsightFace GPU est disponible uniquement si `STEP4_ENABLE_GPU=1` et `STEP4_TRACKING_ENGINE=insightface`, sinon fallback CPU automatique.
 5.  **Réduction JSON** (`env/`) : `json_reducer.py` produit `*_tracking.json` (source primaire AE) avec analytics et `temporal_alignment`.
 6.  **Pré-traitement AE** (`env/`) : `preprocess_ae_json.py` génère `*_ae.json` optimisés, utilisables directement par le script AE et par `Media-Solution` via manifest.
 7.  **Finalisation** (`env/`) : `finalize_and_copy.py` archive les sorties (ResultsArchiver) et publie les artefacts.

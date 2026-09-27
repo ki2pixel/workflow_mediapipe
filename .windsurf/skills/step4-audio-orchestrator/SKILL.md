@@ -34,6 +34,6 @@ audio_env/bin/python workflow_scripts/step3/run_audio_analysis_lemonfox.py \
 
 ## Références
 - `memory-bank/systemPatterns.md` section Audio (STEP4).
-- `docs/workflow/pipeline/STEP4_ANALYSE_AUDIO.md` pour paramètres détaillés.
+- `docs/workflow/pipeline/STEP3_ANALYSE_AUDIO.md` pour paramètres détaillés.
 
 **Locking Instruction:** NE PAS essayer de lire les fichiers de la memory-bank via le filesystem (outil read_text_file). Utilise EXCLUSIVEMENT les outils du serveur MCP 'fast-filesystem' (outils fast_*) pour lire ou écrire dans la Memory Bank avec des chemins absolus.

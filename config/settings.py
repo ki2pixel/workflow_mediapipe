@@ -6,6 +6,7 @@ following the project's development guidelines.
 """
 
 import os
+import re
 import logging
 import subprocess
 from pathlib import Path
@@ -13,6 +14,11 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 
 logger = logging.getLogger(__name__)
+
+# Schéma de numérotation des variables d'étape (`STEPn_*`). À incrémenter à chaque
+# renumérotation du pipeline, en même temps que `scripts/migrate_env_step_names.py`.
+SCHEMA_MARKER_KEY = "ENV_STEP_SCHEMA"
+SCHEMA_VERSION = "2"
 
 
 def _parse_bool(raw: Optional[str], default: bool) -> bool:
@@ -61,7 +67,7 @@ def _parse_optional_float(raw: Optional[str]) -> Optional[float]:
         return None
 
 
-def _normalize_step4_method(raw: Optional[str]) -> Optional[str]:
+def _normalize_audio_method(raw: Optional[str]) -> Optional[str]:
     if raw is None:
         return None
     method = raw.strip().lower()
@@ -198,8 +204,8 @@ class Config:
     LEMONFOX_TRANSCODE_AUDIO_CODEC: str = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
     LEMONFOX_TRANSCODE_BITRATE_KBPS: int = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
 
-    STEP4_METHOD: str = os.environ.get("STEP4_METHOD", "")
-    STEP4_USE_LEMONFOX: bool = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+    STEP3_METHOD: str = os.environ.get("STEP3_METHOD", "")
+    STEP3_USE_LEMONFOX: bool = os.environ.get('STEP3_USE_LEMONFOX', '0') == '1'
 
     # DeepInfra API Configuration (STEP4 alternative)
     DEEPINFRA_API_KEY: Optional[str] = os.environ.get("DEEPINFRA_API_KEY")
@@ -222,7 +228,7 @@ class Config:
     )
     DEEPINFRA_TEMPERATURE: Optional[float] = _parse_optional_float(os.environ.get("DEEPINFRA_TEMPERATURE"))
     DEEPINFRA_FALLBACK_TO_PYANNOTE: bool = _parse_bool(
-        os.environ.get("STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE"),
+        os.environ.get("STEP3_DEEPINFRA_FALLBACK_TO_PYANNOTE"),
         default=True,
     )
     DEEPINFRA_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("DEEPINFRA_SPEECH_GAP_FILL_SEC", "0.15"))
@@ -230,23 +236,23 @@ class Config:
     
     # STEP5 Object Detection Configuration
     # Model selection for fallback object detection when face detection fails (MediaPipe only)
-    STEP5_OBJECT_DETECTOR_MODEL: str = os.environ.get(
-        'STEP5_OBJECT_DETECTOR_MODEL',
+    STEP4_OBJECT_DETECTOR_MODEL: str = os.environ.get(
+        'STEP4_OBJECT_DETECTOR_MODEL',
         'efficientdet_lite2'  # Default: current baseline, backward compatible
     )
-    STEP5_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
-    STEP5_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
+    STEP4_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH')
+    STEP4_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP4_ENABLE_OBJECT_DETECTION', '0') == '1'
     
     # STEP5 Tracking configuration
-    STEP5_ENABLE_PROFILING: bool = os.environ.get('STEP5_ENABLE_PROFILING', '0') == '1'
-    STEP5_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP5_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
+    STEP4_ENABLE_PROFILING: bool = os.environ.get('STEP4_ENABLE_PROFILING', '0') == '1'
+    STEP4_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP4_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
 
-    STEP5_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_MEDIAPIPE_MAX_FACES')
+    STEP4_MEDIAPIPE_MAX_FACES: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP4_MEDIAPIPE_MAX_FACES')
     )
-    STEP5_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
-    STEP5_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
-        os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+    STEP4_MEDIAPIPE_JAWOPEN_SCALE: float = float(os.environ.get('STEP4_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+    STEP4_MEDIAPIPE_MAX_WIDTH: Optional[int] = _parse_optional_positive_int(
+        os.environ.get('STEP4_MEDIAPIPE_MAX_WIDTH')
     )
     
     def __post_init__(self):
@@ -363,8 +369,8 @@ class Config:
         )
         self.LEMONFOX_TRANSCODE_AUDIO_CODEC = os.environ.get("LEMONFOX_TRANSCODE_AUDIO_CODEC", "aac")
         self.LEMONFOX_TRANSCODE_BITRATE_KBPS = int(os.environ.get("LEMONFOX_TRANSCODE_BITRATE_KBPS", "96"))
-        self.STEP4_METHOD = os.environ.get("STEP4_METHOD", "")
-        self.STEP4_USE_LEMONFOX = os.environ.get('STEP4_USE_LEMONFOX', '0') == '1'
+        self.STEP3_METHOD = os.environ.get("STEP3_METHOD", "")
+        self.STEP3_USE_LEMONFOX = os.environ.get('STEP3_USE_LEMONFOX', '0') == '1'
         
         # DeepInfra API Configuration (STEP4 alternative)
         self.DEEPINFRA_API_KEY = os.environ.get("DEEPINFRA_API_KEY")
@@ -380,42 +386,42 @@ class Config:
         self.DEEPINFRA_MAX_RETRIES = int(os.environ.get("DEEPINFRA_MAX_RETRIES", "2"))
         self.DEEPINFRA_BACKOFF_SEC = float(os.environ.get("DEEPINFRA_BACKOFF_SEC", "1.5"))
         self.DEEPINFRA_RESPONSE_FORMAT = os.environ.get("DEEPINFRA_RESPONSE_FORMAT", "verbose_json")
-        self.STEP5_MEDIAPIPE_JAWOPEN_SCALE = float(os.environ.get('STEP5_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
-        self.STEP5_MEDIAPIPE_MAX_WIDTH = _parse_optional_positive_int(
-            os.environ.get('STEP5_MEDIAPIPE_MAX_WIDTH')
+        self.STEP4_MEDIAPIPE_JAWOPEN_SCALE = float(os.environ.get('STEP4_MEDIAPIPE_JAWOPEN_SCALE', '1.0'))
+        self.STEP4_MEDIAPIPE_MAX_WIDTH = _parse_optional_positive_int(
+            os.environ.get('STEP4_MEDIAPIPE_MAX_WIDTH')
         )
         
         # Coral TPU Acceleration
         self.ENABLE_CORAL_TPU_ACCELERATION = os.environ.get('ENABLE_CORAL_TPU_ACCELERATION', 'false').lower() == 'true'
+        self.STEP2_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP2_ENABLE_CORAL_TPU'), default=True)
         self.STEP3_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP3_ENABLE_CORAL_TPU'), default=True)
         self.STEP4_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP4_ENABLE_CORAL_TPU'), default=True)
-        self.STEP5_ENABLE_CORAL_TPU = _parse_bool(os.environ.get('STEP5_ENABLE_CORAL_TPU'), default=True)
         
         # OpenCV 5.0 Experimental
-        self.USE_OPENCV5_STEP3 = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
-        self.USE_OPENCV5_STEP5 = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
-        self.STEP5_CV5_NUM_WORKERS = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
-        step5_cv5_worker_mode = os.environ.get('STEP5_CV5_WORKER_MODE', 'auto').strip().lower()
-        self.STEP5_CV5_WORKER_MODE = step5_cv5_worker_mode if step5_cv5_worker_mode in {'auto', 'video'} else 'auto'
-        step5_cv5_inference_device = (
-            os.environ.get('STEP5_CV5_INFERENCE_DEVICE', 'cpu').strip().lower()
+        self.USE_OPENCV5_STEP2 = _parse_bool(os.environ.get('USE_OPENCV5_STEP2'), default=False)
+        self.USE_OPENCV5_STEP4 = _parse_bool(os.environ.get('USE_OPENCV5_STEP4'), default=False)
+        self.STEP4_CV5_NUM_WORKERS = _parse_optional_positive_int(os.environ.get('STEP4_CV5_NUM_WORKERS')) or 4
+        step5_cv5_worker_mode = os.environ.get('STEP4_CV5_WORKER_MODE', 'auto').strip().lower()
+        self.STEP4_CV5_WORKER_MODE = step5_cv5_worker_mode if step5_cv5_worker_mode in {'auto', 'video'} else 'auto'
+        tracking_cv5_inference_device = (
+            os.environ.get('STEP4_CV5_INFERENCE_DEVICE', 'cpu').strip().lower()
         )
-        self.STEP5_CV5_INFERENCE_DEVICE = (
-            step5_cv5_inference_device if step5_cv5_inference_device in {'cpu', 'cuda'} else 'cpu'
+        self.STEP4_CV5_INFERENCE_DEVICE = (
+            tracking_cv5_inference_device if tracking_cv5_inference_device in {'cpu', 'cuda'} else 'cpu'
         )
-        self.STEP5_CV5_CPU_BUDGET = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CPU_BUDGET')) or 15
-        self.STEP5_CV5_MAX_ACTIVE_VIDEOS = (
-            _parse_optional_positive_int(os.environ.get('STEP5_CV5_MAX_ACTIVE_VIDEOS'))
-            or self.STEP5_CV5_NUM_WORKERS
+        self.STEP4_CV5_CPU_BUDGET = _parse_optional_positive_int(os.environ.get('STEP4_CV5_CPU_BUDGET')) or 15
+        self.STEP4_CV5_MAX_ACTIVE_VIDEOS = (
+            _parse_optional_positive_int(os.environ.get('STEP4_CV5_MAX_ACTIVE_VIDEOS'))
+            or self.STEP4_CV5_NUM_WORKERS
         )
-        self.STEP5_CV5_MIN_FRAMES_PER_WORKER = (
-            _parse_optional_positive_int(os.environ.get('STEP5_CV5_MIN_FRAMES_PER_WORKER'))
+        self.STEP4_CV5_MIN_FRAMES_PER_WORKER = (
+            _parse_optional_positive_int(os.environ.get('STEP4_CV5_MIN_FRAMES_PER_WORKER'))
             or 80
         )
-        self.STEP5_CV5_CHUNK_FRAMES = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CHUNK_FRAMES')) or 32
-        self.STEP5_CV5_MAX_WORKERS_BY_MEMORY = (
-            _parse_optional_positive_int(os.environ.get('STEP5_CV5_MAX_WORKERS_BY_MEMORY'))
-            or self.STEP5_CV5_CPU_BUDGET
+        self.STEP4_CV5_CHUNK_FRAMES = _parse_optional_positive_int(os.environ.get('STEP4_CV5_CHUNK_FRAMES')) or 32
+        self.STEP4_CV5_MAX_WORKERS_BY_MEMORY = (
+            _parse_optional_positive_int(os.environ.get('STEP4_CV5_MAX_WORKERS_BY_MEMORY'))
+            or self.STEP4_CV5_CPU_BUDGET
         )
         
         # Médias préservés (logos animés .mov avec couche alpha)
@@ -524,19 +530,19 @@ class Config:
         # Create necessary directories
         self._create_directories()
 
-    def resolve_step4_method(self) -> str:
+    def resolve_audio_method(self) -> str:
         """
         Resolve active STEP4 method with backward compatibility.
 
         Priority:
-          1) STEP4_METHOD when valid (pyannote|lemonfox|deepinfra)
-          2) Legacy STEP4_USE_LEMONFOX toggle
+          1) STEP3_METHOD when valid (pyannote|lemonfox|deepinfra)
+          2) Legacy STEP3_USE_LEMONFOX toggle
           3) Default pyannote
         """
-        normalized = _normalize_step4_method(getattr(self, "STEP4_METHOD", None))
+        normalized = _normalize_audio_method(getattr(self, "STEP3_METHOD", None))
         if normalized:
             return normalized
-        if bool(getattr(self, "STEP4_USE_LEMONFOX", False)):
+        if bool(getattr(self, "STEP3_USE_LEMONFOX", False)):
             return "lemonfox"
         return "pyannote"
 
@@ -595,6 +601,40 @@ class Config:
             except Exception as e:
                 logger.error(f"Failed to create directory {directory}: {e}")
     
+    def check_step_env_schema(self) -> Optional[str]:
+        """Détecte un fichier `.env` resté au schéma 1 de numérotation des étapes.
+
+        La suppression de l'étape de conversion a décalé les variables `STEPn_*`
+        (l'audio est passé de STEP4_* à STEP3_*, le tracking de STEP5_* à
+        STEP4_*, etc.). Un `.env` non migré serait donc interprété de travers :
+        l'ancien `STEP4_ENABLE_CORAL_TPU` (audio) désignerait le tracking.
+
+        Returns:
+            Message d'erreur si le schéma est obsolète, `None` si tout est cohérent.
+        """
+        env_candidates = [Path.cwd() / ".env", Path(self.BASE_PATH_SCRIPTS) / ".env"]
+        env_file = next((candidate for candidate in env_candidates if candidate.is_file()), None)
+        if env_file is None:
+            return None
+
+        try:
+            content = env_file.read_text(encoding="utf-8")
+        except OSError as e:
+            logger.debug(f"Lecture de {env_file} impossible: {e}")
+            return None
+
+        if f"{SCHEMA_MARKER_KEY}={SCHEMA_VERSION}" in content.replace(" ", ""):
+            return None
+
+        if not re.search(r'^\s*STEP[2-7]_[A-Z0-9_]*\s*=', content, re.MULTILINE):
+            return None
+
+        return (
+            f"{env_file} utilise l'ancien schéma de variables d'étape (schéma 1) : "
+            f"lancer `python scripts/migrate_env_step_names.py` puis ajouter "
+            f"{SCHEMA_MARKER_KEY}={SCHEMA_VERSION}"
+        )
+
     def validate(self, strict: bool = None) -> bool:
         """
         Validate the configuration and ensure all required settings are present.
@@ -655,6 +695,14 @@ class Config:
         
         if not self.LOCAL_DOWNLOADS_DIR.exists():
             warnings.append(f"Downloads directory does not exist: {self.LOCAL_DOWNLOADS_DIR}")
+
+        # Schéma de numérotation des variables d'étape (`STEPn_*`)
+        step_env_message = self.check_step_env_schema()
+        if step_env_message:
+            if strict:
+                errors.append(step_env_message)
+            else:
+                warnings.append(step_env_message)
         
         # Python executable validation
         python_exe_path = Path(self.PYTHON_VENV_EXE)
@@ -730,9 +778,9 @@ class Config:
             self.BASE_PATH_SCRIPTS / 'utils',
         ]
         # Include OpenCV 5.0 experimental venv paths when enabled
-        if getattr(self, 'USE_OPENCV5_STEP3', False):
+        if getattr(self, 'USE_OPENCV5_STEP2', False):
             paths.append(self.get_venv_path('transnet_cv5_env'))
-        if getattr(self, 'USE_OPENCV5_STEP5', False):
+        if getattr(self, 'USE_OPENCV5_STEP4', False):
             paths.append(self.get_venv_path('tracking_cv5_env'))
         return paths
     
@@ -851,7 +899,7 @@ class Config:
 
         # Optional external ONNXRuntime CUDA check (useful when ORT GPU lives in a dedicated venv)
         if not result.get('onnx_cuda'):
-            ort_gpu_python = os.environ.get('STEP5_INSIGHTFACE_ENV_PYTHON', '').strip()
+            ort_gpu_python = os.environ.get('STEP4_INSIGHTFACE_ENV_PYTHON', '').strip()
             if ort_gpu_python:
                 try:
                     ort_check_code = (
@@ -876,13 +924,13 @@ class Config:
                         )
                 except FileNotFoundError:
                     logger.warning(
-                        "STEP5_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
+                        "STEP4_INSIGHTFACE_ENV_PYTHON '%s' introuvable pour la vérification GPU ONNXRuntime",
                         ort_gpu_python,
                     )
                 except subprocess.TimeoutExpired:
-                    logger.warning("ONNXRuntime GPU check timed out via STEP5_INSIGHTFACE_ENV_PYTHON")
+                    logger.warning("ONNXRuntime GPU check timed out via STEP4_INSIGHTFACE_ENV_PYTHON")
                 except Exception as exc:
-                    logger.warning(f"ONNXRuntime GPU check failed via STEP5_INSIGHTFACE_ENV_PYTHON: {exc}")
+                    logger.warning(f"ONNXRuntime GPU check failed via STEP4_INSIGHTFACE_ENV_PYTHON: {exc}")
         
         # Déterminer disponibilité finale (InsightFace s'appuie uniquement sur ONNX Runtime GPU)
         if result['onnx_cuda']:
@@ -907,9 +955,9 @@ class Config:
         Vérifier si le mode GPU STEP5 est activé via configuration.
         
         Returns:
-            bool: True si STEP5_ENABLE_GPU=1
+            bool: True si STEP4_ENABLE_GPU=1
         """
-        return _parse_bool(os.environ.get('STEP5_ENABLE_GPU'), default=False)
+        return _parse_bool(os.environ.get('STEP4_ENABLE_GPU'), default=False)
     
     @staticmethod
     def get_step5_gpu_engines() -> List[str]:
@@ -919,7 +967,7 @@ class Config:
         Returns:
             List[str]: ['insightface'] (valeurs non supportées ignorées)
         """
-        engines_str = os.environ.get('STEP5_GPU_ENGINES', '')
+        engines_str = os.environ.get('STEP4_GPU_ENGINES', '')
         engines = _parse_csv_list(engines_str)
 
         normalized = [e.strip().lower() for e in engines if e.strip()]
@@ -935,22 +983,22 @@ class Config:
             int: Limite en Mo (défaut: 2048)
         """
         return _parse_optional_positive_int(
-            os.environ.get('STEP5_GPU_MAX_VRAM_MB')
+            os.environ.get('STEP4_GPU_MAX_VRAM_MB')
         ) or 2048
 
     # ========================
     # Coral TPU Acceleration
     # ========================
     ENABLE_CORAL_TPU_ACCELERATION: bool = os.environ.get('ENABLE_CORAL_TPU_ACCELERATION', 'false').lower() == 'true'
+    STEP2_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP2_ENABLE_CORAL_TPU'), default=True)
     STEP3_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP3_ENABLE_CORAL_TPU'), default=True)
     STEP4_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP4_ENABLE_CORAL_TPU'), default=True)
-    STEP5_ENABLE_CORAL_TPU: bool = _parse_bool(os.environ.get('STEP5_ENABLE_CORAL_TPU'), default=True)
 
     # ========================
     # OpenCV 5.0 Experimental
     # ========================
-    USE_OPENCV5_STEP3: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP3'), default=False)
-    USE_OPENCV5_STEP5: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP5'), default=False)
+    USE_OPENCV5_STEP2: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP2'), default=False)
+    USE_OPENCV5_STEP4: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP4'), default=False)
 
     # ========================
     # Médias préservés (logos .mov alpha)
@@ -966,21 +1014,21 @@ class Config:
     STEP1_QUALITY_CRF: int = _parse_optional_positive_int(os.environ.get('STEP1_QUALITY_CRF')) or 28
     STEP1_MAX_GPU_WORKERS: int = _parse_optional_positive_int(os.environ.get('STEP1_MAX_GPU_WORKERS')) or 3
 
-    STEP5_CV5_NUM_WORKERS: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_NUM_WORKERS')) or 4
-    STEP5_CV5_WORKER_MODE: str = os.environ.get('STEP5_CV5_WORKER_MODE', 'auto').strip().lower()
-    STEP5_CV5_INFERENCE_DEVICE: str = (
-        os.environ.get('STEP5_CV5_INFERENCE_DEVICE', 'cpu').strip().lower()
-        if os.environ.get('STEP5_CV5_INFERENCE_DEVICE', 'cpu').strip().lower() in {'cpu', 'cuda'}
+    STEP4_CV5_NUM_WORKERS: int = _parse_optional_positive_int(os.environ.get('STEP4_CV5_NUM_WORKERS')) or 4
+    STEP4_CV5_WORKER_MODE: str = os.environ.get('STEP4_CV5_WORKER_MODE', 'auto').strip().lower()
+    STEP4_CV5_INFERENCE_DEVICE: str = (
+        os.environ.get('STEP4_CV5_INFERENCE_DEVICE', 'cpu').strip().lower()
+        if os.environ.get('STEP4_CV5_INFERENCE_DEVICE', 'cpu').strip().lower() in {'cpu', 'cuda'}
         else 'cpu'
     )
-    STEP5_CV5_CPU_BUDGET: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CPU_BUDGET')) or 15
-    STEP5_CV5_MAX_ACTIVE_VIDEOS: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_MAX_ACTIVE_VIDEOS')) or 4
-    STEP5_CV5_MIN_FRAMES_PER_WORKER: int = _parse_optional_positive_int(
-        os.environ.get('STEP5_CV5_MIN_FRAMES_PER_WORKER')
+    STEP4_CV5_CPU_BUDGET: int = _parse_optional_positive_int(os.environ.get('STEP4_CV5_CPU_BUDGET')) or 15
+    STEP4_CV5_MAX_ACTIVE_VIDEOS: int = _parse_optional_positive_int(os.environ.get('STEP4_CV5_MAX_ACTIVE_VIDEOS')) or 4
+    STEP4_CV5_MIN_FRAMES_PER_WORKER: int = _parse_optional_positive_int(
+        os.environ.get('STEP4_CV5_MIN_FRAMES_PER_WORKER')
     ) or 80
-    STEP5_CV5_CHUNK_FRAMES: int = _parse_optional_positive_int(os.environ.get('STEP5_CV5_CHUNK_FRAMES')) or 32
-    STEP5_CV5_MAX_WORKERS_BY_MEMORY: int = _parse_optional_positive_int(
-        os.environ.get('STEP5_CV5_MAX_WORKERS_BY_MEMORY')
+    STEP4_CV5_CHUNK_FRAMES: int = _parse_optional_positive_int(os.environ.get('STEP4_CV5_CHUNK_FRAMES')) or 32
+    STEP4_CV5_MAX_WORKERS_BY_MEMORY: int = _parse_optional_positive_int(
+        os.environ.get('STEP4_CV5_MAX_WORKERS_BY_MEMORY')
     ) or 15
 
 

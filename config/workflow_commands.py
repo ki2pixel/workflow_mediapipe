@@ -124,12 +124,12 @@ class WorkflowCommandsConfig:
         step2_log_dir = self.logs_base_dir / "step2"
         
         # Priority: OpenCV 5.0 experimental > Coral TPU > Legacy PyTorch
-        if getattr(config, 'USE_OPENCV5_STEP3', False):
+        if getattr(config, 'USE_OPENCV5_STEP2', False):
             cmd = [
                 str(config.get_venv_python('transnet_cv5_env')),
                 str(self.base_path / 'workflow_scripts' / 'step2' / 'run_transnet_cv5.py'),
             ]
-        elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
+        elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP2_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step2" / "run_scene_detect_tpu.py"),
@@ -180,7 +180,7 @@ class WorkflowCommandsConfig:
         """
         step3_log_dir = self.logs_base_dir / "step3"
 
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step3" / "run_audio_diarization_tpu.py"),
@@ -189,9 +189,9 @@ class WorkflowCommandsConfig:
         else:
             resolved_method = "pyannote"
             try:
-                resolved_method = config.resolve_step4_method()
+                resolved_method = config.resolve_audio_method()
             except Exception:
-                resolved_method = "lemonfox" if getattr(config, "STEP4_USE_LEMONFOX", False) else "pyannote"
+                resolved_method = "lemonfox" if getattr(config, "STEP3_USE_LEMONFOX", False) else "pyannote"
 
             audio_script_by_method = {
                 "pyannote": "run_audio_analysis.py",
@@ -207,7 +207,7 @@ class WorkflowCommandsConfig:
 
             if audio_script_name == "run_audio_analysis.py" and self.hf_token:
                 cmd.extend(["--hf_auth_token", str(self.hf_token)])
-        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
+        if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
             progress_patterns = {
                 "total": re.compile(r"TOTAL[_ ]VIDEOS[_ ]TO[_ ]PROCESS:\s*(\d+)", re.IGNORECASE),
                 "current": re.compile(r"PROCESSING[_ ]VIDEO:\s*(.*)$", re.IGNORECASE),
@@ -255,19 +255,19 @@ class WorkflowCommandsConfig:
         step4_log_dir = self.logs_base_dir / "step4"
         
         # Priority: OpenCV 5.0 experimental > Coral TPU > Legacy CPU/GPU
-        if getattr(config, 'USE_OPENCV5_STEP5', False):
+        if getattr(config, 'USE_OPENCV5_STEP4', False):
             cmd = [
                 str(config.get_venv_python('tracking_cv5_env')),
                 str(self.base_path / 'workflow_scripts' / 'step4' / 'run_tracking_cv5.py'),
-                "--num_workers", str(getattr(config, 'STEP5_CV5_NUM_WORKERS', 4)),
-                "--worker_mode", str(getattr(config, 'STEP5_CV5_WORKER_MODE', 'auto')),
+                "--num_workers", str(getattr(config, 'STEP4_CV5_NUM_WORKERS', 4)),
+                "--worker_mode", str(getattr(config, 'STEP4_CV5_WORKER_MODE', 'auto')),
                 "--inference_device",
-                str(getattr(config, 'STEP5_CV5_INFERENCE_DEVICE', 'cpu')),
-                "--cpu_budget", str(getattr(config, 'STEP5_CV5_CPU_BUDGET', 15)),
-                "--max_active_videos", str(getattr(config, 'STEP5_CV5_MAX_ACTIVE_VIDEOS', 4)),
-                "--min_frames_per_worker", str(getattr(config, 'STEP5_CV5_MIN_FRAMES_PER_WORKER', 80)),
-                "--chunk_frames", str(getattr(config, 'STEP5_CV5_CHUNK_FRAMES', 32)),
-                "--max_workers_by_memory", str(getattr(config, 'STEP5_CV5_MAX_WORKERS_BY_MEMORY', 15))
+                str(getattr(config, 'STEP4_CV5_INFERENCE_DEVICE', 'cpu')),
+                "--cpu_budget", str(getattr(config, 'STEP4_CV5_CPU_BUDGET', 15)),
+                "--max_active_videos", str(getattr(config, 'STEP4_CV5_MAX_ACTIVE_VIDEOS', 4)),
+                "--min_frames_per_worker", str(getattr(config, 'STEP4_CV5_MIN_FRAMES_PER_WORKER', 80)),
+                "--chunk_frames", str(getattr(config, 'STEP4_CV5_CHUNK_FRAMES', 32)),
+                "--max_workers_by_memory", str(getattr(config, 'STEP4_CV5_MAX_WORKERS_BY_MEMORY', 15))
             ]
             specific_logs = [
                 {
@@ -299,7 +299,7 @@ class WorkflowCommandsConfig:
                 ),
                 "current_item_text_from_success_line": True
             }
-        elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP5_ENABLE_CORAL_TPU", True):
+        elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
                 str(self.base_path / "workflow_scripts" / "step4" / "run_tracking_tpu.py")

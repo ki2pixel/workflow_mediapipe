@@ -28,8 +28,8 @@ from utils.tracking_optimizations import apply_tracking_and_management
 
 
 def test_blendshapes_profile_mouth_filters_keys(monkeypatch):
-    monkeypatch.setenv("STEP5_BLENDSHAPES_PROFILE", "mouth")
-    monkeypatch.delenv("STEP5_BLENDSHAPES_INCLUDE_TONGUE", raising=False)
+    monkeypatch.setenv("STEP4_BLENDSHAPES_PROFILE", "mouth")
+    monkeypatch.delenv("STEP4_BLENDSHAPES_INCLUDE_TONGUE", raising=False)
 
     det = {
         "bbox": (0, 0, 10, 10),
@@ -61,8 +61,8 @@ def test_blendshapes_profile_mouth_filters_keys(monkeypatch):
 
 
 def test_blendshapes_profile_mouth_can_include_tongue(monkeypatch):
-    monkeypatch.setenv("STEP5_BLENDSHAPES_PROFILE", "mouth")
-    monkeypatch.setenv("STEP5_BLENDSHAPES_INCLUDE_TONGUE", "1")
+    monkeypatch.setenv("STEP4_BLENDSHAPES_PROFILE", "mouth")
+    monkeypatch.setenv("STEP4_BLENDSHAPES_INCLUDE_TONGUE", "1")
 
     det = {
         "bbox": (0, 0, 10, 10),
@@ -92,7 +92,7 @@ def test_blendshapes_profile_mouth_can_include_tongue(monkeypatch):
 
 
 def test_blendshapes_profile_none_disables_export(monkeypatch):
-    monkeypatch.setenv("STEP5_BLENDSHAPES_PROFILE", "none")
+    monkeypatch.setenv("STEP4_BLENDSHAPES_PROFILE", "none")
 
     det = {
         "bbox": (0, 0, 10, 10),

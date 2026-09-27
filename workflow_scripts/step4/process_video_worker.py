@@ -153,16 +153,16 @@ class FrameProcessor:
         self.enhanced_speaking_detector = enhanced_speaking_detector
         self.lock = threading.Lock()
 
-        self._enable_profiling = _is_truthy_env(os.environ.get("STEP5_ENABLE_PROFILING", "0"))
+        self._enable_profiling = _is_truthy_env(os.environ.get("STEP4_ENABLE_PROFILING", "0"))
         self._profiling_stats = {
             "to_rgb_total": 0.0,
             "detect_total": 0.0,
             "post_total": 0.0,
             "frame_count": 0,
         }
-        self._blendshapes_throttle_n = max(1, int(os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")))
-        self._jaw_open_scale = float(os.environ.get("STEP5_MEDIAPIPE_JAWOPEN_SCALE", "1.0"))
-        self._max_width = _parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_WIDTH"))
+        self._blendshapes_throttle_n = max(1, int(os.environ.get("STEP4_BLENDSHAPES_THROTTLE_N", "1")))
+        self._jaw_open_scale = float(os.environ.get("STEP4_MEDIAPIPE_JAWOPEN_SCALE", "1.0"))
+        self._max_width = _parse_optional_positive_int(os.environ.get("STEP4_MEDIAPIPE_MAX_WIDTH"))
         self._blendshapes_cache = {}
 
     def _preprocess_frame(self, frame):
@@ -501,11 +501,11 @@ def _run_face_engine(args, face_engine, engine_name):
                     models_dir = Path(args.models_dir)
                     object_detector_model_name = (
                         getattr(args, 'object_detector_model', None)
-                        or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2')
+                        or os.environ.get('STEP4_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2')
                     )
                     object_detector_model_path = (
                         getattr(args, 'object_detector_model_path', None)
-                        or os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+                        or os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH')
                     )
                     object_model_path = ObjectDetectorRegistry.resolve_model_path(
                         model_name=object_detector_model_name,
@@ -808,7 +808,7 @@ def _run_mediapipe_engine(args):
     face_options = FaceLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(face_model_path), delegate=delegate),
         running_mode=VisionRunningMode.VIDEO,
-        num_faces=int(_parse_optional_positive_int(os.environ.get("STEP5_MEDIAPIPE_MAX_FACES")) or args.mp_landmarker_num_faces),
+        num_faces=int(_parse_optional_positive_int(os.environ.get("STEP4_MEDIAPIPE_MAX_FACES")) or args.mp_landmarker_num_faces),
         min_face_detection_confidence=args.mp_landmarker_min_face_detection_confidence,
         min_face_presence_confidence=args.mp_landmarker_min_face_presence_confidence,
         min_tracking_confidence=args.mp_landmarker_min_tracking_confidence,

@@ -46,8 +46,8 @@ class TestStep5JsonFormats:
             temp_path = f.name
         
         test_env = os.environ.copy()
-        test_env["STEP5_TRACKING_ENGINE"] = ""
-        test_env["STEP5_ENABLE_GPU"] = "0"
+        test_env["STEP4_TRACKING_ENGINE"] = ""
+        test_env["STEP4_ENABLE_GPU"] = "0"
         
         try:
             # Run manager with raw list format
@@ -87,8 +87,8 @@ class TestStep5JsonFormats:
             temp_path = f.name
         
         test_env = os.environ.copy()
-        test_env["STEP5_TRACKING_ENGINE"] = ""
-        test_env["STEP5_ENABLE_GPU"] = "0"
+        test_env["STEP4_TRACKING_ENGINE"] = ""
+        test_env["STEP4_ENABLE_GPU"] = "0"
         
         try:
             result = subprocess.run(
@@ -125,8 +125,8 @@ class TestStep5JsonFormats:
             temp_path = f.name
         
         test_env = os.environ.copy()
-        test_env["STEP5_TRACKING_ENGINE"] = ""
-        test_env["STEP5_ENABLE_GPU"] = "0"
+        test_env["STEP4_TRACKING_ENGINE"] = ""
+        test_env["STEP4_ENABLE_GPU"] = "0"
         
         try:
             result = subprocess.run(
@@ -155,8 +155,8 @@ class TestStep5JsonFormats:
             temp_path = f.name
         
         test_env = os.environ.copy()
-        test_env["STEP5_TRACKING_ENGINE"] = ""
-        test_env["STEP5_ENABLE_GPU"] = "0"
+        test_env["STEP4_TRACKING_ENGINE"] = ""
+        test_env["STEP4_ENABLE_GPU"] = "0"
         
         try:
             result = subprocess.run(

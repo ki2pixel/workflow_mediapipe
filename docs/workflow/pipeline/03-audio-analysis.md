@@ -1,6 +1,6 @@
 # Analyse Audio
 
-**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Supporte également l'accélération matérielle basse consommation Google Coral Edge TPU. Quatre méthodes compatibles : **Pyannote** (défaut local GPU/CPU), **Lemonfox** (cloud diarisation), **DeepInfra** (cloud STT), et **Edge TPU** (YAMNet local + Spectral Clustering CPU). Sélection centralisée via `STEP4_METHOD`, contrat JSON inchangé pour STEP4/STEP5.
+**TL;DR** : Analyse audio STEP4 avec isolation GPU forcée (`AUDIO_GPU_ISOLATION=1`) exécutée en sous-processus pour éviter les crashs SIGSEGV et fuites VRAM. Supporte également l'accélération matérielle basse consommation Google Coral Edge TPU. Quatre méthodes compatibles : **Pyannote** (défaut local GPU/CPU), **Lemonfox** (cloud diarisation), **DeepInfra** (cloud STT), et **Edge TPU** (YAMNet local + Spectral Clustering CPU). Sélection centralisée via `STEP3_METHOD`, contrat JSON inchangé pour STEP4/STEP5.
 
 ## Le Problème : Analyse Audio Manuelle Inefficace
 
@@ -93,7 +93,7 @@ projets_extraits/projet_camille_001/docs/video1_audio.json
 
 ```bash
 # Sélection méthode STEP4 (lorsque TPU désactivé)
-STEP4_METHOD=pyannote          # pyannote | lemonfox | deepinfra
+STEP3_METHOD=pyannote          # pyannote | lemonfox | deepinfra
 
 # Accélération matérielle
 ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (YAMNet)
@@ -143,7 +143,7 @@ Le pipeline impose `AUDIO_GPU_ISOLATION=1` pour exécuter l'analyse Pyannote dan
 
 ```bash
 # Activation Lemonfox
-STEP4_USE_LEMONFOX=1
+STEP3_USE_LEMONFOX=1
 LEMONFOX_API_KEY=votre_cle_api_ici
 
 # Configuration Lemonfox
@@ -168,14 +168,14 @@ DEEPINFRA_TIMESTAMP_GRANULARITIES=segment
 DEEPINFRA_TIMEOUT_SEC=300
 DEEPINFRA_MAX_RETRIES=2
 DEEPINFRA_BACKOFF_SEC=1.5
-STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
+STEP3_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 ```
 
 ### Priorité de sélection STEP4
 
 1. Accélération Coral TPU si `ENABLE_CORAL_TPU_ACCELERATION=true` (→ Exécution de `run_audio_diarization_tpu.py` sous `coral_env`).
-2. `STEP4_METHOD` si valeur valide (`pyannote|lemonfox|deepinfra`)
-3. Fallback legacy `STEP4_USE_LEMONFOX=1` (→ Lemonfox)
+2. `STEP3_METHOD` si valeur valide (`pyannote|lemonfox|deepinfra`)
+3. Fallback legacy `STEP3_USE_LEMONFOX=1` (→ Lemonfox)
 4. Sinon défaut historique Pyannote (local)
 
 > Endpoint DeepInfra officiel appliqué avec garde-fou typo :
@@ -455,7 +455,7 @@ curl -H "Authorization: Bearer $LEMONFOX_API_KEY" https://api.lemonfox.ai/v1/sta
 # Solutions
 # 1. Vérifier clé API et quota
 # 2. Désactiver Lemonfox (fallback Pyannote)
-export STEP4_USE_LEMONFOX=0
+export STEP3_USE_LEMONFOX=0
 ```
 
 ### DeepInfra API Erreurs
@@ -471,7 +471,7 @@ PY
 # 1. Vérifier DEEPINFRA_API_KEY
 # 2. Vérifier endpoint officiel (/v1/openai/audio/transcriptions)
 # 3. Laisser fallback actif vers Pyannote
-export STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
+export STEP3_DEEPINFRA_FALLBACK_TO_PYANNOTE=1
 ```
 
 ## Tests et Validation

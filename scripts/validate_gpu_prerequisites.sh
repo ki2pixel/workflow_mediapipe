@@ -16,7 +16,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 VENV_PATH="/mnt/venv_ext4/tracking_env_slim"
-INSIGHTFACE_PYTHON="${STEP5_INSIGHTFACE_ENV_PYTHON:-}"
+INSIGHTFACE_PYTHON="${STEP4_INSIGHTFACE_ENV_PYTHON:-}"
 if [ -z "$INSIGHTFACE_PYTHON" ]; then
     if [ -x "/mnt/venv_ext4/insightface_env/bin/python" ]; then
         INSIGHTFACE_PYTHON="/mnt/venv_ext4/insightface_env/bin/python"
@@ -156,7 +156,7 @@ if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "  1. If ONNX CUDA missing: install onnxruntime-gpu in insightface_env"
-    echo "  2. Enable GPU: Set STEP5_ENABLE_GPU=1 in .env"
+    echo "  2. Enable GPU: Set STEP4_ENABLE_GPU=1 in .env"
 elif [ $ERRORS -eq 0 ]; then
     echo -e "${YELLOW}⚠ $WARNINGS warning(s) - GPU partially available${NC}"
     echo ""

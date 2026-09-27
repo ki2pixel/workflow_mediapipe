@@ -243,16 +243,16 @@ class TestStep5Cv5JsonFormats:
         from workflow_scripts.step4.object_detector_registry import ObjectDetectorRegistry
         
         # Save original env
-        orig_env = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+        orig_env = os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH')
         
         # Set to a fake/real tflite path
-        os.environ['STEP5_OBJECT_DETECTOR_MODEL_PATH'] = 'workflow_scripts/step4/models/object_detectors/tflite/efficientdet_lite2_int8_mediapipe.tflite'
+        os.environ['STEP4_OBJECT_DETECTOR_MODEL_PATH'] = 'workflow_scripts/step4/models/object_detectors/tflite/efficientdet_lite2_int8_mediapipe.tflite'
         
         try:
             # Execute the same env popping logic as in run_tracking_cv5.py main()
-            env_path = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH', '')
+            env_path = os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH', '')
             if env_path and not env_path.endswith('.onnx'):
-                orig_env_val = os.environ.pop('STEP5_OBJECT_DETECTOR_MODEL_PATH', None)
+                orig_env_val = os.environ.pop('STEP4_OBJECT_DETECTOR_MODEL_PATH', None)
             else:
                 orig_env_val = None
                 
@@ -266,19 +266,19 @@ class TestStep5Cv5JsonFormats:
                 )
             finally:
                 if orig_env_val is not None:
-                    os.environ['STEP5_OBJECT_DETECTOR_MODEL_PATH'] = orig_env_val
+                    os.environ['STEP4_OBJECT_DETECTOR_MODEL_PATH'] = orig_env_val
             
             # The resolved model path must end with yolo11n.onnx
             assert object_model_path.name == 'yolo11n.onnx'
             assert object_model_path.exists()
             
         finally:
-            if orig_env == os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH'):
+            if orig_env == os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH'):
                 pass
             elif orig_env is None:
-                os.environ.pop('STEP5_OBJECT_DETECTOR_MODEL_PATH', None)
+                os.environ.pop('STEP4_OBJECT_DETECTOR_MODEL_PATH', None)
             else:
-                os.environ['STEP5_OBJECT_DETECTOR_MODEL_PATH'] = orig_env
+                os.environ['STEP4_OBJECT_DETECTOR_MODEL_PATH'] = orig_env
 
 
 if __name__ == "__main__":

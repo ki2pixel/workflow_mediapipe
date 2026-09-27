@@ -9,8 +9,8 @@ from config import settings
 from pprint import pprint
 keys = [
     'CACHE_ROOT_DIR', 'ARCHIVES_DIR', 'DOWNLOAD_HISTORY_DB_PATH',
-    'DRY_RUN_DOWNLOADS', 'AUDIO_PROFILE', 'STEP5_TRACKING_ENGINE',
-    'STEP5_ENABLE_GPU', 'STEP5_GPU_ENGINES', 'TRACKING_CPU_WORKERS'
+    'DRY_RUN_DOWNLOADS', 'AUDIO_PROFILE', 'STEP4_TRACKING_ENGINE',
+    'STEP4_ENABLE_GPU', 'STEP4_GPU_ENGINES', 'TRACKING_CPU_WORKERS'
 ]
 config = settings.config
 pprint({k: config.get(k) for k in keys})

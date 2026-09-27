@@ -3,8 +3,8 @@
 ## 1. Matrice moteurs (v4.2 simplifiée)
 | Moteur | Env var clé | GPU support | Logs à vérifier | Notes |
 | --- | --- | --- | --- | --- |
-| `mediapipe` | `STEP5_TRACKING_ENGINE=""` (défaut) | CPU via `tracking_env_slim` | `logs/step4/manager_*`, `[PROFILING] MediaPipe` | Import lazy via `importlib`; vérifier `STEP5_MEDIAPIPE_MAX_WIDTH` |
-| `insightface` | `STEP5_TRACKING_ENGINE=insightface` + `STEP5_ENABLE_GPU=1` | GPU obligatoire via `insightface_env` | `logs/step4/worker_*INSIGHTFACE*` | Vérifier modèles `~/.insightface`, FileExistsError → quarantine |
+| `mediapipe` | `STEP4_TRACKING_ENGINE=""` (défaut) | CPU via `tracking_env_slim` | `logs/step4/manager_*`, `[PROFILING] MediaPipe` | Import lazy via `importlib`; vérifier `STEP4_MEDIAPIPE_MAX_WIDTH` |
+| `insightface` | `STEP4_TRACKING_ENGINE=insightface` + `STEP4_ENABLE_GPU=1` | GPU obligatoire via `insightface_env` | `logs/step4/worker_*INSIGHTFACE*` | Vérifier modèles `~/.insightface`, FileExistsError → quarantine |
 
 ## 2. Script de validation providers
 ```bash
@@ -27,13 +27,13 @@ PY
 ## 3. Switch CPU ↔ GPU (InsightFace)
 ```bash
 # Basculer en GPU InsightFace
-export STEP5_TRACKING_ENGINE=insightface
-export STEP5_ENABLE_GPU=1
+export STEP4_TRACKING_ENGINE=insightface
+export STEP4_ENABLE_GPU=1
 # Utiliser insightface_env/bin/python pour l'exécution
 
 # Revenir CPU MediaPipe (par défaut)
-export STEP5_TRACKING_ENGINE=""
-export STEP5_ENABLE_GPU=0
+export STEP4_TRACKING_ENGINE=""
+export STEP4_ENABLE_GPU=0
 export TRACKING_DISABLE_GPU=1
 # Utiliser tracking_env_slim/bin/python pour l'exécution
 ```
@@ -56,6 +56,6 @@ PY
 - Si `missing` non vide → vérifier warmup `cap.read()` et chunking.
 
 ## 5. Profiling hooks
-- Activer `STEP5_ENABLE_PROFILING=1` puis inspecter `logs/step4/worker_*` pour `[PROFILING] frame` toutes les 20 frames.
-- Ajuster `STEP5_BLENDSHAPES_THROTTLE_N` pour réduire la pression CPU lors des runs longue durée.
+- Activer `STEP4_ENABLE_PROFILING=1` puis inspecter `logs/step4/worker_*` pour `[PROFILING] frame` toutes les 20 frames.
+- Ajuster `STEP4_BLENDSHAPES_THROTTLE_N` pour réduire la pression CPU lors des runs longue durée.
 - Pour `tracking_env_slim`, utiliser `requirements-tracking-env-lite.txt` (packages allégés, pas de GPU).

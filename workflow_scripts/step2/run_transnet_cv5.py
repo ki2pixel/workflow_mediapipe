@@ -15,7 +15,7 @@ Prérequis :
   - Le modèle ONNX (transnetv2.onnx) doit être placé dans assets/models/onnx/
   - Le venv transnet_cv5_env doit être activé (opencv-python-headless>=5.0.0)
 
-Activation : USE_OPENCV5_STEP3=true dans .env
+Activation : USE_OPENCV5_STEP2=true dans .env
 """
 
 import os
@@ -125,7 +125,7 @@ class ORTDNNNet:
         import onnxruntime as ort
         opts = ort.SessionOptions()
         
-        env_force_cpu = os.environ.get("STEP3_CV5_FORCE_CPU", "false").lower() == "true"
+        env_force_cpu = os.environ.get("STEP2_CV5_FORCE_CPU", "false").lower() == "true"
         effective_force_cpu = force_cpu or env_force_cpu
         
         # Détection et priorisation des execution providers (GPU vs CPU)

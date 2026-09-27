@@ -41,7 +41,7 @@ def test_adaptive_worker_count_respects_memory_and_available_work():
 
 
 def test_cv5_cpu_worker_pool_ignores_insightface_gpu_flag(monkeypatch):
-    monkeypatch.setenv("STEP5_ENABLE_GPU", "1")
+    monkeypatch.setenv("STEP4_ENABLE_GPU", "1")
 
     worker_count = tracking_cv5.calculate_cv5_inference_worker_count(
         [1600],
@@ -71,7 +71,7 @@ def test_cv5_inference_device_defaults_to_cpu_for_invalid_values():
 
 
 def test_cv5_cpu_onnx_runtime_provider_ignores_insightface_gpu_flag(monkeypatch):
-    monkeypatch.setenv("STEP5_ENABLE_GPU", "1")
+    monkeypatch.setenv("STEP4_ENABLE_GPU", "1")
 
     providers = tracking_cv5.get_cv5_onnx_runtime_providers(
         "cpu",

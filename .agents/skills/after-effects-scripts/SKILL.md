@@ -42,13 +42,13 @@ Scripts AE (Windows) → Post-production créative
 ### Variables d'Environnement Clés
 ```bash
 # STEP7 - Pré-traitement AE
-STEP7_ENABLE_ANALYTICS=1          # Activer analytics dans *_ae.json
-STEP7_INCLUDE_AUDIO_DATA=1       # Inclure données audio
+STEP6_ENABLE_ANALYTICS=1          # Activer analytics dans *_ae.json
+STEP6_INCLUDE_AUDIO_DATA=1       # Inclure données audio
 
 # STEP6 - Réduction JSON (consommé par AE)
-STEP6_INCLUDE_TRACKING_ANALYTICS=1    # Histogrammes confidence
-STEP6_INCLUDE_EXPRESSION_SUMMARY=0    # Résumé expressions (défaut: désactivé)
-STEP6_EXPRESSION_KEYS=jawOpen         # Clés expressions si activé
+STEP5_INCLUDE_TRACKING_ANALYTICS=1    # Histogrammes confidence
+STEP5_INCLUDE_EXPRESSION_SUMMARY=0    # Résumé expressions (défaut: désactivé)
+STEP5_EXPRESSION_KEYS=jawOpen         # Clés expressions si activé
 
 # Ponts Python
 PYTHON_EXECUTABLE=python3          # Chemin Python pour system.callSystem()

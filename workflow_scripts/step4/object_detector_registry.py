@@ -164,7 +164,7 @@ class ObjectDetectorRegistry:
         
         Priority order:
         1. override_path (if provided and exists)
-        2. Environment variable STEP5_OBJECT_DETECTOR_MODEL_PATH
+        2. Environment variable STEP4_OBJECT_DETECTOR_MODEL_PATH
         3. models_dir / model_spec.filename
         4. Default models directory / model_spec.filename
         
@@ -189,13 +189,13 @@ class ObjectDetectorRegistry:
             logger.warning(f"Override path does not exist: {override_path}")
 
         # Priority 2: Environment variable
-        env_path = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH')
+        env_path = os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH')
         if env_path:
             env_path_obj = cls._try_resolve_path(env_path, models_dir=models_dir)
             if env_path_obj is not None:
-                logger.info(f"Using model path from STEP5_OBJECT_DETECTOR_MODEL_PATH: {env_path_obj}")
+                logger.info(f"Using model path from STEP4_OBJECT_DETECTOR_MODEL_PATH: {env_path_obj}")
                 return env_path_obj
-            logger.warning(f"STEP5_OBJECT_DETECTOR_MODEL_PATH does not exist: {env_path}")
+            logger.warning(f"STEP4_OBJECT_DETECTOR_MODEL_PATH does not exist: {env_path}")
         
         # Get model spec
         spec = cls.get_model_spec(model_name)
@@ -229,7 +229,7 @@ class ObjectDetectorRegistry:
             f"Expected filename: {spec.filename}\n"
             f"Searched in: {searched_in}\n"
             f"To use this model, download it under workflow_scripts/step4/models/object_detectors/ "
-            f"or set STEP5_OBJECT_DETECTOR_MODEL_PATH environment variable."
+            f"or set STEP4_OBJECT_DETECTOR_MODEL_PATH environment variable."
         )
     
     @classmethod

@@ -93,25 +93,25 @@ No,Timecode In,Timecode Out,Frame In,Frame Out
 
 ```bash
 # Seuil de détection (défaut: 0.5)
-STEP3_THRESHOLD=0.5
+STEP2_THRESHOLD=0.5
 
 # Paramètres de traitement
-STEP3_WINDOW_SIZE=100
-STEP3_STRIDE=50
-STEP3_PADDING=25
+STEP2_WINDOW_SIZE=100
+STEP2_STRIDE=50
+STEP2_PADDING=25
 
 # Accélération matérielle
 ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (PCIe/USB)
 
 # Device et performance (lorsque TPU désactivé)
-STEP3_DEVICE=auto           # auto, cuda, cpu
-STEP3_BATCH_SIZE=8          # GPU: 8 pour VRAM 4Go
-STEP3_NUM_WORKERS=1        # Multi-vidéos (CPU only)
+STEP2_DEVICE=auto           # auto, cuda, cpu
+STEP2_BATCH_SIZE=8          # GPU: 8 pour VRAM 4Go
+STEP2_NUM_WORKERS=1        # Multi-vidéos (CPU only)
 
 # Optimisations PyTorch
-STEP3_MIXED_PRECISION=true
-STEP3_AMP_DTYPE=float16
-STEP3_TORCHSCRIPT=true
+STEP2_MIXED_PRECISION=true
+STEP2_AMP_DTYPE=float16
+STEP2_TORCHSCRIPT=true
 ```
 
 ### Configuration JSON
@@ -217,7 +217,7 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 
 ## Mode Expérimental OpenCV 5.0 DNN
 
-Lorsque `USE_OPENCV5_STEP3=true` est configuré dans le fichier `.env`, l'étape 2 bascule du runtime lourd PyTorch vers le moteur DNN orienté graphe d'OpenCV 5.0 pour l'inférence TransNetV2 :
+Lorsque `USE_OPENCV5_STEP2=true` est configuré dans le fichier `.env`, l'étape 2 bascule du runtime lourd PyTorch vers le moteur DNN orienté graphe d'OpenCV 5.0 pour l'inférence TransNetV2 :
 
 * **Script d'exécution** : `workflow_scripts/step2/run_transnet_cv5.py`
 * **Moteur Graphique** : Utilisation de `cv2.dnn.ENGINE_NEW` qui compile le graphe à la volée pour optimiser les performances et le dispatching des instructions vectorielles (AVX2/AVX-512/NEON).
@@ -360,10 +360,10 @@ python -c "import torch; print(torch.cuda.memory_allocated()/1024**3)"
 
 # Solutions
 # 1. Réduire batch_size
-STEP3_BATCH_SIZE=1 python workflow_scripts/step2/run_transnet.py
+STEP2_BATCH_SIZE=1 python workflow_scripts/step2/run_transnet.py
 
 # 2. Forcer CPU
-STEP3_DEVICE=cpu python workflow_scripts/step2/run_transnet.py
+STEP2_DEVICE=cpu python workflow_scripts/step2/run_transnet.py
 ```
 
 ### Modèle Non Trouvé

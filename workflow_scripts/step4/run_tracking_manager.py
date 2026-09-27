@@ -81,17 +81,17 @@ _load_env_file()
 
 
 ENV = _EnvConfig(os.environ)
-step5_enable_object_detection = ENV.get_bool("STEP5_ENABLE_OBJECT_DETECTION", default=True)
+step5_enable_object_detection = ENV.get_bool("STEP4_ENABLE_OBJECT_DETECTION", default=True)
 
 def _log_env_snapshot():
     relevant_keys = [
-        "STEP5_ENABLE_GPU",
-        "STEP5_GPU_ENGINES",
-        "STEP5_TRACKING_ENGINE",
+        "STEP4_ENABLE_GPU",
+        "STEP4_GPU_ENGINES",
+        "STEP4_TRACKING_ENGINE",
         "TRACKING_DISABLE_GPU",
         "TRACKING_CPU_WORKERS",
-        "STEP5_GPU_FALLBACK_AUTO",
-        "STEP5_ENABLE_OBJECT_DETECTION",
+        "STEP4_GPU_FALLBACK_AUTO",
+        "STEP4_ENABLE_OBJECT_DETECTION",
         "INSIGHTFACE_HOME",
     ]
     snapshot = ENV.snapshot(relevant_keys)
@@ -162,12 +162,12 @@ def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
     """
     Detect CUDA libraries available on the host for engines that bundle their own interpreter (InsightFace).
     Priority order:
-      1. Explicit STEP5_CUDA_LIB_PATH (colon-separated).
-      2. STEP5_CUDA_HOME / CUDA_HOME lib64 folders.
+      1. Explicit STEP4_CUDA_LIB_PATH (colon-separated).
+      2. STEP4_CUDA_HOME / CUDA_HOME lib64 folders.
       3. Common /usr/local/cuda-* lib64 folders.
       4. /usr/lib/x86_64-linux-gnu in case distro ships the libs there.
     """
-    explicit_paths = env.get_str("STEP5_CUDA_LIB_PATH", "").strip()
+    explicit_paths = env.get_str("STEP4_CUDA_LIB_PATH", "").strip()
     if explicit_paths:
         resolved = [
             str(Path(p.strip()).expanduser())
@@ -178,7 +178,7 @@ def _discover_system_cuda_lib_paths(env: _EnvConfig) -> list[str]:
             return resolved
 
     candidates: list[Path] = []
-    for env_var in ("STEP5_CUDA_HOME", "CUDA_HOME"):
+    for env_var in ("STEP4_CUDA_HOME", "CUDA_HOME"):
         value = env.get_str(env_var, "").strip()
         if value:
             candidates.append(Path(value).expanduser())
@@ -214,8 +214,8 @@ WORKER_CONFIG_TEMPLATE = {
     "mp_landmarker_output_blendshapes": True, "enable_object_detection": step5_enable_object_detection,
     "object_score_threshold": 0.5, "object_max_results": 5, "mp_max_distance_tracking": 70,
     "mp_frames_unseen_deregister": 7, "speaking_detection_jaw_open_threshold": 0.08,
-    "object_detector_model": ENV.get_str('STEP5_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
-    "object_detector_model_path": ENV.get_optional_str('STEP5_OBJECT_DETECTOR_MODEL_PATH'),
+    "object_detector_model": ENV.get_str('STEP4_OBJECT_DETECTOR_MODEL', 'efficientdet_lite2'),
+    "object_detector_model_path": ENV.get_optional_str('STEP4_OBJECT_DETECTOR_MODEL_PATH'),
 }
 
 CPU_OPTIMIZED_CONFIG = {
@@ -347,13 +347,13 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
     models_dir_path = Path(__file__).resolve().parent / "models"
     worker_script_path = Path(__file__).resolve().parent / worker_script
 
-    worker_python_override_insightface = ENV.get_optional_str("STEP5_INSIGHTFACE_ENV_PYTHON")
+    worker_python_override_insightface = ENV.get_optional_str("STEP4_INSIGHTFACE_ENV_PYTHON")
     worker_python = TRACKING_ENV_PYTHON
     
     if engine_norm == "insightface":
         if not use_gpu:
             raise RuntimeError(
-                "InsightFace engine is GPU-only. Enable STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
+                "InsightFace engine is GPU-only. Enable STEP4_ENABLE_GPU=1 and include 'insightface' in STEP4_GPU_ENGINES."
             )
 
         worker_python = (
@@ -364,7 +364,7 @@ def launch_worker_process(video_path, use_gpu, internal_workers=1, tracking_engi
         if not worker_python.exists():
             raise RuntimeError(
                 f"InsightFace engine selected but python interpreter not found: {worker_python}. "
-                "Create insightface_env or set STEP5_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
+                "Create insightface_env or set STEP4_INSIGHTFACE_ENV_PYTHON to the insightface_env python path."
             )
     command_args = [str(worker_python), str(worker_script_path), video_path, "--models_dir", str(models_dir_path)]
     if use_gpu: command_args.append("--use_gpu")
@@ -482,7 +482,7 @@ def main():
         args.cpu_internal_workers = ENV.get_int('TRACKING_CPU_WORKERS', args.cpu_internal_workers)
 
         if args.tracking_engine is None:
-            raw_engine = ENV.get_optional_str('STEP5_TRACKING_ENGINE')
+            raw_engine = ENV.get_optional_str('STEP4_TRACKING_ENGINE')
             if raw_engine:
                 args.tracking_engine = raw_engine
     except Exception:
@@ -493,13 +493,13 @@ def main():
         _engine_norm = ""
     if _engine_norm not in {"", "insightface"}:
         logging.error(
-            "Unsupported STEP5_TRACKING_ENGINE '%s'. Supported values: insightface (GPU) or empty (default MediaPipe).",
+            "Unsupported STEP4_TRACKING_ENGINE '%s'. Supported values: insightface (GPU) or empty (default MediaPipe).",
             _engine_norm,
         )
         sys.exit(1)
     
-    gpu_enabled_global = ENV.get_str('STEP5_ENABLE_GPU', '0').strip() == '1'
-    gpu_engines_str = ENV.get_str('STEP5_GPU_ENGINES', '').strip().lower()
+    gpu_enabled_global = ENV.get_str('STEP4_ENABLE_GPU', '0').strip() == '1'
+    gpu_engines_str = ENV.get_str('STEP4_GPU_ENGINES', '').strip().lower()
     gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
     _log_env_snapshot()
     
@@ -519,7 +519,7 @@ def main():
 
                     if not gpu_status['available']:
                         logging.warning(f"GPU requested but unavailable: {gpu_status['reason']}")
-                        fallback_auto = ENV.get_str('STEP5_GPU_FALLBACK_AUTO', '1').strip() == '1'
+                        fallback_auto = ENV.get_str('STEP4_GPU_FALLBACK_AUTO', '1').strip() == '1'
                         if fallback_auto:
                             logging.info("Auto-fallback to CPU enabled")
                             args.disable_gpu = True
@@ -541,7 +541,7 @@ def main():
                     engine_supports_gpu = False
             else:
                 logging.warning(
-                    f"InsightFace not listed in STEP5_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode"
+                    f"InsightFace not listed in STEP4_GPU_ENGINES ({gpu_engines_str}), forcing CPU-only mode"
                 )
                 args.disable_gpu = True
         else:
@@ -555,7 +555,7 @@ def main():
     if _engine_norm == "insightface" and (args.disable_gpu or not engine_supports_gpu):
         logging.error(
             "InsightFace engine is GPU-only, but GPU mode is disabled or not authorized. "
-            "Set STEP5_ENABLE_GPU=1 and include 'insightface' in STEP5_GPU_ENGINES."
+            "Set STEP4_ENABLE_GPU=1 and include 'insightface' in STEP4_GPU_ENGINES."
         )
         sys.exit(1)
 

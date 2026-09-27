@@ -18,7 +18,7 @@ Prérequis :
   - Les modèles ONNX (blazeface.onnx, facemesh.onnx) doivent être dans assets/models/onnx/
   - Le venv tracking_cv5_env doit être activé (opencv-python-headless>=5.0.0)
 
-Activation : USE_OPENCV5_STEP5=true dans .env
+Activation : USE_OPENCV5_STEP4=true dans .env
 """
 
 import os
@@ -802,7 +802,7 @@ def run_tracking_pipeline_cv5(video_path, blazeface_net, facemesh_net, blendshap
                 "confidence": 0.95
             })
         # 5b. Détection d'objets (YOLOv11 ONNX GPU/CPU) s'il n'y a pas de visage détecté
-        enable_object_detection = os.environ.get("STEP5_ENABLE_OBJECT_DETECTION", "1") == "1"
+        enable_object_detection = os.environ.get("STEP4_ENABLE_OBJECT_DETECTION", "1") == "1"
         if not current_detections and enable_object_detection and object_detector_net is not None:
             obj_detections = detect_objects_yolo_cv5(object_detector_net, image, width, height)
             current_detections.extend(obj_detections)
@@ -1546,23 +1546,23 @@ def main():
     successful_count = 0
 
     # Résoudre le modèle de détection d'objets si activé
-    enable_object_detection = os.environ.get("STEP5_ENABLE_OBJECT_DETECTION", "1") == "1"
+    enable_object_detection = os.environ.get("STEP4_ENABLE_OBJECT_DETECTION", "1") == "1"
     object_model_path = None
     if enable_object_detection:
         try:
             # En mode CV5, on ignore les configurations TFLite du .env pour rester compatible sans modification
-            env_path = os.environ.get('STEP5_OBJECT_DETECTOR_MODEL_PATH', '')
+            env_path = os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH', '')
             
             # Pour éviter que ObjectDetectorRegistry.resolve_model_path ne charge le modèle TFLite depuis l'env
             # si celui-ci n'est pas au format ONNX
             if env_path and not env_path.endswith('.onnx'):
-                orig_env_val = os.environ.pop('STEP5_OBJECT_DETECTOR_MODEL_PATH', None)
+                orig_env_val = os.environ.pop('STEP4_OBJECT_DETECTOR_MODEL_PATH', None)
             else:
                 orig_env_val = None
                 
             override_path = env_path if env_path.endswith('.onnx') else None
             
-            model_name = os.environ.get("STEP5_OBJECT_DETECTOR_MODEL", "yolo11n_onnx")
+            model_name = os.environ.get("STEP4_OBJECT_DETECTOR_MODEL", "yolo11n_onnx")
             if not model_name.endswith('_onnx') and model_name != 'nanodet_plus':
                 # Forcer un modèle ONNX pour OpenCV 5.0
                 model_name = 'yolo11n_onnx'
@@ -1574,7 +1574,7 @@ def main():
                 )
             finally:
                 if orig_env_val is not None:
-                    os.environ['STEP5_OBJECT_DETECTOR_MODEL_PATH'] = orig_env_val
+                    os.environ['STEP4_OBJECT_DETECTOR_MODEL_PATH'] = orig_env_val
                     
             logging.info(f"Détecteur d'objets CV5 résolu: {model_name} -> {object_model_path}")
         except Exception as e_res:

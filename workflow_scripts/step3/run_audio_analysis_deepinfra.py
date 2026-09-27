@@ -72,7 +72,7 @@ def _import_deepinfra_audio_service():
 
 
 def _should_fallback_to_pyannote() -> bool:
-    raw = (os.getenv("STEP4_DEEPINFRA_FALLBACK_TO_PYANNOTE") or "1").strip().lower()
+    raw = (os.getenv("STEP3_DEEPINFRA_FALLBACK_TO_PYANNOTE") or "1").strip().lower()
     return raw in {"1", "true", "yes", "on", "y"}
 
 

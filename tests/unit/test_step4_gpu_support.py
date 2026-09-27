@@ -101,37 +101,37 @@ class TestConfigGPUValidation:
         assert result["cuda_version"]
     
     def test_is_step5_gpu_enabled(self):
-        """Tester la lecture de STEP5_ENABLE_GPU."""
+        """Tester la lecture de STEP4_ENABLE_GPU."""
         from config.settings import Config
         
-        original = os.environ.get('STEP5_ENABLE_GPU')
+        original = os.environ.get('STEP4_ENABLE_GPU')
         try:
-            os.environ['STEP5_ENABLE_GPU'] = '0'
+            os.environ['STEP4_ENABLE_GPU'] = '0'
             assert Config.is_step5_gpu_enabled() is False
             
-            os.environ['STEP5_ENABLE_GPU'] = '1'
+            os.environ['STEP4_ENABLE_GPU'] = '1'
             assert Config.is_step5_gpu_enabled() is True
         finally:
             if original is not None:
-                os.environ['STEP5_ENABLE_GPU'] = original
+                os.environ['STEP4_ENABLE_GPU'] = original
             else:
-                os.environ.pop('STEP5_ENABLE_GPU', None)
+                os.environ.pop('STEP4_ENABLE_GPU', None)
     
     def test_get_step5_gpu_engines(self):
-        """Tester la lecture de STEP5_GPU_ENGINES."""
+        """Tester la lecture de STEP4_GPU_ENGINES."""
         from config.settings import Config
         
-        original = os.environ.get('STEP5_GPU_ENGINES')
+        original = os.environ.get('STEP4_GPU_ENGINES')
         try:
-            os.environ['STEP5_GPU_ENGINES'] = 'mediapipe_landmarker,openseeface,insightface'
+            os.environ['STEP4_GPU_ENGINES'] = 'mediapipe_landmarker,openseeface,insightface'
             engines = Config.get_step5_gpu_engines()
 
             assert engines == ['insightface']
         finally:
             if original is not None:
-                os.environ['STEP5_GPU_ENGINES'] = original
+                os.environ['STEP4_GPU_ENGINES'] = original
             else:
-                os.environ.pop('STEP5_GPU_ENGINES', None)
+                os.environ.pop('STEP4_GPU_ENGINES', None)
 
 
 class TestFaceEngineFactory:

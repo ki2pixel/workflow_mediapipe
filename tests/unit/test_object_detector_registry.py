@@ -24,7 +24,7 @@ class TestObjectDetectorRegistry:
     
     @pytest.fixture(autouse=True)
     def clean_env(self, monkeypatch):
-        monkeypatch.delenv("STEP5_OBJECT_DETECTOR_MODEL_PATH", raising=False)
+        monkeypatch.delenv("STEP4_OBJECT_DETECTOR_MODEL_PATH", raising=False)
 
     
     def test_get_model_spec_valid(self):
@@ -180,7 +180,7 @@ class TestObjectDetectorRegistry:
         env_model_file.write_text("env model")
         
         # Set environment variable
-        monkeypatch.setenv('STEP5_OBJECT_DETECTOR_MODEL_PATH', str(env_model_file))
+        monkeypatch.setenv('STEP4_OBJECT_DETECTOR_MODEL_PATH', str(env_model_file))
         
         # Test that environment variable is used
         resolved_path = ObjectDetectorRegistry.resolve_model_path(
@@ -212,7 +212,7 @@ class TestObjectDetectorRegistry:
         assert resolved == override_file
         
         # Test priority 2: Env wins if no override
-        monkeypatch.setenv('STEP5_OBJECT_DETECTOR_MODEL_PATH', str(env_file))
+        monkeypatch.setenv('STEP4_OBJECT_DETECTOR_MODEL_PATH', str(env_file))
         resolved = ObjectDetectorRegistry.resolve_model_path(
             model_name='efficientdet_lite0',
             models_dir=models_dir
@@ -220,7 +220,7 @@ class TestObjectDetectorRegistry:
         assert resolved == env_file
         
         # Test priority 3: models_dir wins if no override/env
-        monkeypatch.delenv('STEP5_OBJECT_DETECTOR_MODEL_PATH', raising=False)
+        monkeypatch.delenv('STEP4_OBJECT_DETECTOR_MODEL_PATH', raising=False)
         resolved = ObjectDetectorRegistry.resolve_model_path(
             model_name='efficientdet_lite0',
             models_dir=models_dir

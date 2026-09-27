@@ -45,8 +45,8 @@ def get_extractor_model_cached(model_path):
                 raise ImportError(f"Cannot load {model_str}: onnxruntime is not installed.")
             
             import multiprocessing
-            step4_workers_str = os.environ.get("STEP4_MAX_WORKERS", "")
-            max_workers = int(step4_workers_str) if step4_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
+            audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
+            max_workers = int(audio_workers_str) if audio_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
             # Allocate the total CPU threads evenly among the max_workers
             onnx_threads = max(1, multiprocessing.cpu_count() // max_workers)
             
@@ -61,8 +61,8 @@ def get_extractor_model_cached(model_path):
         else:
             import tflite_runtime.interpreter as tflite
             import multiprocessing
-            step4_workers_str = os.environ.get("STEP4_MAX_WORKERS", "")
-            max_workers = int(step4_workers_str) if step4_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
+            audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
+            max_workers = int(audio_workers_str) if audio_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
             xnnpack_threads = max(1, multiprocessing.cpu_count() // max_workers)
             
             interp = tflite.Interpreter(model_path=model_str, num_threads=xnnpack_threads)
@@ -1094,13 +1094,13 @@ def main():
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
-                    if k.strip() == "STEP4_MAX_WORKERS":
-                        os.environ["STEP4_MAX_WORKERS"] = v.strip()
+                    if k.strip() == "STEP3_MAX_WORKERS":
+                        os.environ["STEP3_MAX_WORKERS"] = v.strip()
                         break
 
-    step4_workers_str = os.environ.get("STEP4_MAX_WORKERS", "")
-    if step4_workers_str.isdigit():
-        max_workers = int(step4_workers_str)
+    audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
+    if audio_workers_str.isdigit():
+        max_workers = int(audio_workers_str)
     else:
         max_workers = max(1, multiprocessing.cpu_count() // 2)
     logging.info(f"Utilisation de {max_workers} threads (ThreadPoolExecutor) pour l'analyse inter-vidéos.")

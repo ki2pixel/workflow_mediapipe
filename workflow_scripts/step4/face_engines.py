@@ -100,7 +100,7 @@ class InsightFaceEngine:
     ):
         if not use_gpu:
             raise RuntimeError(
-                "InsightFace engine is GPU-only. Set STEP5_ENABLE_GPU=1, include 'insightface' in STEP5_GPU_ENGINES, "
+                "InsightFace engine is GPU-only. Set STEP4_ENABLE_GPU=1, include 'insightface' in STEP4_GPU_ENGINES, "
                 "and run with use_gpu=True."
             )
 
@@ -129,7 +129,7 @@ class InsightFaceEngine:
                 "InsightFace engine requires the 'insightface' Python package inside insightface_env."
             ) from e
 
-        self._enable_profiling = os.environ.get("STEP5_ENABLE_PROFILING", "0").strip().lower() in {
+        self._enable_profiling = os.environ.get("STEP4_ENABLE_PROFILING", "0").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -141,25 +141,25 @@ class InsightFaceEngine:
             "frame_count": 0,
         }
 
-        env_max_faces = os.environ.get("STEP5_INSIGHTFACE_MAX_FACES")
+        env_max_faces = os.environ.get("STEP4_INSIGHTFACE_MAX_FACES")
         self._max_faces = _parse_optional_positive_int(env_max_faces)
 
-        env_max_width = os.environ.get("STEP5_INSIGHTFACE_MAX_WIDTH")
+        env_max_width = os.environ.get("STEP4_INSIGHTFACE_MAX_WIDTH")
         if env_max_width is None or env_max_width.strip() == "":
             env_max_width = "1280"
         self._max_detection_width = max(1, int(str(env_max_width).strip() or "1280"))
 
-        env_detect_every = os.environ.get("STEP5_INSIGHTFACE_DETECT_EVERY_N")
+        env_detect_every = os.environ.get("STEP4_INSIGHTFACE_DETECT_EVERY_N")
         if env_detect_every is None or env_detect_every.strip() == "":
-            env_detect_every = os.environ.get("STEP5_BLENDSHAPES_THROTTLE_N", "1")
+            env_detect_every = os.environ.get("STEP4_BLENDSHAPES_THROTTLE_N", "1")
         self._detect_every_n = max(1, int(str(env_detect_every).strip() or "1"))
 
-        self._jaw_open_scale = float(os.environ.get("STEP5_INSIGHTFACE_JAWOPEN_SCALE", "1.0"))
+        self._jaw_open_scale = float(os.environ.get("STEP4_INSIGHTFACE_JAWOPEN_SCALE", "1.0"))
 
-        env_model_name = os.environ.get("STEP5_INSIGHTFACE_MODEL_NAME")
+        env_model_name = os.environ.get("STEP4_INSIGHTFACE_MODEL_NAME")
         self._model_name = (model_name or (env_model_name.strip() if env_model_name else "") or "antelopev2")
 
-        env_det_size = os.environ.get("STEP5_INSIGHTFACE_DET_SIZE")
+        env_det_size = os.environ.get("STEP4_INSIGHTFACE_DET_SIZE")
         det_size_value = det_size
         if det_size_value is None:
             try:
@@ -168,7 +168,7 @@ class InsightFaceEngine:
                 det_size_value = 640
         self._det_size = max(64, int(det_size_value))
 
-        ctx_id_raw = os.environ.get("STEP5_INSIGHTFACE_CTX_ID")
+        ctx_id_raw = os.environ.get("STEP4_INSIGHTFACE_CTX_ID")
         try:
             ctx_id = int(str(ctx_id_raw).strip()) if ctx_id_raw else 0
         except Exception:
@@ -186,13 +186,13 @@ class InsightFaceEngine:
         insightface_root_raw = os.environ.get("INSIGHTFACE_HOME", "").strip()
         insightface_root = str(Path(insightface_root_raw or "~/.insightface").expanduser())
 
-        allowed_modules_env = os.environ.get("STEP5_INSIGHTFACE_ALLOWED_MODULES", "").strip()
+        allowed_modules_env = os.environ.get("STEP4_INSIGHTFACE_ALLOWED_MODULES", "").strip()
         allowed_modules = None
         if allowed_modules_env:
             allowed_modules = [m.strip() for m in allowed_modules_env.split(",") if m.strip()]
             if "detection" not in allowed_modules:
                 raise RuntimeError(
-                    "STEP5_INSIGHTFACE_ALLOWED_MODULES must include 'detection' (required by FaceAnalysis)."
+                    "STEP4_INSIGHTFACE_ALLOWED_MODULES must include 'detection' (required by FaceAnalysis)."
                 )
 
         try:

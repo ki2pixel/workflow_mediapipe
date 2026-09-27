@@ -231,7 +231,7 @@ def test_lemonfox_wrapper():
 
 ```python
 # Variables d'environnement pour tests
-STEP4_USE_LEMONFOX=1
+STEP3_USE_LEMONFOX=1
 LEMONFOX_API_KEY=test_key_mock
 LEMONFOX_TIMEOUT_SEC=30
 DRY_RUN_DOWNLOADS=true

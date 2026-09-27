@@ -180,7 +180,7 @@ AUDIO_DISABLE_GPU=0          # 1 pour forcer CPU
 
 **Lemonfox (alternative cloud)** :
 ```bash
-STEP4_USE_LEMONFOX=1
+STEP3_USE_LEMONFOX=1
 LEMONFOX_API_KEY=ta_cle_api
 LEMONFOX_DEFAULT_LANGUAGE=fr
 ```
@@ -190,23 +190,23 @@ LEMONFOX_DEFAULT_LANGUAGE=fr
 **MediaPipe CPU (défaut recommandé)** :
 ```bash
 # Vide = MediaPipe par défaut
-STEP5_TRACKING_ENGINE=
+STEP4_TRACKING_ENGINE=
 TRACKING_CPU_WORKERS=15        # Ajuste selon tes cœurs CPU
 ```
 
 **InsightFace GPU (optionnel)** :
 ```bash
-STEP5_ENABLE_GPU=1
-STEP5_TRACKING_ENGINE=insightface
-STEP5_GPU_ENGINES=insightface
-STEP5_GPU_MAX_VRAM_MB=2048     # Ajuste selon ta carte
+STEP4_ENABLE_GPU=1
+STEP4_TRACKING_ENGINE=insightface
+STEP4_GPU_ENGINES=insightface
+STEP4_GPU_MAX_VRAM_MB=2048     # Ajuste selon ta carte
 ```
 
 ### STEP5 - Réduction JSON
 
 ```bash
-STEP6_INCLUDE_TRACKING_ANALYTICS=1
-STEP6_INCLUDE_EXPRESSION_SUMMARY=1
+STEP5_INCLUDE_TRACKING_ANALYTICS=1
+STEP5_INCLUDE_EXPRESSION_SUMMARY=1
 ```
 
 ## Commandes Utiles

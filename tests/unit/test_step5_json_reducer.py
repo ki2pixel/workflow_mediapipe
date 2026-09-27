@@ -157,7 +157,7 @@ def test_process_directory_writes_tracking_suffix_and_alignment(tmp_path: Path, 
     mod = _load_json_reducer_module(repo_root)
 
     # Ensure analytics are enabled for this test (default is enabled, but keep test deterministic)
-    monkeypatch.setenv("STEP6_INCLUDE_TRACKING_ANALYTICS", "1")
+    monkeypatch.setenv("STEP5_INCLUDE_TRACKING_ANALYTICS", "1")
 
     project_dir = tmp_path / "Camille Test"
     docs_dir = project_dir / "docs"
@@ -220,7 +220,7 @@ def test_process_directory_enriches_reduced_tracking_from_legacy_when_needed(tmp
     repo_root = Path(__file__).resolve().parents[2]
     mod = _load_json_reducer_module(repo_root)
 
-    monkeypatch.setenv("STEP6_INCLUDE_TRACKING_ANALYTICS", "1")
+    monkeypatch.setenv("STEP5_INCLUDE_TRACKING_ANALYTICS", "1")
 
     project_dir = tmp_path / "Camille Enrich"
     docs_dir = project_dir / "docs"
@@ -300,8 +300,8 @@ def test_reduce_video_json_can_emit_expression_summary_when_enabled(monkeypatch)
     repo_root = Path(__file__).resolve().parents[2]
     mod = _load_json_reducer_module(repo_root)
 
-    monkeypatch.setenv("STEP6_INCLUDE_EXPRESSION_SUMMARY", "1")
-    monkeypatch.setenv("STEP6_EXPRESSION_KEYS", "jawOpen, mouthSmileLeft")
+    monkeypatch.setenv("STEP5_INCLUDE_EXPRESSION_SUMMARY", "1")
+    monkeypatch.setenv("STEP5_EXPRESSION_KEYS", "jawOpen, mouthSmileLeft")
 
     raw = {
         "fps": 25.0,

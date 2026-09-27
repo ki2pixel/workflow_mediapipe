@@ -64,9 +64,9 @@ Le routage vers l'orchestrateur dépend des variables d'environnement définies 
 ENABLE_CORAL_TPU_ACCELERATION=true
 
 # Contrôle du routage par étape
+STEP2_ENABLE_CORAL_TPU=true
 STEP3_ENABLE_CORAL_TPU=true
 STEP4_ENABLE_CORAL_TPU=true
-STEP5_ENABLE_CORAL_TPU=true
 ```
 
 ## Analyse des Trade-offs

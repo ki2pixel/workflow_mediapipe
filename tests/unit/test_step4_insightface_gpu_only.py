@@ -2,7 +2,7 @@
 Tests unitaires pour valider que le GPU STEP5 est réservé exclusivement à InsightFace.
 
 Décision v4.2+ : Seul le moteur InsightFace peut utiliser le GPU.
-Le mode MediaPipe (défaut) doit s'exécuter en mode CPU-only même si STEP5_ENABLE_GPU=1.
+Le mode MediaPipe (défaut) doit s'exécuter en mode CPU-only même si STEP4_ENABLE_GPU=1.
 """
 
 import pytest
@@ -42,11 +42,11 @@ class TestInsightFaceGPUOnly:
 
     def test_insightface_gpu_enabled(self):
         """
-        Test: InsightFace avec STEP5_ENABLE_GPU=1 doit activer le GPU.
+        Test: InsightFace avec STEP4_ENABLE_GPU=1 doit activer le GPU.
         """
-        os.environ['STEP5_ENABLE_GPU'] = '1'
-        os.environ['STEP5_GPU_ENGINES'] = 'insightface'
-        os.environ['STEP5_TRACKING_ENGINE'] = 'insightface'
+        os.environ['STEP4_ENABLE_GPU'] = '1'
+        os.environ['STEP4_GPU_ENGINES'] = 'insightface'
+        os.environ['STEP4_TRACKING_ENGINE'] = 'insightface'
         
         mock_gpu_status = {
             'available': True,
@@ -67,7 +67,7 @@ class TestInsightFaceGPUOnly:
             args = Args()
             
             engine_norm = 'insightface'
-            gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
+            gpu_enabled_global = os.environ.get('STEP4_ENABLE_GPU', '0').strip() == '1'
             gpu_engines = ['insightface']
             
             engine_supports_gpu = False
@@ -81,11 +81,11 @@ class TestInsightFaceGPUOnly:
 
     def test_mediapipe_gpu_forced_to_cpu(self):
         """
-        Test: MediaPipe avec STEP5_ENABLE_GPU=1 doit être forcé en mode CPU.
+        Test: MediaPipe avec STEP4_ENABLE_GPU=1 doit être forcé en mode CPU.
         """
-        os.environ['STEP5_ENABLE_GPU'] = '1'
-        os.environ['STEP5_GPU_ENGINES'] = 'insightface'
-        os.environ['STEP5_TRACKING_ENGINE'] = 'mediapipe_landmarker'
+        os.environ['STEP4_ENABLE_GPU'] = '1'
+        os.environ['STEP4_GPU_ENGINES'] = 'insightface'
+        os.environ['STEP4_TRACKING_ENGINE'] = 'mediapipe_landmarker'
         
         # Simuler les arguments CLI
         class Args:
@@ -98,7 +98,7 @@ class TestInsightFaceGPUOnly:
         
         engine_norm = _normalize_tracking_engine('mediapipe_landmarker')
         _validate_supported_tracking_engine(engine_norm)
-        gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
+        gpu_enabled_global = os.environ.get('STEP4_ENABLE_GPU', '0').strip() == '1'
         
         engine_supports_gpu = False
         if gpu_enabled_global and not args.disable_gpu:
@@ -112,19 +112,19 @@ class TestInsightFaceGPUOnly:
 
     def test_unknown_engine_is_rejected(self):
         """Test: Un moteur non supporté doit être rejeté."""
-        os.environ['STEP5_TRACKING_ENGINE'] = 'unknown_engine'
+        os.environ['STEP4_TRACKING_ENGINE'] = 'unknown_engine'
         engine_norm = _normalize_tracking_engine('unknown_engine')
         with pytest.raises(ValueError):
             _validate_supported_tracking_engine(engine_norm)
 
     def test_insightface_without_gpu_engines_forced_to_cpu(self):
         """
-        Test: InsightFace avec STEP5_ENABLE_GPU=1 mais absent de STEP5_GPU_ENGINES
+        Test: InsightFace avec STEP4_ENABLE_GPU=1 mais absent de STEP4_GPU_ENGINES
         doit être forcé en mode CPU avec warning.
         """
-        os.environ['STEP5_ENABLE_GPU'] = '1'
-        os.environ['STEP5_GPU_ENGINES'] = 'mediapipe_landmarker'  # InsightFace absent
-        os.environ['STEP5_TRACKING_ENGINE'] = 'insightface'
+        os.environ['STEP4_ENABLE_GPU'] = '1'
+        os.environ['STEP4_GPU_ENGINES'] = 'mediapipe_landmarker'  # InsightFace absent
+        os.environ['STEP4_TRACKING_ENGINE'] = 'insightface'
         
         # Simuler les arguments CLI
         class Args:
@@ -136,8 +136,8 @@ class TestInsightFaceGPUOnly:
         args = Args()
         
         engine_norm = 'insightface'
-        gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
-        gpu_engines_str = os.environ.get('STEP5_GPU_ENGINES', '').strip().lower()
+        gpu_enabled_global = os.environ.get('STEP4_ENABLE_GPU', '0').strip() == '1'
+        gpu_engines_str = os.environ.get('STEP4_GPU_ENGINES', '').strip().lower()
         gpu_engines = [e.strip() for e in gpu_engines_str.split(',') if e.strip()]
         
         engine_supports_gpu = False
@@ -153,12 +153,12 @@ class TestInsightFaceGPUOnly:
 
     def test_gpu_disabled_globally(self):
         """
-        Test: Avec STEP5_ENABLE_GPU=0, tous les moteurs doivent utiliser le CPU.
+        Test: Avec STEP4_ENABLE_GPU=0, tous les moteurs doivent utiliser le CPU.
         """
         # Setup
-        os.environ['STEP5_ENABLE_GPU'] = '0'
-        os.environ['STEP5_GPU_ENGINES'] = 'insightface'
-        os.environ['STEP5_TRACKING_ENGINE'] = 'insightface'
+        os.environ['STEP4_ENABLE_GPU'] = '0'
+        os.environ['STEP4_GPU_ENGINES'] = 'insightface'
+        os.environ['STEP4_TRACKING_ENGINE'] = 'insightface'
         
         # Simuler les arguments CLI
         class Args:
@@ -170,13 +170,13 @@ class TestInsightFaceGPUOnly:
         args = Args()
         
         engine_norm = 'insightface'
-        gpu_enabled_global = os.environ.get('STEP5_ENABLE_GPU', '0').strip() == '1'
+        gpu_enabled_global = os.environ.get('STEP4_ENABLE_GPU', '0').strip() == '1'
         
         engine_supports_gpu = False
         if gpu_enabled_global and not args.disable_gpu:
             pass
         
-        assert engine_supports_gpu is False, "Aucun moteur ne doit utiliser le GPU si STEP5_ENABLE_GPU=0"
+        assert engine_supports_gpu is False, "Aucun moteur ne doit utiliser le GPU si STEP4_ENABLE_GPU=0"
 
 
 if __name__ == "__main__":

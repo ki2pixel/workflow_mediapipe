@@ -85,7 +85,7 @@ Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes dé
 - **Bénéfice** : JSON 10x plus petits, parsing AE rapide
 
 ### ❌ Calculs lourds vs ❌ Métriques utiles
-- **Choix** : Analytics optionnels (flag `STEP6_INCLUDE_TRACKING_ANALYTICS`)
+- **Choix** : Analytics optionnels (flag `STEP5_INCLUDE_TRACKING_ANALYTICS`)
 - **Coût** : Overhead computationnel pour diagnostics
 - **Bénéfice** : Insights qualité tracking sans outils externes
 
@@ -103,16 +103,16 @@ Les JSON bruts contiennent des données denses (frames-by-frame, blendshapes dé
 
 ```bash
 # Contrôle verbosité STEP4 (impact sur réduction)
-STEP5_EXPORT_VERBOSE_FIELDS=0        # 0 = optimisé (défaut), 1 = verbose
+STEP4_EXPORT_VERBOSE_FIELDS=0        # 0 = optimisé (défaut), 1 = verbose
 
 # Options STEP5
-STEP6_INCLUDE_TRACKING_ANALYTICS=1   # Analytics confidence/statistiques
-STEP6_INCLUDE_EXPRESSION_SUMMARY=1    # Résumé blendshapes
-STEP6_EXPRESSION_KEYS=jawOpen,mouthSmileLeft,mouthSmileRight  # Blendshapes à inclure
+STEP5_INCLUDE_TRACKING_ANALYTICS=1   # Analytics confidence/statistiques
+STEP5_INCLUDE_EXPRESSION_SUMMARY=1    # Résumé blendshapes
+STEP5_EXPRESSION_KEYS=jawOpen,mouthSmileLeft,mouthSmileRight  # Blendshapes à inclure
 
 # Filtres et logging
-STEP6_KEYWORD_FILTER=Camille           # Filtre projets
-STEP6_LOG_LEVEL=INFO                   # DEBUG, INFO, WARNING
+STEP5_KEYWORD_FILTER=Camille           # Filtre projets
+STEP5_LOG_LEVEL=INFO                   # DEBUG, INFO, WARNING
 ```
 
 ### Configuration Analytics

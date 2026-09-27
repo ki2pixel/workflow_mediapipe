@@ -831,7 +831,7 @@ def main():
     cocompiled_dir = assets_dir / "cocompiled"
     use_cocompiled = (
         cocompiled_dir.exists() and
-        os.environ.get('STEP5_COCOMPILED_MODELS', '1') != '0'
+        os.environ.get('STEP4_COCOMPILED_MODELS', '1') != '0'
     )
     
     if use_cocompiled:
@@ -850,7 +850,7 @@ def main():
     blendshapes_path = assets_dir / "face_blendshapes.tflite"
     object_detector_path = assets_dir / "detect_edgetpu.tflite"
     
-    enable_object_detection = os.environ.get('STEP5_ENABLE_OBJECT_DETECTION', '0') == '1'
+    enable_object_detection = os.environ.get('STEP4_ENABLE_OBJECT_DETECTION', '0') == '1'
 
     if args.sequential:
         try:

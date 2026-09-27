@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Any, Optional
 
 
 def _filter_blendshapes_for_export(blendshapes: Any) -> Any:
-    profile = os.environ.get("STEP5_BLENDSHAPES_PROFILE", "full").strip().lower()
+    profile = os.environ.get("STEP4_BLENDSHAPES_PROFILE", "full").strip().lower()
     if not blendshapes or not isinstance(blendshapes, dict):
         return blendshapes
 
@@ -24,7 +24,7 @@ def _filter_blendshapes_for_export(blendshapes: Any) -> Any:
             for k, v in blendshapes.items()
             if k.startswith("mouth") or k.startswith("jaw")
         }
-        include_tongue = os.environ.get("STEP5_BLENDSHAPES_INCLUDE_TONGUE", "0").strip().lower() in {
+        include_tongue = os.environ.get("STEP4_BLENDSHAPES_INCLUDE_TONGUE", "0").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -40,7 +40,7 @@ def _filter_blendshapes_for_export(blendshapes: Any) -> Any:
         return filtered or None
 
     if profile == "custom":
-        keys_raw = os.environ.get("STEP5_BLENDSHAPES_EXPORT_KEYS", "").strip()
+        keys_raw = os.environ.get("STEP4_BLENDSHAPES_EXPORT_KEYS", "").strip()
         if not keys_raw:
             return blendshapes
         keys = [k.strip() for k in keys_raw.split(",") if k.strip()]
@@ -203,10 +203,10 @@ def apply_tracking_and_management(
                     output_obj.pop("speaking_sources", None)
 
             # Optional exports for face engines (not present for object detector)
-            # Controlled by STEP5_EXPORT_VERBOSE_FIELDS to reduce JSON size
+            # Controlled by STEP4_EXPORT_VERBOSE_FIELDS to reduce JSON size
             try:
                 if output_obj.get("source") == "face_landmarker":
-                    export_verbose = os.environ.get("STEP5_EXPORT_VERBOSE_FIELDS", "false").strip().lower()
+                    export_verbose = os.environ.get("STEP4_EXPORT_VERBOSE_FIELDS", "false").strip().lower()
                     should_export_verbose = export_verbose in {"true", "1", "yes", "on", "all"}
                     
                     if should_export_verbose:

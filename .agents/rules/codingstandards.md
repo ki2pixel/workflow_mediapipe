@@ -55,7 +55,7 @@ alwaysApply: true
   - TPU: YAMNet INT8 (fenêtrage glissant overlap 50%, hop 0.48s) + Filtre Médian VAD + FSM Hangover (1.0s) + AHC (Agglomerative Hierarchical Clustering) avec distance cosine (seuil calibré 0.32) + réassignation des locuteurs mineurs (<7.0s) + estimation optionnelle par Spectral Clustering (Eigen-gap/Silhouette) + extraction d-vectors ECAPA-TDNN Float32 CPU (XNNPACK) avec fallback embeddings YAMNet 1024D. Seuil VAD calibré 0.20.
 - **STEP4 (Tracking)**:
   - CPU: MediaPipe (`tracking_env_slim`), multiprocessing obligatoire + `cv2.setNumThreads(0)`.
-  - GPU: InsightFace (`insightface_env`, activé via `STEP5_ENABLE_GPU=1`).
+  - GPU: InsightFace (`insightface_env`, activé via `STEP4_ENABLE_GPU=1`).
   - TPU: Cascade séquentielle TFLite (BlazeFace + FaceMesh sans `half_pixel_centers` + Face Blendshapes) + Filtre One-Euro (OneEuroFilterND @njit 52 dimensions) CPU par défaut (Kalman de secours). Support optionnel des modèles co-compilés dans la SRAM partagée (8 Mo).
   - **Obligatoire**: `StreamingJSONOutput` pour export O(1).
 - **STEP4, 6 & 7**: `ijson` obligatoire. Scripts AE priorisent `*_ae.json`.

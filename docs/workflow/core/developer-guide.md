@@ -275,36 +275,36 @@ GET /api/system/diagnostics
 
 ```bash
 # MediaPipe (défaut, CPU)
-STEP5_TRACKING_ENGINE=          # vide = MediaPipe
+STEP4_TRACKING_ENGINE=          # vide = MediaPipe
 TRACKING_CPU_WORKERS=15
 
 # InsightFace (GPU optionnel)
-STEP5_ENABLE_GPU=1
-STEP5_TRACKING_ENGINE=insightface
-STEP5_GPU_ENGINES=insightface
-STEP5_GPU_MAX_VRAM_MB=2048
+STEP4_ENABLE_GPU=1
+STEP4_TRACKING_ENGINE=insightface
+STEP4_GPU_ENGINES=insightface
+STEP4_GPU_MAX_VRAM_MB=2048
 ```
 
 ### Variables Clés
 
 ```bash
 # Optimisations
-STEP5_MEDIAPIPE_MAX_FACES=4
-STEP5_MEDIAPIPE_JAWOPEN_SCALE=1.0
-STEP5_MEDIAPIPE_MAX_WIDTH=960
+STEP4_MEDIAPIPE_MAX_FACES=4
+STEP4_MEDIAPIPE_JAWOPEN_SCALE=1.0
+STEP4_MEDIAPIPE_MAX_WIDTH=960
 
 # Object detection (optionnel)
-STEP5_ENABLE_OBJECT_DETECTION=0
-STEP5_OBJECT_DETECTOR_MODEL=efficientdet_lite2
+STEP4_ENABLE_OBJECT_DETECTION=0
+STEP4_OBJECT_DETECTOR_MODEL=efficientdet_lite2
 
 # Profiling
-STEP5_ENABLE_PROFILING=0
+STEP4_ENABLE_PROFILING=0
 ```
 
 ### Fallback GPU
 
 ```bash
-STEP5_GPU_FALLBACK_AUTO=1  # Bascule CPU auto si GPU échoue
+STEP4_GPU_FALLBACK_AUTO=1  # Bascule CPU auto si GPU échoue
 ```
 
 ## Composants Frontend Supprimés

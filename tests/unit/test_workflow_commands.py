@@ -180,7 +180,7 @@ class TestStepConfigurations:
     def test_step2_uses_transnet_env(self, temp_base_path):
         """Test that STEP2 uses transnet_env."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', False), \
-             patch.object(config, 'USE_OPENCV5_STEP3', False, create=True):
+             patch.object(config, 'USE_OPENCV5_STEP2', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP2')
@@ -192,8 +192,8 @@ class TestStepConfigurations:
     def test_step2_uses_tpu_when_accelerated(self, temp_base_path):
         """Test that STEP2 uses Coral TPU script when accelerated."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
-             patch.object(config, 'STEP3_ENABLE_CORAL_TPU', True, create=True), \
-             patch.object(config, 'USE_OPENCV5_STEP3', False, create=True):
+             patch.object(config, 'STEP2_ENABLE_CORAL_TPU', True, create=True), \
+             patch.object(config, 'USE_OPENCV5_STEP2', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP2')
@@ -205,8 +205,8 @@ class TestStepConfigurations:
     def test_step2_uses_transnet_when_tpu_disabled_for_step(self, temp_base_path):
         """Test that STEP2 uses transnet_env when global TPU is enabled but step TPU is disabled."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
-             patch.object(config, 'STEP3_ENABLE_CORAL_TPU', False, create=True), \
-             patch.object(config, 'USE_OPENCV5_STEP3', False, create=True):
+             patch.object(config, 'STEP2_ENABLE_CORAL_TPU', False, create=True), \
+             patch.object(config, 'USE_OPENCV5_STEP2', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP2')
@@ -217,7 +217,7 @@ class TestStepConfigurations:
 
     def test_step2_uses_opencv5(self, temp_base_path):
         """Test that STEP2 uses OpenCV 5.0 when enabled."""
-        with patch.object(config, 'USE_OPENCV5_STEP3', True, create=True):
+        with patch.object(config, 'USE_OPENCV5_STEP2', True, create=True):
             # Create the virtual environment directory structure for CV5
             (temp_base_path / "transnet_cv5_env" / "bin").mkdir(parents=True, exist_ok=True)
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
@@ -258,7 +258,7 @@ class TestStepConfigurations:
     def test_step3_uses_audio_when_tpu_disabled_for_step(self, temp_base_path):
         """Test that STEP3 uses audio_env when global TPU is enabled but step TPU is disabled."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
-             patch.object(config, 'STEP4_ENABLE_CORAL_TPU', False, create=True):
+             patch.object(config, 'STEP3_ENABLE_CORAL_TPU', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP3')
@@ -274,7 +274,7 @@ class TestStepConfigurations:
     def test_step4_uses_tracking_env_slim(self, temp_base_path):
         """Test that STEP4 uses tracking_env_slim."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', False), \
-             patch.object(config, 'USE_OPENCV5_STEP5', False, create=True):
+             patch.object(config, 'USE_OPENCV5_STEP4', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP4')
@@ -286,8 +286,8 @@ class TestStepConfigurations:
     def test_step4_uses_tpu_when_accelerated(self, temp_base_path):
         """Test that STEP4 uses Coral TPU script when accelerated."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
-             patch.object(config, 'STEP5_ENABLE_CORAL_TPU', True, create=True), \
-             patch.object(config, 'USE_OPENCV5_STEP5', False, create=True):
+             patch.object(config, 'STEP4_ENABLE_CORAL_TPU', True, create=True), \
+             patch.object(config, 'USE_OPENCV5_STEP4', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP4')
@@ -299,8 +299,8 @@ class TestStepConfigurations:
     def test_step4_uses_tracking_when_tpu_disabled_for_step(self, temp_base_path):
         """Test that STEP4 uses tracking_env_slim when global TPU is enabled but step TPU is disabled."""
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
-             patch.object(config, 'STEP5_ENABLE_CORAL_TPU', False, create=True), \
-             patch.object(config, 'USE_OPENCV5_STEP5', False, create=True):
+             patch.object(config, 'STEP4_ENABLE_CORAL_TPU', False, create=True), \
+             patch.object(config, 'USE_OPENCV5_STEP4', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             
             cmd = commands.get_step_command('STEP4')
@@ -311,7 +311,7 @@ class TestStepConfigurations:
 
     def test_step4_uses_opencv5(self, temp_base_path):
         """Test that STEP4 uses OpenCV 5.0 when enabled."""
-        with patch.object(config, 'USE_OPENCV5_STEP5', True, create=True):
+        with patch.object(config, 'USE_OPENCV5_STEP4', True, create=True):
             # Create the virtual environment directory structure for CV5
             (temp_base_path / "tracking_cv5_env" / "bin").mkdir(parents=True, exist_ok=True)
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
@@ -440,7 +440,7 @@ class TestLogConfiguration:
         """Test that STEP4 has multiple log configurations."""
         # Test default/non-accelerated mode
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', False), \
-             patch.object(config, 'USE_OPENCV5_STEP5', False, create=True):
+             patch.object(config, 'USE_OPENCV5_STEP4', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             logs = commands.get_step_config('STEP4')['specific_logs']
             assert len(logs) >= 3
@@ -451,8 +451,8 @@ class TestLogConfiguration:
 
         # Test accelerated mode (TPU)
         with patch.object(config, 'ENABLE_CORAL_TPU_ACCELERATION', True), \
-             patch.object(config, 'STEP5_ENABLE_CORAL_TPU', True, create=True), \
-             patch.object(config, 'USE_OPENCV5_STEP5', False, create=True):
+             patch.object(config, 'STEP4_ENABLE_CORAL_TPU', True, create=True), \
+             patch.object(config, 'USE_OPENCV5_STEP4', False, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             logs = commands.get_step_config('STEP4')['specific_logs']
             assert len(logs) == 1
@@ -460,7 +460,7 @@ class TestLogConfiguration:
 
     def test_step4_opencv5_logs(self, temp_base_path):
         """Test that STEP4 has OpenCV 5.0 specific logs when enabled."""
-        with patch.object(config, 'USE_OPENCV5_STEP5', True, create=True):
+        with patch.object(config, 'USE_OPENCV5_STEP4', True, create=True):
             commands = WorkflowCommandsConfig(base_path=temp_base_path)
             logs = commands.get_step_config('STEP4')['specific_logs']
             assert len(logs) == 2

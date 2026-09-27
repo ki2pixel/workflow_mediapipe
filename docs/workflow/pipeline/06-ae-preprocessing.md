@@ -606,7 +606,7 @@ graph LR
 **Solution** : Utiliser le mode analyzer pour déléguer les calculs à Python via `system.callSystem()`.
 
 ### Piège #3 : Fichiers AE trop volumineux
-**Solution** : Vérifier que STEP6 a bien réduit les fichiers avec `STEP5_EXPORT_VERBOSE_FIELDS=0`.
+**Solution** : Vérifier que STEP6 a bien réduit les fichiers avec `STEP4_EXPORT_VERBOSE_FIELDS=0`.
 
 ### Piège #4 Mode analyzer non disponible
 **Solution** : Vérifier que les scripts AE supportent `system.callSystem()` et que Python est accessible.

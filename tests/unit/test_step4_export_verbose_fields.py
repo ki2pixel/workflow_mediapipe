@@ -1,5 +1,5 @@
 """
-Tests unitaires pour STEP5_EXPORT_VERBOSE_FIELDS (réduction taille JSON).
+Tests unitaires pour STEP4_EXPORT_VERBOSE_FIELDS (réduction taille JSON).
 
 Vérifie que la variable d'environnement contrôle correctement l'export
 des données volumineuses (landmarks, coefficients EOS) tout en préservant
@@ -39,12 +39,12 @@ class TestExportVerboseFields:
     @pytest.fixture(autouse=True)
     def setup_teardown(self):
         """Sauvegarde et restaure les variables d'environnement."""
-        original_verbose = os.environ.get('STEP5_EXPORT_VERBOSE_FIELDS')
+        original_verbose = os.environ.get('STEP4_EXPORT_VERBOSE_FIELDS')
         yield
         if original_verbose is not None:
-            os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = original_verbose
+            os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = original_verbose
         else:
-            os.environ.pop('STEP5_EXPORT_VERBOSE_FIELDS', None)
+            os.environ.pop('STEP4_EXPORT_VERBOSE_FIELDS', None)
 
     @pytest.fixture
     def mock_detection_with_verbose_fields(self):
@@ -89,8 +89,8 @@ class TestExportVerboseFields:
     def test_export_verbose_false_removes_landmarks_and_eos(
         self, mock_detection_with_verbose_fields, mock_enhanced_speaking_detector
     ):
-        """Avec STEP5_EXPORT_VERBOSE_FIELDS=false, landmarks et eos ne sont pas exportés."""
-        os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = 'false'
+        """Avec STEP4_EXPORT_VERBOSE_FIELDS=false, landmarks et eos ne sont pas exportés."""
+        os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = 'false'
         
         active_objects = {}
         current_detections = [mock_detection_with_verbose_fields]
@@ -125,8 +125,8 @@ class TestExportVerboseFields:
     def test_export_verbose_true_includes_landmarks_and_eos(
         self, mock_detection_with_verbose_fields, mock_enhanced_speaking_detector
     ):
-        """Avec STEP5_EXPORT_VERBOSE_FIELDS=true, landmarks et eos sont exportés."""
-        os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = 'true'
+        """Avec STEP4_EXPORT_VERBOSE_FIELDS=true, landmarks et eos sont exportés."""
+        os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = 'true'
         
         active_objects = {}
         current_detections = [mock_detection_with_verbose_fields]
@@ -157,12 +157,12 @@ class TestExportVerboseFields:
     def test_export_verbose_variants(
         self, mock_detection_with_verbose_fields, mock_enhanced_speaking_detector
     ):
-        """Test des différentes variantes de valeurs pour STEP5_EXPORT_VERBOSE_FIELDS."""
+        """Test des différentes variantes de valeurs pour STEP4_EXPORT_VERBOSE_FIELDS."""
         active_objects = {}
         next_id_counter = {"value": 0}
         
         for true_value in ["true", "1", "yes", "on", "all"]:
-            os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = true_value
+            os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = true_value
             active_objects_copy = {}
             current_detections = [mock_detection_with_verbose_fields.copy()]
             
@@ -180,7 +180,7 @@ class TestExportVerboseFields:
             assert "eos" in result[0], f"Failed for value: {true_value}"
         
         for false_value in ["false", "0", "no", "off", ""]:
-            os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = false_value
+            os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = false_value
             active_objects_copy = {}
             current_detections = [mock_detection_with_verbose_fields.copy()]
             
@@ -201,7 +201,7 @@ class TestExportVerboseFields:
         self, mock_detection_large_landmarks, mock_enhanced_speaking_detector
     ):
         """Test avec 478 landmarks volumineux."""
-        os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = 'false'
+        os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = 'false'
         
         active_objects = {}
         current_detections = [mock_detection_large_landmarks]
@@ -227,7 +227,7 @@ class TestExportVerboseFields:
 
     def test_non_face_objects_never_have_verbose_fields(self, mock_enhanced_speaking_detector):
         """Les objets non-faciaux n'ont jamais de landmarks/eos."""
-        os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = 'true'
+        os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = 'true'
         
         detection_object = {
             "bbox": (50, 100, 200, 300),
@@ -262,7 +262,7 @@ class TestExportVerboseFields:
         self, mock_detection_with_verbose_fields, mock_enhanced_speaking_detector
     ):
         """Vérifier que tous les champs requis par STEP5 sont présents."""
-        os.environ['STEP5_EXPORT_VERBOSE_FIELDS'] = 'false'
+        os.environ['STEP4_EXPORT_VERBOSE_FIELDS'] = 'false'
         
         active_objects = {}
         current_detections = [mock_detection_with_verbose_fields]

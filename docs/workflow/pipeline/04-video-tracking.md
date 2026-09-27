@@ -13,10 +13,10 @@ Nous utilisons plusieurs approches complémentaires : MediaPipe pour le traiteme
 ### ❌ Anciens moteurs retirés (anti-pattern)
 ```bash
 # Approche obsolète - moteurs supprimés en v4.3
-STEP5_TRACKING_ENGINE=yunet      # Plus supporté
-STEP5_TRACKING_ENGINE=opencv     # Plus supporté  
-STEP5_TRACKING_ENGINE=eos        # Plus supporté
-STEP5_TRACKING_ENGINE=openseeface # Plus supporté
+STEP4_TRACKING_ENGINE=yunet      # Plus supporté
+STEP4_TRACKING_ENGINE=opencv     # Plus supporté  
+STEP4_TRACKING_ENGINE=eos        # Plus supporté
+STEP4_TRACKING_ENGINE=openseeface # Plus supporté
 # Résultat : erreur de validation, fallback MediaPipe automatique
 ```
 
@@ -65,7 +65,7 @@ cd projets_extraits
 python ../workflow_scripts/step4/run_tracking_manager.py
 
 # Mode InsightFace GPU (optionnel)
-STEP5_TRACKING_ENGINE=insightface python ../workflow_scripts/step4/run_tracking_manager.py
+STEP4_TRACKING_ENGINE=insightface python ../workflow_scripts/step4/run_tracking_manager.py
 
 # Mode Edge TPU (optionnel, nécessite coral_env)
 source coral_env/bin/activate
@@ -112,32 +112,32 @@ projets_extraits/projet_camille_001/docs/video1_tracking.json
 ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (PCIe/USB)
 
 # Moteur de tracking (lorsque TPU désactivé - défaut: MediaPipe)
-STEP5_TRACKING_ENGINE=              # vide = MediaPipe, "insightface" = GPU
+STEP4_TRACKING_ENGINE=              # vide = MediaPipe, "insightface" = GPU
 
 # GPU (lorsque TPU désactivé - réservé à InsightFace)
-STEP5_ENABLE_GPU=0                  # 1 pour activer GPU InsightFace
-STEP5_GPU_ENGINES=insightface        # Moteurs GPU autorisés
-STEP5_GPU_FALLBACK_AUTO=1           # Bascule CPU auto si GPU échoue
+STEP4_ENABLE_GPU=0                  # 1 pour activer GPU InsightFace
+STEP4_GPU_ENGINES=insightface        # Moteurs GPU autorisés
+STEP4_GPU_FALLBACK_AUTO=1           # Bascule CPU auto si GPU échoue
 
 # Configuration VRAM InsightFace (Optionnel)
-STEP5_INSIGHTFACE_ALLOWED_MODULES=detection,landmark_3d_68 # Modules requis (défaut)
-STEP5_INSIGHTFACE_DET_SIZE=480      # Résolution interne (480 ou 640)
-STEP5_INSIGHTFACE_MAX_WIDTH=1280    # Largeur max avant downscale
+STEP4_INSIGHTFACE_ALLOWED_MODULES=detection,landmark_3d_68 # Modules requis (défaut)
+STEP4_INSIGHTFACE_DET_SIZE=480      # Résolution interne (480 ou 640)
+STEP4_INSIGHTFACE_MAX_WIDTH=1280    # Largeur max avant downscale
 
 # Performance CPU (MediaPipe)
 TRACKING_CPU_WORKERS=15              # Workers MediaPipe (défaut)
-STEP5_BLENDSHAPES_THROTTLE_N=2       # Calcul blendshapes toutes les N frames
+STEP4_BLENDSHAPES_THROTTLE_N=2       # Calcul blendshapes toutes les N frames
 
 # Options avancées
-STEP5_ENABLE_PROFILING=0            # Logs performance toutes les 20 frames
-STEP5_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
+STEP4_ENABLE_PROFILING=0            # Logs performance toutes les 20 frames
+STEP4_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 ```
 
 > **Note v4.3** : Les variables suivantes ont été supprimées et ne sont plus prises en compte dans le pipeline legacy :
-> - `STEP5_OPENCV_*` (historique), `STEP5_YUNET_*`, `STEP5_EOS_*`, `STEP5_OPENSEEFACE_*` (moteurs retirés)
-> - `STEP5_BLENDSHAPES_PROFILE` (profil unique conservé)
+> - `STEP4_OPENCV_*` (historique), `STEP4_YUNET_*`, `STEP4_EOS_*`, `STEP4_OPENSEEFACE_*` (moteurs retirés)
+> - `STEP4_BLENDSHAPES_PROFILE` (profil unique conservé)
 > 
-> *Note relative à l'activation d'OpenCV 5.0* : La variable `STEP5_ENABLE_OBJECT_DETECTION` est réutilisée en mode expérimental OpenCV 5.0 pour activer le détecteur d'objets YOLOv11 ONNX en cas d'absence de visage.
+> *Note relative à l'activation d'OpenCV 5.0* : La variable `STEP4_ENABLE_OBJECT_DETECTION` est réutilisée en mode expérimental OpenCV 5.0 pour activer le détecteur d'objets YOLOv11 ONNX en cas d'absence de visage.
 
 ### Configuration MediaPipe (CPU)
 
@@ -237,11 +237,11 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 
 ## Mode Expérimental OpenCV 5.0 DNN
 
-Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape 4 bascule vers le nouveau mode expérimental basé sur le moteur OpenCV 5.0 DNN :
+Lorsque `USE_OPENCV5_STEP4=true` est configuré dans le fichier `.env`, l'étape 4 bascule vers le nouveau mode expérimental basé sur le moteur OpenCV 5.0 DNN :
 
 * **Script d'exécution** : `workflow_scripts/step4/run_tracking_cv5.py`
 * **Architecture de Planification Adaptative** :
-  Le traitement n'utilise plus un parallélisme simpliste par vidéo, mais s'appuie sur un **pool global adaptatif de workers** (`ProcessPoolExecutor` initialisé en mode `spawn`) distribuant des chunks de frames (`STEP5_CV5_CHUNK_FRAMES`, défaut `32`) de manière dynamique.
+  Le traitement n'utilise plus un parallélisme simpliste par vidéo, mais s'appuie sur un **pool global adaptatif de workers** (`ProcessPoolExecutor` initialisé en mode `spawn`) distribuant des chunks de frames (`STEP4_CV5_CHUNK_FRAMES`, défaut `32`) de manière dynamique.
   - **Orchestration Parent** : Le processus parent coordonne la lecture des vidéos (décodage), découpe les frames en lots de taille fixe, les envoie au pool de workers, collecte les résultats asynchrones, réassemble les frames dans le bon ordre chronologique (`_flush_cv5_ready_chunks`), applique le lissage temporel (filtres One Euro et Kalman), préserve la continuité du tracking et sérialise les résultats de manière atomique sur le disque.
   - **Workers autonomes** : Les workers se contentent de réaliser les inférences sur les chunks reçus sans interagir avec l'état global ou le système de fichiers, éliminant ainsi toute contention.
 * **Cascade d'Inférence** :
@@ -250,22 +250,22 @@ Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape
   3. **Landmarks (FaceMesh)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `facemesh.onnx`) pour extraire 468 points faciaux 3D.
   4. **Animation (Face Blendshapes)** : Inférence du modèle TFLite `face_blendshapes.tflite` effectuée sur le CPU (en raison du padding 146 points pour l'iris).
   5. **Lissage Temporel (Parent)** : Application des filtres stabilisateurs (One Euro et Kalman) sur les 52 coefficients ARKit par le processus parent.
-* **Détecteur d'Objets Fallback (YOLOv11 ONNX)** : Si `STEP5_ENABLE_OBJECT_DETECTION=1` est activé, YOLOv11 ONNX (`yolo11n.onnx`) prend le relais si aucun visage n'est détecté.
+* **Détecteur d'Objets Fallback (YOLOv11 ONNX)** : Si `STEP4_ENABLE_OBJECT_DETECTION=1` est activé, YOLOv11 ONNX (`yolo11n.onnx`) prend le relais si aucun visage n'est détecté.
 * **Séparation de Matériel et GPU Decoupling** :
-  - La variable d'environnement `STEP5_CV5_INFERENCE_DEVICE` (valeurs `cpu` ou `cuda`) détermine l'appareil d'inférence d'OpenCV DNN, de manière totalement découplée de `STEP5_ENABLE_GPU` (qui reste réservé pour InsightFace).
-  - En mode **CPU** (`STEP5_CV5_INFERENCE_DEVICE=cpu`), le pool s'exécute en parallèle sous le budget configuré par `STEP5_CV5_CPU_BUDGET`.
-  - En mode **CUDA** (`STEP5_CV5_INFERENCE_DEVICE=cuda`), OpenCV DNN utilise ONNX Runtime CUDA, mais le pool est bridé à **1 seul worker actif** pour éviter la contention de mémoire VRAM et les plantages CUDA.
+  - La variable d'environnement `STEP4_CV5_INFERENCE_DEVICE` (valeurs `cpu` ou `cuda`) détermine l'appareil d'inférence d'OpenCV DNN, de manière totalement découplée de `STEP4_ENABLE_GPU` (qui reste réservé pour InsightFace).
+  - En mode **CPU** (`STEP4_CV5_INFERENCE_DEVICE=cpu`), le pool s'exécute en parallèle sous le budget configuré par `STEP4_CV5_CPU_BUDGET`.
+  - En mode **CUDA** (`STEP4_CV5_INFERENCE_DEVICE=cuda`), OpenCV DNN utilise ONNX Runtime CUDA, mais le pool est bridé à **1 seul worker actif** pour éviter la contention de mémoire VRAM et les plantages CUDA.
 * **Multiprocessing spawn-safe** : Le traitement s'appuie sur le multiprocessing de type `spawn` (les modèles ne sont pas partagés entre processus parents/enfants) avec une configuration `cv2.setNumThreads(1)` forcée dans les workers pour éliminer la contention et l'oversubscription CPU.
 * **Consommation Mémoire O(1)** : Utilisation obligatoire des classes `StreamingJSONOutput` ou `StreamingNDJSONOutput` pour sérialiser les frames sur le disque à la volée.
 
 ### Paramètres de Planification Adaptative (.env)
 
-* `STEP5_CV5_INFERENCE_DEVICE` (`cpu` | `cuda`) : Périphérique cible pour l'inférence OpenCV DNN (défaut : `cpu`).
-* `STEP5_CV5_CPU_BUDGET` (défaut : `15`) : Budget de workers maximum alloué au pool global CPU.
-* `STEP5_CV5_MAX_ACTIVE_VIDEOS` (défaut : `4`) : Nombre maximum de vidéos décodées simultanément.
-* `STEP5_CV5_MIN_FRAMES_PER_WORKER` (défaut : `80`) : Nombre minimum de frames requises pour allouer un worker.
-* `STEP5_CV5_CHUNK_FRAMES` (défaut : `32`) : Taille de chunk de frames soumise à chaque exécution de worker.
-* `STEP5_CV5_MAX_WORKERS_BY_MEMORY` (défaut : `15`) : Limite de workers calculée selon la mémoire physique disponible.
+* `STEP4_CV5_INFERENCE_DEVICE` (`cpu` | `cuda`) : Périphérique cible pour l'inférence OpenCV DNN (défaut : `cpu`).
+* `STEP4_CV5_CPU_BUDGET` (défaut : `15`) : Budget de workers maximum alloué au pool global CPU.
+* `STEP4_CV5_MAX_ACTIVE_VIDEOS` (défaut : `4`) : Nombre maximum de vidéos décodées simultanément.
+* `STEP4_CV5_MIN_FRAMES_PER_WORKER` (défaut : `80`) : Nombre minimum de frames requises pour allouer un worker.
+* `STEP4_CV5_CHUNK_FRAMES` (défaut : `32`) : Taille de chunk de frames soumise à chaque exécution de worker.
+* `STEP4_CV5_MAX_WORKERS_BY_MEMORY` (défaut : `15`) : Limite de workers calculée selon la mémoire physique disponible.
 
 ## Trade-offs par Configuration Workers
 
@@ -275,7 +275,7 @@ Lorsque `USE_OPENCV5_STEP5=true` est configuré dans le fichier `.env`, l'étape
 | **15** (défaut) | Optimale | Équilibrée | Production standard |
 | **20+** | Maximale | Surcharge CPU | Serveur puissant |
 
-> **Note** : Les configurations de workers s'appliquent à MediaPipe (via le pool standard de workers) et à OpenCV 5.0 DNN (via le pool adaptatif avec budget CPU défini par `STEP5_CV5_CPU_BUDGET`). InsightFace utilise toujours 1 worker GPU unique.
+> **Note** : Les configurations de workers s'appliquent à MediaPipe (via le pool standard de workers) et à OpenCV 5.0 DNN (via le pool adaptatif avec budget CPU défini par `STEP4_CV5_CPU_BUDGET`). InsightFace utilise toujours 1 worker GPU unique.
 
 ## Analogie : Studio de Capture vs Laboratoire
 
@@ -345,35 +345,35 @@ VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv')
 TRACKING_CPU_WORKERS=15  # Workers parallèles
 
 # Blendshapes throttling
-STEP5_BLENDSHAPES_THROTTLE_N=2  # Calcul toutes les 2 frames
+STEP4_BLENDSHAPES_THROTTLE_N=2  # Calcul toutes les 2 frames
 
 # Profiling optionnel
-STEP5_ENABLE_PROFILING=1  # Logs toutes les 20 frames
+STEP4_ENABLE_PROFILING=1  # Logs toutes les 20 frames
 ```
 
 ### InsightFace GPU Optimizations
 
 ```python
 # GPU validation
-STEP5_GPU_FALLBACK_AUTO=1  # Bascule CPU auto si GPU échoue
+STEP4_GPU_FALLBACK_AUTO=1  # Bascule CPU auto si GPU échoue
 
 # Memory management & VRAM Optimizations (Ex: pour GPU 4 Go)
 # ONNX Runtime GPU avec VRAM monitoring dynamique
-STEP5_INSIGHTFACE_ALLOWED_MODULES=detection,landmark_3d_68  # Restreint le chargement de modèles inutiles
-STEP5_INSIGHTFACE_DET_SIZE=480  # Réduit l'empreinte mémoire d'inférence
-STEP5_INSIGHTFACE_MAX_WIDTH=1280  # Limite la taille des frames analysées
+STEP4_INSIGHTFACE_ALLOWED_MODULES=detection,landmark_3d_68  # Restreint le chargement de modèles inutiles
+STEP4_INSIGHTFACE_DET_SIZE=480  # Réduit l'empreinte mémoire d'inférence
+STEP4_INSIGHTFACE_MAX_WIDTH=1280  # Limite la taille des frames analysées
 ```
 
 ### Export Optimizations
 
 ```python
 # JSON réduit (défaut)
-STEP5_EXPORT_VERBOSE_FIELDS=0  # Pas de landmarks dans export
+STEP4_EXPORT_VERBOSE_FIELDS=0  # Pas de landmarks dans export
 
 # Blendshapes filtering
-STEP5_BLENDSHAPES_PROFILE=full    # Tous les 52 coefficients
-STEP5_BLENDSHAPES_PROFILE=mouth   # Uniquement bouche
-STEP5_BLENDSHAPES_PROFILE=none    # Désactive blendshapes
+STEP4_BLENDSHAPES_PROFILE=full    # Tous les 52 coefficients
+STEP4_BLENDSHAPES_PROFILE=mouth   # Uniquement bouche
+STEP4_BLENDSHAPES_PROFILE=none    # Désactive blendshapes
 ```
 
 > **Streaming JSON Export** : Le pipeline utilise désormais un objet `StreamingJSONOutput`. Au lieu d'accumuler toutes les frames en mémoire et de générer un pic massif de RAM lors de l'export final, les données sont écrites frame par frame en *stream* sur le disque. La complexité mémoire (RAM) est strictement constante **O(1)**, ce qui élimine définitivement les plantages OOM sur les très longues vidéos (>1 heure).
@@ -494,7 +494,7 @@ python -c "import onnxruntime as ort; print('GPU:', 'GPU' in ort.get_available_p
 
 # Solutions
 # 1. Forcer CPU
-STEP5_ENABLE_GPU=0 python workflow_scripts/step4/run_tracking_manager.py
+STEP4_ENABLE_GPU=0 python workflow_scripts/step4/run_tracking_manager.py
 
 # 2. Vérifier drivers CUDA
 sudo apt install nvidia-driver-470
@@ -525,7 +525,7 @@ python -c "import torch; print(torch.cuda.memory_allocated()/1024**3)"
 
 # Solutions
 # 1. Fallback CPU automatique
-STEP5_GPU_FALLBACK_AUTO=1 python workflow_scripts/step4/run_tracking_manager.py
+STEP4_GPU_FALLBACK_AUTO=1 python workflow_scripts/step4/run_tracking_manager.py
 
 # 2. Réduire concurrents
 # Arrêter autres processus GPU
@@ -564,7 +564,7 @@ head docs/test_face_tracking.json | jq '.tracked_objects[0].faces[0].blendshapes
 
 ```bash
 # Activer GPU
-STEP5_TRACKING_ENGINE=insightface source insightface_env/bin/activate
+STEP4_TRACKING_ENGINE=insightface source insightface_env/bin/activate
 
 # Exécuter tracking
 cd test_tracking
@@ -666,25 +666,25 @@ for frame_data in tracking_data['tracked_objects']:
 ## Pièges Courants et Solutions
 
 ### Piège #1 : Anciens moteurs dans la configuration
-**Solution** : Les variables `STEP5_TRACKING_ENGINE=yunet/opencv/eos/openseeface` ne sont plus supportées. Le système fallback automatiquement vers MediaPipe.
+**Solution** : Les variables `STEP4_TRACKING_ENGINE=yunet/opencv/eos/openseeface` ne sont plus supportées. Le système fallback automatiquement vers MediaPipe.
 
 ### Piège #2 : GPU activé inutilement
-**Solution** : MediaPipe reste CPU-only même si `STEP5_ENABLE_GPU=1`. GPU réservé à InsightFace.
+**Solution** : MediaPipe reste CPU-only même si `STEP4_ENABLE_GPU=1`. GPU réservé à InsightFace.
 
 ### Piège #3 : Trop de workers CPU
 **Solution** : Surveiller la charge CPU et ajuster `TRACKING_CPU_WORKERS` (15 par défaut).
 
 ### Piège #4 : VRAM insuffisante
-**Solution** : Activer `STEP5_GPU_FALLBACK_AUTO=1` pour basculer CPU automatiquement.
+**Solution** : Activer `STEP4_GPU_FALLBACK_AUTO=1` pour basculer CPU automatiquement.
 
 ### Piège #5 : JSON trop volumineux
-**Solution** : Utiliser `STEP5_EXPORT_VERBOSE_FIELDS=0` pour réduire la taille.
+**Solution** : Utiliser `STEP4_EXPORT_VERBOSE_FIELDS=0` pour réduire la taille.
 
 ### Piège #6 : Fichiers sans audio STEP4
 **Solution** : Le tracking fonctionne sans audio, mais la détection de parole améliore les résultats.
 
 ### Piège #7 : Variables obsolètes
-**Solution** : Supprimer les variables `STEP5_ENABLE_OBJECT_DETECTION` et `STEP5_*ENGINE_*` des fichiers `.env`.
+**Solution** : Supprimer les variables `STEP4_ENABLE_OBJECT_DETECTION` et `STEP5_*ENGINE_*` des fichiers `.env`.
 
 L'étape 4 transforme les vidéos en données faciales 3D précises avec une architecture simplifiée et fiable. La double approche CPU/GPU garantit que le système fonctionne dans tous les environnements tout en offrant une haute précision quand les ressources le permettent. Le retrait des moteurs historiques simplifie la maintenance et élimine les points de défaillance.
 

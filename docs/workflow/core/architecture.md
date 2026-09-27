@@ -149,7 +149,7 @@ Identifie les changements de scène avec TransNetV2 :
 ### Étape 3 : Analyse Audio (`audio_env/`)
 Diarisation et analyse des locuteurs :
 - **Pyannote.audio 3.1** par défaut (profil TV optimisé)
-- **Lemonfox** en fallback si `STEP4_USE_LEMONFOX=1`
+- **Lemonfox** en fallback si `STEP3_USE_LEMONFOX=1`
 - Extraction audio via ffmpeg (remplace MoviePy)
 - Support embeddings locuteurs avec `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1`
 
@@ -157,7 +157,7 @@ Diarisation et analyse des locuteurs :
 ```bash
 AUDIO_DISABLE_GPU=0          # Forcer CPU si nécessaire
 HF_AUTH_TOKEN=your_token     # Token Hugging Face
-STEP4_USE_LEMONFOX=0         # Activer Lemonfox
+STEP3_USE_LEMONFOX=0         # Activer Lemonfox
 ```
 
 ### Étape 4 : Suivi Vidéo (`tracking_env_slim/` ou `insightface_env/`)
@@ -165,14 +165,14 @@ Détection faciale et tracking d'objets :
 
 **Architecture simplifiée (v4.3)** :
 - **MediaPipe** (défaut, CPU) : 478 landmarks + 52 blendshapes ARKit
-- **InsightFace** (GPU optionnel) : Activé avec `STEP5_ENABLE_GPU=1` et `STEP5_TRACKING_ENGINE=insightface`
+- **InsightFace** (GPU optionnel) : Activé avec `STEP4_ENABLE_GPU=1` et `STEP4_TRACKING_ENGINE=insightface`
 
 **Variables clés** :
 ```bash
-STEP5_TRACKING_ENGINE=          # vide = MediaPipe, "insightface" = GPU
-STEP5_ENABLE_GPU=0              # Activer GPU (InsightFace uniquement)
+STEP4_TRACKING_ENGINE=          # vide = MediaPipe, "insightface" = GPU
+STEP4_ENABLE_GPU=0              # Activer GPU (InsightFace uniquement)
 TRACKING_CPU_WORKERS=15         # Workers CPU pour MediaPipe
-STEP5_ENABLE_PROFILING=0        # Logs détaillés toutes les 20 frames
+STEP4_ENABLE_PROFILING=0        # Logs détaillés toutes les 20 frames
 ```
 
 **Restrictions importantes** :
@@ -188,9 +188,9 @@ Optimise les données pour After Effects :
 
 **Variables optionnelles** :
 ```bash
-STEP6_INCLUDE_TRACKING_ANALYTICS=1
-STEP6_INCLUDE_EXPRESSION_SUMMARY=1
-STEP6_EXPRESSION_KEYS=key1,key2,key3
+STEP5_INCLUDE_TRACKING_ANALYTICS=1
+STEP5_INCLUDE_EXPRESSION_SUMMARY=1
+STEP5_EXPRESSION_KEYS=key1,key2,key3
 ```
 
 ### Étape 6 : Pré-traitement AE (`env/`)
@@ -228,16 +228,16 @@ DISABLE_EXPLORER_OPEN=1           # Sécurité prod/headless
 # STEP4 Audio
 HF_AUTH_TOKEN=your-hf-token
 AUDIO_DISABLE_GPU=0
-STEP4_USE_LEMONFOX=0
+STEP3_USE_LEMONFOX=0
 
 # STEP5 Tracking
-STEP5_TRACKING_ENGINE=           # vide ou "insightface"
-STEP5_ENABLE_GPU=0
+STEP4_TRACKING_ENGINE=           # vide ou "insightface"
+STEP4_ENABLE_GPU=0
 TRACKING_CPU_WORKERS=15
 
 # STEP6 Réduction
-STEP6_INCLUDE_TRACKING_ANALYTICS=1
-STEP6_INCLUDE_EXPRESSION_SUMMARY=1
+STEP5_INCLUDE_TRACKING_ANALYTICS=1
+STEP5_INCLUDE_EXPRESSION_SUMMARY=1
 ```
 
 ### Principes de Sécurité

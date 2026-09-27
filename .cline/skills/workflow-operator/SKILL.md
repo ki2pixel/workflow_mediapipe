@@ -56,7 +56,7 @@ audio_env/bin/python workflow_scripts/step3/run_audio_analysis_lemonfox.py --log
 
 ### Step 4 : Tracking (Standard: CPU MediaPipe via tracking_env_slim, GPU InsightFace-only)
 **Standard CPU** : Mode MediaPipe par défaut via `tracking_env_slim` avec multiprocessing obligatoire (`TRACKING_CPU_WORKERS`).
-**GPU InsightFace** : Mode GPU exclusivement pour InsightFace (`STEP5_ENABLE_GPU=1`, `STEP5_TRACKING_ENGINE=insightface`) via `insightface_env`.
+**GPU InsightFace** : Mode GPU exclusivement pour InsightFace (`STEP4_ENABLE_GPU=1`, `STEP4_TRACKING_ENGINE=insightface`) via `insightface_env`.
 **Modèles Interdits** : YuNet, EOS, OpenSeeFace, py-feat et OpenCV Haar. Lightning et Vultr sont abandonnés.
 **Process** : Warmup `cap.read()`, chunking adaptatif interne.
 **Export JSON** : Obligation absolue d'utiliser `StreamingJSONOutput` pour écrire en streaming (O(1) RAM).
@@ -71,7 +71,7 @@ TRACKING_DISABLE_GPU=1 tracking_env_slim/bin/python workflow_scripts/step4/run_t
 
 # Mode GPU InsightFace (uniquement si moteur InsightFace sélectionné)
 echo '["/chemin/absolu/vers/video.mp4"]' > temp_tracking.json
-STEP5_ENABLE_GPU=1 STEP5_TRACKING_ENGINE=insightface insightface_env/bin/python workflow_scripts/step4/run_tracking_manager.py \
+STEP4_ENABLE_GPU=1 STEP4_TRACKING_ENGINE=insightface insightface_env/bin/python workflow_scripts/step4/run_tracking_manager.py \
   --videos_json_path temp_tracking.json \
   --tracking_engine insightface
 ```
@@ -113,7 +113,7 @@ Pour diagnostiquer un état incohérent :
      - Lire/écrire un fichier : utiliser les helpers de `FilesystemService` pour valider les permissions et verrous.
      - **Jamais** de manipulation directe du disque sans passer par ce service.
 2. **Historique** : Si problème de téléchargement, vérifier `download_history.sqlite3` (pas le JSON déprécié).
-3. **Tracking** : Si le tracking plante, vérifier que `config.settings.py` charge bien les modèles depuis le `InsightFaceEngine` (factory `create_face_engine()`) et non des chemins en dur. Confirmer que `STEP5_TRACKING_ENGINE` est vide (MediaPipe via `tracking_env_slim`) ou `insightface` (GPU via `insightface_env`).
+3. **Tracking** : Si le tracking plante, vérifier que `config.settings.py` charge bien les modèles depuis le `InsightFaceEngine` (factory `create_face_engine()`) et non des chemins en dur. Confirmer que `STEP4_TRACKING_ENGINE` est vide (MediaPipe via `tracking_env_slim`) ou `insightface` (GPU via `insightface_env`).
 4. **Scripts** : Les subprocess doivent utiliser `utils.resource_manager` pour la gestion des verrous et ressources.
 5. **Tests** : Environnement de test `/mnt/venv_ext4/env` avec `DRY_RUN_DOWNLOADS=true` pour CI.
 6. **Sécurité Démarrage** : Le script `validate_startup.py` est obligatoire. En mode `DEBUG=False`, l'application Flask crashe si des secrets par défaut (`dev-*`) sont détectés.
