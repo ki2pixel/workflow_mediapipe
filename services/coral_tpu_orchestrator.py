@@ -9,7 +9,7 @@ class CoralTPUOrchestrator:
     """
     Gestionnaire de queue asynchrone dédié au TPU Coral.
     Objectif: Traitement par micro-lots (batch processing) et sérialisation 
-    des requêtes d'inférence (STEP3, STEP4, STEP5) pour préserver la SRAM de 8Mo 
+    des requêtes d'inférence (STEP2, STEP3, STEP4) pour préserver la SRAM de 8Mo 
     et éviter les évictions de cache coûteuses sur le bus PCIe.
     """
 
@@ -53,7 +53,7 @@ class CoralTPUOrchestrator:
     def submit_task(self, func: Callable[..., Any]) -> Any:
         """
         Soumet une fonction synchrone à la queue asynchrone du TPU et attend le résultat.
-        Cela garantit que l'accès au TPU (ex: lancement d'un subprocess STEP3/4/5) 
+        Cela garantit que l'accès au TPU (ex: lancement d'un subprocess STEP2/3/4) 
         est sérialisé et orchestré.
         """
         future = asyncio.run_coroutine_threadsafe(self._enqueue(func), self.loop)

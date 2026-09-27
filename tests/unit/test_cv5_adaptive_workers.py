@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from workflow_scripts.step5 import run_tracking_cv5 as tracking_cv5
+from workflow_scripts.step4 import run_tracking_cv5 as tracking_cv5
 
 
 class _CapturingOutput:

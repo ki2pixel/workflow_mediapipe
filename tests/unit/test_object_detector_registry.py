@@ -14,9 +14,9 @@ import sys
 # Add project root to path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "workflow_scripts" / "step5"))
+sys.path.insert(0, str(project_root / "workflow_scripts" / "step4"))
 
-from workflow_scripts.step5.object_detector_registry import ObjectDetectorRegistry, ObjectDetectorModelSpec
+from workflow_scripts.step4.object_detector_registry import ObjectDetectorRegistry, ObjectDetectorModelSpec
 
 
 class TestObjectDetectorRegistry:
@@ -139,7 +139,7 @@ class TestObjectDetectorRegistry:
         # To test the missing-file behavior deterministically, inject a temporary model spec
         # with a filename that does not exist anywhere.
         with pytest.MonkeyPatch.context() as mp:
-            from workflow_scripts.step5.object_detector_registry import ObjectDetectorModelSpec
+            from workflow_scripts.step4.object_detector_registry import ObjectDetectorModelSpec
 
             models_copy = dict(ObjectDetectorRegistry.MODELS)
             models_copy["missing_model"] = ObjectDetectorModelSpec(

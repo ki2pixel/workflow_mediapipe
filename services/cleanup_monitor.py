@@ -23,7 +23,7 @@ def stop_cleanup_monitor() -> None:
     shutdown_event.set()
 
 def orphan_cleanup_service():
-    """Service de nettoyage en arrière-plan (orphelins STEP8 & logs obsolètes). S'exécute toutes les 12 heures."""
+    """Service de nettoyage en arrière-plan (orphelins STEP7 & logs obsolètes). S'exécute toutes les 12 heures."""
     logger.info("CLEANUP MONITOR: Service de nettoyage continu démarré.")
     
     interval_seconds = 12 * 3600  # 12 heures

@@ -100,9 +100,9 @@ if (typeof structuredClone === 'undefined') {
       process.exit(1);
     }
 
-    // Given: defaultSequenceableStepsKeys has 8 steps
-    if (!Array.isArray(constants.defaultSequenceableStepsKeys) || constants.defaultSequenceableStepsKeys.length !== 8) {
-      console.error('defaultSequenceableStepsKeys should have 8 steps');
+    // Given: defaultSequenceableStepsKeys has 7 steps
+    if (!Array.isArray(constants.defaultSequenceableStepsKeys) || constants.defaultSequenceableStepsKeys.length !== 7) {
+      console.error('defaultSequenceableStepsKeys should have 7 steps');
       process.exit(1);
     }
 

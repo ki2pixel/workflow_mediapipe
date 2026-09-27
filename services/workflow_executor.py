@@ -88,7 +88,7 @@ def parse_and_update_progress(line: str, step_key: str, step_progress_patterns: 
                         workflow_state.set_step_field(step_key, 'progress_total', total_num)
                     if filename:
                         workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
-                elif len(groups) >= 1 and step_key in (StepKey.STEP3.value, StepKey.STEP4.value, StepKey.STEP5.value):
+                elif len(groups) >= 1 and step_key in (StepKey.STEP2.value, StepKey.STEP3.value, StepKey.STEP4.value):
                     filename = groups[0].strip()
                     if filename:
                         workflow_state.set_step_field(step_key, 'progress_text', html.escape(filename))
@@ -267,7 +267,7 @@ def _run_process_async_internal(step_key: str):
     cmd_str_list = [str(c) for c in step_config['cmd']]
     temp_json_path_for_tracking = None
 
-    if step_key == StepKey.STEP5.value:
+    if step_key == StepKey.STEP4.value:
         workflow_state.append_step_log(step_key, "Préparation de l'étape de tracking : recherche des vidéos à traiter...\n")
         try:
             videos_to_process = WorkflowService.prepare_tracking_step(
@@ -368,19 +368,19 @@ def _run_process_async_internal(step_key: str):
         except Exception as _e:
             logger.warning(f"Unable to set LD_LIBRARY_PATH: {_e}")
 
-        if step_key == StepKey.STEP3.value:
+        if step_key == StepKey.STEP2.value:
             try:
                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
             except Exception as _e:
                 logger.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF: {_e}")
 
-        if step_key == StepKey.STEP4.value:
+        if step_key == StepKey.STEP3.value:
             try:
                 process_env["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
                 process_env["AUDIO_PARTIAL_SUCCESS_OK"] = "1"
                 process_env["AUDIO_GPU_ISOLATION"] = os.environ.get("AUDIO_GPU_ISOLATION", "1")
             except Exception as _e:
-                logger.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP4: {_e}")
+                logger.warning(f"Unable to set PYTORCH_CUDA_ALLOC_CONF for STEP3: {_e}")
 
         # Get current log size to skip reading previous content during tailing
         initial_log_size = 0
@@ -494,15 +494,15 @@ def _run_process_async_internal(step_key: str):
 def run_process_async(step_key: str):
     """
     Point d'entrée pour exécuter une étape. Si le Coral TPU est activé, 
-    les requêtes d'inférence (STEP3, 4, 5) sont envoyées à l'orchestrateur de queue asynchrone 
+    les requêtes d'inférence (STEP2, 3, 4) sont envoyées à l'orchestrateur de queue asynchrone 
     pour un traitement par micro-lots (protection de la SRAM 8Mo).
     """
     is_tpu_step = False
-    if step_key == StepKey.STEP3.value:
+    if step_key == StepKey.STEP2.value:
         is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP3_ENABLE_CORAL_TPU", True)
-    elif step_key == StepKey.STEP4.value:
+    elif step_key == StepKey.STEP3.value:
         is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP4_ENABLE_CORAL_TPU", True)
-    elif step_key == StepKey.STEP5.value:
+    elif step_key == StepKey.STEP4.value:
         is_tpu_step = config.ENABLE_CORAL_TPU_ACCELERATION and getattr(config, "STEP5_ENABLE_CORAL_TPU", True)
 
     if is_tpu_step:

@@ -74,7 +74,7 @@ except ImportError:
 
 # Vérifier les scripts de test
 echo "4. Vérification des scripts de test..."
-for script in run_main_tests.sh run_step3_tests.sh run_step5_tests.sh; do
+for script in run_main_tests.sh run_step2_tests.sh run_step4_tests.sh; do
     if [ -f "scripts/$script" ]; then
         if [ -x "scripts/$script" ]; then
             echo "✅ $script existe et exécutable"
@@ -90,15 +90,15 @@ done
 echo "5. Vérification de pytest.ini..."
 if [ -f "pytest.ini" ]; then
     echo "✅ pytest.ini existe"
-    if grep -q "test_step3_transnet.py" pytest.ini; then
-        echo "✅ Exclusions STEP3 configurées"
+    if grep -q "test_step2_transnet.py" pytest.ini; then
+        echo "✅ Exclusions STEP2 configurées"
     else
-        echo "⚠️ Exclusions STEP3 non trouvées"
+        echo "⚠️ Exclusions STEP2 non trouvées"
     fi
-    if grep -q "test_step5_" pytest.ini; then
-        echo "✅ Exclusions STEP5 configurées"
+    if grep -q "test_step4_" pytest.ini; then
+        echo "✅ Exclusions STEP4 configurées"
     else
-        echo "⚠️ Exclusions STEP5 non trouvées"
+        echo "⚠️ Exclusions STEP4 non trouvées"
     fi
 else
     echo "❌ pytest.ini manquant"

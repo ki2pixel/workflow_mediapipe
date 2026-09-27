@@ -4,9 +4,9 @@
 
 Règle métier : les fichiers `.mov` livrés dans les archives sont des logos
 animés à couche alpha (ajoutés manuellement en post-production), et non des
-vidéos du tournage. Ils ne doivent être ni convertis (STEP2) ni analysés
-(STEP3 à STEP7), mais traverser le pipeline tels quels jusqu'à la
-finalisation (STEP8), qui les copie dans le dossier `docs/` final.
+vidéos du tournage. Ils ne doivent être ni normalisés (STEP1) ni analysés
+(STEP2 à STEP6), mais traverser le pipeline tels quels jusqu'à la
+finalisation (STEP7), qui les copie dans le dossier `docs/` final.
 
 Le comportement est piloté par la variable d'environnement `SKIP_MOV_FILES`
 (active par défaut) : la désactiver rétablit la conversion `.mov` -> `.mp4`.

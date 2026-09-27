@@ -1,12 +1,12 @@
 """
 DeepInfra Audio Service
-Provides integration with DeepInfra OpenAI-compatible Speech-to-Text API for STEP4.
+Provides integration with DeepInfra OpenAI-compatible Speech-to-Text API for STEP3.
 
 This service:
 - Calls DeepInfra API with media files
-- Converts transcription output to STEP4-compatible JSON format
+- Converts transcription output to STEP3-compatible JSON format
 - Writes {video_stem}_audio.json files with frame-by-frame audio analysis
-- Preserves compatibility with STEP5/STEP6 consumers
+- Preserves compatibility with STEP4/STEP5 consumers
 """
 
 import json
@@ -450,7 +450,7 @@ class DeepinfraAudioService:
             os.replace(tmp_path, output_path)
             return True
         except Exception as e:
-            logger.error("Failed to write DeepInfra STEP4 JSON: %s", e, exc_info=True)
+            logger.error("Failed to write DeepInfra STEP3 JSON: %s", e, exc_info=True)
             try:
                 if tmp_path.exists():
                     tmp_path.unlink()

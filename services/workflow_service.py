@@ -545,7 +545,7 @@ class WorkflowService:
     
     @staticmethod
     def prepare_tracking_step(base_path: Path, keyword: str, subdir: str) -> Optional[List[str]]:
-        """Prepare tracking step (STEP5) by finding videos to process.
+        """Prepare tracking step (STEP4) by finding videos to process.
         
         Args:
             base_path: Base path for video search
@@ -557,7 +557,7 @@ class WorkflowService:
         """
         from services.filesystem_service import FilesystemService
         
-        logger.info("STEP5: Searching for videos requiring tracking...")
+        logger.info("STEP4: Searching for videos requiring tracking...")
         
         videos_to_process = FilesystemService.find_videos_for_tracking(
             base_path,
@@ -566,10 +566,10 @@ class WorkflowService:
         )
         
         if not videos_to_process:
-            logger.info("STEP5: No videos to process (all have existing JSON)")
+            logger.info("STEP4: No videos to process (all have existing JSON)")
             return None
         
-        logger.info(f"STEP5: Found {len(videos_to_process)} videos needing tracking")
+        logger.info(f"STEP4: Found {len(videos_to_process)} videos needing tracking")
         return videos_to_process
     
     @staticmethod

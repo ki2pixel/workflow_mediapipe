@@ -131,7 +131,7 @@ if (typeof structuredClone === 'undefined') {
     }
     mod.setStepsConfig({
       STEP1: { display_name: 'Extraction', specific_logs: [] },
-      STEP2: { display_name: 'Conversion', specific_logs: [] },
+      STEP2: { display_name: 'Analyse des transitions', specific_logs: [] },
     });
 
     // Given: getStepsConfig returns the previously set config

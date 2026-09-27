@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class WorkflowCommandsConfig:
     """Centralized workflow commands configuration.
     
-    This class provides configuration for all 8 workflow steps, including:
+    This class provides configuration for all 7 workflow steps, including:
     - Command line arguments
     - Working directories
     - Log file locations
@@ -50,7 +50,7 @@ class WorkflowCommandsConfig:
     def _ensure_log_directories(self) -> None:
         """Ensure all log directories exist."""
         self.logs_base_dir.mkdir(exist_ok=True)
-        for step in range(1, 9):
+        for step in range(1, 8):
             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
     
     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
@@ -67,7 +67,6 @@ class WorkflowCommandsConfig:
             "STEP5": self._get_step5_config(),
             "STEP6": self._get_step6_config(),
             "STEP7": self._get_step7_config(),
-            "STEP8": self._get_step8_config(),
         }
     
     def _get_step1_config(self) -> Dict[str, Any]:
@@ -117,65 +116,33 @@ class WorkflowCommandsConfig:
         }
     
     def _get_step2_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 2: Video Conversion.
+        """Get configuration for Step 2: Scene Detection.
         
         Returns:
             Step 2 configuration dictionary
         """
         step2_log_dir = self.logs_base_dir / "step2"
         
-        return {
-            "display_name": "2. Conversion des vidéos",
-            "cmd": [
-                str(config.get_venv_python("env")),
-                str(self.base_path / "workflow_scripts" / "step2" / "convert_videos.py")
-            ],
-            "cwd": str(self.base_path / "projets_extraits"),
-            "specific_logs": [
-                {
-                    "name": "Log Conversion",
-                    "type": "directory_latest",
-                    "path": step2_log_dir,
-                    "pattern": "*.log",
-                    "lines": 200
-                }
-            ],
-            "progress_patterns": {
-                "total": re.compile(r"TOTAL_VIDEOS_TO_PROCESS:\s*(\d+)", re.IGNORECASE),
-                "current": re.compile(
-                    r"--- Traitement de la vidéo \((\d+)/(\d+)\): (.*?) ---", re.IGNORECASE
-                )
-            }
-        }
-    
-    def _get_step3_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 3: Scene Detection.
-        
-        Returns:
-            Step 3 configuration dictionary
-        """
-        step3_log_dir = self.logs_base_dir / "step3"
-        
         # Priority: OpenCV 5.0 experimental > Coral TPU > Legacy PyTorch
         if getattr(config, 'USE_OPENCV5_STEP3', False):
             cmd = [
                 str(config.get_venv_python('transnet_cv5_env')),
-                str(self.base_path / 'workflow_scripts' / 'step3' / 'run_transnet_cv5.py'),
+                str(self.base_path / 'workflow_scripts' / 'step2' / 'run_transnet_cv5.py'),
             ]
         elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP3_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
-                str(self.base_path / "workflow_scripts" / "step3" / "run_scene_detect_tpu.py"),
-                "--config", str(self.base_path / "config" / "step3_tpu.json")
+                str(self.base_path / "workflow_scripts" / "step2" / "run_scene_detect_tpu.py"),
+                "--config", str(self.base_path / "config" / "step2_tpu.json")
             ]
         else:
             cmd = [
                 str(config.get_venv_python("transnet_env")),
-                str(self.base_path / "workflow_scripts" / "step3" / "run_transnet.py"),
+                str(self.base_path / "workflow_scripts" / "step2" / "run_transnet.py"),
             ]
 
         return {
-            "display_name": "3. Analyse des transitions",
+            "display_name": "2. Analyse des transitions",
             "cmd": cmd,
 
             "cwd": str(self.base_path / "projets_extraits"),
@@ -183,7 +150,7 @@ class WorkflowCommandsConfig:
                 {
                     "name": "Log Analyse Transitions",
                     "type": "directory_latest",
-                    "path": step3_log_dir,
+                    "path": step2_log_dir,
                     "pattern": "*.log",
                     "lines": 150
                 }
@@ -205,19 +172,19 @@ class WorkflowCommandsConfig:
             }
         }
     
-    def _get_step4_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 4: Audio Analysis.
+    def _get_step3_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 3: Audio Analysis.
         
         Returns:
-            Step 4 configuration dictionary
+            Step 3 configuration dictionary
         """
-        step4_log_dir = self.logs_base_dir / "step4"
+        step3_log_dir = self.logs_base_dir / "step3"
 
         if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
-                str(self.base_path / "workflow_scripts" / "step4" / "run_audio_diarization_tpu.py"),
-                "--log_dir", str(step4_log_dir),
+                str(self.base_path / "workflow_scripts" / "step3" / "run_audio_diarization_tpu.py"),
+                "--log_dir", str(step3_log_dir),
             ]
         else:
             resolved_method = "pyannote"
@@ -226,19 +193,19 @@ class WorkflowCommandsConfig:
             except Exception:
                 resolved_method = "lemonfox" if getattr(config, "STEP4_USE_LEMONFOX", False) else "pyannote"
 
-            step4_script_by_method = {
+            audio_script_by_method = {
                 "pyannote": "run_audio_analysis.py",
                 "lemonfox": "run_audio_analysis_lemonfox.py",
                 "deepinfra": "run_audio_analysis_deepinfra.py",
             }
-            step4_script_name = step4_script_by_method.get(resolved_method, "run_audio_analysis.py")
+            audio_script_name = audio_script_by_method.get(resolved_method, "run_audio_analysis.py")
             cmd = [
                 str(config.get_venv_python("audio_env")),
-                str(self.base_path / "workflow_scripts" / "step4" / step4_script_name),
-                "--log_dir", str(step4_log_dir),
+                str(self.base_path / "workflow_scripts" / "step3" / audio_script_name),
+                "--log_dir", str(step3_log_dir),
             ]
 
-            if step4_script_name == "run_audio_analysis.py" and self.hf_token:
+            if audio_script_name == "run_audio_analysis.py" and self.hf_token:
                 cmd.extend(["--hf_auth_token", str(self.hf_token)])
         if getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP4_ENABLE_CORAL_TPU", True):
             progress_patterns = {
@@ -264,14 +231,14 @@ class WorkflowCommandsConfig:
             }
 
         return {
-            "display_name": "4. Analyse audio",
+            "display_name": "3. Analyse audio",
             "cmd": cmd,
             "cwd": str(self.base_path / "projets_extraits"),
             "specific_logs": [
                 {
                     "name": "Log Analyse Audio",
                     "type": "directory_latest",
-                    "path": step4_log_dir,
+                    "path": step3_log_dir,
                     "pattern": "*.log",
                     "lines": 150
                 }
@@ -279,19 +246,19 @@ class WorkflowCommandsConfig:
             "progress_patterns": progress_patterns
         }
     
-    def _get_step5_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 5: Tracking Analysis.
+    def _get_step4_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 4: Tracking Analysis.
         
         Returns:
-            Step 5 configuration dictionary
+            Step 4 configuration dictionary
         """
-        step5_log_dir = self.logs_base_dir / "step5"
+        step4_log_dir = self.logs_base_dir / "step4"
         
         # Priority: OpenCV 5.0 experimental > Coral TPU > Legacy CPU/GPU
         if getattr(config, 'USE_OPENCV5_STEP5', False):
             cmd = [
                 str(config.get_venv_python('tracking_cv5_env')),
-                str(self.base_path / 'workflow_scripts' / 'step5' / 'run_tracking_cv5.py'),
+                str(self.base_path / 'workflow_scripts' / 'step4' / 'run_tracking_cv5.py'),
                 "--num_workers", str(getattr(config, 'STEP5_CV5_NUM_WORKERS', 4)),
                 "--worker_mode", str(getattr(config, 'STEP5_CV5_WORKER_MODE', 'auto')),
                 "--inference_device",
@@ -306,14 +273,14 @@ class WorkflowCommandsConfig:
                 {
                     "name": "Log Tracking CV5",
                     "type": "directory_latest",
-                    "path": step5_log_dir,
+                    "path": step4_log_dir,
                     "pattern": "tpu_tracking_cv5*.log",
                     "lines": 100
                 },
                 {
                     "name": "Log Worker CV5",
                     "type": "directory_latest",
-                    "path": step5_log_dir,
+                    "path": step4_log_dir,
                     "pattern": "*worker_CPU_cv5*.log",
                     "lines": 100
                 }
@@ -335,13 +302,13 @@ class WorkflowCommandsConfig:
         elif getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False) and getattr(config, "STEP5_ENABLE_CORAL_TPU", True):
             cmd = [
                 str(config.get_venv_python("coral_env")),
-                str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_tpu.py")
+                str(self.base_path / "workflow_scripts" / "step4" / "run_tracking_tpu.py")
             ]
             specific_logs = [
                 {
                     "name": "Log Tracking TPU",
                     "type": "directory_latest",
-                    "path": step5_log_dir,
+                    "path": step4_log_dir,
                     "pattern": "tpu_tracking*.log",
                     "lines": 100
                 }
@@ -360,27 +327,27 @@ class WorkflowCommandsConfig:
         else:
             cmd = [
                 str(config.get_venv_python("tracking_env_slim")),
-                str(self.base_path / "workflow_scripts" / "step5" / "run_tracking_manager.py")
+                str(self.base_path / "workflow_scripts" / "step4" / "run_tracking_manager.py")
             ]
             specific_logs = [
                 {
                     "name": "Log Tracking Manager",
                     "type": "directory_latest",
-                    "path": step5_log_dir,
+                    "path": step4_log_dir,
                     "pattern": "manager_tracking*.log",
                     "lines": 100
                 },
                 {
                     "name": "Log Worker CPU",
                     "type": "directory_latest",
-                    "path": step5_log_dir,
+                    "path": step4_log_dir,
                     "pattern": "*worker_CPU*.log",
                     "lines": 100
                 },
                 {
                     "name": "Log Worker GPU",
                     "type": "directory_latest",
-                    "path": step5_log_dir,
+                    "path": step4_log_dir,
                     "pattern": "*worker_GPU*.log",
                     "lines": 100
                 }
@@ -396,7 +363,7 @@ class WorkflowCommandsConfig:
             }
 
         return {
-            "display_name": "5. Analyse du tracking",
+            "display_name": "4. Analyse du tracking",
             "cmd": cmd,
             "cwd": str(self.base_path / "projets_extraits"),
             "specific_logs": specific_logs,
@@ -404,20 +371,20 @@ class WorkflowCommandsConfig:
             "post_completion_message_ui": "Traitement du tracking terminé."
         }
     
-    def _get_step6_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 6: JSON Reduction.
+    def _get_step5_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 5: JSON Reduction.
         
         Returns:
-            Step 6 configuration dictionary
+            Step 5 configuration dictionary
         """
-        step6_log_dir = self.logs_base_dir / "step6"
+        step5_log_dir = self.logs_base_dir / "step5"
         
         return {
-            "display_name": "6. Réduction JSON",
+            "display_name": "5. Réduction JSON",
             "cmd": [
                 str(config.get_venv_python("env")),
-                str(self.base_path / "workflow_scripts" / "step6" / "json_reducer.py"),
-                "--log_dir", str(step6_log_dir),
+                str(self.base_path / "workflow_scripts" / "step5" / "json_reducer.py"),
+                "--log_dir", str(step5_log_dir),
                 "--work_dir", str(self.base_path / "projets_extraits")
             ],
             "cwd": str(self.base_path / "projets_extraits"),
@@ -425,7 +392,7 @@ class WorkflowCommandsConfig:
                 {
                     "name": "Log Réduction JSON",
                     "type": "directory_latest",
-                    "path": step6_log_dir,
+                    "path": step5_log_dir,
                     "pattern": "*.log",
                     "lines": 150
                 }
@@ -444,20 +411,20 @@ class WorkflowCommandsConfig:
             }
         }
     
-    def _get_step7_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 7: AE JSON preprocessing.
+    def _get_step6_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 6: AE JSON preprocessing.
 
         Returns:
-            Step 7 configuration dictionary
+            Step 6 configuration dictionary
         """
-        step7_log_dir = self.logs_base_dir / "step7"
+        step6_log_dir = self.logs_base_dir / "step6"
 
         return {
-            "display_name": "7. Pré-traitement AE",
+            "display_name": "6. Pré-traitement AE",
             "cmd": [
                 str(config.get_venv_python("env")),
-                str(self.base_path / "workflow_scripts" / "step7" / "preprocess_ae_json.py"),
-                "--log_dir", str(step7_log_dir),
+                str(self.base_path / "workflow_scripts" / "step6" / "preprocess_ae_json.py"),
+                "--log_dir", str(step6_log_dir),
                 "--work_dir", str(self.base_path / "projets_extraits"),
             ],
             "cwd": str(self.base_path / "projets_extraits"),
@@ -465,7 +432,7 @@ class WorkflowCommandsConfig:
                 {
                     "name": "Log Pré-traitement AE",
                     "type": "directory_latest",
-                    "path": step7_log_dir,
+                    "path": step6_log_dir,
                     "pattern": "*.log",
                     "lines": 150,
                 }
@@ -485,26 +452,26 @@ class WorkflowCommandsConfig:
             "post_completion_message_ui": "Pré-traitement AE terminé.",
         }
 
-    def _get_step8_config(self) -> Dict[str, Any]:
-        """Get configuration for Step 8: Finalization.
+    def _get_step7_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 7: Finalization.
 
         Returns:
-            Step 8 configuration dictionary
+            Step 7 configuration dictionary
         """
-        step8_log_dir = self.logs_base_dir / "step8"
+        step7_log_dir = self.logs_base_dir / "step7"
 
         return {
-            "display_name": "8. Finalisation",
+            "display_name": "7. Finalisation",
             "cmd": [
                 str(config.get_venv_python("env")),
-                str(self.base_path / "workflow_scripts" / "step8" / "finalize_and_copy.py"),
+                str(self.base_path / "workflow_scripts" / "step7" / "finalize_and_copy.py"),
             ],
             "cwd": str(self.base_path / "projets_extraits"),
             "specific_logs": [
                 {
                     "name": "Log Finalisation",
                     "type": "directory_latest",
-                    "path": step8_log_dir,
+                    "path": step7_log_dir,
                     "pattern": "*.log",
                     "lines": 150,
                 }
@@ -602,7 +569,7 @@ class WorkflowCommandsConfig:
             hf_token: New HuggingFace authentication token
         """
         self.hf_token = hf_token
-        self._config["STEP4"] = self._get_step4_config()
+        self._config["STEP3"] = self._get_step3_config()
         logger.info("HuggingFace token updated in configuration")
     
     def __repr__(self) -> str:

@@ -70,6 +70,28 @@ function runTest() {
     assert(appState.getStateProperty('selectedStepsOrder').length === 0, 'Steps order should revert to default');
     console.log('✓ Reset success');
 
+    console.log('Test 4: Purge one-shot de la sélection d\'étapes obsolète');
+    // Given: une sélection persistée avant la renumérotation STEP1→STEP7
+    mockLocalStorage.clear();
+    mockLocalStorage.setItem('appstate:selectedStepsOrder', '["STEP1","STEP2","STEP3"]');
+    assert(mockLocalStorage.getItem('appstate:migration:stepKeysV2') === null, 'Migration flag should start unset');
+
+    // When: rechargement de l'état persisté
+    appState._loadPersistedState();
+
+    // Then: la sélection obsolète est purgée et le marqueur est posé
+    assert(mockLocalStorage.getItem('appstate:selectedStepsOrder') === null, 'Legacy step selection should be purged');
+    assert(mockLocalStorage.getItem('appstate:migration:stepKeysV2') === 'done', 'Migration flag should be set');
+
+    // And: une nouvelle sélection post-migration est conservée
+    appState.setState({ selectedStepsOrder: ['STEP1', 'STEP4'] }, 'test_steps_after_migration');
+    appState._loadPersistedState();
+    assert(
+        mockLocalStorage.getItem('appstate:selectedStepsOrder') === '["STEP1","STEP4"]',
+        'Post-migration selection should be preserved'
+    );
+    console.log('✓ Purge one-shot success');
+
     console.log('=== Tous les tests passés ===\n');
 }
 

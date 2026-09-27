@@ -62,18 +62,17 @@ except ImportError:
 BASE_PATH_SCRIPTS = config.BASE_PATH_SCRIPTS
 PYTHON_VENV_EXE = config.PYTHON_VENV_EXE
 
-PARALLEL_TRACKING_SCRIPT_PATH = BASE_PATH_SCRIPTS / "workflow_scripts" / "step5" / "run_tracking_manager.py"
+PARALLEL_TRACKING_SCRIPT_PATH = BASE_PATH_SCRIPTS / "workflow_scripts" / "step4" / "run_tracking_manager.py"
 
 LOGS_BASE_DIR = BASE_PATH_SCRIPTS / "logs"
 os.makedirs(LOGS_BASE_DIR, exist_ok=True)
 
-for step in range(1, 9):
+for step in range(1, 8):
     os.makedirs(LOGS_BASE_DIR / f"step{step}", exist_ok=True)
 
 STEP0_PREP_LOG_DIR = Path(os.environ.get('STEP0_PREP_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step1")))
-MEDIA_ENCODER_LOGS_DIR = Path(os.environ.get('MEDIA_ENCODER_LOGS_DIR_ENV', str(LOGS_BASE_DIR / "step2")))
-SCENE_DETECT_LOG_DIR = Path(os.environ.get('SCENE_DETECT_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step3")))
-AUDIO_ANALYSIS_LOG_DIR = Path(os.environ.get('AUDIO_ANALYSIS_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step4")))
+SCENE_DETECT_LOG_DIR = Path(os.environ.get('SCENE_DETECT_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step2")))
+AUDIO_ANALYSIS_LOG_DIR = Path(os.environ.get('AUDIO_ANALYSIS_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step3")))
 
 BASE_TRACKING_LOG_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_LOG_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))
 BASE_TRACKING_PROGRESS_SEARCH_PATH = Path(os.environ.get('BASE_TRACKING_PROGRESS_SEARCH_PATH_ENV', str(BASE_PATH_SCRIPTS)))

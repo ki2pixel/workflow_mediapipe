@@ -29,6 +29,13 @@ class AppState {
             'localDownloadsAlertedOnce': 'ui.localDownloadsAlertedOnce'
         };
 
+        // Marqueur de migration one-shot de la sélection d'étapes persistée.
+        // La renumérotation STEP1→STEP7 (suppression de l'étape de conversion)
+        // rend toute sélection antérieure ambiguë : l'ancien "STEP2" désigne
+        // désormais l'analyse des transitions, pas la conversion.
+        this.STEP_KEYS_MIGRATION_FLAG = 'appstate:migration:stepKeysV2';
+        this.PERSISTED_STEPS_ORDER_PATH = 'appstate:selectedStepsOrder';
+
         this.state = {
             pollingIntervals: {},
             
@@ -349,6 +356,19 @@ class AppState {
         
         let stateHasBeenLoaded = false;
         
+        // Step 0: purge one-shot de la sélection d'étapes après renumérotation.
+        // Sans cela, une sélection enregistrée avant la migration relancerait
+        // silencieusement une autre étape que celle attendue par l'utilisateur.
+        try {
+            if (localStorage.getItem(this.STEP_KEYS_MIGRATION_FLAG) === null) {
+                localStorage.removeItem(this.PERSISTED_STEPS_ORDER_PATH);
+                localStorage.setItem(this.STEP_KEYS_MIGRATION_FLAG, 'done');
+                console.info('[AppState] Sélection d\'étapes purgée (renumérotation STEP1→STEP7)');
+            }
+        } catch (e) {
+            console.warn('[AppState] Failed to purge legacy step selection:', e);
+        }
+
         // Step 1: Migrate legacy keys if they exist and delete them
         try {
             for (const [legacyKey, appStatePath] of Object.entries(this.LEGACY_MIGRATIONS)) {

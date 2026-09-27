@@ -18,10 +18,10 @@ if _env_path.exists():
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--step5-gpu-log",
+        "--step4-gpu-log",
         action="store",
         default=None,
-        help="Path to a STEP5 worker GPU log to validate (optional).",
+        help="Path to a STEP4 worker GPU log to validate (optional).",
     )
 
 
@@ -98,19 +98,19 @@ def make_zip_bytes():
 
 @pytest.fixture(scope="session")
 def transnet_env_info():
-    """Information about TransNet environment for STEP3 tests."""
+    """Information about TransNet environment for STEP2 tests."""
     return {
         "env_path": "/mnt/venv_ext4/transnet_env",
         "required_modules": ["torch", "transnetv2_pytorch"],
-        "test_files": ["test_step3_transnet.py"]
+        "test_files": ["test_step2_transnet.py"]
     }
 
 
 @pytest.fixture(scope="session")
 def tracking_env_info():
-    """Information about Tracking environment for STEP5 tests."""
+    """Information about Tracking environment for STEP4 tests."""
     return {
         "env_path": "/mnt/venv_ext4/tracking_env_slim",
         "required_modules": ["numpy", "cv2", "mediapipe"],
-        "test_files": ["test_step5_*.py", "test_tracking_optimizations_*.py"]
+        "test_files": ["test_step4_*.py", "test_tracking_optimizations_*.py"]
     }

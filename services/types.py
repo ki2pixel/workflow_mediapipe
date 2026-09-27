@@ -14,7 +14,6 @@ class StepKey(str, Enum):
     STEP5 = "STEP5"
     STEP6 = "STEP6"
     STEP7 = "STEP7"
-    STEP8 = "STEP8"
 
 class StepStatus(str, Enum):
     IDLE = "idle"

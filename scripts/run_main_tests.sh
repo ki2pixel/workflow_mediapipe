@@ -7,23 +7,22 @@ echo "=== Exécution des tests backend principaux ==="
 echo "🔄 Activation de l'environnement principal..."
 source /mnt/venv_ext4/env/bin/activate
 
-# Exécuter les tests principaux (excluant STEP3/STEP5 spécialisés)
+# Exécuter les tests principaux (excluant STEP2/STEP4 spécialisés)
 echo "🧪 Exécution des tests principaux..."
 export DRY_RUN_DOWNLOADS=true
 
 # Liste des tests à exclure (nécessitant des environnements spécialisés)
 EXCLUDE_TESTS=(
-    "tests/unit/test_step3_transnet.py"
-    "tests/unit/test_step5_export_verbose_fields.py"
-    "tests/unit/test_step5_face_engines.py"
-    "tests/unit/test_step5_gpu_logs.py"
-    "tests/unit/test_step5_gpu_support.py"
-    "tests/unit/test_step5_insightface_engine.py"
-    "tests/unit/test_step5_insightface_gpu_only.py"
-    "tests/unit/test_step5_yunet_pyfeat_optimizations.py"
+    "tests/unit/test_step2_transnet.py"
+    "tests/unit/test_step4_export_verbose_fields.py"
+    "tests/unit/test_step4_face_engines.py"
+    "tests/unit/test_step4_gpu_logs.py"
+    "tests/unit/test_step4_gpu_support.py"
+    "tests/unit/test_step4_insightface_engine.py"
+    "tests/unit/test_step4_insightface_gpu_only.py"
     "tests/unit/test_tracking_optimizations_blendshapes_filter.py"
-    "tests/integration/test_step5_json_formats.py"
-    "tests/integration/test_step5_cv5_json_formats.py"
+    "tests/integration/test_step4_json_formats.py"
+    "tests/integration/test_step4_cv5_json_formats.py"
 )
 
 # Construire la commande pytest avec les exclusions

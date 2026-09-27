@@ -479,7 +479,7 @@ export function updateStepCardUI(stepKey, data) {
                     currentProgress = data.progress_current_fractional || data.progress_current;
 
                     if (data.progress_current_fractional === null && data.progress_text) {
-                        const isSpecialRunning = (['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
+                        const isSpecialRunning = (['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running','starting','initiated'].includes(normalizedStatus);
                         if (!isSpecialRunning) {
                             const percentMatch = data.progress_text.match(/(\d+)%/);
                             if (percentMatch) {
@@ -493,7 +493,7 @@ export function updateStepCardUI(stepKey, data) {
                     percentage = Math.round((currentProgress / data.progress_total) * 100);
                     percentage = Math.min(percentage, 100);
 
-                    if ((['STEP3','STEP4','STEP5'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
+                    if ((['STEP2','STEP3','STEP4'].includes(stepKey)) && ['running', 'starting', 'initiated'].includes(normalizedStatus)) {
                         if (percentage >= 100) {
                             percentage = 99;
                         }

@@ -54,8 +54,8 @@ download_history.sqlite3-wal
 download_history.sqlite3-shm
 
 # Modèles lourds maintenus hors Git (stockage externe)
-workflow_scripts/step5/models/engines/insightface/1k3d68.onnx
-workflow_scripts/step5/models/engines/insightface/glintr100.onnx
+workflow_scripts/step4/models/engines/insightface/1k3d68.onnx
+workflow_scripts/step4/models/engines/insightface/glintr100.onnx
 
 # Fichiers système
 .DS_Store

@@ -1,12 +1,12 @@
 """
 Lemonfox Audio Service
-Provides integration with Lemonfox Speech-to-Text API for STEP4 (Audio Analysis).
+Provides integration with Lemonfox Speech-to-Text API for STEP3 (Audio Analysis).
 
 This service:
 - Calls Lemonfox API with video files
-- Converts Lemonfox transcription output to STEP4-compatible JSON format
+- Converts Lemonfox transcription output to STEP3-compatible JSON format
 - Writes {video_stem}_audio.json files with frame-by-frame audio analysis
-- Ensures compatibility with STEP5 (enhanced_speaking_detection.py) and STEP6 (json_reducer.py)
+- Ensures compatibility with STEP4 (enhanced_speaking_detection.py) and STEP5 (json_reducer.py)
 
 Architecture:
 - Service layer only (business logic)
@@ -30,7 +30,7 @@ from config.settings import config
 
 logger = logging.getLogger(__name__)
 
-# Constants matching STEP4 current implementation
+# Constants matching STEP3 current implementation
 AUDIO_SUFFIX = "_audio.json"
 DEFAULT_FPS = 25.0
 
@@ -794,7 +794,7 @@ class LemonfoxAudioService:
         speaker_embeddings: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
-        Write STEP4-compatible JSON atomically.
+        Write STEP3-compatible JSON atomically.
         
         Args:
             output_path: Target output path
@@ -872,7 +872,7 @@ class LemonfoxAudioService:
         eu_processing: Optional[bool] = None
     ) -> AudioAnalysisResult:
         """
-        Process a video with Lemonfox API and generate STEP4-compatible JSON.
+        Process a video with Lemonfox API and generate STEP3-compatible JSON.
         
         This is the main service method called by API routes.
         
