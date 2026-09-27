@@ -4,6 +4,15 @@
 - Aucune tâche active.
 
 ## Dernière Session Clôturée
+- [2026-09-27 22:25:22] Exclusions pytest effectives et réparation des runners d'étapes (COMPLET) :
+  - **Décision** : les exclusions de tests spécialisés quittent `pytest.ini` (motifs `!pattern` dans `python_files`, qui ne sont pas une syntaxe pytest et n'étaient donc jamais appliqués) pour `collect_ignore_glob` dans `tests/conftest.py` ; les runners documentés sont réparés. Détail et alternatives rejetées dans `decisionLog.md`.
+  - **Implémentation** : `run_step2_tests.sh` (`workflow_scripts/step2` sur le `PYTHONPATH`, sinon faux négatif sur `transnetv2_pytorch`), `run_step4_tests.sh` (`python -m pytest` dans le venv, ligne morte retirée), `run_tests.sh` (résolution de `VENV_BASE_DIR` depuis `.env`, fin du double `-q` qui masquait le bilan), propagation du code de sortie dans les trois, fixture autouse du cache tolérante à l'absence de Flask, skip du test TPU quand `run_tracking_tpu` sort à l'import, `diagnose_tests.sh` et `AGENTS.md` alignés.
+  - **Environnement** : `python-dotenv` ajouté à `transnet_env`, `pytest` + `python-dotenv` à `tracking_env_slim` (delta purement additif, versions épinglées du projet).
+  - **Validation** : suite par défaut 528 réussis / 32 ignorés (contre 3 erreurs de collecte + 9 échecs), `run_step2_tests.sh` 8 réussis, `run_step4_tests.sh` 25 réussis / 4 ignorés, suite frontend verte.
+- [2026-09-27 22:12:37] Audit du warning OpenCV DNN de STEP2 et repli CPU silencieux (COMPLET) :
+  - **Décision** : l'échec d'import d'`transnetv2.onnx` par OpenCV DNN est un cas **attendu** (nœuds `Flatten` avec `axis` égal au rang, puis `Mul`, non supportés par l'importeur), plus un incident ; OpenCV DNN n'est tenté que si le moteur graphe est disponible, et le backend réellement actif (`ONNX Runtime (CUDA|CPU)`) est affiché au chargement, à la validation pré-vol et sur chaque succès. Rapport : `docs/audits/audit_step2_opencv_dnn_2026-09-27.md`.
+  - **Correctif connexe** : `LD_LIBRARY_PATH` étant figé par ld.so au démarrage du processus, l'injection des libs nvidia du venv n'agissait pas dans le processus courant → repli CPU silencieux hors lanceur applicatif (~8× plus lent). Une ré-exécution unique (garde `STEP2_CV5_CUDA_ENV_READY`) rend l'injection effective, sans effet en production où `workflow_executor` fournit déjà les chemins.
+  - **Validation** : intégration STEP2 3/3 ; clip de 12 s en 1,08 s (CUDA) contre 8,84 s (CPU) ; `STEP2_CV5_FORCE_CPU=true` validé ; log produit sans bruit ORT.
 - [2026-09-27 22:05:00] Renumérotation des variables d'environnement et des endpoints audio (COMPLET) :
   - **Décision** : les variables `STEPn_*` suivent désormais la numérotation actuelle du pipeline (STEP2_* transitions, STEP3_* audio, STEP4_* tracking, STEP5_* réduction JSON, STEP6_* pré-traitement AE) ; les endpoints audio passent de `/api/step4/*` à `/api/audio/*` en renommage sec. Détail et garde-fous dans `decisionLog.md`.
   - **Implémentation** : ~1300 occurrences renommées dans 73 fichiers ; `scripts/migrate_env_step_names.py` (passe unique, sauvegarde horodatée, marqueur `ENV_STEP_SCHEMA=2`) ; `.env` local migré (sauvegarde `.env.bak-*`) ; garde-fou `Config.check_step_env_schema()` — erreur en production, avertissement en développement — car le décalage est une permutation et un `.env` non migré change de sens silencieusement.
@@ -16,7 +25,7 @@
   - **Validation** : suite backend complète (unit + intégration) et suites frontend Node ESM au vert.
 
 ## Prochaine Action
-- Redémarrer l'application (le `.env` a été migré et le cache frontend doit être reconstruit).
-- Rattraper les projets extraits avant la migration : `env/bin/python workflow_scripts/step1/extract_archives.py --normalize-only`.
-- Lancer et monitorer le workflow complet (1→7) sur un projet de test.
-- Mettre à jour les appels externes vers `/api/audio/lemonfox` et `/api/audio/deepinfra` (curl, n8n, règles de reverse-proxy).
+- Vérifier sur le prochain run complet que STEP2 journalise bien `ONNX Runtime (CUDA)` dans `logs/step2/` (un repli CPU signerait une régression de l'injection `LD_LIBRARY_PATH`).
+- Valider la sonde du moteur graphe (`DNN_ENGINE_NEW` / `ENGINE_NEW`) sur une vraie installation OpenCV 5.x : seule voie pour exploiter le moteur graphe de l'option expérimentale de STEP2.
+- Trancher le sort de `config/step2_cv5.json` (absent : le script tourne sur ses valeurs par défaut, dont `ffmpeg_threads=0`).
+- Optionnel, chantier dédié : rendre `transnetv2.onnx` importable par OpenCV DNN (nœuds `Flatten` **et** `Mul` non supportés) — sans intérêt immédiat tant qu'OpenCV 5.x n'est pas installé.
