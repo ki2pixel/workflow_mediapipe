@@ -44,7 +44,7 @@ def temp_project_dir():
 
 class TestDeepinfraEndpointValidation:
     def test_endpoint_rejects_missing_body(self, client):
-        response = client.post("/api/step4/deepinfra_audio")
+        response = client.post("/api/audio/deepinfra")
         assert response.status_code == 400
         data = json.loads(response.data)
         assert data["status"] == "error"
@@ -52,7 +52,7 @@ class TestDeepinfraEndpointValidation:
 
     def test_endpoint_rejects_missing_project_name(self, client):
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={"video_name": "test.mp4"},
         )
         assert response.status_code == 400
@@ -61,7 +61,7 @@ class TestDeepinfraEndpointValidation:
 
     def test_endpoint_rejects_missing_video_name(self, client):
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={"project_name": "test_project"},
         )
         assert response.status_code == 400
@@ -70,7 +70,7 @@ class TestDeepinfraEndpointValidation:
 
     def test_endpoint_validates_timestamp_granularities_type(self, client):
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={
                 "project_name": "test_project",
                 "video_name": "test.mp4",
@@ -83,7 +83,7 @@ class TestDeepinfraEndpointValidation:
 
     def test_endpoint_validates_response_format_type(self, client):
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={
                 "project_name": "test_project",
                 "video_name": "test.mp4",
@@ -96,7 +96,7 @@ class TestDeepinfraEndpointValidation:
 
     def test_endpoint_validates_temperature_type(self, client):
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={
                 "project_name": "test_project",
                 "video_name": "test.mp4",
@@ -141,7 +141,7 @@ class TestDeepinfraEndpointIntegration:
         )()
 
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": temp_project_dir["video_name"],
@@ -163,7 +163,7 @@ class TestDeepinfraEndpointIntegration:
         mock_config.PROJECTS_DIR = temp_project_dir["projects_dir"]
 
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={
                 "project_name": "missing_project",
                 "video_name": "test.mp4",
@@ -189,7 +189,7 @@ class TestDeepinfraEndpointIntegration:
         )()
 
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={"project_name": "p", "video_name": "v.mp4"},
         )
 
@@ -212,7 +212,7 @@ class TestDeepinfraEndpointIntegration:
         )()
 
         response = client.post(
-            "/api/step4/deepinfra_audio",
+            "/api/audio/deepinfra",
             json={"project_name": "p", "video_name": "v.mp4"},
         )
 

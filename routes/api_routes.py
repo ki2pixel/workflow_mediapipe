@@ -514,14 +514,14 @@ def stats_history():
 
 
 
-@api_bp.route('/step4/lemonfox_audio', methods=['POST'])
-@measure_api('/api/step4/lemonfox_audio')
+@api_bp.route('/audio/lemonfox', methods=['POST'])
+@measure_api('/api/audio/lemonfox')
 @require_internal_worker_token
 def lemonfox_audio_analysis():
     """
     Process video audio analysis using Lemonfox Speech-to-Text API.
     
-    Generates a STEP4-compatible {video_stem}_audio.json file with frame-by-frame
+    Generates a STEP3-compatible {video_stem}_audio.json file with frame-by-frame
     audio analysis including speaker diarization.
     
     Request JSON:
@@ -665,8 +665,8 @@ def lemonfox_audio_analysis():
         }), 500
 
 
-@api_bp.route('/step4/deepinfra_audio', methods=['POST'])
-@measure_api('/api/step4/deepinfra_audio')
+@api_bp.route('/audio/deepinfra', methods=['POST'])
+@measure_api('/api/audio/deepinfra')
 @require_internal_worker_token
 def deepinfra_audio_analysis():
     """Process video audio analysis using DeepInfra OpenAI-compatible STT API."""

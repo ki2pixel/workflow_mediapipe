@@ -247,7 +247,7 @@ curl -sI https://workflow.example.com/ | grep -i strict-transport
 curl -s https://workflow.example.com/ | grep -o 'worker.token'
 
 # Vérifier que les endpoints protégés rejettent sans token
-curl -s -X POST https://workflow.example.com/api/step4/lemonfox_audio \
+curl -s -X POST https://workflow.example.com/api/audio/lemonfox \
   -H "Content-Type: application/json" \
   -d '{"project_name":"test","video_name":"test.mp4"}' | jq .
 

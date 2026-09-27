@@ -53,7 +53,7 @@ class TestLemonfoxEndpointValidation:
     
     def test_endpoint_rejects_missing_body(self, client):
         """Reject requests without JSON body."""
-        response = client.post('/api/step4/lemonfox_audio')
+        response = client.post('/api/audio/lemonfox')
         assert response.status_code == 400
         data = json.loads(response.data)
         assert data["status"] == "error"
@@ -62,7 +62,7 @@ class TestLemonfoxEndpointValidation:
     def test_endpoint_rejects_missing_project_name(self, client):
         """Reject requests without project_name."""
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={"video_name": "test.mp4"}
         )
         assert response.status_code == 400
@@ -73,7 +73,7 @@ class TestLemonfoxEndpointValidation:
     def test_endpoint_rejects_missing_video_name(self, client):
         """Reject requests without video_name."""
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={"project_name": "test_project"}
         )
         assert response.status_code == 400
@@ -84,7 +84,7 @@ class TestLemonfoxEndpointValidation:
     def test_endpoint_validates_min_speakers_type(self, client):
         """Reject invalid min_speakers type."""
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": "test_project",
                 "video_name": "test.mp4",
@@ -99,7 +99,7 @@ class TestLemonfoxEndpointValidation:
     def test_endpoint_validates_max_speakers_type(self, client):
         """Reject invalid max_speakers type."""
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": "test_project",
                 "video_name": "test.mp4",
@@ -114,7 +114,7 @@ class TestLemonfoxEndpointValidation:
     def test_endpoint_validates_timestamp_granularities_type(self, client):
         """Reject invalid timestamp_granularities type."""
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": "test_project",
                 "video_name": "test.mp4",
@@ -157,7 +157,7 @@ class TestLemonfoxEndpointIntegration:
         
         # Make request
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": temp_project_dir["video_name"]
@@ -216,7 +216,7 @@ class TestLemonfoxEndpointIntegration:
         
         # Make request
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": temp_project_dir["video_name"]
@@ -240,7 +240,7 @@ class TestLemonfoxEndpointIntegration:
         mock_config.PROJECTS_DIR = temp_project_dir["projects_dir"]
         
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": "nonexistent_project",
                 "video_name": "test.mp4"
@@ -258,7 +258,7 @@ class TestLemonfoxEndpointIntegration:
         mock_config.PROJECTS_DIR = temp_project_dir["projects_dir"]
         
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": "nonexistent.mp4"
@@ -292,7 +292,7 @@ class TestLemonfoxEndpointIntegration:
         )
         
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": temp_project_dir["video_name"]
@@ -311,7 +311,7 @@ class TestLemonfoxEndpointIntegration:
         mock_config.LEMONFOX_API_KEY = None  # Not configured
         
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": temp_project_dir["video_name"]
@@ -332,7 +332,7 @@ class TestLemonfoxEndpointSecurity:
         mock_config.PROJECTS_DIR = temp_project_dir["projects_dir"]
         
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": "/etc/passwd"
@@ -350,7 +350,7 @@ class TestLemonfoxEndpointSecurity:
         mock_config.PROJECTS_DIR = temp_project_dir["projects_dir"]
         
         response = client.post(
-            '/api/step4/lemonfox_audio',
+            '/api/audio/lemonfox',
             json={
                 "project_name": temp_project_dir["project_name"],
                 "video_name": "../../../etc/passwd"

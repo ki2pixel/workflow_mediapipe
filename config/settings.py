@@ -172,7 +172,7 @@ class Config:
     # GPU Configuration
     ENABLE_GPU_MONITORING: bool = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
     
-    # Lemonfox API Configuration (STEP4 alternative)
+    # Lemonfox API Configuration (STEP3 alternative)
     LEMONFOX_API_KEY: Optional[str] = os.environ.get('LEMONFOX_API_KEY')
     LEMONFOX_TIMEOUT_SEC: int = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
     LEMONFOX_EU_DEFAULT: bool = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
@@ -207,7 +207,7 @@ class Config:
     STEP3_METHOD: str = os.environ.get("STEP3_METHOD", "")
     STEP3_USE_LEMONFOX: bool = os.environ.get('STEP3_USE_LEMONFOX', '0') == '1'
 
-    # DeepInfra API Configuration (STEP4 alternative)
+    # DeepInfra API Configuration (STEP3 alternative)
     DEEPINFRA_API_KEY: Optional[str] = os.environ.get("DEEPINFRA_API_KEY")
     DEEPINFRA_BASE_URL: str = os.environ.get("DEEPINFRA_BASE_URL", "https://api.deepinfra.com")
     DEEPINFRA_TRANSCRIPTIONS_ENDPOINT: str = os.environ.get(
@@ -234,7 +234,7 @@ class Config:
     DEEPINFRA_SPEECH_GAP_FILL_SEC: float = float(os.environ.get("DEEPINFRA_SPEECH_GAP_FILL_SEC", "0.15"))
     DEEPINFRA_SPEECH_MIN_ON_SEC: float = float(os.environ.get("DEEPINFRA_SPEECH_MIN_ON_SEC", "0.0"))
     
-    # STEP5 Object Detection Configuration
+    # STEP4 Object Detection Configuration
     # Model selection for fallback object detection when face detection fails (MediaPipe only)
     STEP4_OBJECT_DETECTOR_MODEL: str = os.environ.get(
         'STEP4_OBJECT_DETECTOR_MODEL',
@@ -243,7 +243,7 @@ class Config:
     STEP4_OBJECT_DETECTOR_MODEL_PATH: Optional[str] = os.environ.get('STEP4_OBJECT_DETECTOR_MODEL_PATH')
     STEP4_ENABLE_OBJECT_DETECTION: bool = os.environ.get('STEP4_ENABLE_OBJECT_DETECTION', '0') == '1'
     
-    # STEP5 Tracking configuration
+    # STEP4 Tracking configuration
     STEP4_ENABLE_PROFILING: bool = os.environ.get('STEP4_ENABLE_PROFILING', '0') == '1'
     STEP4_BLENDSHAPES_THROTTLE_N: int = int(os.environ.get('STEP4_BLENDSHAPES_THROTTLE_N', '1'))  # 1 = every frame (no throttling)
 
@@ -341,7 +341,7 @@ class Config:
         # GPU Configuration
         self.ENABLE_GPU_MONITORING = os.environ.get('ENABLE_GPU_MONITORING', 'true').lower() == 'true'
         
-        # Lemonfox API Configuration (STEP4 alternative)
+        # Lemonfox API Configuration (STEP3 alternative)
         self.LEMONFOX_API_KEY = os.environ.get('LEMONFOX_API_KEY')
         self.LEMONFOX_TIMEOUT_SEC = int(os.environ.get('LEMONFOX_TIMEOUT_SEC', '300'))
         self.LEMONFOX_EU_DEFAULT = os.environ.get('LEMONFOX_EU_DEFAULT', '0') == '1'
@@ -372,7 +372,7 @@ class Config:
         self.STEP3_METHOD = os.environ.get("STEP3_METHOD", "")
         self.STEP3_USE_LEMONFOX = os.environ.get('STEP3_USE_LEMONFOX', '0') == '1'
         
-        # DeepInfra API Configuration (STEP4 alternative)
+        # DeepInfra API Configuration (STEP3 alternative)
         self.DEEPINFRA_API_KEY = os.environ.get("DEEPINFRA_API_KEY")
         self.DEEPINFRA_BASE_URL = os.environ.get("DEEPINFRA_BASE_URL", "https://api.deepinfra.com")
         self.DEEPINFRA_TRANSCRIPTIONS_ENDPOINT = os.environ.get(
@@ -532,7 +532,7 @@ class Config:
 
     def resolve_audio_method(self) -> str:
         """
-        Resolve active STEP4 method with backward compatibility.
+        Resolve active STEP3 (audio) method with backward compatibility.
 
         Priority:
           1) STEP3_METHOD when valid (pyannote|lemonfox|deepinfra)
@@ -806,7 +806,7 @@ class Config:
     @staticmethod
     def check_gpu_availability() -> dict:
         """
-        Vérifier la disponibilité GPU pour STEP5 (InsightFace uniquement).
+        Vérifier la disponibilité GPU pour STEP4 (InsightFace uniquement).
         
         Returns:
             dict: {
@@ -952,7 +952,7 @@ class Config:
     @staticmethod
     def is_step5_gpu_enabled() -> bool:
         """
-        Vérifier si le mode GPU STEP5 est activé via configuration.
+        Vérifier si le mode GPU STEP4 est activé via configuration.
         
         Returns:
             bool: True si STEP4_ENABLE_GPU=1
@@ -962,7 +962,7 @@ class Config:
     @staticmethod
     def get_step5_gpu_engines() -> List[str]:
         """
-        Récupérer la liste des moteurs STEP5 autorisés à utiliser le GPU.
+        Récupérer la liste des moteurs STEP4 autorisés à utiliser le GPU.
         
         Returns:
             List[str]: ['insightface'] (valeurs non supportées ignorées)
@@ -977,7 +977,7 @@ class Config:
     @staticmethod
     def get_step5_gpu_max_vram_mb() -> int:
         """
-        Récupérer la limite VRAM maximale pour STEP5 GPU (Mo).
+        Récupérer la limite VRAM maximale pour STEP4 GPU (Mo).
         
         Returns:
             int: Limite en Mo (défaut: 2048)

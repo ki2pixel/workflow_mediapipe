@@ -257,8 +257,8 @@ def endpoint_handler():
 ### Métriques Personnalisées
 
 ```python
-@api_bp.route('/api/step4/lemonfox_audio', methods=['POST'])
-@measure_api('/api/step4/lemonfox_audio', sample_rate=0.1)  # 10% sampling
+@api_bp.route('/api/audio/lemonfox', methods=['POST'])
+@measure_api('/api/audio/lemonfox', sample_rate=0.1)  # 10% sampling
 async def analyze_audio():
     result = await LemonfoxAudioService.analyze(...)
     
@@ -299,7 +299,7 @@ async def analyze_audio():
 
 ```python
 # Sampling pour endpoints lourds
-@measure_api('/api/step4/lemonfox_audio', sample_rate=0.1)
+@measure_api('/api/audio/lemonfox', sample_rate=0.1)
 
 # Cache pour réponses statiques
 @cache.memoize(timeout=300)
@@ -443,7 +443,7 @@ curl http://localhost:5000/api/step_status/STEP4
 
 ```bash
 # Diagnostic
-curl -X POST http://localhost:5000/api/step4/lemonfox_audio -H "Content-Type: application/json" -d '{"project_name": "test"}' --max-time 5
+curl -X POST http://localhost:5000/api/audio/lemonfox -H "Content-Type: application/json" -d '{"project_name": "test"}' --max-time 5
 
 # Solution
 # Augmenter timeout dans configuration
