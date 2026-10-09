@@ -286,7 +286,7 @@ Pense au tracking comme un **studio de capture** vs un **laboratoire de recherch
 ### Vidéos en Entrée
 
 ```python
-# Formats supportés (.mov exclus : logos animés à couche alpha, préservés — règle SKIP_MOV_FILES)
+# Formats supportés (.mov alpha et noms de PRESERVED_MOV_NAMES exclus — règle SKIP_MOV_FILES)
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv')
 
 # Prérequis
@@ -295,7 +295,7 @@ VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv')
 - Scènes détectées (STEP3)
 ```
 
-⚠️ Les `.mov` sont écartés du lot de tracking : ce sont des logos animés à couche alpha préservés par l'étape 2 (`SKIP_MOV_FILES`). Aucun JSON de tracking n'est produit pour eux.
+⚠️ Les `.mov` à couche alpha (logos animés) et les noms de `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) sont écartés du lot de tracking (`SKIP_MOV_FILES`, cf. `utils/media_filters.py`) : aucun JSON de tracking n'est produit pour eux. Les `.mov` sans alpha sont convertis en `.mp4` par l'étape 1 puis trackés normalement.
 
 ### Structure de Données
 

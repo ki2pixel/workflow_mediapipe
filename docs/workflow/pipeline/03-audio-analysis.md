@@ -227,8 +227,8 @@ Pense à l'analyse audio comme un **studio mixage** vs un **service de transcrip
 ### Vidéos en Entrée
 
 ```python
-# Formats supportés (.mov exclus : logos animés à couche alpha, préservés — règle SKIP_MOV_FILES)
-VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mkv', '.webm', '.flv')
+# Formats supportés (.mov alpha et noms de PRESERVED_MOV_NAMES exclus — règle SKIP_MOV_FILES)
+VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm')
 ```
 
 ### Spécifications Audio
@@ -443,7 +443,9 @@ export HUGGINGFACE_HUB_TOKEN=hf_your_new_token
 ffprobe -v error -select_streams a:0 -show_entries stream=codec_name video.mov
 
 # Comportement attendu
-# Les fichiers .mov sont automatiquement exclus (souvent sans piste audio)
+# Les .mov alpha (logos) sont préservés et exclus de l'analyse.
+# Les .mov sans alpha sont normalisés en .mp4 par l'étape 1 ; sans piste audio,
+# ils restent sans transcription, comme tout .mp4 muet.
 ```
 
 ### Lemonfox API Erreurs
@@ -592,7 +594,7 @@ for frame_data in audio_analysis['frames_analysis']:
 **Solution** : Générer token sur https://huggingface.co/settings/tokens et configurer `HUGGINGFACE_HUB_TOKEN`.
 
 ### Piège #3 : Fichiers MOV sans audio
-**Solution** : Les fichiers `.mov` sont automatiquement exclus par le système (règle partagée `SKIP_MOV_FILES`, voir étape 2 : logos animés à couche alpha).
+**Solution** : Les `.mov` alpha (logos) sont préservés et exclus de l'analyse (règle partagée `SKIP_MOV_FILES`, cf. `utils/media_filters.py`). Les `.mov` sans alpha sont convertis en `.mp4` par l'étape 1 ; une absence de piste audio est alors traitée comme pour tout `.mp4` muet.
 
 ### Piège #4 : OOM GPU sur vidéos longues
 **Solution** : Configuration `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32` et fallback CPU automatique.

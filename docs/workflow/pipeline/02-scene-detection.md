@@ -157,7 +157,7 @@ STEP2_TORCHSCRIPT=true
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
 ```
 
-⚠️ Les `.mov` sont écartés au filtrage : ce sont des logos animés à couche alpha, préservés par l'étape 2 (règle partagée `SKIP_MOV_FILES`). Aucun CSV de scènes n'est produit pour eux.
+⚠️ Le filtrage préserve les `.mov` à couche alpha (logos animés) et les noms listés dans `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) : aucun CSV de scènes n'est produit pour eux. Les `.mov` sans alpha sont normalisés en `.mp4` par l'étape 1 puis analysés normalement (règle partagée `SKIP_MOV_FILES`, cf. `utils/media_filters.py`).
 
 ### Spécifications d'Entrée
 

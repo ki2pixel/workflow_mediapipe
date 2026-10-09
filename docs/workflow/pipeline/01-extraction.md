@@ -115,6 +115,8 @@ RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1-9', 'LPT1-9']
 - Audio : `.wav`, `.mp3`, `.aac`, `.m4a`
 - Documents : `.pdf`, `.txt`, `.docx`, `.jpg`, `.png`
 
+⚠️ Après extraction, l'étape 1 normalise les vidéos (MP4 / H.264 / 25 fps). Les `.mov` à couche alpha (logos animés) et ceux listés dans `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) sont préservés tels quels ; les autres `.mov` sont convertis en `.mp4`, comme les `.avi`/`.mkv` (cf. `utils/media_filters.py`).
+
 ## Sécurité Renforcée
 
 ### Protection Path Traversal

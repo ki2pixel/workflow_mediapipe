@@ -93,7 +93,7 @@ archives/
 
 ### Médias préservés
 
-Les logos animés `.mov` (couche alpha) ne sont ni convertis (étape 2) ni analysés (étapes 3 à 7) : ils traversent le pipeline tels quels et sont copiés dans le `docs/` du projet finalisé (voir `SKIP_MOV_FILES`).
+Les `.mov` à couche alpha (logos animés) et ceux listés dans `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) ne sont ni convertis (étape 1) ni analysés (étapes 2 à 6) : ils traversent le pipeline tels quels et sont copiés dans le `docs/` du projet finalisé (voir `SKIP_MOV_FILES`). Les `.mov` sans alpha sont convertis en `.mp4` par l'étape 1 et suivent le flux normal.
 
 Cas limite : un projet qui ne contiendrait **que** ces `.mov` (aucun `.mp4`) n'est pas considéré comme prêt et reste exposé au nettoyage des orphelins (48 h) — l'avertissement correspondant est journalisé.
 
