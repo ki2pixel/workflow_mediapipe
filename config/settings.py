@@ -11,7 +11,7 @@ import logging
 import subprocess
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -424,8 +424,9 @@ class Config:
             or self.STEP4_CV5_CPU_BUDGET
         )
         
-        # Médias préservés (logos animés .mov avec couche alpha)
+        # Médias préservés .mov (couche alpha détectée, ou noms listés explicitement)
         self.SKIP_MOV_FILES = _parse_bool(os.environ.get('SKIP_MOV_FILES'), default=True)
+        self.PRESERVED_MOV_NAMES = tuple(_parse_csv_list(os.environ.get('PRESERVED_MOV_NAMES')) or ['m6+.mov'])
 
         # Normalisation vidéo portée par STEP1 (ex-STEP2 "conversion")
         self.STEP1_NORMALIZE_VIDEOS = _parse_bool(os.environ.get('STEP1_NORMALIZE_VIDEOS'), default=True)
@@ -1001,9 +1002,12 @@ class Config:
     USE_OPENCV5_STEP4: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP4'), default=False)
 
     # ========================
-    # Médias préservés (logos .mov alpha)
+    # Médias préservés .mov (couche alpha ou liste PRESERVED_MOV_NAMES)
     # ========================
     SKIP_MOV_FILES: bool = _parse_bool(os.environ.get('SKIP_MOV_FILES'), default=True)
+    PRESERVED_MOV_NAMES: Tuple[str, ...] = tuple(
+        _parse_csv_list(os.environ.get('PRESERVED_MOV_NAMES')) or ['m6+.mov']
+    )
 
     # ========================
     # Normalisation vidéo STEP1 (MP4 / H.264 / 25 fps)

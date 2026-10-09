@@ -533,7 +533,7 @@ def _iter_videos_in_docs(docs_dir: Path) -> List[Path]:
             videos.append(p)
     videos, preserved_logos = split_preserved_media(videos)
     if preserved_logos:
-        logger.info("%d .mov préservé(s) ignoré(s) (logo alpha, conservé pour l'étape 8).", len(preserved_logos))
+        logger.info("%d média(s) .mov préservé(s) ignoré(s) (alpha/liste noire, conservé jusqu'à la finalisation).", len(preserved_logos))
     return videos
 
 def _resolve_tracking_paths(docs_dir: Path, stem: str) -> Tuple[Optional[Path], Optional[Path]]:

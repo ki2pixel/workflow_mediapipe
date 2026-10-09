@@ -33,6 +33,7 @@ def _find_videos_for_audio_analysis(work_dir: Path) -> list[Path]:
 
     for video_path in all_videos:
         if is_preserved_media(video_path):
+            logging.debug("Média .mov préservé ignoré par l'analyse audio: %s", video_path.name)
             continue
 
         output_json_path = video_path.with_name(f"{video_path.stem}_audio.json")

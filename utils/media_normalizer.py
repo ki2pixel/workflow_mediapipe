@@ -17,8 +17,9 @@ Il est désormais :
   qu'elles découvrent (`analyze_video` / `is_conformant` n'ont aucune
   dépendance à `config.settings`).
 
-Les fichiers `.mov` (logos animés à couche alpha, cf. `utils.media_filters`)
-ne sont jamais touchés.
+Les fichiers `.mov` préservés (couche alpha ou figurant dans
+`PRESERVED_MOV_NAMES`, cf. `utils.media_filters`) ne sont jamais touchés ; les
+autres `.mov` sans alpha sont normalisés comme n'importe quel autre format.
 """
 from __future__ import annotations
 
@@ -222,7 +223,7 @@ def discover_videos(root: Path) -> Tuple[List[Path], List[Path]]:
     """Liste les vidéos candidates sous ``root``.
 
     Returns:
-        ``(candidats, logos_mov_préservés)``
+        ``(candidats, médias_mov_préservés)``
     """
     candidates: List[Path] = []
     for current_root, _, files in os.walk(root):
@@ -261,7 +262,7 @@ def normalize_video(
         return False
 
     if is_preserved_media(video_path):
-        logger.info("Logo .mov préservé ignoré par le worker: %s", video_path.name)
+        logger.info("Média .mov préservé ignoré par le worker: %s", video_path.name)
         return True
 
     worker_type = 'GPU' if use_gpu else 'CPU'
@@ -313,6 +314,14 @@ def normalize_video(
             return False
 
         final_dest = video_path.with_suffix('.mp4')
+        if final_dest != video_path and final_dest.exists():
+            logger.error(
+                "Collision de nom pour %s : %s existe déjà, aucun écrasement (fichier laissé en échec).",
+                video_path.name, final_dest.name,
+            )
+            if temp_output_path.exists():
+                temp_output_path.unlink()
+            return False
         if final_dest != video_path and video_path.exists():
             video_path.unlink()
 
@@ -365,10 +374,10 @@ def normalize_videos_in(root: Path, force: bool = False) -> NormalizationSummary
 
     candidates, preserved_logos = discover_videos(root)
     for logo in preserved_logos:
-        logger.info("--- Logo .mov préservé (non normalisé, alpha intact): %s ---", logo.name)
+        logger.info("--- Média .mov préservé (non normalisé, alpha/liste noire): %s ---", logo.name)
     if preserved_logos:
         logger.info(
-            "%d .mov préservé(s) ignoré(s) par la normalisation (alpha conservé jusqu'à la finalisation).",
+            "%d média(s) .mov préservé(s) ignoré(s) par la normalisation (alpha conservé jusqu'à la finalisation).",
             len(preserved_logos),
         )
 

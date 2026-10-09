@@ -98,7 +98,7 @@ def find_projects_to_finalize():
             logging.info(f"Projet '{project_dir.name}' ignoré (mode={FINALIZE_MODE}). Aucune vidéo/artefact requis trouvés.")
             if _has_preserved_media_only(project_dir):
                 logging.warning(
-                    f"Projet '{project_dir.name}' : uniquement des .mov préservés (logos alpha), aucune vidéo .mp4. "
+                    f"Projet '{project_dir.name}' : uniquement des .mov préservés (alpha/liste noire), aucune vidéo .mp4. "
                     "Il ne sera pas finalisé et reste exposé au nettoyage des orphelins."
                 )
 

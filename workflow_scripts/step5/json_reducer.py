@@ -850,7 +850,7 @@ def process_directory(base_path: str, keyword: str = "Camille"):
         video_files, preserved_logos = split_preserved_media(video_files)
         if preserved_logos:
             logger.info(
-                "  - %d .mov préservé(s) ignoré(s) (logo alpha, conservé pour l'étape 8).",
+                "  - %d média(s) .mov préservé(s) ignoré(s) (alpha/liste noire, conservé jusqu'à la finalisation).",
                 len(preserved_logos),
             )
         if not video_files:

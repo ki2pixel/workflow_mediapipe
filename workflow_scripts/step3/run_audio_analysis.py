@@ -88,7 +88,7 @@ def find_videos_for_audio_analysis():
     filtered_videos, preserved_logos = split_preserved_media(all_videos)
     if preserved_logos:
         logging.info(
-            f"{len(preserved_logos)} .mov logo(s) préservé(s) ignoré(s) par l'analyse audio (alpha conservé pour l'étape 8)."
+            f"{len(preserved_logos)} média(s) .mov préservé(s) ignoré(s) par l'analyse audio (alpha/liste noire conservé jusqu'à la finalisation)."
         )
 
     for video_path in filtered_videos:

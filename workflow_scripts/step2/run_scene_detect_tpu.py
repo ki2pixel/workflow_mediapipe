@@ -555,7 +555,7 @@ def main():
     videos, preserved_logos = split_preserved_media(videos)
     if preserved_logos:
         logging.info(
-            f"{len(preserved_logos)} .mov logo(s) préservé(s) ignoré(s) par la détection de scènes (alpha conservé pour l'étape 8)."
+            f"{len(preserved_logos)} média(s) .mov préservé(s) ignoré(s) par la détection de scènes (alpha/liste noire conservé jusqu'à la finalisation)."
         )
     total_videos = len(videos)
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")

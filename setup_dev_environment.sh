@@ -54,6 +54,14 @@ check_system_dependencies() {
     else
         print_status "FFmpeg found"
     fi
+
+    if ! command -v mediainfo &> /dev/null; then
+        print_warning "MediaInfo not found (optional). It improves .mov alpha detection (plan B)."
+        echo "  Ubuntu/Debian: sudo apt update && sudo apt install mediainfo"
+        echo "  macOS: brew install mediainfo"
+    else
+        print_status "MediaInfo found"
+    fi
     
     if ! command -v git &> /dev/null; then
         print_error "Git is required but not installed"
