@@ -1,9 +1,13 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active.
+- Aucune tâche active (dernière tâche clôturée : assouplissement du filtre .mov — détection alpha réelle, 2026-10-09).
 
 ## Dernière Session Clôturée
+- [2026-10-09 21:12:18] Assouplissement du filtre .mov — détection réelle de la couche alpha (COMPLET) :
+  - **Décision** : `utils/media_filters.py` ne rejette plus les `.mov` par extension ; seuls les `.mov` à couche alpha et les noms de `PRESERVED_MOV_NAMES` (défaut `m6+.mov`, insensible à la casse) sont préservés, tous les autres `.mov` sont normalisés en `.mp4` par STEP1 comme les autres formats. Détection alpha à deux étages : ffprobe `pix_fmt`/tags (`ap4h`/`ap4x`/`rle`/`png`), puis MediaInfo (`pymediainfo` ou CLI `mediainfo`) en plan B ; verdict indéterminé => préservation par précaution. Détail et alternatives rejetées dans `decisionLog.md`.
+  - **Implémentation** : cache `(chemin, mtime, taille)` sous `RLock` (verdicts définitifs seuls), garde-fou anti-collision `video.mov`/`video.mp4` dans `media_normalizer.normalize_video`, logs « média .mov préservé » reformulés (STEP1/2/3/5/6/7), `PRESERVED_MOV_NAMES` dans `config/settings.py` + `.env.example`, check `mediainfo` optionnel dans `setup_dev_environment.sh`, docs pipeline 01/02/03/04/07 alignées.
+  - **Validation** : suite backend 593 réussis / 28 ignorés (baseline 562/28) ; matrice ffmpeg réelle (ProRes 4444, Animation, PNG alpha préservés ; AVC, ProRes 422 convertis ; `m6+.mov` et `.mov` corrompu préservés) ; passe réelle `normalize_videos_in` : 2/2 conversions yuv420p/25 fps, 5 fichiers préservés MD5-identiques.
 - [2026-09-27 22:25:22] Exclusions pytest effectives et réparation des runners d'étapes (COMPLET) :
   - **Décision** : les exclusions de tests spécialisés quittent `pytest.ini` (motifs `!pattern` dans `python_files`, qui ne sont pas une syntaxe pytest et n'étaient donc jamais appliqués) pour `collect_ignore_glob` dans `tests/conftest.py` ; les runners documentés sont réparés. Détail et alternatives rejetées dans `decisionLog.md`.
   - **Implémentation** : `run_step2_tests.sh` (`workflow_scripts/step2` sur le `PYTHONPATH`, sinon faux négatif sur `transnetv2_pytorch`), `run_step4_tests.sh` (`python -m pytest` dans le venv, ligne morte retirée), `run_tests.sh` (résolution de `VENV_BASE_DIR` depuis `.env`, fin du double `-q` qui masquait le bilan), propagation du code de sortie dans les trois, fixture autouse du cache tolérante à l'absence de Flask, skip du test TPU quand `run_tracking_tpu` sort à l'import, `diagnose_tests.sh` et `AGENTS.md` alignés.
@@ -25,6 +29,8 @@
   - **Validation** : suite backend complète (unit + intégration) et suites frontend Node ESM au vert.
 
 ## Prochaine Action
+- Installer `mediainfo` sur l'hôte de production (`sudo apt install mediainfo`) pour activer le plan B de détection alpha ; sans lui, un `.mov` illisible par ffprobe reste préservé par précaution.
+- Valider le nouveau filtre sur une vraie archive contenant des `.mov` réels (vidéos non-alpha à traiter, logos alpha intacts).
 - Vérifier sur le prochain run complet que STEP2 journalise bien `ONNX Runtime (CUDA)` dans `logs/step2/` (un repli CPU signerait une régression de l'injection `LD_LIBRARY_PATH`).
 - Valider la sonde du moteur graphe (`DNN_ENGINE_NEW` / `ENGINE_NEW`) sur une vraie installation OpenCV 5.x : seule voie pour exploiter le moteur graphe de l'option expérimentale de STEP2.
 - Trancher le sort de `config/step2_cv5.json` (absent : le script tourne sur ses valeurs par défaut, dont `ffmpeg_threads=0`).

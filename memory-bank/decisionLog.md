@@ -10,6 +10,15 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## Octobre 2026
+
+- [2026-10-09 21:12:18] **Assouplissement du filtre .mov : détection réelle de la couche alpha (COMPLET)**
+  - **Décision** : remplacer le rejet des `.mov` par extension (règle « logos alpha présumés ») par une détection réelle de la couche alpha à deux étages — `ffprobe` `pix_fmt`/tag conteneur, puis MediaInfo (`pymediainfo` ou CLI `mediainfo`) en plan B — et ne préserver que : les `.mov` à couche alpha et les noms de `PRESERVED_MOV_NAMES` (défaut `m6+.mov`, insensible à la casse) ; tout autre `.mov` est normalisé en `.mp4` par STEP1 comme un `.avi`/`.mkv`. Un verdict indéterminable préserve le fichier (aucune conversion d'un `.mov` non vérifié) : c'est le seul sens d'erreur non destructif.
+  - **Raison** : de plus en plus de vidéos réelles arrivent en `.mov` et étaient ignorées silencieusement ; `m6+.mov` est le seul `.mov` sans alpha à écarter explicitement. La détection par `pix_fmt` couvre les logos réels (ProRes 4444, Animation, PNG — validé empiriquement) et le plan B évite de dépendre du seul parseur FFmpeg sur des conteneurs abîmés.
+  - **Alternatives rejetées** : (1) détection via le profil ProRes seul (ne distingue pas 4444 avec/sans plan alpha, rate Animation/PNG) ; (2) seuil `BitDepth` MediaInfo 24/32 (observé à 8 pour du RLE alpha — faux négatifs destructeurs) ; (3) conversion des `.mov` alpha après aplatissement (perte d'alpha) ; (4) renommage de `SKIP_MOV_FILES` (contrat déployé conservé, préférence projet).
+  - **Implémentation** : cache des verdicts par `(chemin, mtime, taille)` sous `RLock` (seuls les verdicts définitifs sont mémorisés, les indéterminés sont re-sondés) ; garde-fou anti-collision `video.mov`/`video.mp4` avant `shutil.move` (échec propre, aucun écrasement) ; logs « média .mov préservé » reformulés dans STEP1/2/3/5/6/7 ; `PRESERVED_MOV_NAMES` déclaré dans `config/settings.py` et `.env.example` ; `setup_dev_environment.sh` signale l'option MediaInfo.
+  - **Validation** : matrice ffmpeg réelle — ProRes 4444 (`yuva444p12le`), Animation (`argb`), PNG (`rgba`) préservés ; AVC `yuv420p` et ProRes 422 convertis ; `m6+.mov` préservé ; `.mov` corrompu préservé par précaution (ffprobe et MediaInfo le renvoient indéterminé) ; passe réelle `normalize_videos_in` : 2/2 conversions conformes yuv420p/25 fps, 5 préservés MD5-identiques ; suite backend complète 593 réussis / 28 ignorés (baseline 562/28), tests ciblés 89 réussis.
+
 ## Septembre 2026
 
 - [2026-09-27 22:12:37] **Audit du warning OpenCV DNN de STEP2 : backend explicite et repli CPU silencieux corrigé (COMPLET)**
