@@ -6,6 +6,7 @@ import pytest
 
 from services.filesystem_service import FilesystemService
 import services.filesystem_service as fs_mod
+from utils import media_filters
 
 
 @pytest.fixture
@@ -257,3 +258,22 @@ def test_find_videos_for_tracking_includes_mov_when_preservation_disabled(tmp_pa
     # Then: Both videos are returned
     assert len(videos) == 2
     assert any("logo.mov" in v for v in videos)
+
+
+def test_find_videos_for_tracking_includes_non_alpha_mov(tmp_path, monkeypatch):
+    """Un .mov sans couche alpha redevient candidat au tracking."""
+    # Given: la préservation active et un .mov sans alpha à côté d'un .mp4
+    monkeypatch.setenv("SKIP_MOV_FILES", "true")
+    monkeypatch.setattr(media_filters, "has_alpha_channel", lambda _path: False)
+    projets = tmp_path / "projets_extraits"
+    projets.mkdir()
+
+    (projets / "video1.mp4").touch()
+    (projets / "reel.mov").touch()
+
+    # When: Searching for videos needing tracking
+    videos = FilesystemService.find_videos_for_tracking(tmp_path, None, None)
+
+    # Then: Both videos are returned, the non-alpha .mov is a candidate
+    assert len(videos) == 2
+    assert any("reel.mov" in v for v in videos)

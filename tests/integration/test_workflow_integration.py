@@ -14,6 +14,7 @@ import json
 
 from services.workflow_service import WorkflowService
 from services.filesystem_service import FilesystemService
+from utils import media_filters
 
 
 class TestWorkflowServiceSTEP5Integration:
@@ -67,6 +68,29 @@ class TestWorkflowServiceSTEP5Integration:
         assert videos is not None
         assert len(videos) == 2
         assert any('video2.mov' in v for v in videos)
+
+    def test_prepare_tracking_step_includes_non_alpha_mov(self, tmp_path, monkeypatch):
+        """Un .mov sans couche alpha reste candidat à la préparation du tracking."""
+        # Given: la préservation active et un .mov sans alpha
+        monkeypatch.setenv("SKIP_MOV_FILES", "true")
+        monkeypatch.setattr(media_filters, "has_alpha_channel", lambda _path: False)
+        projets_dir = tmp_path / "projets_extraits"
+        project_dir = projets_dir / "test_project"
+        project_dir.mkdir(parents=True)
+        (project_dir / "video1.mp4").touch()
+        (project_dir / "reel.mov").touch()
+
+        # When: préparation de l'étape de tracking
+        videos = WorkflowService.prepare_tracking_step(
+            projets_dir,
+            keyword="",
+            subdir=""
+        )
+
+        # Then: le .mov sans alpha est candidat
+        assert videos is not None
+        assert len(videos) == 2
+        assert any('reel.mov' in v for v in videos)
     
     def test_prepare_tracking_step_no_videos(self, tmp_path):
         """Test STEP5 preparation when no videos need processing."""

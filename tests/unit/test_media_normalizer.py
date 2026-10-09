@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from utils import media_normalizer
+from utils import media_filters, media_normalizer
 
 
 def _analyzed_info(path: Path, fps: float = 25.0, video_codec: str = "h264", audio_codec: str | None = None) -> dict:
@@ -167,6 +167,25 @@ class TestDiscovery:
         # Then: le fichier temporaire est ignoré
         assert [p.name for p in candidates] == ["clip.mp4"]
 
+    def test_discover_videos_includes_non_alpha_mov(self, monkeypatch, tmp_path):
+        # Given: un logo alpha et un .mov sans couche alpha
+        work_dir = tmp_path / "docs"
+        work_dir.mkdir()
+        (work_dir / "logo.mov").write_bytes(b"alpha")
+        (work_dir / "reel.mov").write_bytes(b"video")
+        monkeypatch.setenv("SKIP_MOV_FILES", "true")
+        monkeypatch.setattr(
+            media_filters, "has_alpha_channel",
+            lambda path: Path(path).name == "logo.mov",
+        )
+
+        # When: découverte des vidéos candidates
+        candidates, preserved = media_normalizer.discover_videos(work_dir)
+
+        # Then: seul le .mov alpha reste préservé
+        assert [p.name for p in candidates] == ["reel.mov"]
+        assert [p.name for p in preserved] == ["logo.mov"]
+
 
 class TestNormalizeVideo:
     """Encodage ffmpeg unitaire."""
@@ -215,6 +234,51 @@ class TestNormalizeVideo:
         assert not video.exists()
         assert "-vf" in calls[0]
         assert "libx264" in calls[0]
+
+    def test_normalize_video_converts_non_alpha_mov(self, monkeypatch, tmp_path):
+        # Given: un .mov sans couche alpha et un ffmpeg simulé qui réussit
+        video = tmp_path / "clip.mov"
+        video.write_bytes(b"video")
+        monkeypatch.setenv("SKIP_MOV_FILES", "true")
+        monkeypatch.setattr(media_filters, "has_alpha_channel", lambda _path: False)
+
+        def fake_run(command, **_kwargs):
+            Path(command[-1]).write_bytes(b"converted")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", fake_run)
+
+        # When: normalisation du .mov
+        result = media_normalizer.normalize_video(_analyzed_info(video), use_gpu=False)
+
+        # Then: le .mov est converti puis remplacé par son .mp4
+        assert result is True
+        assert (tmp_path / "clip.mp4").exists()
+        assert not video.exists()
+
+    def test_normalize_video_never_overwrites_existing_mp4(self, monkeypatch, tmp_path):
+        # Given: un .mov sans alpha et un .mp4 homonyme déjà présent
+        video = tmp_path / "clip.mov"
+        video.write_bytes(b"video")
+        existing = tmp_path / "clip.mp4"
+        existing.write_bytes(b"precious")
+        monkeypatch.setenv("SKIP_MOV_FILES", "true")
+        monkeypatch.setattr(media_filters, "has_alpha_channel", lambda _path: False)
+
+        def fake_run(command, **_kwargs):
+            Path(command[-1]).write_bytes(b"converted")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", fake_run)
+
+        # When: normalisation du .mov
+        result = media_normalizer.normalize_video(_analyzed_info(video), use_gpu=False)
+
+        # Then: échec propre, aucun écrasement ni fichier temporaire résiduel
+        assert result is False
+        assert existing.read_bytes() == b"precious"
+        assert video.exists()
+        assert not (tmp_path / "clip.temp_normalize.mp4").exists()
 
     def test_normalize_video_removes_temp_file_on_ffmpeg_failure(self, monkeypatch, tmp_path):
         # Given: un ffmpeg simulé qui échoue
