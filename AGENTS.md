@@ -95,8 +95,8 @@ Authoritative rules: `./.agents/rules/codingstandards.md` (mirrored in
 
 ## Agent Skills and Workflows
 
-Project-local skills under `./.agents/skills/` (mirrored to `.clinerules/`,
-`.windsurf/`, `.cline/`) override global behavior. Stack order from
-`codingstandards.md`: `workflow-operator` → debug/local skills → these rules →
+Project-local skills under `./.agents/skills/` override global behavior. Stack
+order from `codingstandards.md`: `workflow-operator` → debug/local skills →
+these rules → docs → global skills. Standard workflows (commit, docs-updater,
 docs → global skills. Standard workflows (commit, docs-updater,
 repomix-bundle, enhance, end) live in `./.agents/workflows/`.
