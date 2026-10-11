@@ -50,7 +50,7 @@ class WorkflowCommandsConfig:
     def _ensure_log_directories(self) -> None:
         """Ensure all log directories exist."""
         self.logs_base_dir.mkdir(exist_ok=True)
-        for step in range(1, 8):
+        for step in range(1, 9):
             (self.logs_base_dir / f"step{step}").mkdir(exist_ok=True)
     
     def _build_configuration(self) -> Dict[str, Dict[str, Any]]:
@@ -67,6 +67,7 @@ class WorkflowCommandsConfig:
             "STEP5": self._get_step5_config(),
             "STEP6": self._get_step6_config(),
             "STEP7": self._get_step7_config(),
+            "STEP8": self._get_step8_config(),
         }
     
     def _get_step1_config(self) -> Dict[str, Any]:
@@ -484,6 +485,41 @@ class WorkflowCommandsConfig:
                 "current_item_text_from_success_line": True,
             },
             "post_completion_message_ui": "Finalisation des projets terminée.",
+        }
+
+    def _get_step8_config(self) -> Dict[str, Any]:
+        """Get configuration for Step 8: Media Solution (EffectCraft).
+
+        Returns:
+            Step 8 configuration dictionary
+        """
+        step8_log_dir = self.logs_base_dir / "step8"
+
+        return {
+            "display_name": "8. Media Solution (EffectCraft)",
+            "cmd": [
+                str(config.get_venv_python("env")),
+                str(self.base_path / "workflow_scripts" / "step8" / "run_mediasolution_ec.py"),
+            ],
+            "cwd": str(self.base_path),
+            "specific_logs": [
+                {
+                    "name": "Log Media Solution",
+                    "type": "directory_latest",
+                    "path": step8_log_dir,
+                    "pattern": "*.log",
+                    "lines": 200,
+                }
+            ],
+            "progress_patterns": {
+                "total": re.compile(r"MS_BATCH_TOTAL:\s*(\d+)"),
+                "current": re.compile(r"MS_BATCH_PROGRESS:\s*(\d+)/(\d+)\s*-\s*(.*)"),
+                "current_success_line_pattern": re.compile(r"MS_BATCH_OK:\s*(.*?)\s*$"),
+                "current_failure_line_pattern": re.compile(r"MS_BATCH_FAIL:\s*(.*?)\s*$"),
+                "current_item_text_from_success_line": True,
+            },
+            "timeout": getattr(config, "STEP8_TIMEOUT", 14400),
+            "post_completion_message_ui": "Projets EffectCraft générés.",
         }
     
     # ========== Public API ==========

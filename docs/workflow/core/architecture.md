@@ -1,12 +1,12 @@
 # Architecture du Workflow MediaPipe
 
-**TL;DR** : Un pipeline vidéo en 7 étapes avec Flask + JavaScript natif, où chaque étape tourne dans son environnement Python isolé. L'état est centralisé via `WorkflowState`, la configuration via `WorkflowCommandsConfig`, et les données arrivent par un webhook JSON unique.
+**TL;DR** : Un pipeline vidéo en 8 étapes avec Flask + JavaScript natif, où chaque étape tourne dans son environnement Python isolé. L'état est centralisé via `WorkflowState`, la configuration via `WorkflowCommandsConfig`, et les données arrivent par un webhook JSON unique.
 
 ## Le Problème que Nous Résolvons
 
 Tu dois analyser des vidéos pour la post-production After Effects, mais chaque outil (détection de scènes, analyse audio, tracking facial) demande des bibliothèques Python différentes et souvent incompatibles. Lancer manuellement chaque étape est chronophage, et les résultats sont difficiles à synchroniser.
 
-## Notre Solution : Le Pipeline à 7 Étapes
+## Notre Solution : Le Pipeline à 8 Étapes
 
 Nous avons construit un pipeline où chaque étape est un script Python indépendant, orchestré par une interface web. Tu lances une étape, tu regardes la progression en temps réel, et les résultats sont automatiquement disponibles pour After Effects.
 
@@ -19,7 +19,8 @@ graph TD
     F --> G[Étape 5: Réduction JSON]
     G --> H[Étape 6: Pré-traitement AE]
     H --> I[Étape 7: Finalisation]
-    I --> J[Résultats Finaux]
+    I --> J[Étape 8: Media Solution EffectCraft]
+    J --> K[Résultats Finaux]
 ```
 
 ## Architecture Backend : Services Centralisés
@@ -204,6 +205,13 @@ Archive et consolide les résultats :
 - Validation d'intégrité SHA-256
 - Organisation hiérarchique dans `archives/`
 - Métadonnées de provenance complètes
+- Manifeste `logs/step7/finalized_projects_*.json` des dossiers publiés (lu par l'étape 8)
+
+### Étape 8 : Media Solution (`env/`)
+Génère les projets EffectCraft en headless :
+- Concaténation du panel `scripts/MediaSolution-EC/MediaSolution.jsx` + driver généré
+- Exécution `effectcraft-cli script` (mode « Tout exécuter », `runBatch(maxUnits=0)`)
+- Sortie : `<dossier>/projets/<video>_9x16.ecproj` (recadrage 9:16, découpes CSV, recentrage par tracking)
 
 ## Configuration et Sécurité
 

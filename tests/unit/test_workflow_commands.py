@@ -17,7 +17,7 @@ def temp_base_path(tmp_path):
     """Create a temporary base path for testing."""
     # Create necessary directory structure
     (tmp_path / "workflow_scripts").mkdir()
-    for step in range(1, 8):
+    for step in range(1, 9):
         (tmp_path / "workflow_scripts" / f"step{step}").mkdir()
     
     (tmp_path / "projets_extraits").mkdir()
@@ -67,7 +67,7 @@ class TestWorkflowCommandsConfigInitialization:
         """Test that log directories are created."""
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
-        for step in range(1, 8):
+        for step in range(1, 9):
             log_dir = commands.logs_base_dir / f"step{step}"
             assert log_dir.exists()
 
@@ -76,13 +76,13 @@ class TestConfigurationRetrieval:
     """Test configuration retrieval methods."""
     
     def test_get_config_returns_all_steps(self, temp_base_path):
-        """Test that get_config returns all 7 steps."""
+        """Test that get_config returns all 8 steps."""
         commands = WorkflowCommandsConfig(base_path=temp_base_path)
         
         config = commands.get_config()
         
-        assert len(config) == 7
-        assert all(f"STEP{i}" in config for i in range(1, 8))
+        assert len(config) == 8
+        assert all(f"STEP{i}" in config for i in range(1, 9))
     
     def test_get_step_config_valid_key(self, temp_base_path):
         """Test getting config for valid step key."""
@@ -110,7 +110,8 @@ class TestConfigurationRetrieval:
         assert commands.validate_step_key('STEP1') is True
         assert commands.validate_step_key('STEP6') is True
         assert commands.validate_step_key('STEP7') is True
-        assert commands.validate_step_key('STEP8') is False
+        assert commands.validate_step_key('STEP8') is True
+        assert commands.validate_step_key('STEP9') is False
         assert commands.validate_step_key('INVALID') is False
     
     def test_get_all_step_keys(self, temp_base_path):
@@ -119,8 +120,8 @@ class TestConfigurationRetrieval:
         
         keys = commands.get_all_step_keys()
         
-        assert len(keys) == 7
-        assert all(f"STEP{i}" in keys for i in range(1, 8))
+        assert len(keys) == 8
+        assert all(f"STEP{i}" in keys for i in range(1, 9))
 
 
 class TestStepSpecificMethods:
@@ -482,4 +483,4 @@ class TestRepr:
         
         assert 'WorkflowCommandsConfig' in repr_str
         assert 'base_path' in repr_str
-        assert 'steps=7' in repr_str
+        assert 'steps=8' in repr_str

@@ -67,7 +67,7 @@ PARALLEL_TRACKING_SCRIPT_PATH = BASE_PATH_SCRIPTS / "workflow_scripts" / "step4"
 LOGS_BASE_DIR = BASE_PATH_SCRIPTS / "logs"
 os.makedirs(LOGS_BASE_DIR, exist_ok=True)
 
-for step in range(1, 8):
+for step in range(1, 9):
     os.makedirs(LOGS_BASE_DIR / f"step{step}", exist_ok=True)
 
 STEP0_PREP_LOG_DIR = Path(os.environ.get('STEP0_PREP_LOG_DIR_ENV', str(LOGS_BASE_DIR / "step1")))

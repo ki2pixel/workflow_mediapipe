@@ -3,9 +3,11 @@
 
 """
 Script de finalisation et copie des projets vers la destination finale.
-Étape 8 (Ubuntu)
+Étape 7 (Ubuntu)
 \- Archive d'abord les artefacts d'analyse (scènes/tracking/audio) avant suppression
 \- Copie ensuite le dossier du projet vers la destination finale
+\- Écrit un manifeste (logs/step7/finalized_projects_<ts>.json) des dossiers copiés,
+  lu par l'étape 8 (Media Solution / EffectCraft)
 """
 
 import os
@@ -18,6 +20,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, List, Optional
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -257,6 +260,36 @@ def _compute_alternative_output_dir(existing_dst: Path) -> Path:
     return candidate
 
 
+def write_finalized_manifest(output_dir: Path, projects: List[Dict[str, str]]) -> Path:
+    """Écrit le manifeste des projets finalisés, lu par l'étape 8 (Media Solution).
+
+    Un fichier horodaté par run ; l'étape 8 lit le plus récent par mtime.
+    """
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    manifest_path = LOG_DIR / f"finalized_projects_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    payload = {
+        "schema": 1,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "output_dir": str(output_dir),
+        "mode": FINALIZE_MODE,
+        "projects": projects,
+    }
+    tmp_path = manifest_path.with_suffix(".json.tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, manifest_path)
+    logging.info(f"Manifeste des projets finalisés écrit: '{manifest_path}'")
+    return manifest_path
+
+
+def _write_manifest_safe(output_dir: Path, projects: List[Dict[str, str]]) -> None:
+    """Écrit le manifeste sans faire échouer la finalisation en cas d'erreur I/O."""
+    try:
+        write_finalized_manifest(output_dir, projects)
+    except OSError as e:
+        logging.error(f"Écriture du manifeste des projets finalisés impossible: {e}")
+
+
 def _normalize_project_docs_structure(dst_project_dir: Path) -> None:
     docs_dir = dst_project_dir / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
@@ -345,7 +378,8 @@ def restore_archived_analysis(project_name: str, output_project_dir: Path) -> No
         logging.warning(f"Restauration des analyses archivées échouée (projet={project_name}): {e}")
 
 
-def finalize_project(project_dir):
+def finalize_project(project_dir) -> Optional[Path]:
+    """Finalise un projet ; retourne le dossier de destination final, ou None en cas d'échec."""
     try:
         project_name = project_dir.name
         logging.info(f"Finalisation du projet: {project_name}")
@@ -395,7 +429,7 @@ def finalize_project(project_dir):
         try:
             project_dir.resolve().relative_to(config.ARCHIVES_DIR.resolve())
             logging.error(f"Refus de suppression: '{project_dir}' est sous ARCHIVES_DIR")
-            return False
+            return None
         except Exception:
             pass
         _safe_rmtree(project_dir)
@@ -403,11 +437,11 @@ def finalize_project(project_dir):
 
         logging.info(f"Finalisation terminée pour '{project_name}'")
         print(f"Finalisation terminée pour '{project_name}'")
-        return True
+        return output_project_dir
 
     except Exception as e:
         logging.exception(f"Erreur lors de la finalisation du projet {project_dir.name}: {e}")
-        return False
+        return None
 
 
 def main():
@@ -427,13 +461,19 @@ def main():
     print(f"{total_projects} projet(s) à finaliser")
 
     if total_projects == 0:
+        _write_manifest_safe(OUTPUT_DIR, [])
         logging.info("Aucun projet à finaliser. Fin du script.")
         return
 
     successful_count = 0
+    finalized_projects = []
     for project in projects:
-        if finalize_project(project):
+        destination = finalize_project(project)
+        if destination:
             successful_count += 1
+            finalized_projects.append({"name": project.name, "path": str(destination)})
+
+    _write_manifest_safe(OUTPUT_DIR, finalized_projects)
 
     logging.info("--- Finalisation terminée ---")
     logging.info(f"Résumé: {successful_count}/{total_projects} projet(s) finalisé(s) et déplacé(s) avec succès.")

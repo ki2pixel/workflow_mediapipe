@@ -6,6 +6,11 @@ Le projet est une application web complète qui automatise le traitement et l'an
 ## Architecture Générale
 Le système est composé d'un backend **Flask** et d'un frontend **JavaScript** natif. Il suit une **architecture orientée services** où la logique métier est découplée de l'API.
 
+### Note de version (v4.5) — Octobre 2026
+- Pipeline 8 étapes : ajout de la **STEP8 « Media Solution (EffectCraft) »** — génération headless des projets EffectCraft `<video>_9x16.ecproj` en pilotant le panel `scripts/MediaSolution-EC/MediaSolution.jsx` via `effectcraft-cli script` (mode « Tout exécuter »). Les dossiers traités sont ceux publiés par le run courant de STEP7 (manifeste `logs/step7/finalized_projects_*.json`) ; l'étape 8 est incluse dans la séquence complète « (1-8) ».
+- Sorties `.ecproj` uniquement : les exports `.aep`/`.prproj` restent hors pipeline (raccourcis `Export-AEP-Camille.desktop` / `Export-PRPROJ-Camille.desktop`).
+- Doc dédiée : `docs/workflow/pipeline/08-mediasolution-ec.md`.
+
 ### Note de version (v4.4) — Septembre 2026
 - Pipeline 7 étapes : suppression de l'étape de conversion et migration de la normalisation vidéo (**MP4 / H.264 / yuv420p / 25 fps**) dans l'étape d'extraction via `utils/media_normalizer.py`, avec rattrapage possible par `extract_archives.py --normalize-only`.
 - Renumérotation continue des clés (`STEP1` → `STEP7`) et des artefacts associés : dossiers `workflow_scripts/stepN`, `logs/stepN`, `config/stepN_*.json`, tests, runners et documentation. Les noms de variables d'environnement `STEPn_*` restent volontairement inchangés (voir `decisionLog.md`).
@@ -19,21 +24,22 @@ Le système est composé d'un backend **Flask** et d'un frontend **JavaScript** 
 
 ### Maintenabilité v4.1 (documentée)
 - État centralisé avec `WorkflowState` (thread-safe via RLock; API étapes, séquences, téléchargements).
-- Configuration centralisée avec `WorkflowCommandsConfig` (7 étapes, patterns regex, gestion token HF).
+- Configuration centralisée avec `WorkflowCommandsConfig` (8 étapes, patterns regex, gestion token HF).
 - Extraction de la logique de téléchargements dans `DownloadService` (callbacks, validation, dataclass `DownloadResult`).
 - Réduction de la complexité: `execute_csv_download_worker()` ~230 → ~85 lignes (-63%); `run_process_async()` simplifié (~-40 lignes) avec helpers dans `WorkflowService`.
 - Références documentation: `docs/PHASE1_FOUNDATIONS.md`, `docs/PHASE3_PLAN.md`, `docs/REFACTORING_SUMMARY.md`, `docs/COMPLETE_REFACTORING_REPORT.md`, `docs/FINAL_REFACTORING_REPORT.md`.
 - Statut: documenté; validation codebase en cours côté `WorkflowService` (voir `docs/MIGRATION_STATUS.md`).
 
 ### Pipeline de Traitement
-Le cœur du système est un pipeline en 7 étapes, chacune isolée dans son environnement Python :
+Le cœur du système est un pipeline en 8 étapes, chacune isolée dans son environnement Python :
 1.  **Extraction + normalisation** (`env/`) : Extraction sécurisée des apports (ZIP/RAR/TAR) via `FilesystemService` (cache relocalisable `CACHE_ROOT_DIR`), puis normalisation FFmpeg des vidéos extraites (MP4 / H.264 / yuv420p / 25 fps) via `utils/media_normalizer.py` — contrat obligatoire pour toutes les étapes aval.
 2.  **Détection de Scènes** (`transnet_env/`) : TransNetV2 PyTorch pour les coupures, avec skips conditionnels documentés lorsque les modèles manquent.
 3.  **Analyse Audio** (`audio_env/`) : Pipeline Lemonfox + Pyannote (fallback) avec embeddings locuteurs optionnels (`AUDIO_INCLUDE_SPEAKER_EMBEDDINGS`).
 4.  **Suivi Vidéo** (`tracking_env_slim/`, `insightface_env/`) : MediaPipe Landmarker CPU-only en multiprocessing (valeur par défaut). InsightFace GPU est disponible uniquement si `STEP4_ENABLE_GPU=1` et `STEP4_TRACKING_ENGINE=insightface`, sinon fallback CPU automatique.
 5.  **Réduction JSON** (`env/`) : `json_reducer.py` produit `*_tracking.json` (source primaire AE) avec analytics et `temporal_alignment`.
 6.  **Pré-traitement AE** (`env/`) : `preprocess_ae_json.py` génère `*_ae.json` optimisés, utilisables directement par le script AE et par `Media-Solution` via manifest.
-7.  **Finalisation** (`env/`) : `finalize_and_copy.py` archive les sorties (ResultsArchiver) et publie les artefacts.
+7.  **Finalisation** (`env/`) : `finalize_and_copy.py` archive les sorties (ResultsArchiver), publie les artefacts et écrit le manifeste `logs/step7/finalized_projects_*.json` des dossiers copiés.
+8.  **Media Solution (EffectCraft)** (`env/`) : `run_mediasolution_ec.py` génère les projets EffectCraft `<video>_9x16.ecproj` (recadrage 9:16, découpes CSV, recentrage par tracking) depuis les dossiers du manifeste de l'étape 7, en headless via `effectcraft-cli script`.
 
 ### Intégrations Clés
 -   **Webhook JSON** : Source unique pour le monitoring temps réel (`CSVMonitorService` + `download_history.sqlite3`).

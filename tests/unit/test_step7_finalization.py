@@ -3,6 +3,7 @@
 
 import errno
 import importlib.util
+import json
 import logging
 import subprocess
 from pathlib import Path
@@ -77,3 +78,39 @@ class TestStep7FinalizationChmodFallback:
         # Then:  Expected result/verification
         assert 'Destination ne supporte pas chmod' in caplog.text
         assert 'cp --no-preserve a échoué' in caplog.text
+
+
+class TestFinalizedManifest:
+    """Manifeste des projets finalisés (lu par l'étape 8 — Media Solution)."""
+
+    def test_write_finalized_manifest_payload(self, tmp_path, monkeypatch):
+        mod = _load_finalize_module()
+
+        # Given: un dossier de logs isolé et un projet finalisé
+        monkeypatch.setattr(mod, 'LOG_DIR', tmp_path / 'logs' / 'step7')
+        projects = [{'name': '117 Camille', 'path': '/mnt/cache/117 Camille'}]
+
+        # When:  écriture du manifeste
+        manifest_path = mod.write_finalized_manifest(Path('/mnt/cache'), projects)
+
+        # Then:  le fichier horodaté contient le schéma attendu
+        assert manifest_path.exists()
+        assert manifest_path.name.startswith('finalized_projects_')
+        payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+        assert payload['schema'] == 1
+        assert payload['output_dir'] == '/mnt/cache'
+        assert payload['mode'] in ('lenient', 'strict', 'videos')
+        assert payload['projects'] == projects
+
+    def test_write_finalized_manifest_empty(self, tmp_path, monkeypatch):
+        mod = _load_finalize_module()
+
+        # Given: un dossier de logs isolé et aucun projet finalisé
+        monkeypatch.setattr(mod, 'LOG_DIR', tmp_path / 'logs' / 'step7')
+
+        # When:  écriture d'un manifeste vide
+        manifest_path = mod.write_finalized_manifest(Path('/mnt/cache'), [])
+
+        # Then:  la liste des projets est vide (l'étape 8 terminera sans rien traiter)
+        payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+        assert payload['projects'] == []

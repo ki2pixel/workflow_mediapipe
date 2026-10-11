@@ -1,10 +1,11 @@
 # Repository Guidelines
 
 Flask + native-JS pipeline that turns raw video archives into After Effects-ready
-artifacts through seven sequential steps (extraction + video normalization →
+artifacts through eight sequential steps (extraction + video normalization →
 scene detection → audio diarization → tracking → JSON reduction → AE
-preprocessing → finalization). Each step runs in its own Python virtualenv so
-incompatible dependencies (PyTorch, MediaPipe, InsightFace, Coral TPU) coexist.
+preprocessing → finalization → EffectCraft project generation). Each step runs in
+its own Python virtualenv so incompatible dependencies (PyTorch, MediaPipe,
+InsightFace, Coral TPU) coexist.
 Docs are French (`docs/workflow/`); commits and PRs are English.
 
 ## Project Structure & Module Organization
@@ -18,12 +19,14 @@ Docs are French (`docs/workflow/`); commits and PRs are English.
   decorated with `@measure_api`.
 - `./config/` — `settings.py`, `workflow_commands.py`, `security.py`,
   `step2_transnet.json`, `step2_tpu.json`. No hardcoded paths or secrets.
-- `./workflow_scripts/step{1..7}/` — per-step executables. Venvs live at
+- `./workflow_scripts/step{1..8}/` — per-step executables. Venvs live at
   `${VENV_BASE_DIR:-.}/{env,transnet_env,audio_env,tracking_env_slim,insightface_env,tracking_cv5_env,transnet_cv5_env,coral_env}`.
 - `./static/utils/` — `DOMBatcher.js`, `AppState.js`, `PollingManager.js`,
   `DOMDiff.js`, `WorkerManager.js`, `PerformanceMonitor.js`.
 - `./scripts/after_effects/MediaSolution-CEP/` — ES3 ExtendScript panel;
   Python bridge via `system.callSystem()`.
+- `./scripts/MediaSolution-EC/` — ScriptUI panel for EffectCraft (open-source AE
+  clone); STEP8 drives it headless through `effectcraft-cli script`.
 - `./memory-bank/` — accessed **only** through `fast-filesystem` MCP tools
   (`.agents/rules/memorybankprotocol.md`).
 - `./tests/{unit,integration,frontend,legacy}` — pytest suites plus Node ESM

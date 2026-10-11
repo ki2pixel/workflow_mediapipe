@@ -1,6 +1,6 @@
 # Finalisation
 
-**TL;DR** : Archive les résultats, copie les projets vers la destination finale, et nettoie les dossiers temporaires. Dernière étape du pipeline 7 étapes.
+**TL;DR** : Archive les résultats, copie les projets vers la destination finale, et nettoie les dossiers temporaires. Avant-dernière étape du pipeline 8 étapes (suivie de l'étape 8 : Media Solution / EffectCraft).
 
 ## Le Problème : Organisation et Nettoyage Final
 
@@ -96,6 +96,22 @@ archives/
 Les `.mov` à couche alpha (logos animés) et ceux listés dans `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) ne sont ni convertis (étape 1) ni analysés (étapes 2 à 6) : ils traversent le pipeline tels quels et sont copiés dans le `docs/` du projet finalisé (voir `SKIP_MOV_FILES`). Les `.mov` sans alpha sont convertis en `.mp4` par l'étape 1 et suivent le flux normal.
 
 Cas limite : un projet qui ne contiendrait **que** ces `.mov` (aucun `.mp4`) n'est pas considéré comme prêt et reste exposé au nettoyage des orphelins (48 h) — l'avertissement correspondant est journalisé.
+
+### Manifeste pour l'étape 8
+
+Chaque run écrit `logs/step7/finalized_projects_<horodatage>.json` ; l'étape 8 lit le plus récent par date de modification :
+
+```json
+{
+  "schema": 1,
+  "timestamp": "2026-10-11T12:00:00",
+  "output_dir": "/mnt/cache",
+  "mode": "lenient",
+  "projects": [{"name": "117 Camille", "path": "/mnt/cache/117 Camille"}]
+}
+```
+
+Seuls les projets copiés avec succès y figurent ; un run sans projet finalisé écrit un manifeste vide (l'étape 8 se termine alors sans rien traiter). Voir [08 Media Solution](08-mediasolution-ec.md).
 
 ## Configuration Essentielle
 

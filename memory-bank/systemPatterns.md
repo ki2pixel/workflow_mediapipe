@@ -96,6 +96,13 @@ Ce document définit les règles et les patrons de conception à suivre pour le 
 - `media_solution_bridge.py` fournit un mode `cuts` pour externaliser le parsing CSV et générer des segments (`ms_cuts_manifest_*`). Feature flag `enablePythonCutsParser` + fallback ExtendScript automatique.
 - Le pipeline AE consomme en priorité `*_tracking.json` (STEP6). STEP5 brut n’est utilisé qu’en fallback streaming. Les logs `[PY]` doivent être visibles côté script AE pour diagnostiquer les ponts Python.
 
+### Media Solution / EffectCraft (STEP8) — 2026-10-11
+- **Chaînage par manifeste** : STEP7 écrit `logs/step7/finalized_projects_<ts>.json` (nom + chemin final des dossiers copiés avec succès, y compris vide) ; STEP8 lit le plus récent par mtime. Une étape aval ne redécouvre jamais le travail par scan de `/mnt/cache`.
+- **Driver concaténé** : les scripts EffectCraft ne s'incluent pas entre eux — STEP8 concatène `scripts/MediaSolution-EC/MediaSolution.jsx` et un driver généré dans `logs/step8/drivers/` (les 10 derniers sont conservés). Le driver active obligatoirement `app.run("prefs.set", { key: "scripting.allowScriptsWriteFiles", value: true })` avant tout batch headless.
+- **Mode « Tout exécuter » uniquement** : un seul `runBatch(foldersJson, null, 0)` synchrone. Ne jamais passer `maxUnits > 0` : le batch resterait « en cours » sans méthode de reprise (le pas-à-pas est réservé à l'UI ScriptUI).
+- **Contrat de progression** : le wrapper relaie la sortie du CLI et ré-émet des lignes stables `MS_BATCH_TOTAL/PROGRESS/OK/FAIL/END/RESULT`, seules lues par les `progress_patterns` de la configuration STEP8. Le succès est décidé sur `MS_BATCH_RESULT` (`ok: true` et `errors: []`), pas sur le seul code retour du CLI. SIGTERM (bouton Annuler) → le wrapper termine le process `effectcraft-cli` enfant avant de sortir.
+- **Config du panel** : `mediasolution_ec.json` (racine de publication, ex. `/mnt/cache`) est lu par le wrapper et poussé via `applyConfig` — en headless le script ne lit jamais ce fichier lui-même.
+
 ## Général
 -   **Logging** : Utiliser le logger centralisé et les logs spécifiques à chaque étape.
 -   **Gestion des Erreurs** : Implémenter une gestion d'erreurs robuste (ex: `ErrorHandler.js` côté frontend).

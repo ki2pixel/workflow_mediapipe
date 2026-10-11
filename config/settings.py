@@ -444,6 +444,24 @@ class Config:
         
         # Subprocess default timeout configuration
         self.SUBPROCESS_TIMEOUT = _parse_optional_positive_int(os.environ.get('SUBPROCESS_TIMEOUT')) or 1800
+
+        # Étape 8 : Media Solution (EffectCraft, headless via effectcraft-cli)
+        self.STEP8_TIMEOUT = _parse_optional_positive_int(os.environ.get('STEP8_TIMEOUT')) or 14400
+        self.STEP8_EFFECTCRAFT_CLI = os.environ.get('STEP8_EFFECTCRAFT_CLI', 'effectcraft-cli')
+        self.STEP8_PANEL_JSX = os.environ.get(
+            'STEP8_PANEL_JSX',
+            str(self.BASE_PATH_SCRIPTS / "scripts" / "MediaSolution-EC" / "MediaSolution.jsx"),
+        )
+        self.STEP8_PANEL_CONFIG = os.environ.get('STEP8_PANEL_CONFIG', '')
+        # Mode d'exécution de l'étape 8 : auto (défaut), headless (<= 0.7) ou bridge (app ouverte)
+        self.STEP8_MODE = os.environ.get('STEP8_MODE', 'auto').strip().lower() or 'auto'
+        self.STEP8_BRIDGE_PORT = _parse_optional_positive_int(os.environ.get('STEP8_BRIDGE_PORT')) or 9877
+        # Mode bridge : lancer l'application si son control channel n'écoute pas
+        self.STEP8_AUTO_LAUNCH_APP = os.environ.get('STEP8_AUTO_LAUNCH_APP', 'true').strip().lower() not in (
+            '0', 'false', 'no', 'off'
+        )
+        self.STEP8_EFFECTCRAFT_APP = os.environ.get('STEP8_EFFECTCRAFT_APP', 'effectcraft')
+        self.STEP8_APP_LAUNCH_TIMEOUT = _parse_optional_positive_int(os.environ.get('STEP8_APP_LAUNCH_TIMEOUT')) or 60
         
         self._normalize_paths()
 
@@ -589,6 +607,7 @@ class Config:
             self.LOGS_DIR / 'step5',
             self.LOGS_DIR / 'step6',
             self.LOGS_DIR / 'step7',
+            self.LOGS_DIR / 'step8',
             # Ensure projects directory exists by default to avoid confusion
             self.PROJECTS_DIR,
             # Ensure archives directory exists

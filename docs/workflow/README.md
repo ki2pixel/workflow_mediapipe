@@ -1,6 +1,6 @@
 # Workflow MediaPipe - Documentation
 
-**TL;DR** : Pipeline vidéo 7 étapes avec tracking facial, analyse audio et préparation After Effects. Architecture Flask + Python avec environnements spécialisés.
+**TL;DR** : Pipeline vidéo 8 étapes avec tracking facial, analyse audio, préparation After Effects et génération des projets EffectCraft. Architecture Flask + Python avec environnements spécialisés.
 
 ## Pourquoi ce Projet ?
 
@@ -13,14 +13,14 @@ Tu dois transformer des vidéos brutes en données d'animation 3D pour After Eff
 - Synchroniser manuellement les résultats
 
 ### ✅ Notre pipeline intégré
-- Un seul clic pour lancer les 7 étapes
+- Un seul clic pour lancer les 8 étapes
 - Environnements isolés automatiquement
 - Progression visible en temps réel
 - Résultats optimisés pour After Effects
 
 ## Comment Ça Marche ?
 
-Le pipeline traite les vidéos en 7 étapes séquentielles, chacune dans son environnement virtuel optimisé :
+Le pipeline traite les vidéos en 8 étapes séquentielles, chacune dans son environnement virtuel optimisé :
 
 1. **Extraction** : Archives ZIP/RAR/TAR avec sécurité renforcée, puis normalisation vidéo (MP4/H.264/25 fps)
 2. **Scènes** : Détection automatique des changements de scène
@@ -29,6 +29,7 @@ Le pipeline traite les vidéos en 7 étapes séquentielles, chacune dans son env
 5. **Réduction** : JSON optimisé avec analytics enrichis
 6. **Pré-traitement AE** : Format optimisé pour After Effects
 7. **Finalisation** : Archivage et copie vers destination
+8. **Media Solution** : Génération des projets EffectCraft (`<video>_9x16.ecproj`) via le panel MediaSolution en headless
 
 ## Démarrage Rapide
 
@@ -63,6 +64,7 @@ python app_new.py
 - **[05 JSON Reduction](pipeline/05-json-reduction.md)** : Réduction JSON avec analytics
 - **[06 AE Preprocessing](pipeline/06-ae-preprocessing.md)** : Préparation After Effects
 - **[07 Finalization](pipeline/07-finalization.md)** : Archivage et finalisation
+- **[08 Media Solution](pipeline/08-mediasolution-ec.md)** : Projets EffectCraft (Media Solution headless)
 
 ### ⚙️ **Services** - Composants Métier
 - **[CSV Service](services/csv-service.md)** : Monitoring téléchargements webhook
