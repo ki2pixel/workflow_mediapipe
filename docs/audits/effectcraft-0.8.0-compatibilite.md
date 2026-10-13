@@ -52,6 +52,15 @@ MS_BATCH_RESULT: {"ok":false,"error":"Aucun projet à traiter (vérifiez docs/ e
 
 → L'étape 8, `tests/smoke_driver.js` et `tests/run_batch_headless.js` sont **inutilisables en headless pur** en 0.8.0 (0.7.0 : validés).
 
+## Limite connue : vidéos entrelacées (0.7.0 comme 0.8.0)
+
+Un flux **H.264 entrelacé** (1080i TFF, MBAFF/PAFF) est **rendu en noir** par EffectCraft — aperçu comme rendu headless — alors que l'audio reste correct et que la vidéo se lit normalement dans un lecteur externe (ffmpeg la décode sans erreur).
+
+- Reproductible sur 0.7.0 et 0.8.0 (aucune régression de version) : `render-frame` sur une comp contenant le fichier source renvoie 100 % de pixels noirs, contre une image normale après désentrelacement `yadif`.
+- `field_order` de ffprobe reste `unknown` sur ce type de fichier : la détection fiable passe par le drapeau `interlaced_frame` des frames (`ffprobe -read_intervals %+1 -show_entries frame=interlaced_frame`).
+- Corrigé côté pipeline : `utils/media_normalizer.py` sonde l'entrelacement, refuse la conformité et ré-encode avec `yadif` (chemin CPU, `libx264`), donc les prochains runs ne produisent plus ce cas.
+- Cas rencontré le 2026-10-12 : `/mnt/cache/122 Camille/docs/M6 - LFAUIT - Elle est capable de soulever 300 kilos !.mp4` (1080i50, 1884 frames). Vidéo réparée (désentrelacée sur place, backup temporaire) et projet régénéré ; rendu vérifié aux temps 2/20/40/70 s.
+
 ## Option retenue : mode bridge (implémenté et validé)
 
 L'étape 8 supporte désormais deux modes d'exécution, avec auto-détection de version (`STEP8_MODE=auto`) :

@@ -3,10 +3,12 @@
 """Normalisation vidéo partagée du pipeline (extraction STEP1 et garde-fous aval).
 
 Règle d'or du pipeline : toute vidéo doit être conforme au contrat
-**MP4 / H.264 / 25 fps / yuv420p** avant l'analyse des transitions, car les
+**MP4 / H.264 / 25 fps / yuv420p / progressif** avant l'analyse des transitions, car les
 étapes aval (transitions, audio, tracking, réduction JSON, pré-traitement AE)
 indexent leurs résultats par numéro de frame et calculent leurs timecodes sur
-une base 25 fps codée en dur.
+une base 25 fps codée en dur. Le caractère progressif compte aussi pour
+EffectCraft : l'aperçu rend les flux entrelacés (MBAFF/PAFF) en noir, donc un
+flux entrelacé est ré-encodé avec désentrelacement (`yadif`).
 
 Ce module était auparavant le script `workflow_scripts/step2/convert_videos.py`.
 Il est désormais :
@@ -41,6 +43,12 @@ TARGET_FPS = 25.0
 FPS_TOLERANCE = 0.1
 VIDEO_EXTENSIONS = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv')
 CONFORMANT_VIDEO_CODECS = ('h264',)
+
+# EffectCraft rend les flux entrelacés en noir : les fichiers concernés sont
+# ré-encodés avec désentrelacement (yadif, une frame par frame d'entrée).
+DEINTERLACE_FILTER = 'yadif'
+# Durée de la sonde d'entrelacement (le drapeau est lu frame par frame).
+INTERLACE_PROBE_SECONDS = 1
 
 # --- Encodage ---
 QUALITY_CRF = 28
@@ -157,6 +165,35 @@ def _parse_ffprobe_fps(payload: dict) -> Optional[float]:
         return None
 
 
+def _probe_interlaced(video_path: Path) -> Optional[bool]:
+    """Vrai si le flux vidéo est entrelacé (le drapeau est lu frame par frame).
+
+    `field_order` de ffprobe reste `unknown` sur du H.264 entrelacé réel : le
+    drapeau `interlaced_frame` de chaque frame est le seul indicateur fiable.
+    Retourne ``None`` quand la sonde est impossible (jamais bloquant).
+    """
+    try:
+        command = [
+            FFPROBE_PATH, "-v", "error",
+            "-select_streams", "v:0",
+            "-read_intervals", f"%+{INTERLACE_PROBE_SECONDS}",
+            "-show_entries", "frame=interlaced_frame",
+            "-of", "csv=p=0",
+            str(video_path),
+        ]
+        result = subprocess.run(
+            command, capture_output=True, text=True, check=True, encoding='utf-8', timeout=60,
+        )
+    except Exception as exc:
+        logger.debug("Sonde d'entrelacement impossible pour %s: %s", Path(video_path).name, exc)
+        return None
+
+    flags = [line.split(',')[0].strip() for line in (result.stdout or '').splitlines() if line.strip()]
+    if not flags:
+        return None
+    return any(flag == '1' for flag in flags)
+
+
 def analyze_video(video_path: Path, target_fps: float = TARGET_FPS) -> Dict[str, Any]:
     """Analyse framerate, codecs vidéo/audio d'un fichier via ffprobe."""
     try:
@@ -184,6 +221,7 @@ def analyze_video(video_path: Path, target_fps: float = TARGET_FPS) -> Dict[str,
             'fps': fps,
             'video_codec': video_codec,
             'audio_codec': audio_codec,
+            'interlaced': _probe_interlaced(Path(video_path)),
             'needs_fps_fix': fps is not None and abs(fps - target_fps) > FPS_TOLERANCE,
             'error': None,
         }
@@ -194,13 +232,14 @@ def analyze_video(video_path: Path, target_fps: float = TARGET_FPS) -> Dict[str,
             'fps': None,
             'video_codec': None,
             'audio_codec': None,
+            'interlaced': None,
             'needs_fps_fix': False,
             'error': str(exc),
         }
 
 
 def is_conformant(video_info: Dict[str, Any], target_fps: float = TARGET_FPS) -> bool:
-    """Vrai si le fichier respecte déjà le contrat MP4 / H.264 / <target_fps>."""
+    """Vrai si le fichier respecte déjà le contrat MP4 / H.264 / progressif / <target_fps>."""
     if video_info.get('error'):
         return False
 
@@ -214,6 +253,10 @@ def is_conformant(video_info: Dict[str, Any], target_fps: float = TARGET_FPS) ->
 
     fps = video_info.get('fps')
     if fps is None:
+        return False
+
+    # Un flux entrelacé est « correct » pour ffprobe mais rend noir dans EffectCraft.
+    if video_info.get('interlaced'):
         return False
 
     return abs(float(fps) - float(target_fps)) <= FPS_TOLERANCE
@@ -265,15 +308,26 @@ def normalize_video(
         logger.info("Média .mov préservé ignoré par le worker: %s", video_path.name)
         return True
 
+    interlaced = bool(video_info.get('interlaced'))
+    if interlaced:
+        # yadif s'exécute sur le CPU : un flux entrelacé repasse par libx264.
+        use_gpu = False
     worker_type = 'GPU' if use_gpu else 'CPU'
     temp_output_path = video_path.with_suffix(TEMP_SUFFIX)
 
     try:
         fps_str = f"{video_info['fps']:.2f}" if video_info.get('fps') is not None else "Inconnu"
         logger.info(
-            "Normalisation (%s) démarrée pour %s (FPS=%s, Audio=%s)",
+            "Normalisation (%s) démarrée pour %s (FPS=%s, Audio=%s%s)",
             worker_type, video_path.name, fps_str, video_info.get('audio_codec'),
+            ', désentrelacement' if interlaced else '',
         )
+
+        filters: List[str] = []
+        if interlaced:
+            filters.append(DEINTERLACE_FILTER)
+        if video_info.get('needs_fps_fix'):
+            filters.append(f'fps={target_fps}')
 
         command = [FFMPEG_PATH, '-y', '-hide_banner']
         if use_gpu:
@@ -281,8 +335,8 @@ def normalize_video(
 
         command.extend(['-i', str(video_path)])
 
-        if video_info.get('needs_fps_fix'):
-            command.extend(['-vf', f'fps={target_fps}'])
+        if filters:
+            command.extend(['-vf', ','.join(filters)])
 
         if use_gpu:
             command.extend([

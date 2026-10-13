@@ -115,7 +115,7 @@ RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1-9', 'LPT1-9']
 - Audio : `.wav`, `.mp3`, `.aac`, `.m4a`
 - Documents : `.pdf`, `.txt`, `.docx`, `.jpg`, `.png`
 
-⚠️ Après extraction, l'étape 1 normalise les vidéos (MP4 / H.264 / 25 fps). Les `.mov` à couche alpha (logos animés) et ceux listés dans `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) sont préservés tels quels ; les autres `.mov` sont convertis en `.mp4`, comme les `.avi`/`.mkv` (cf. `utils/media_filters.py`).
+⚠️ Après extraction, l'étape 1 normalise les vidéos (MP4 / H.264 / 25 fps / progressif). Les flux **entrelacés** (1080i, MBAFF/PAFF) sont **désentrelacés** (`yadif`) : EffectCraft les rend en noir à l'aperçu. Les `.mov` à couche alpha (logos animés) et ceux listés dans `PRESERVED_MOV_NAMES` (défaut `m6+.mov`) sont préservés tels quels ; les autres `.mov` sont convertis en `.mp4`, comme les `.avi`/`.mkv` (cf. `utils/media_filters.py`).
 
 ## Sécurité Renforcée
 
@@ -321,12 +321,17 @@ Pense à l'extraction comme un **sas de décontamination**. Les archives entrent
 
 L'étape 1 prépare **et normalise** les fichiers pour l'étape 2 (analyse des transitions) :
 - Les vidéos sont dans `projets_extraits/<projet>/docs/`
-- Chaque vidéo respecte le contrat **MP4 / H.264 / yuv420p / 25 fps** (via `utils/media_normalizer.py`)
+- Chaque vidéo respecte le contrat **MP4 / H.264 / yuv420p / 25 fps / progressif** (via `utils/media_normalizer.py`)
+- Un flux entrelacé (1080i) est détecté par la sonde de frames (`interlaced_frame`) et ré-encodé avec désentrelacement `yadif` (chemin CPU, une frame par frame d'entrée : le nombre de frames est conservé)
 - La structure est cohérente pour le reste du pipeline
 - Les métadonnées sont journalisées pour traçabilité
 
 > ⚠️ La normalisation est ce qui garantit l'alignement frame/timecode des étapes aval
 > (transitions, audio, tracking, JSON, AE), qui indexent leurs résultats par numéro de frame.
+>
+> ⚠️ Le caractère **progressif** compte aussi : l'aperçu EffectCraft (0.7.0 comme 0.8.0) rend les
+> flux entrelacés (1080i) en **noir** à l'écran, alors que ffprobe les juge à 25 fps et `yuv420p`.
+> Sans la sonde d'entrelacement, ce type de fichier traversait le pipeline sans être ré-encodé.
 
 ### Rattrapage des projets déjà extraits
 

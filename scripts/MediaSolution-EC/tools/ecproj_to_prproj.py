@@ -25,7 +25,14 @@ valeur par valeur avec le .ecproj d'origine. Correspondances vérifiées :
                             exportés, comme pour le .aep) ;
   - les médias            → vidéo, image fixe (structure « still » à durée infinie) et audio
                             seul (sans flux vidéo) ; chemins réécrits par défaut selon
-                            PATH_MAP (/mnt/cache → F:, pour l'ouverture sous Windows).
+                            PATH_MAP (/mnt/cache → F:, pour l'ouverture sous Windows) ;
+  - les masques « Add »   → un filtre `AE.ADBE AEMask2` (27 paramètres) écrit en sous-composant
+                            du filtre Opacité du clip (l'Opacité devient explicite) ; le tracé
+                            est un blob binaire (points normalisés [0..1], 3 points par sommet,
+                            tangentes absolues) ; tracé animé : 1re clé (comme l'export .aep) ;
+  - l'effet Gaussian Blur → le filtre `AE.Impact_Blur_FX` de Premiere (18 paramètres, intensité
+                            dans « Amount ») ; `dimensions`/`repeatEdge` d'EffectCraft ne sont
+                            pas repris (avertissement).
 
 Les temps écrits sont ceux du .ecproj. La chaîne Adobe .aep→Premiere décalait les clés de
 1 à 4 images (`floor(image × 25/24)`, artefact de timebase) : ce décalage n'est pas reproduit.
@@ -33,9 +40,11 @@ Les temps écrits sont ceux du .ecproj. La chaîne Adobe .aep→Premiere décala
 Limites v1 (avertissement, non exporté) : sources autres que Footage (Solid/Text/Shape/Camera/
 Light/comp imbriquée), plus d'une comp, blend ≠ Normal, opacité ≠ 100, stretch ≠ 100.
 
-Masques et effets (propres à EffectCraft — l'export .aep, lui, les écrit) : ces projets ne
-sont **pas exportés en .prproj** (le fichier serait incomplet) — seul le .aep est produit, et
-un .prproj voisin devenu obsolète est supprimé. `--force` passe outre.
+Masques et effets — structures relevées sur un projet Premiere 2026 de référence (masque et
+Gaussian Blur créés dans l'application). Un projet dont le masque utilise un autre mode que
+« Add », une inversion ou une option non reprise, ou un effet hors table, n'est **pas exporté
+en .prproj** (le fichier serait incomplet) — seul le .aep est produit, et un .prproj voisin
+devenu obsolète est supprimé. `--force` passe outre.
 
 Usage :
   python3 ecproj_to_prproj.py <projet.ecproj> [-o sortie.prproj] [--path-map SRC=DST] [--verify]
@@ -49,7 +58,8 @@ Options :
                         la constante PATH_MAP, /mnt/cache → F:)
   --no-path-map         n'applique aucune réécriture (chemins Linux écrits tels quels)
   --skip-missing        n'affiche qu'un décompte des médias absents (pas la liste)
-  --force               exporte même si le projet a des masques/effets (incomplet)
+  --force               exporte même si des éléments ne sont pas repris (masque non « Add »,
+                        inversé, effet inconnu) — le .prproj sera incomplet
   --verify              relit le .prproj produit et affiche un résumé (lecture seule)
   --compare-with REF    compare le résultat à un .prproj de référence (diff sémantique)
   --xml-dump            écrit aussi le XML décompressé à côté du .prproj (débogage)
@@ -59,11 +69,14 @@ Options :
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
+import hashlib
 import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import uuid
@@ -147,6 +160,8 @@ CLASS_UNIFORM_PARAM = ("cc12343e-f113-4d3b-ae05-b287db77d461", "10")
 CLASS_ALT_PARAM = ("a4ff2d6e-7ac2-44f8-9d52-17d9ca50e542", "10")
 CLASS_MUTE_PARAM = ("32657501-3aa4-445f-a49b-d09ecb9fa1ae", "10")
 CLASS_VOLUME_PARAM = ("a714635e-a628-4b27-9d59-77eba47dbc1a", "10")
+CLASS_ENUM_PARAM = ("6e02e8bb-2569-46b2-8ab1-4ab11c43e9c8", "10")
+CLASS_ARB_PARAM = ("313e54d4-6903-49ad-b0bf-8262cdd10f4e", "3")
 
 GUID_MEDIA_VIDEO = "228cda18-3625-4d2d-951e-348879e4ed93"
 GUID_MEDIA_AUDIO = "80b8e3d5-6dca-4195-aefb-cb5f407ab009"
@@ -166,6 +181,38 @@ DEFAULT_CLIP_VOLUME = "0.177827939391"
 DEFAULT_CLIP_VOLUME_F = "0.17782793939113617"
 STILL_DURATION_TICKS = 10973491200000000   # durée « infinie » d'un média image : 12 h (comme Adobe)
 STILL_CLIP_TICKS = 1524096000000           # plage nominale du clip image dans le masterclip (6 s)
+
+# --- masques et effets (structures relevées sur un projet Premiere 2026 de référence) ----------
+# Un masque est un filtre `AE.ADBE AEMask2` (27 paramètres) écrit en sous-composant du filtre
+# Opacité du clip ; son tracé est un blob binaire base64 (paramètre « Path »). Le « Gaussian
+# Blur » de Premiere est le filtre `AE.Impact_Blur_FX` (18 paramètres), composant de premier
+# niveau de la chaîne (comme Motion).
+MASK2_MATCH_NAME = "AE.ADBE AEMask2"
+MASK2_DISPLAY_NAME = "Mask2"
+MASK_PATH_TAG = b"Vy"
+# Données privées du filtre : constantes pour toutes les instances de masque du projet de
+# référence (relevées telles quelles ; Premiere les recalcule à l'enregistrement).
+MASK2_PRIVATE_DATA = "a2NpbgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIDl+f//////AQAAAAAAAACA5fn//////wEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+MASK_TRACKER_DATA = "AQAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAA="
+MASK_TRACKER24_DATA = "DAAAAAgADAAEAAgACAAAABgAAABMAAAAEAAMAAAAAAAAAAcAAAAIABAAAAAAAAAABAAAACQAAABiZWI3MTgwNi0yZjAzLTQ0NTgtOWFhMy0xZmMxNTAwNGYyYWQAAAAAAAAAAA=="
+MASK_INTERACTIONS_DATA = "AA=="
+# Tracé vide (masque sans points) : conteneur « 2, 0 tracé » observé sur l'échantillon.
+MASK_EMPTY_PATH = "AgAAAAAAAAA="
+# Hashes Adobe connus des payloads constants ci-dessus (mêmes octets → même hash dans
+# tous les projets Premiere) : ils sont réutilisés tels quels.
+MASK_KNOWN_HASHES = {
+    MASK2_PRIVATE_DATA: "801239b7-73d1-ddc5-2fb7-1cc30000007c",
+    MASK_TRACKER_DATA: "11d96c46-af5b-7d09-d31f-ff4d00000074",
+    MASK_TRACKER24_DATA: "f00faa56-7d8f-97ac-729c-312c00000070",
+    MASK_INTERACTIONS_DATA: "c40c6399-6b26-8c2c-feaf-d01b0000000d",
+    MASK_EMPTY_PATH: "5b3d1e1b-2b68-8c23-e1d2-827a00000014",
+}
+# Paramètre « Type » du masque = mode (enum AE MaskMode : 2 = Add). Les autres modes
+# (Subtract, Intersect…) restent à calibrer : seuls les masques « Add » sont exportés (v1).
+MASK_TYPE_ENUM = {"Add": 2}
+PP_BLUR_MATCH_NAME = "AE.Impact_Blur_FX"
+PP_BLUR_DISPLAY_NAME = "Gaussian Blur"
+PP_BLUR_EFFECTS = ("ec.blur.gaussian",)
 
 
 # -------------------------------------------------------------- mini-DOM XML
@@ -497,6 +544,424 @@ def scalar_keyframes(node: dict):
     return scalar_start(val(keys[0])), ";".join(rows) + ";"
 
 
+# -------------------------------------------------- tracés de masque (blob Premiere)
+
+
+def mask_children(mask: dict) -> dict[str, dict]:
+    """Enfants d'un masque .ecproj indexés par `match` (path, feather, opacity, expansion)."""
+    return {child.get("match"): child for child in mask.get("children") or []}
+
+
+def mask_path_value(node: dict | None) -> dict:
+    """Valeur du tracé d'un nœud Mask Path (1re clé si le tracé est animé, comme le .aep)."""
+    if node is None:
+        return {}
+    keys = node_keys(node)
+    if keys:
+        return (keys[0].get("value") or {}).get("v") or {}
+    return (node.get("value") or {}).get("v") or {}
+
+
+def mask_path_is_closed(mask: dict) -> bool:
+    """Vrai si le tracé du masque est fermé."""
+    return bool(mask_path_value(mask_children(mask).get("path")).get("closed", False))
+
+
+def mask_is_applied(mask: dict) -> bool:
+    """Vrai si EffectCraft applique ce masque au rendu (même règle que le moteur).
+
+    `crates/render/src/masks.rs` ne retient que les masques actifs dont le mode n'est pas
+    « None » et dont le tracé est **fermé** : « an open mask makes no transparency: the
+    layer shows whole until the path is closed ». Un masque ignoré par EffectCraft ne doit
+    pas être écrit dans le .prproj — il découperait le clip alors qu'EffectCraft le laisse
+    entier (cas des masques vides non fermés, fréquents dans les .ecproj).
+    """
+    kind = mask.get("kind") or {}
+    return str(kind.get("mode") or "Add") != "None" and mask_path_is_closed(mask)
+
+
+def pack_mask_path(points, closed: bool) -> str:
+    """Blob base64 du paramètre « Path » à partir de points **normalisés** [0..1].
+
+    `points` : un tuple `(x_entrée, y_entrée, x_sommet, y_sommet, x_sortie, y_sortie)` par
+    sommet (tangentes en positions absolues). Assemblage : en-tête de 25 octets (version,
+    balise « Vy », nombre de sommets), puis 3 points par sommet séparés par un float 0.0,
+    et un octet final (1 = tracé fermé, 0 = ouvert) — structure relevée octet par octet sur
+    un rectangle à 4 sommets (134 octets, round-trip vérifié).
+    """
+    count = len(points)
+    raw = bytearray(struct.pack("<II", 2, 1))          # version du conteneur, 1 tracé
+    raw += MASK_PATH_TAG + b"\x00\x00\x00"             # balise « Vy » + remplissage observé
+    raw += struct.pack("<III", 2, count, 0)            # constant, nombre de sommets, constant
+    for index, point in enumerate(points):
+        raw += struct.pack("<6f", *point)
+        if index != count - 1:
+            raw += struct.pack("<f", 0.0)
+    raw += bytes([1 if closed else 0])
+    return base64.b64encode(bytes(raw)).decode("ascii")
+
+
+def encode_mask_path(vertices, in_tangents, out_tangents, closed, frame_w, frame_h) -> str:
+    """Blob « Path » d'un masque (pixels → normalisé [0..1] par la taille de la frame).
+
+    Les tangentes .ecproj sont relatives au sommet ; Premiere stocke les trois points
+    (entrée, sommet, sortie) en absolu. Le nombre de sommets est écrit sur 4 octets ;
+    au-delà de 255, l'ordre des octets reste à confirmer (masques usuels : moins de
+    256 sommets, où toutes les variantes d'encodage coïncident).
+    """
+    points = []
+    for index, (vx, vy) in enumerate(vertices):
+        tx, ty = in_tangents[index] if index < len(in_tangents) else (0.0, 0.0)
+        ox, oy = out_tangents[index] if index < len(out_tangents) else (0.0, 0.0)
+        points.append(((vx + tx) / frame_w, (vy + ty) / frame_h,
+                       vx / frame_w, vy / frame_h,
+                       (vx + ox) / frame_w, (vy + oy) / frame_h))
+    return pack_mask_path(points, bool(closed))
+
+
+def decode_mask_path(blob: str) -> list[tuple[float, ...]]:
+    """Points normalisés d'un blob « Path » (miroir de `pack_mask_path`)."""
+    try:
+        raw = base64.b64decode(blob, validate=True)
+    except Exception:
+        return []
+    if len(raw) < 26 or raw[:8] != struct.pack("<II", 2, 1):
+        return []
+    count = struct.unpack_from("<I", raw, 17)[0]
+    body = raw[25:-1]
+    floats = struct.unpack(f"<{len(body) // 4}f", body)
+    points = []
+    index = 0
+    for position in range(count):
+        if index + 6 > len(floats):
+            break
+        points.append(tuple(floats[index:index + 6]))
+        index += 7 if position < count - 1 else 6
+    return points
+
+
+def mask_bounds_center(vertices, frame_w: float, frame_h: float) -> tuple[float, float]:
+    """Centre de la bounding-box d'un tracé (Position/Anchor du masque Premiere)."""
+    if not vertices:
+        return 0.5, 0.5
+    xs = [float(x) for x, _ in vertices]
+    ys = [float(y) for _, y in vertices]
+    return ((min(xs) + max(xs)) / 2.0 / frame_w, (min(ys) + max(ys)) / 2.0 / frame_h)
+
+
+def mask_feather_node(mask: dict) -> dict | None:
+    """Nœud « feather » d'un masque, réduit à un scalaire (max des deux axes, v1)."""
+    node = mask_children(mask).get("feather")
+    if node is None:
+        return None
+
+    def greatest(value):
+        vec = conv.prop_value(value)
+        if isinstance(vec, list) and vec:
+            return max(float(component) for component in vec)
+        return float(vec or 0.0)
+
+    reduced = dict(node)
+    reduced["value"] = {"t": "Scalar", "v": greatest(node.get("value"))}
+    reduced["keys"] = [{**key, "value": {"t": "Scalar", "v": greatest(key.get("value"))}}
+                       for key in node_keys(node)]
+    return reduced
+
+
+def make_mask_bool_param(parameter_id: int, control: int | None = None, name: str | None = None,
+                         upper: bool = False, value: bool = False) -> Obj:
+    """Paramètre booléen d'un masque ou d'un effet (classe « cc12343e »)."""
+    param = Obj("VideoComponentParam", classid_version=CLASS_UNIFORM_PARAM)
+    if control is not None:
+        param.txt("ParameterControlType", str(control))
+    param.txt("ParameterID", str(parameter_id))
+    if name:
+        param.txt("Name", name)
+    param.txt("StartKeyframe", f"{SENTINEL},{'true' if value else 'false'},0,0,0,0,0,0")
+    if upper:
+        param.txt("UpperBound", "false")
+    return param
+
+
+def make_mask_scalar_param(parameter_id: int, name: str | None, node: dict | None, default: float,
+                           lower: int, upper: int, lower_ui: int | None = None,
+                           upper_ui: int | None = None, control: int | None = None,
+                           angle_class: bool = False, current: str | None = None) -> Obj:
+    """Paramètre scalaire borné d'un masque ou d'un effet (« a4ff2d6e » / « fe47129e »)."""
+    param = Obj("VideoComponentParam",
+                classid_version=(CLASS_IDS["VideoComponentParam"] if angle_class
+                                 else CLASS_ALT_PARAM))
+    if lower_ui is not None:
+        param.txt("LowerUIBound", str(lower_ui))
+    if upper_ui is not None:
+        param.txt("UpperUIBound", str(upper_ui))
+    if control is not None:
+        param.txt("ParameterControlType", str(control))
+    param.txt("ParameterID", str(parameter_id))
+    if name:
+        param.txt("Name", name)
+    if node is not None and node_keys(node) and not keys_are_constant(node):
+        start, rows = scalar_keyframes(node)
+        param.txt("StartKeyframe", start)
+        if rows is not None:
+            param.txt("Keyframes", rows)
+    else:
+        value = scalar_of(node_value(node), default) if node is not None else default
+        param.txt("StartKeyframe", scalar_start(value))
+    if current is not None:
+        param.txt("CurrentValue", current)
+    param.txt("LowerBound", str(lower))
+    param.txt("UpperBound", str(upper))
+    return param
+
+
+def make_mask_enum_param(parameter_id: int, name: str | None, value: int, lower: int, upper: int,
+                         control: int | None = None) -> Obj:
+    """Paramètre énuméré d'un masque ou d'un effet (classe « 6e02e8bb »)."""
+    param = Obj("VideoComponentParam", classid_version=CLASS_ENUM_PARAM)
+    param.txt("DiscontinuousInterpolate", "true")
+    if control is not None:
+        param.txt("ParameterControlType", str(control))
+    param.txt("ParameterID", str(parameter_id))
+    if name:
+        param.txt("Name", name)
+    param.txt("StartKeyframe", f"{SENTINEL},{int(value)},0,0,0,0,0,0")
+    param.txt("LowerBound", str(lower))
+    param.txt("UpperBound", str(upper))
+    return param
+
+
+def make_mask_point_param(parameter_id: int, name: str, x, y) -> Obj:
+    """Paramètre Point d'un masque (Position, Anchor Point, Scale)."""
+    param = Obj("PointComponentParam")
+    param.txt("ParameterID", str(parameter_id))
+    param.txt("Name", name)
+    param.txt("StartKeyframe", point_start(x, y))
+    return param
+
+
+def mask_payload_hash(payload: str) -> str:
+    """Identifiant `BinaryHash` d'un payload base64 (clé, pas une somme de contrôle).
+
+    Premiere s'en sert de clé pour ne stocker qu'une copie d'un payload (les copies
+    suivantes sont vides et portent le même hash) : il n'est ni recalculé ni validé à
+    la lecture — des écrivains tiers en créent librement (py_premiere utilise des
+    uuid4, et Premiere ouvre ces fichiers). On garde la forme observée chez Adobe
+    (identifiant + taille du blob + 12) en la rendant déterministe, et on réutilise
+    les hashes Adobe des payloads constants.
+    """
+    known = MASK_KNOWN_HASHES.get(payload)
+    if known:
+        return known
+    raw = base64.b64decode(payload)
+    digest = hashlib.md5(raw).digest()
+    return (f"{digest[0:4].hex()}-{digest[4:6].hex()}-{digest[6:8].hex()}-"
+            f"{digest[8:10].hex()}-{digest[10:12].hex()}"
+            f"{struct.pack('>I', len(raw) + 12).hex()}")
+
+
+def make_mask_arb_param(parameter_id: int, name: str, payload: str | None = None) -> Obj:
+    """Paramètre opaque d'un masque (blob base64 : tracé, tracker, interactions)."""
+    param = Obj("ArbVideoComponentParam", classid_version=CLASS_ARB_PARAM)
+    param.txt("ParameterControlType", "22")
+    param.txt("ParameterID", str(parameter_id))
+    param.txt("Name", name)
+    param.txt("StartKeyframePosition", SENTINEL)
+    attrs = {"Encoding": "base64"}
+    if payload:
+        attrs["BinaryHash"] = mask_payload_hash(payload)
+    param.el(E("StartKeyframeValue", attrs, text=payload))
+    return param
+
+
+def build_mask_component(mask: dict, index: int, source_w: float, source_h: float,
+                         warn) -> tuple[Obj, list[Obj]]:
+    """Filtre `AE.ADBE AEMask2` (27 paramètres) d'un masque .ecproj.
+
+    Le tracé est écrit en coordonnées normalisées par la taille **source** du clip (les
+    masques vivent dans l'espace du calque, comme dans After Effects : 1920×1080 pour une
+    source paysage, même si la séquence est en 1080×1920), Position/Anchor au centre de sa
+    bounding-box. Un masque sans tracé prend l'état par défaut d'Adobe (`Type 0`,
+    Position/Anchor `0:0`) : il ne découpe rien. Un tracé animé est écrit à sa première clé
+    (comme l'export .aep) ; les options non reprises (mode ≠ Add, inversion…) sont refusées
+    en amont par `premiere_skip_reason` et signalées ici par un avertissement.
+    """
+    kind = mask.get("kind") or {}
+    children = mask_children(mask)
+    name = mask.get("name")
+    path_node = children.get("path")
+    value = mask_path_value(path_node)
+    vertices = [(float(x), float(y)) for x, y in value.get("vertices") or []]
+    in_tangents = [(float(x), float(y)) for x, y in (value.get("in_tangents") or [])]
+    out_tangents = [(float(x), float(y)) for x, y in (value.get("out_tangents") or [])]
+    blob = (encode_mask_path(vertices, in_tangents, out_tangents,
+                             bool(value.get("closed", True)), source_w, source_h)
+            if vertices else MASK_EMPTY_PATH)
+    if value.get("feather"):
+        warn(f"masque « {name} » : feather variable (points) non repris (v1)")
+    center_x, center_y = (mask_bounds_center(vertices, source_w, source_h) if vertices
+                          else (0.0, 0.0))
+    mode = str(kind.get("mode") or "Add")
+    if mode not in MASK_TYPE_ENUM:
+        warn(f"masque « {name} » : mode {mode} non repris (v1), écrit comme Add")
+    if bool(kind.get("inverted")):
+        warn(f"masque « {name} » : masque inversé non repris (v1)")
+    if path_node is not None and vertices and node_keys(path_node) and any(
+            key.get("value") != node_keys(path_node)[0].get("value")
+            for key in node_keys(path_node)):
+        warn(f"masque « {name} » : tracé animé — seule la 1re clé est écrite (v1)")
+    mask_type = MASK_TYPE_ENUM.get(mode, MASK_TYPE_ENUM["Add"]) if vertices else 0
+
+    params = [
+        make_mask_bool_param(1, control=11, upper=True),
+        make_mask_bool_param(2, control=16),
+        make_mask_bool_param(3, control=16),
+        make_mask_bool_param(4, control=16),
+        make_mask_bool_param(19, control=16),
+        make_mask_bool_param(20, control=16),
+        make_mask_bool_param(5, control=12, upper=True),
+        make_mask_arb_param(6, "Tracker", MASK_TRACKER_DATA),
+        make_mask_arb_param(24, "Tracker", MASK_TRACKER24_DATA),
+        make_mask_arb_param(7, "Path", blob),
+        make_mask_bool_param(8, control=11, name="Transform", upper=True),
+        make_mask_point_param(9, "Position", center_x, center_y),
+        make_mask_point_param(11, "Scale", 1, 1),
+        make_mask_scalar_param(26, "Scale Height", None, 100.0, -5000, 5000,
+                               lower_ui=0, upper_ui=200),
+        make_mask_scalar_param(27, "Scale Width", None, 100.0, -5000, 5000,
+                               lower_ui=0, upper_ui=200),
+        make_mask_bool_param(28, name="Uniform Scale"),
+        make_mask_scalar_param(12, "Rotation", None, 0.0, -32768, 32767, control=3,
+                               angle_class=True),
+        make_mask_point_param(10, "Anchor Point", center_x, center_y),
+        make_mask_bool_param(13, control=12, upper=True),
+        make_mask_scalar_param(14, "Feather", mask_feather_node(mask), 0.0, 0, 5000,
+                               upper_ui=300),
+        make_mask_scalar_param(15, "Opacity", children.get("opacity"), 100.0, 0, 100),
+        make_mask_scalar_param(16, "Expansion", children.get("expansion"), 0.0, -5000, 5000,
+                               lower_ui=-300, upper_ui=300),
+        make_mask_bool_param(17),
+        make_mask_scalar_param(25, None, None, 32.0, 0, 192),
+        make_mask_enum_param(21, "Blend Mode", 0, 0, 2),
+        make_mask_enum_param(22, "Type", mask_type, 0, 4, control=10),
+        make_mask_arb_param(23, "User Interactions", MASK_INTERACTIONS_DATA),
+    ]
+    filter_obj = Obj("VideoFilterComponent")
+    filter_obj.el(E("Component", {"Version": "7"}, children=[
+        E("Params", {"Version": "1"}, children=[
+            E("Param", {"Index": str(position), "ref": param})
+            for position, param in enumerate(params)
+        ]),
+        E("DisplayName", text=MASK2_DISPLAY_NAME),
+        E("InstanceName", text=f"{index + 1:02d}"),
+    ]))
+    filter_obj.el(E("PremiereFilterPrivateData",
+                    {"Encoding": "base64", "BinaryHash": mask_payload_hash(MASK2_PRIVATE_DATA)},
+                    text=MASK2_PRIVATE_DATA))
+    filter_obj.txt("MatchName", MASK2_MATCH_NAME)
+    filter_obj.txt("VideoFilterType", "2")
+    return filter_obj, params
+
+
+def build_opacity_component(mask_filters: list[Obj]) -> tuple[Obj, list[Obj]]:
+    """Filtre Opacité explicite (`AE.ADBE Opacity`) portant les masques en sous-composants.
+
+    Relevé sur le projet de référence : quand un clip a un masque, Premiere matérialise
+    l'Opacité (3 paramètres) et la chaîne du clip ne porte plus `DefaultOpacity`.
+    """
+    opacity = Obj("VideoComponentParam")
+    opacity.txt("ParameterID", "1")
+    opacity.txt("Name", "Opacity")
+    opacity.txt("StartKeyframe", scalar_start(100.0))
+    opacity.txt("LowerBound", "0")
+    opacity.txt("UpperBound", "100")
+    blend = Obj("VideoComponentParam", classid_version=CLASS_ENUM_PARAM)
+    blend.txt("DiscontinuousInterpolate", "true")
+    blend.txt("ParameterControlType", "10")
+    blend.txt("ParameterID", "2")
+    blend.txt("Name", "Blend Mode")
+    blend.txt("StartKeyframe", f"{SENTINEL},18,0,0,0,0,0,0")
+    blend.txt("LowerBound", "0")
+    blend.txt("UpperBound", "27")
+    matte = Obj("VideoComponentParam", classid_version=CLASS_ENUM_PARAM)
+    matte.txt("DiscontinuousInterpolate", "true")
+    matte.txt("ParameterID", "3")
+    matte.txt("Name", "Blend Mode")
+    matte.txt("StartKeyframe", f"{SENTINEL},0,0,0,0,0,0,0")
+    matte.txt("LowerBound", "0")
+    matte.txt("UpperBound", "31")
+    filter_obj = Obj("VideoFilterComponent")
+    filter_obj.el(E("Component", {"Version": "7"}, children=[
+        E("Params", {"Version": "1"}, children=[
+            E("Param", {"Index": "0", "ref": opacity}),
+            E("Param", {"Index": "1", "ref": blend}),
+            E("Param", {"Index": "2", "ref": matte}),
+        ]),
+        E("DisplayName", text="Opacity"),
+        E("Intrinsic", text="true"),
+        E("ID", text="1"),
+    ]))
+    filter_obj.el(E("SubComponents", {"Version": "1"}, children=[
+        E("SubComponent", {"Index": str(index), "ref": mask})
+        for index, mask in enumerate(mask_filters)
+    ]))
+    filter_obj.txt("MatchName", "AE.ADBE Opacity")
+    filter_obj.txt("VideoFilterType", "2")
+    return filter_obj, [opacity, blend, matte]
+
+
+def build_blur_component(effect: dict, warn) -> tuple[Obj, list[Obj]]:
+    """Filtre `AE.Impact_Blur_FX` (le « Gaussian Blur » de Premiere) + ses 18 paramètres.
+
+    Mapping v1 de `ec.blur.gaussian` : `blurriness` → « Amount » (borné 0-100, comme
+    l'interface) ; « Thickness » reçoit la même valeur (corrélation observée sur le projet
+    de référence) ; `dimensions` et `repeatEdge` n'ont pas d'équivalent (avertissement).
+    """
+    children = {child.get("match"): child for child in effect.get("children") or []}
+    amount = 0.0
+    if "blurriness" in children:
+        amount = min(100.0, max(0.0, scalar_of(node_value(children["blurriness"]), 0.0)))
+    dimensions = (scalar_of(node_value(children.get("dimensions")), 0.0)
+                  if "dimensions" in children else 0.0)
+    repeat = bool(node_value(children.get("repeatEdge"))) if "repeatEdge" in children else False
+    if abs(dimensions) > 1e-9 or repeat:
+        warn(f"effet « {effect.get('name')} » : dimensions/repeatEdge non repris par le "
+             f"Gaussian Blur de Premiere (v1)")
+    params = [
+        make_mask_bool_param(8100, control=16, name="Error occurred"),
+        make_mask_bool_param(1, control=11, name="Controls", upper=True),
+        make_mask_bool_param(8040, control=16),
+        make_mask_scalar_param(8041, "Seed", None, 0.0, 0, 99999),
+        make_mask_scalar_param(2, "Angle", None, 0.0, -32768, 32767, control=3,
+                               angle_class=True),
+        make_mask_scalar_param(3, "Amount", None, amount, 0, 100, current=f"{amount:g}"),
+        make_mask_scalar_param(4, "Thickness", None, amount, 0, 100),
+        make_mask_bool_param(5, name="Uniform Blur", value=True),
+        make_mask_scalar_param(6, "Chromatic Aberration", None, 0.0, 0, 100),
+        make_mask_enum_param(8, "Edge Behavior", 1, 0, 2),
+        make_mask_bool_param(8240, control=16),
+        make_mask_bool_param(7, control=12, name="Controls", upper=True),
+        make_mask_bool_param(8141, control=16),
+        make_mask_scalar_param(8140, "Applied Version", None, 260000.0, 0, 999999),
+        make_mask_bool_param(9020, name="Overlays Enabled"),
+        make_mask_scalar_param(9040, "Sequence Width", None, -1.0, -1, 1000000000),
+        make_mask_scalar_param(9041, "Sequence Height", None, -1.0, -1, 1000000000),
+        make_mask_scalar_param(9042, "Sequence Pixel Ratio", None, -1.0, -1, 1000000000),
+    ]
+    filter_obj = Obj("VideoFilterComponent")
+    filter_obj.el(E("Component", {"Version": "7"}, children=[
+        E("Params", {"Version": "1"}, children=[
+            E("Param", {"Index": str(position), "ref": param})
+            for position, param in enumerate(params)
+        ]),
+        E("DisplayName", text=PP_BLUR_DISPLAY_NAME),
+        E("ID", text="3"),
+    ]))
+    filter_obj.txt("MatchName", PP_BLUR_MATCH_NAME)
+    filter_obj.txt("VideoFilterType", "2")
+    return filter_obj, params
+
+
 # ------------------------------------------------------- fabriques d'objets
 
 
@@ -543,25 +1008,37 @@ def make_ccgvs():
     return ccgvs, ccvs, serializers
 
 
-def make_video_chain(filter_obj: Obj | None = None, intrinsic_motion: bool = False) -> Obj:
+def make_video_chain(components: list[Obj] | None = None, intrinsic_motion: bool = False,
+                     default_opacity: bool = True) -> Obj:
+    """Chaîne de composants vidéo d'un clip.
+
+    `components` : filtres de premier niveau dans l'ordre d'application (l'Opacité qui porte
+    les masques d'abord, puis Motion, puis les effets). `default_opacity=False` quand une
+    Opacité explicite est écrite (cas des masques — relevé sur le projet de référence :
+    la chaîne ne porte alors plus DefaultOpacity).
+    """
+    components = list(components or [])
     chain = Obj("VideoComponentChain")
-    if filter_obj is None and not intrinsic_motion:
+    if not components and not intrinsic_motion:
         chain.el(E("ComponentChain", {"Version": "3"}))
         return chain
     if intrinsic_motion:
         chain.txt("DefaultMotion", "true")
-    chain.txt("DefaultOpacity", "true")
+    if default_opacity:
+        chain.txt("DefaultOpacity", "true")
     if intrinsic_motion:
         chain.txt("DefaultMotionComponentID", "2")
-    chain.txt("DefaultOpacityComponentID", "1")
-    if filter_obj is None:
-        chain.el(E("ComponentChain", {"Version": "3"}))
-    else:
+    if default_opacity:
+        chain.txt("DefaultOpacityComponentID", "1")
+    if components:
         chain.el(E("ComponentChain", {"Version": "3"}, children=[
             E("Components", {"Version": "1"}, children=[
-                E("Component", {"Index": "0", "ref": filter_obj})
+                E("Component", {"Index": str(index), "ref": obj})
+                for index, obj in enumerate(components)
             ])
         ]))
+    else:
+        chain.el(E("ComponentChain", {"Version": "3"}))
     return chain
 
 
@@ -704,11 +1181,6 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         blend = str(layer.get("blend_mode") or "Normal")
         if blend != "Normal":
             warn(f"calque « {layer.get('name')} » : mode de fusion {blend} non géré (v1)")
-        n_masks = len(conv.enabled_masks(layer))
-        n_effects = len(conv.collect_effects(layer))
-        if n_masks or n_effects:
-            warn(f"calque « {layer.get('name')} » : {n_masks} masque(s) et {n_effects} effet(s) "
-                 f"propres à EffectCraft, non repris par Premiere (v1)")
         start = int(layer.get("in_point") or 0)
         end = int(layer.get("out_point") or 0)
         if end <= start:
@@ -1245,10 +1717,43 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             and abs(rotation_value) < 1e-6
         )
 
+        # masques et effets : le masque vit sous l'Opacité du clip (matérialisée), les effets
+        # sont des composants de premier niveau de la chaîne, comme Motion
+        mask_filters: list[Obj] = []
+        mask_params: list[Obj] = []
+        for mask in conv.enabled_masks(layer):
+            mode = str((mask.get("kind") or {}).get("mode") or "Add")
+            if mode == "None":
+                continue                       # mode None : aucun découpage, rien à écrire
+            if not mask_path_is_closed(mask):
+                warn(f"masque « {mask.get('name')} » de « {name} » : tracé ouvert (non fermé) "
+                     f"— non écrit, comme dans EffectCraft (le calque reste entier)")
+                continue
+            mask_filter, params = build_mask_component(mask, len(mask_filters), sw, sh, warn)
+            mask_filters.append(mask_filter)
+            mask_params += params
+        opacity_filter, opacity_params = (build_opacity_component(mask_filters)
+                                          if mask_filters else (None, []))
+        blur_filters: list[Obj] = []
+        blur_params: list[Obj] = []
+        for effect in conv.collect_effects(layer):
+            if effect.get("enabled") is False:
+                continue
+            if (effect.get("kind") or {}).get("effect") not in PP_BLUR_EFFECTS:
+                warn(f"calque « {name} » : effet « {effect.get('name')} » non repris "
+                     f"par Premiere (v1)")
+                continue
+            blur_filter, params = build_blur_component(effect, warn)
+            blur_filters.append(blur_filter)
+            blur_params += params
+        if mask_filters and default_motion:
+            # masque + Transform par défaut : écrire un filtre Motion explicite (aucune
+            # référence Adobe pour « composants intrinsèques + sous-composants »)
+            default_motion = False
+
         if default_motion:
             motion_params = []
             motion_filter = None
-            video_chain = make_video_chain(None, intrinsic_motion=True)
         else:
             motion_params = [
                 make_point_param(position_node, cw, ch, (cw / 2.0, ch / 2.0), offset),
@@ -1276,10 +1781,17 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             ]))
             motion_filter.txt("MatchName", "AE.ADBE Motion")
             motion_filter.txt("VideoFilterType", "2")
-            video_chain = make_video_chain(motion_filter)
+        components = ([opacity_filter] if opacity_filter is not None else []) \
+            + ([motion_filter] if motion_filter is not None else []) + blur_filters
+        video_chain = make_video_chain(components or None, intrinsic_motion=not components,
+                                       default_opacity=opacity_filter is None)
         entry["params"] = motion_params
+        entry["extra_params"] = opacity_params + mask_params + blur_params
         entry["keyframed"] = animated(position_node)
         entry["motion_filter"] = motion_filter
+        entry["mask_filters"] = mask_filters
+        entry["opacity_filter"] = opacity_filter
+        entry["blur_filters"] = blur_filters
         segment_video_clip = Obj("VideoClip")
         segment_video_clip.el(E("Clip", {"Version": "18"}, children=[
             E("Source", {"ref": bundle["video_source"]}),
@@ -1313,7 +1825,11 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             # média audio seul : pas d'item vidéo (les objets construits plus haut ne sont
             # pas émis — seule la partie audio de ce calque compte)
             entry["params"] = []
+            entry["extra_params"] = []
             entry["motion_filter"] = None
+            entry["mask_filters"] = []
+            entry["opacity_filter"] = None
+            entry["blur_filters"] = []
             entry["video_chain"] = None
             entry["video_item"] = None
             entry["video_subclip"] = None
@@ -1578,6 +2094,11 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
           for field in (faders[index], meters[index], balance_params[index])],
         faders[audio_track_count],
         meters[audio_track_count],
+        *[field for entry in entries for field in entry["mask_filters"]],
+        *[field for entry in entries if entry["opacity_filter"] is not None
+          for field in (entry["opacity_filter"],)],
+        *[field for entry in entries if entry["blur_filters"]
+          for field in entry["blur_filters"]],
         *[field for entry in entries
           if entry["motion_filter"] is not None and entry["segment_video_clip"] is not None
           for field in (entry["motion_filter"], entry["segment_video_clip"])],
@@ -1587,7 +2108,7 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         *[field for entry in audio_entries
           for field in (entry["audio_filter"], entry["segment_audio_clip"])],
         *[field for pair in fader_params for field in pair],
-        *[param for entry in entries for param in entry["params"]],
+        *[param for entry in entries for param in entry["params"] + entry["extra_params"]],
         *[field for entry in audio_entries
           for field in (entry["audio_tail_params"][0], entry["audio_tail_params"][1],
                         entry["audio_tail_secondary"][0], entry["audio_tail_secondary"][1])],
@@ -1682,7 +2203,8 @@ def sequence_snapshot(root, by_id, by_uid) -> list[dict]:
                     item = resolve(item_ref, by_id, by_uid)
                     if item is None:
                         continue
-                    info = {"start": 0, "end": 0, "in": 0, "out": 0, "params": {}}
+                    info = {"start": 0, "end": 0, "in": 0, "out": 0, "params": {},
+                            "masks": 0, "effects": []}
                     track_item = item.find("ClipTrackItem/TrackItem")
                     if track_item is not None:
                         info["start"] = int(track_item.findtext("Start") or 0)
@@ -1701,6 +2223,16 @@ def sequence_snapshot(root, by_id, by_uid) -> list[dict]:
                             filter_obj = resolve(component_ref, by_id, by_uid)
                             if filter_obj is None:
                                 continue
+                            match = filter_obj.findtext("MatchName") or ""
+                            if match == MASK2_MATCH_NAME:
+                                info["masks"] += 1
+                            elif match not in ("AE.ADBE Motion", "AE.ADBE Opacity"):
+                                info["effects"].append(match or filter_obj.tag)
+                            for sub_ref in filter_obj.findall("SubComponents/SubComponent"):
+                                sub = resolve(sub_ref, by_id, by_uid)
+                                sub_match = sub.findtext("MatchName") if sub is not None else None
+                                if sub_match == MASK2_MATCH_NAME:
+                                    info["masks"] += 1
                             for param_ref in filter_obj.findall("Component/Params/Param"):
                                 param = resolve(param_ref, by_id, by_uid)
                                 if param is None:
@@ -1748,11 +2280,14 @@ def verify_summary(path: str) -> str:
                      f"{len(audio_tracks)} piste(s), cadre {video['dims'][0]}x{video['dims'][1]}")
         for item in video["items"][:3]:
             state = "animé" if item["params"].get(0, {}).get("keys") else "fixe"
+            extras = f", {item['masks']} masque(s)" if item["masks"] else ""
+            if item["effects"]:
+                extras += ", effets " + ", ".join(item["effects"])
             lines.append(
                 f"    [{item['start'] / TICKS_PER_SECOND:8.3f} .. "
                 f"{item['end'] / TICKS_PER_SECOND:8.3f}] média "
                 f"{item['in'] / TICKS_PER_SECOND:8.3f}..{item['out'] / TICKS_PER_SECOND:8.3f} "
-                f"{state}, Position={parse_point(item['params'].get(0, {}).get('start'))}")
+                f"{state}{extras}, Position={parse_point(item['params'].get(0, {}).get('start'))}")
         if len(video["items"]) > 3:
             lines.append(f"    … et {len(video['items']) - 3} autre(s) clip(s)")
     return "\n".join(lines)
@@ -1806,17 +2341,66 @@ def compare_prproj(ours_path: str, ref_path: str) -> None:
 # ------------------------------------------------------- compatibilité Premiere
 
 
+def mask_unsupported_reason(mask: dict) -> str | None:
+    """Ce que l'écriture .prproj v1 ne reprend pas d'un masque .ecproj, sinon None."""
+    if not mask_is_applied(mask):
+        return None            # EffectCraft ne l'applique pas non plus : rien à reprendre
+    kind = mask.get("kind") or {}
+    mode = str(kind.get("mode") or "Add")
+    if mode not in MASK_TYPE_ENUM:
+        return f"mode {mode} non repris (v1)"
+    if kind.get("inverted"):
+        return "masque inversé non repris (v1)"
+    if kind.get("roto_bezier"):
+        return "roto-bezier non repris (v1)"
+    if mask_path_value(mask_children(mask).get("path")).get("feather"):
+        return "feather variable (points) non repris (v1)"
+    if str(kind.get("feather_falloff") or "Smooth") != "Smooth":
+        return f"feather « {kind.get('feather_falloff')} » non repris (v1)"
+    if str(kind.get("motion_blur") or "SameAsLayer") != "SameAsLayer":
+        return f"motion blur « {kind.get('motion_blur')} » non repris (v1)"
+    return None
+
+
+def pp_unsupported_reasons(ec: dict) -> list[str]:
+    """Éléments du .ecproj que l'écriture .prproj v1 ne reprend pas (masques, effets)."""
+    reasons: list[str] = []
+    for item in (ec.get("items") or {}).values():
+        kind = item.get("kind") or {}
+        if kind.get("type") != "Comp":
+            continue
+        for layer in kind.get("layers") or []:
+            if (layer.get("source") or {}).get("type") == "Null":
+                continue
+            layer_name = layer.get("name")
+            for mask in conv.enabled_masks(layer):
+                reason = mask_unsupported_reason(mask)
+                if reason:
+                    reasons.append(f"masque « {mask.get('name')} » de « {layer_name} » : "
+                                   f"{reason}")
+            for effect in conv.collect_effects(layer):
+                if effect.get("enabled") is False:
+                    continue
+                if (effect.get("kind") or {}).get("effect") not in PP_BLUR_EFFECTS:
+                    reasons.append(f"effet « {effect.get('name')} » de « {layer_name} » : "
+                                   f"non repris par Premiere (v1)")
+    return reasons
+
+
 def premiere_skip_reason(ec_path: str) -> str | None:
     """Raison de ne pas exporter ce .ecproj en .prproj, sinon None.
 
-    Premiere ne reprend ni masques ni effets (propres à EffectCraft) : ces projets ne
-    sont exportés qu'en .aep, pour ne pas produire un .prproj incomplet.
+    Masques et effets sont désormais écrits (masque « Add » non inversé sous l'Opacité du
+    clip, Gaussian Blur en `AE.Impact_Blur_FX`) : seuls les cas non repris – autre mode,
+    inversion, options exotiques, effet hors table – bloquent l'export, pour ne pas produire
+    un .prproj incomplet (seul le .aep est alors écrit).
     """
     try:
         with open(ec_path, "r", encoding="utf-8") as handle:
-            return conv.premiere_incompatibilities(json.load(handle))
+            reasons = pp_unsupported_reasons(json.load(handle))
     except Exception:
         return None
+    return " ; ".join(reasons) if reasons else None
 
 
 def remove_stale_prproj(ec_path: str) -> str | None:
@@ -1831,8 +2415,8 @@ def remove_stale_prproj(ec_path: str) -> str | None:
 def report_skip(ec_path: str, reason: str, log) -> None:
     """Signale un projet sauté et retire le .prproj obsolète éventuel."""
     removed = remove_stale_prproj(ec_path)
-    print(f"  ignoré : {reason} propre(s) à EffectCraft, non repris par Premiere "
-          f"— export .aep uniquement" + (" ; .prproj obsolète supprimé" if removed else ""))
+    print(f"  ignoré : {reason} — export .aep uniquement"
+          + (" ; .prproj obsolète supprimé" if removed else ""))
     log(f"[prproj] {os.path.basename(ec_path)} : ignoré ({reason})"
         + (" ; .prproj obsolète supprimé" if removed else ""))
 
@@ -1932,7 +2516,7 @@ def run_desktop(args, maps) -> int:
         progress.wait()
     summary = f"{conversions} projet(s) converti(s), {failures} échec(s)"
     if skipped:
-        summary += (f", {skipped} ignoré(s) (masques/effets : export .aep uniquement)")
+        summary += (f", {skipped} ignoré(s) (éléments non repris : export .aep uniquement)")
     summary += "."
     if gui:
         subprocess.run(["zenity", "--info", "--title", "Export PRPROJ", "--text", summary])
@@ -1957,8 +2541,8 @@ def main() -> int:
     parser.add_argument("--skip-missing", action="store_true",
                         help="résume les médias absents au lieu de les lister")
     parser.add_argument("--force", action="store_true",
-                        help="exporte même si le projet a des masques/effets (le .prproj "
-                             "sera alors incomplet : Premiere ne les reprend pas)")
+                        help="exporte même si des éléments ne sont pas repris (masque non "
+                             "« Add », inversé, effet inconnu) : le .prproj sera incomplet")
     parser.add_argument("--verify", action="store_true", help="relit le .prproj produit")
     parser.add_argument("--compare-with", metavar="REF.prproj",
                         help="compare le résultat à un .prproj de référence")
@@ -2045,8 +2629,8 @@ def main() -> int:
                 print(f"  comparaison impossible : {exc}", file=sys.stderr)
 
     if skipped:
-        print(f"{skipped} projet(s) ignoré(s) (masques/effets : export .aep uniquement).")
-        log_line(f"{skipped} projet(s) ignoré(s) (masques/effets)")
+        print(f"{skipped} projet(s) ignoré(s) (éléments non repris : export .aep uniquement).")
+        log_line(f"{skipped} projet(s) ignoré(s) (éléments non repris)")
     return 1 if failures else 0
 
 

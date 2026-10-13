@@ -126,11 +126,12 @@ exécute `effectcraft-cli script` en headless sur les dossiers du manifeste
   `STEP8_PANEL_CONFIG` (config `mediasolution_ec.json` appliquée via `applyConfig`).
 - Sorties : `.ecproj` dans `<dossier>/projets/` ; l'export `.aep`/`.prproj` reste hors étape 8
   (voir ci-dessous).
-- **⚠️ EffectCraft 0.8.0** : le mode headless est bloqué par le nouveau garde-fou de scripting
-  (un script ne peut plus activer `allowScriptsWriteFiles`, et le CLI headless ignore la préférence
-  utilisateur). L'étape 8 gère les deux cas automatiquement (`STEP8_MODE=auto`) : headless en
-  ≤ 0.7.0, **pilotage de l'application ouverte** en 0.8.0+ — lancée automatiquement si son canal
-  n'écoute pas (`effectcraft --control 9877`). Détail : `../../docs/audits/effectcraft-0.8.0-compatibilite.md`.
+- **⚠️ EffectCraft 0.8.0+** (garde-fou vérifié en 0.9.2) : le mode headless est bloqué par le
+  garde-fou de scripting (un script ne peut plus activer `allowScriptsWriteFiles`, et le CLI
+  headless ignore la préférence utilisateur). L'étape 8 gère les deux cas automatiquement
+  (`STEP8_MODE=auto`) : headless en ≤ 0.7.0, **pilotage de l'application ouverte** en 0.8.0+ —
+  lancée automatiquement si son canal n'écoute pas (`effectcraft --control 9877`). Détail :
+  `../../docs/audits/effectcraft-0.8.0-compatibilite.md`.
 
 ---
 
@@ -230,14 +231,28 @@ projet de référence généré par Adobe et vérifiée valeur par valeur :
   audio) ; un calque dont le Transform est celui par défaut utilise les composants
   Motion/Opacity intrinsèques de Premiere, comme le fait l'import Adobe ;
 - **audio seul** (mp3, wav…) → média audio sans flux vidéo, comme Adobe ;
+- **masques** « Add » non inversés → filtre `AE.ADBE AEMask2` (27 paramètres) sous-composant de
+  l'**Opacité** du clip (matérialisée, comme Adobe) ; tracé en blob binaire (points normalisés
+  par la taille **source** du média — espace du calque, comme After Effects —, 3 points par
+  sommet, tangentes absolues), payloads avec `BinaryHash`, Position/Anchor au centre de la
+  bounding-box ; un tracé animé est écrit à sa première clé (comme l'export `.aep`) ;
+  **un masque qu'EffectCraft n'applique pas — tracé ouvert (non fermé), mode « None », masque
+  désactivé — n'est pas écrit** : le clip reste entier, comme dans EffectCraft
+  (`crates/render/src/masks.rs` : aucune transparence tant que le tracé n'est pas fermé) ; un
+  masque vide **mais fermé** découpe à vide et prend l'état par défaut d'Adobe (`Type 0`) —
+  relevé de format : `../../docs/audits/prproj-masques-premiere-2026.md` ;
+- **Gaussian Blur** (`ec.blur.gaussian`) → filtre `AE.Impact_Blur_FX` de Premiere (18
+  paramètres) : `blurriness` → « Amount » (borné 0-100) ; `dimensions`/`repeatEdge` d'EffectCraft
+  ne sont pas repris (avertissement) ;
 - médias référencés par leur chemin écrit (**par défaut `PATH_MAP`, `/mnt/cache ⇒ F:`**,
   pour l'ouverture sous Windows ; `--no-path-map` écrit les chemins Linux tels quels).
 
-**Un projet qui contient des masques ou des effets** (propres à EffectCraft) n'est **pas**
-exporté en `.prproj` : Premiere ne les reprend pas, le fichier serait incomplet. Seul le
-`.aep` est alors produit, et un `.prproj` voisin devenu obsolète est supprimé (le journal
-et l'interface le signalent). `--force` passe outre — le rendu Premiere sera amputé des
-masques/effets.
+**Ce qui reste hors périmètre** (masques d'un autre mode que « Add », inversés, roto-bezier /
+feather non lisse, feather variable par points, motion blur, effets hors table — seul
+`ec.blur.gaussian` est repris) est signalé projet par projet : le `.prproj` n'est alors pas
+écrit, seul le `.aep` est produit et un `.prproj` voisin devenu obsolète est supprimé (le
+journal et l'interface le signalent). `--force` passe outre — le rendu Premiere sera amputé de
+ces éléments.
 
 ### Double-clic
 
@@ -265,10 +280,34 @@ temps de la chaîne Adobe et la précision d'affichage des flottants.
 
 Limites v1 (avertissement explicite, non exporté) : sources autres que Footage (Solid/
 Text/Shape/Camera/Light, comp imbriquée), plus d'une comp, mode de fusion ≠ Normal,
-opacité ≠ 100, `stretch` ≠ 100. Un projet avec masques ou effets n'est **pas** converti
-(voir ci-dessus : `.aep` uniquement, `--force` pour passer outre) ; les clés animées
-d'échelle/rotation/ancre sont encodées en « expérimental ». Format ciblé : **Premiere Pro
-2026**.
+opacité ≠ 100, `stretch` ≠ 100. Masques : seuls les « Add » non inversés sont écrits ; ceux
+qu'EffectCraft n'applique pas (tracé ouvert, mode « None ») sont ignorés — le clip reste
+entier, comme dans EffectCraft ; autre mode, inversion, options exotiques et feather variable
+par points → `.aep` uniquement (cf. ci-dessus) ; le feather `Vec2` d'EffectCraft est ramené au
+plus grand des deux axes (Premiere n'a qu'un scalaire) ; les clés animées d'échelle/rotation/
+ancre sont encodées en « expérimental ». Format ciblé : **Premiere Pro 2026**.
+
+## Copie de travail (~/Media_Solution/MediaSolution-EC) et synchronisation
+
+Les raccourcis du Bureau et du menu exécutent la **copie déployée**
+`~/Media_Solution/MediaSolution-EC/tools/…`, alors que l'étape 8 du pipeline lit le panel du
+**dépôt** (`scripts/MediaSolution-EC/MediaSolution.jsx`) : les deux arbres doivent porter le
+même code. `deploy.sh` s'en charge (il part toujours de la copie du dépôt) :
+
+```bash
+./deploy.sh             # dépôt → ~/Media_Solution/MediaSolution-EC
+./deploy.sh --check     # ne copie rien, liste les écarts (sort en 1 s'il y en a)
+./deploy.sh --dry-run   # liste ce qui serait copié
+./deploy.sh --prune     # retire aussi les fichiers absents du dépôt
+./deploy.sh --no-panel  # ne pas réinstaller le panel EffectCraft
+```
+
+- La comparaison se fait **par contenu** (`rsync --checksum`), pas par date.
+- Quand `MediaSolution.jsx` change, la copie est automatiquement réinstallée dans EffectCraft
+  (`install.sh`) ; `--no-panel` le désactive.
+- Journaux d'export (`tools/*.log`), `__pycache__`, `*.pyc` et caches pytest sont **propres à
+  chaque copie** : exclus de la synchronisation et jamais supprimés.
+- Destination surchargeable par `MEDIASOLUTION_DEPLOY_DIR` ou `--dest DIR`.
 
 ## Structure
 
@@ -276,7 +315,9 @@ d'échelle/rotation/ancre sont encodées en « expérimental ». Format ciblé :
 MediaSolution-EC/
   MediaSolution.jsx          panel + moteur (fichier unique déployable)
   install.sh                 installation vers ~/.config/effectcraft/Scripts/ScriptUI Panels/
+  deploy.sh                  synchronisation vers la copie de travail ~/Media_Solution/MediaSolution-EC
   docs/COMPATIBILITY.md      correspondance avec le panel CEP, adaptations, limites, options
+  CLI_AUTOMATION.md          guide du pilotage headless/bridge (CLI EffectCraft, garde-fous 0.8.0+)
   tools/ecproj_to_aep.py     convertisseur .ecproj → .aep (py_aep, AE 2026+)
   tools/ae_effect_defs.aepdefs      gabarits d'effets AE pour py_aep (EfdG)
   tools/extract_ae_effect_defs.py   (re)construit ce fichier depuis un .aep Adobe

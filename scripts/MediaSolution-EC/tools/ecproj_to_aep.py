@@ -447,33 +447,6 @@ def enabled_masks(layer: dict) -> list[dict]:
             and node.get("enabled") is not False]
 
 
-def premiere_incompatibilities(ec: dict) -> str | None:
-    """Ce que Premiere ne peut pas reprendre (masques, effets), sinon None.
-
-    Sert à n'exporter en .prproj que les projets que Premiere peut rendre à
-    l'identique : le .aep, lui, écrit masques et effets. Les calques nuls
-    (« Null Segments », non exportés dans un cas comme dans l'autre) sont ignorés.
-    """
-    masks = effects = 0
-    for item in (ec.get("items") or {}).values():
-        kind = item.get("kind") or {}
-        if kind.get("type") != "Comp":
-            continue
-        for layer in kind.get("layers") or []:
-            if (layer.get("source") or {}).get("type") == "Null":
-                continue
-            masks += len(enabled_masks(layer))
-            effects += len(collect_effects(layer))
-    if not masks and not effects:
-        return None
-    parts = []
-    if masks:
-        parts.append(f"{masks} masque(s)")
-    if effects:
-        parts.append(f"{effects} effet(s)")
-    return " et ".join(parts)
-
-
 def write_effects(av: Any, layer: dict, py_aep: Any, report: dict, name: str) -> None:
     """Écrit les effets du calque (EFFECT_MAP) dans le .aep."""
     for node in collect_effects(layer):

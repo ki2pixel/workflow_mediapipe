@@ -9,12 +9,19 @@ import pytest
 from utils import media_filters, media_normalizer
 
 
-def _analyzed_info(path: Path, fps: float = 25.0, video_codec: str = "h264", audio_codec: str | None = None) -> dict:
+def _analyzed_info(
+    path: Path,
+    fps: float = 25.0,
+    video_codec: str = "h264",
+    audio_codec: str | None = None,
+    interlaced: bool = False,
+) -> dict:
     return {
         "path": path,
         "fps": fps,
         "video_codec": video_codec,
         "audio_codec": audio_codec,
+        "interlaced": interlaced,
         "needs_fps_fix": fps is not None and abs(fps - media_normalizer.TARGET_FPS) > media_normalizer.FPS_TOLERANCE,
         "error": None,
     }
@@ -92,6 +99,65 @@ class TestFfprobeParsing:
         assert 12.6 < info["fps"] < 12.8
 
 
+class TestInterlaceDetection:
+    """Sonde d'entrelacement (les flux 1080i rendent noir dans EffectCraft)."""
+
+    def test_probe_interlaced_reads_frame_flags(self, monkeypatch, tmp_path):
+        # Given: une sortie ffprobe csv avec des frames entrelacées
+        monkeypatch.setattr(
+            media_normalizer.subprocess, "run",
+            lambda *_a, **_k: SimpleNamespace(stdout="1,1\n1,1\n0,0\n", returncode=0),
+        )
+
+        # When / Then: le flux est signalé entrelacé
+        assert media_normalizer._probe_interlaced(tmp_path / "clip.mp4") is True
+
+    def test_probe_interlaced_returns_false_for_progressive(self, monkeypatch, tmp_path):
+        # Given: une sortie ffprobe sans frame entrelacée
+        monkeypatch.setattr(
+            media_normalizer.subprocess, "run",
+            lambda *_a, **_k: SimpleNamespace(stdout="0,0\n0,0\n", returncode=0),
+        )
+
+        # When / Then: le flux est progressif
+        assert media_normalizer._probe_interlaced(tmp_path / "clip.mp4") is False
+
+    def test_probe_interlaced_is_inconclusive_on_failure_or_empty_output(self, monkeypatch, tmp_path):
+        # Given: une sonde en échec puis une sonde sans frame
+        def failing_run(*_a, **_k):
+            raise OSError("ffprobe indisponible")
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", failing_run)
+        assert media_normalizer._probe_interlaced(tmp_path / "clip.mp4") is None
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", lambda *_a, **_k: SimpleNamespace(stdout=""))
+        assert media_normalizer._probe_interlaced(tmp_path / "clip.mp4") is None
+
+    def test_analyze_video_reports_interlacing(self, monkeypatch, tmp_path):
+        # Given: un ffprobe JSON (progressive) et une sonde qui signale l'entrelacement
+        fake_payload = {
+            "streams": [
+                {"codec_type": "video", "codec_name": "h264", "avg_frame_rate": "25/1", "r_frame_rate": "25/1"}
+            ]
+        }
+
+        def fake_run(command, **_kwargs):
+            if "frame=interlaced_frame" in command:
+                return SimpleNamespace(stdout="1\n1\n", returncode=0)
+            return SimpleNamespace(stdout=json.dumps(fake_payload), returncode=0)
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", fake_run)
+        video_path = tmp_path / "video.mp4"
+        video_path.write_bytes(b"")
+
+        # When: analyse de la vidéo
+        info = media_normalizer.analyze_video(video_path)
+
+        # Then: l'entrelacement est remonté pour la décision de conformité
+        assert info["error"] is None
+        assert info["interlaced"] is True
+
+
 class TestConformance:
     """Contrat MP4 / H.264 / 25 fps."""
 
@@ -118,6 +184,14 @@ class TestConformance:
         # When / Then: dans les deux cas le fichier doit être traité
         assert media_normalizer.is_conformant(unknown_fps) is False
         assert media_normalizer.is_conformant(failed) is False
+
+
+    def test_is_conformant_rejects_interlaced_stream(self, tmp_path):
+        # Given: un MP4 H.264 25 fps mais entrelacé (rendu noir dans EffectCraft)
+        interlaced = _analyzed_info(tmp_path / "clip.mp4", interlaced=True)
+
+        # When / Then: il doit être ré-encodé
+        assert media_normalizer.is_conformant(interlaced) is False
 
 
 class TestDiscovery:
@@ -298,6 +372,50 @@ class TestNormalizeVideo:
         assert result is False
         assert not (tmp_path / "clip.temp_normalize.mp4").exists()
         assert video.exists()
+
+    def test_normalize_video_deinterlaces_without_gpu(self, monkeypatch, tmp_path):
+        # Given: un clip entrelacé et un ffmpeg simulé qui réussit
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"video")
+        calls = []
+
+        def fake_run(command, **_kwargs):
+            calls.append(command)
+            Path(command[-1]).write_bytes(b"converted")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", fake_run)
+
+        # When: normalisation (le GPU est demandé mais le flux est entrelacé)
+        result = media_normalizer.normalize_video(_analyzed_info(video, interlaced=True), use_gpu=True)
+
+        # Then: yadif est appliqué et l'encodage repasse sur le CPU
+        assert result is True
+        assert len(calls) == 1
+        assert calls[0][calls[0].index("-vf") + 1] == "yadif"
+        assert "-hwaccel" not in calls[0]
+        assert "libx264" in calls[0]
+        assert "h264_nvenc" not in calls[0]
+
+    def test_normalize_video_combines_deinterlace_and_fps_filter(self, monkeypatch, tmp_path):
+        # Given: un clip entrelacé à 30 fps (double correction)
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"video")
+        calls = []
+
+        def fake_run(command, **_kwargs):
+            calls.append(command)
+            Path(command[-1]).write_bytes(b"converted")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(media_normalizer.subprocess, "run", fake_run)
+
+        # When: normalisation
+        result = media_normalizer.normalize_video(_analyzed_info(video, fps=30.0, interlaced=True), use_gpu=False)
+
+        # Then: désentrelacement puis cadence, dans cet ordre
+        assert result is True
+        assert calls[0][calls[0].index("-vf") + 1] == "yadif,fps=25.0"
 
     def test_normalize_video_with_fallback_retries_on_cpu(self, monkeypatch, tmp_path):
         # Given: un encodage GPU qui échoue

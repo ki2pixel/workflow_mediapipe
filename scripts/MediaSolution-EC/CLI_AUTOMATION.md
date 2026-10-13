@@ -2,13 +2,13 @@
 
 > **⚠️ Compatibilité EffectCraft 0.8.0 (2026-10-11)** : ce guide décrit la **0.7.0**. En 0.8.0, un script ne peut plus activer lui-même `scripting.allowScriptsWriteFiles` (garde-fou « Scripts can't change what scripts are allowed to do ») et le CLI headless n'honore pas la préférence utilisateur : le pilotage headless d'un script qui lit/écrit des fichiers est bloqué. L'étape 8 du workflow gère les deux cas automatiquement (`STEP8_MODE=auto`) : headless ≤ 0.7.0, `--bridge` sur l'application ouverte en 0.8.0+. Détail et preuves : `../../docs/audits/effectcraft-0.8.0-compatibilite.md`.
 
-Ce document synthétise les capacités de l'outil CLI d'EffectCraft ([apps/effectcraft-cli](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/apps/effectcraft-cli)), ses différents modes d'interaction sans interface graphique (*headless*), ses possibilités d'animation et de rendu, ainsi que des exemples concrets d'automatisation de scripts After Effects / ScriptUI Panels (notamment le cas pratique `MediaSolution.jsx`).
+Ce document synthétise les capacités de l'outil CLI d'EffectCraft ([apps/effectcraft-cli](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/apps/effectcraft-cli)), ses différents modes d'interaction sans interface graphique (*headless*), ses possibilités d'animation et de rendu, ainsi que des exemples concrets d'automatisation de scripts After Effects / ScriptUI Panels (notamment le cas pratique `MediaSolution.jsx`).
 
 ---
 
 ## 1. Architecture générale : *"Everything is an Engine Command"*
 
-EffectCraft repose sur une séparation stricte entre l'interface utilisateur et le moteur de composition ([crates/engine](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/crates/engine)) :
+EffectCraft repose sur une séparation stricte entre l'interface utilisateur et le moteur de composition ([crates/engine](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/crates/engine)) :
 
 - **Commandes unifiées** : Tous les menus, raccourcis, manipulations de calques, animations ou rendus passent par des commandes moteur standardisées avec des identifiants stables et des paramètres en JSON (`comp.new`, `layer.newText`, `prop.addKey`, `renderQueue.render`, etc.).
 - **Exécution 100% autonome (*headless*)** : L'outil `effectcraft-cli` s'exécute directement en mémoire sans nécessiter de serveur d'affichage X11 ou Wayland, sans fenêtre, avec un démarrage quasi instantané.
@@ -69,9 +69,9 @@ Idéal pour les scripts Shell / Python, l'intégration continue ou les opératio
 
 ### 2.2 Mode 2 : Scripting After Effects JavaScript (`effectcraft-cli script`)
 
-Le scripting est l'approche la plus souple pour concevoir des animations complexes de A à Z. EffectCraft intègre le moteur JavaScript [Boa](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/crates/script) et reproduit fidèlement le modèle objet d'After Effects documenté dans le guide de scripting officiel :
+Le scripting est l'approche la plus souple pour concevoir des animations complexes de A à Z. EffectCraft intègre le moteur JavaScript [Boa](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/crates/script) et reproduit fidèlement le modèle objet d'After Effects documenté dans le guide de scripting officiel :
 
-- **Objets & API disponibles** ([crates/script/src/prelude.js](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/crates/script/src/prelude.js)) :
+- **Objets & API disponibles** ([crates/script/src/prelude.js](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/crates/script/src/prelude.js)) :
   - `app.project`, `CompItem`, `LayerCollection`
   - Calques : `comp.layers.addText()`, `addSolid()`, `addShape()`, `addNull()`, `addCamera()`, `addLight()`, `add(footageItem)`
   - Animation : `property.setValueAtTime(t, v)`, `setValuesAtTimes(times, values)`
@@ -118,7 +118,7 @@ EffectCraft permet de manipuler l'ensemble du graphe d'animation 2D et 3D de man
 | **Animation vectorielle** | Opérateurs de formes : **Trim Paths** (réduction de tracés), **Repeater** (répéteur), **Round Corners**, contours, dégradés linéaires et radiaux. |
 | **Animation temporelle** | Keyframing sub-frame, courbes de Bézier, interpolation spatiale et temporelle, Easy Ease, réglage fin vélocité/influence, Time Remapping. |
 | **Expressions** | Moteur d'expressions JavaScript After Effects complet (`time`, `wiggle()`, `loopOut()`, `linear()`, `ease()`, calculs trigonométriques, `valueAtTime()`). |
-| **Effets & Filtres** | **306 effets intégrés** ([docs/effects.md](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/docs/effects.md)), exécutables sur GPU ou CPU, 32-bit float, plus support de plug-ins WebAssembly (`.wasm`). |
+| **Effets & Filtres** | **306 effets intégrés** ([docs/effects.md](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/docs/effects.md)), exécutables sur GPU ou CPU, 32-bit float, plus support de plug-ins WebAssembly (`.wasm`). |
 | **Tracking & IA headless** | **3D Camera Tracker**, **Warp Stabilizer**, **Motion Tracking**, et détourage IA **Roto Brush (MobileSAM)** exécutables headlessly avec le paramètre `"wait": true`. |
 | **Gabarits Essential Graphics** | Modèles paramétriques (`.ectemplate` / équivalent MOGRT) : exposition de contrôles (textes, couleurs, sliders), instanciation et personnalisation en batch. |
 
@@ -126,7 +126,7 @@ EffectCraft permet de manipuler l'ensemble du graphe d'animation 2D et 3D de man
 
 ## 4. Exportation et rendu sans UI
 
-Le sous-système d'export ([crates/render](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/crates/render) et [crates/export](file:///home/kidpixel/Media_Solution/effectcraft-0.7.0/crates/export)) permet de sortir l'animation dans le format de votre choix sans logiciel tiers :
+Le sous-système d'export ([crates/render](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/crates/render) et [crates/export](file:///home/kidpixel/Media_Solution/effectcraft-0.9.2/crates/export)) permet de sortir l'animation dans le format de votre choix sans logiciel tiers :
 
 ### 4.1 Rendu vidéo complet (`render`)
 ```bash

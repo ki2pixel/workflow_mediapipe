@@ -246,7 +246,7 @@ def main() -> int:
             base = os.path.splitext(p)[0]
             skipped = prproj_mod.premiere_skip_reason(p) if (prproj_enabled and prproj_mod) else None
             if skipped:
-                note = f"  (.prproj ignoré : {skipped} propres à EffectCraft)"
+                note = f"  (.prproj ignoré : {skipped})"
             else:
                 note = f" + {base}.prproj" if prproj_enabled else ""
             ui.say(f"  → {p}  ⇒  {base}.aep{note}")
@@ -309,7 +309,7 @@ def main() -> int:
             if reason:
                 prproj_skipped += 1
                 removed = prproj_conv.remove_stale_prproj(src)
-                details.append(f".prproj : ignoré ({reason} propres à EffectCraft"
+                details.append(f".prproj : ignoré ({reason}"
                                + (", obsolète supprimé" if removed else "")
                                + " — exporter depuis le .aep)")
                 log_lines([f"  [prproj] {os.path.basename(src)} : ignoré ({reason})"
@@ -337,7 +337,8 @@ def main() -> int:
     ok_count = sum(1 for line in report if line.startswith("OK"))
     outputs = ".aep et .prproj" if prproj_enabled else ".aep"
     if prproj_enabled and prproj_skipped:
-        outputs = f".aep et .prproj ({prproj_skipped} .prproj ignoré(s) : masques/effets)"
+        outputs = (f".aep et .prproj ({prproj_skipped} .prproj ignoré(s) : "
+                   f"éléments non repris)")
     summary = (f"{ok_count}/{len(projects)} projet(s) converti(s) en {outputs} "
                f"en {duration:.1f} s\nMédias réécrits : {' → '.join(f'{a} ⇒ {b}' for a, b in maps) if maps else 'aucun'}"
                f"\nJournal : {LOG_FILE}")

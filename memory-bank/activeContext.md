@@ -1,9 +1,29 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active (dernière tâche clôturée : étude de compatibilité EffectCraft 0.8.0, 2026-10-11).
+- Aucune tâche active (dernière tâche clôturée : synchronisation dépôt ↔ copie déployée de MediaSolution-EC, 2026-10-13).
 
 ## Dernière Session Clôturée
+- [2026-10-13 18:38:59] Synchronisation `scripts/MediaSolution-EC` ↔ `~/Media_Solution/MediaSolution-EC` (COMPLET) :
+  - **Constat** : les deux arbres vivaient en deux contextes (dépôt = source de l'étape 8 et des tests ; copie déployée = cible des raccourcis du Bureau/menu), maintenus à la main. Comparaison intégrale : 26/28 fichiers identiques, seul `CLI_AUTOMATION.md` manquait côté déployé (corrigé ; 7 liens `file://…effectcraft-0.7.0` pointaient le checkout supprimé → 0.9.2), seuls les journaux `tools/*.log` (gitignorés) divergent volontairement. Panel installé dans EffectCraft + `install.sh` vérifiés identiques.
+  - **Livrable** : `scripts/MediaSolution-EC/deploy.sh` — `rsync --checksum` dépôt → `~/Media_Solution/MediaSolution-EC` (exclusions `*.log`, `__pycache__/`, `*.pyc`, `.pytest_cache/`), options `--check` (sort en 1 si écart), `--dry-run`, `--prune` (fichiers en trop), `--no-panel`, `--dest`/`MEDIASOLUTION_DEPLOY_DIR` ; réinstalle automatiquement le panel dans EffectCraft quand `MediaSolution.jsx` change ; garde-fou contre l'auto-synchronisation depuis la copie déployée. Piège corrigé pendant les tests : `rsync -a` compare taille+date (une modification de même taille dans la même seconde passait inaperçue) → `--checksum`.
+  - **Validation** : 5 tests dédiés (`tests/unit/test_mediasolution_ec_deploy.py`, arbre factice, hors `~/Media_Solution` et hors copie installée) + suite unitaire complète 550 réussis / 25 ignorés ; `deploy.sh --check` sur la vraie destination : « copie à jour ».
+  - **Trace** : `scripts/MediaSolution-EC/README.md` (section « Copie de travail … et synchronisation » + sommaire), `CLI_AUTOMATION.md`.
+- [2026-10-13 18:26:41] Export `.prproj` : masques et flou gaussien repris depuis le `.ecproj` (COMPLET) :
+  - **Objectif** : lever la limitation qui sautait le `.prproj` dès qu'un masque était détecté dans le `.ecproj` (masques et `ec.blur.gaussian` sont les deux seuls cas réellement utilisés en post-production).
+  - **Format** : relevé sur un projet Premiere natif (`…_mask_blur.prproj`) — masque `AE.ADBE AEMask2` (27 paramètres) **sous-composant de l'Opacité** du clip (opacité matérialisée), tracé en blob binaire (round-trip octet-exact), `BinaryHash` = clé d'identité **opaque** (sans elle Premiere ignore le tracé → calque noir), normalisation du tracé par la taille **source** du média ; blur `ec.blur.gaussian` → `AE.Impact_Blur_FX` (18 paramètres, « Amount »).
+  - **Trois passes de validation utilisateur dans Premiere 2026** sur `PP - LRDP - Bernard Mabille (1)_9x16` : (1) tout noir → `BinaryHash` manquant puis normalisation par la comp ; (2) un masque conforme et l'autre calque noir → masques au tracé **ouvert** (que le moteur d'EffectCraft n'applique pas, `crates/render/src/masks.rs`) réécrits à tort ; (3) **paires correctes** (un clip masqué, l'autre entier) — confirmé par l'utilisateur.
+  - **Parité EffectCraft** : un masque que le moteur n'applique pas (tracé ouvert, mode « None », masque désactivé) n'est pas écrit — le clip reste entier, comme dans EC ; un masque vide **fermé** découpe à vide (état par défaut Adobe `Type 0`).
+  - **Vérifié en 0.9.2** : mêmes règles d'application, schéma `.ecproj` toujours `2`, même modèle de masque ; le garde-fou de scripting headless est toujours là (mode bridge requis à l'étape 8).
+  - **Restent bloqués** (raison précise + `--force`) : mode ≠ Add, inversion, roto-bezier, feather non lisse, feather variable par points, motion blur, effet inconnu — un projet PP natif contenant ces cas permettrait de les lever un par un.
+  - **Validation** : 14 tests dédiés (`tests/unit/test_ecproj_to_prproj_masks.py`) + suite unitaire complète au vert ; trace `docs/audits/prproj-masques-premiere-2026.md`, `docs/COMPATIBILITY.md`, `scripts/MediaSolution-EC/README.md`.
+- [2026-10-12 11:00:00] Vidéos entrelacées rendues en noir dans EffectCraft : détection + désentrelacement (COMPLET) :
+  - **Symptôme** : `122 Camille/projets/M6 - LFAUIT - …_9x16.ecproj` — toutes les découpes noires à l'aperçu, audio correct, source lisible dans un lecteur externe.
+  - **Cause** : source **H.264 1080i entrelacée (TFF)** ; EffectCraft rend l'entrelacé en noir (reproduit en headless, en 0.7.0 comme en 0.8.0) ; `is_conformant()` ne testait pas le caractère progressif, donc aucun ré-encodage n'était déclenché.
+  - **Correctif** : sonde `interlaced_frame` frame par frame dans `analyze_video` (`utils/media_normalizer.py`), conformité refusée si entrelacé, réencodage `yadif` en CPU (`libx264`), filtre appliqué avant `fps=` ; une frame par frame d'entrée (index de frames conservé).
+  - **Réparation** : vidéo de `/mnt/cache/122 Camille/docs/` désentrelacée sur place (backup 146 Mo dans `/tmp/step8_diag/LFAUIT_original_entrelace.mp4`, à supprimer quand validé), `.ecproj` régénéré via l'étape 8 (mode bridge, lancement auto de l'app, 1/1, exit 0), rendu vérifié (images à t=2/20/40/70 s) ; scan des `*/docs/*.mp4` du cache : aucun autre cas entrelacé.
+  - **Validation** : 30 tests du normalizer (dont 7 nouveaux) + suite backend complète au vert.
+  - **Trace** : `docs/workflow/pipeline/01-extraction.md` (contrat « progressif »), `docs/audits/effectcraft-0.8.0-compatibilite.md` (limite connue), `decisionLog.md`.
 - [2026-10-11 15:05:00] Validation terrain EffectCraft 0.8.0 : bridge + lancement automatique confirmés sur le run réel (COMPLET) :
   - **Contexte** : mise à jour système vers 0.8.0 (`/usr/bin/effectcraft*`), relance de la STEP8 sur le manifeste STEP7 réel (2 dossiers, 5 unités).
   - **Résultat** : `mode: bridge`, `app_launched: true`, canal prêt en 0,5 s, `result {ok: true, total: 5, processed: 5, errors: []}`, exit 0, 5,6 s ; les 5 `.ecproj` régénérés à 15:02 dans les deux `projets/` de `/mnt/cache`. L'application reste ouverte pour la retouche.
@@ -43,6 +63,9 @@
   - **Validation** : suite backend complète (unit + intégration) et suites frontend Node ESM au vert.
 
 ## Prochaine Action
+- Fournir un projet Premiere natif contenant les cas encore bloqués (feather non nul, inversion, modes Subtract/Intersect/Difference, roto-bezier, feather variable par points) pour les lever un par un dans `ecproj_to_prproj.py`.
+- Supprimer le backup `/tmp/step8_diag/LFAUIT_original_entrelace.mp4` (146 Mo) une fois la réparation validée à l'écran.
+- *(optionnel)* Remonter en amont (EffectCraft) que les flux H.264 entrelacés rendent du noir au lieu d'une erreur explicite.
 - *(fait le 2026-10-11)* Mise à jour EffectCraft 0.8.0 + validation en mode bridge sur run réel : voir l'entrée 15:05 ci-dessus (succès).
 - Vérifier le comportement de l'annulation (SIGTERM) pendant un batch EffectCraft long et le premier échec partiel (ligne `MS_BATCH_FAIL` + exit 1).
 - Surveiller le premier projet réel complet (étapes 1→7) après activation de MediaInfo : plus de warning « Plan B indisponible » et comportement .mov conforme.
