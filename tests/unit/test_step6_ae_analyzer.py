@@ -83,6 +83,72 @@ def test_analyze_manifest_selects_audio_confirmed_face(tmp_path):
     assert results["1"]["reason"] == "audio_confirm_face"
 
 
+def test_analyze_manifest_accepts_step5_active_speakers(tmp_path):
+    """La STEP5 publie `active_speakers` : la confirmation audio doit marcher sans renommage.
+
+    Sans ce repli, le champ d'entrée était toujours vide dans le flux standard et les
+    paliers `best_audio_face` / `best_audio_person` ne se déclenchaient jamais.
+    """
+    mod = _load_step7_module()
+
+    # Given: deux visages, seul le premier est confirmé par la diarisation, le second est plus large
+    ae_path = tmp_path / "video_ae.json"
+    _write_json(
+        ae_path,
+        {
+            "dataByFrame": {
+                "1": [
+                    {
+                        "id": "face1",
+                        "centroid_x": 100.0,
+                        "source": "face_landmarker",
+                        "label": "face",
+                        "active_speakers": ["SPEAKER_01"],
+                        "bbox_surface": 1000.0,
+                        "confidence": 0.9,
+                    },
+                    {
+                        "id": "face2",
+                        "centroid_x": 900.0,
+                        "source": "face_landmarker",
+                        "label": "face",
+                        "active_speakers": [],
+                        "bbox_surface": 5000.0,
+                        "confidence": 0.9,
+                    },
+                ]
+            },
+            "maxFrame": 1,
+            "audioByFrame": {
+                "1": {"is_speech_present": True, "active_speaker_labels": ["SPEAKER_01"]}
+            },
+            "audioMaxFrame": 1,
+        },
+    )
+
+    manifest = {
+        "comp_name": "Comp",
+        "comp_max_frame": 1,
+        "layers": {
+            "1": {
+                "name": "Layer1",
+                "json_path": str(ae_path),
+                "in_frame": 1,
+                "out_frame": 1,
+                "video_scale": 1.0,
+            }
+        },
+    }
+
+    # When:  Operation to execute
+    results = mod.analyze_manifest(manifest)
+
+    # Then:  le visage confirmé par l'audio l'emporte malgré une surface de bbox plus faible
+    assert "1" in results
+    assert results["1"]["selected_id"] == "face1"
+    assert results["1"]["reason"] == "audio_confirm_face"
+
+
 def test_analyze_manifest_selects_audio_confirmed_person_when_no_face_audio(tmp_path):
     mod = _load_step7_module()
 

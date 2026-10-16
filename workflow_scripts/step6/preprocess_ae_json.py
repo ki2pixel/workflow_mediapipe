@@ -88,6 +88,18 @@ def _normalize_str_list(value: Any) -> List[str]:
         return [value]
     return []
 
+def _object_speakers(obj: Dict[str, Any]) -> List[str]:
+    """Orateurs d'un objet : `video_speakers` (schéma AE) ou `active_speakers` (schéma STEP4/STEP5).
+
+    La STEP5 publie `active_speakers` et la STEP6 écrit `video_speakers` : les fichiers
+    d'entrée du pipeline ne contiennent donc que le premier. Sans ce repli, le champ
+    d'entrée restait vide et la confirmation audio (`best_audio_face` /
+    `best_audio_person`) ne se déclenchait jamais dans le flux standard — les panneaux
+    AE normalisent eux-mêmes `active_speakers`, la STEP6 non.
+    """
+    return _normalize_str_list(obj.get("video_speakers") or obj.get("active_speakers"))
+
+
 def _calculate_stats(values: List[float]) -> Dict[str, float]:
     if not values:
         return {"min": 0.0, "max": 0.0, "spread": 0.0, "average": 0.0}
@@ -250,7 +262,7 @@ def _stream_index_tracking(video_json_path: Path) -> Optional[Dict[str, Any]]:
                     except Exception: conf_f = 0.0
                     conf_f = max(0.0, min(1.0, conf_f))
                     
-                    speakers_out = [s for s in obj.get("video_speakers", []) if isinstance(s, str) and s]
+                    speakers_out = _object_speakers(obj)
                     
                     out_tracked.append({
                         "id": obj_id, "centroid_x": cx_f, "source": source, "label": label,
@@ -340,7 +352,7 @@ def _analyze_layer(
             if bbox_surface < 0.0: bbox_surface = 0.0
 
             conf_f = _clamp01(obj.get("confidence"))
-            speakers = _normalize_str_list(obj.get("video_speakers"))
+            speakers = _object_speakers(obj)
 
             if obj_id not in objects_in_layer:
                 objects_in_layer[obj_id] = {

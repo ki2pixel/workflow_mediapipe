@@ -115,15 +115,61 @@ bash scripts/run_step4_tests.sh && bash scripts/run_main_tests.sh
 1. **Libellés `class_N` déjà publiés** : les `<stem>.json` livrés avant ce correctif restent exploitables pour
    les visages mais leurs objets sont perdus ; il faut rejouer STEP4 → STEP5 → STEP6 pour rafraîchir
    (`_tracking.json` et `_ae.json`), STEP5 réécrivant `_audio.json` **en place**.
-2. **Pistes détournées** (préexistant) : une détection d'objet peut écraser une piste de visage
-   (`utils/tracking_optimizations.py`). Avant, la piste devenait `class_N` et **disparaissait** de
-   `_ae.json` (trou) ; désormais elle survit en `person`, centrée sur l'objet — meilleure continuité d'`id`,
-   mais dérive possible du centre. À surveiller lors du contrôle visuel.
+2. **Bascules de `source` d'une piste** : mesurées et requalifiées au § 9.2 — ce n'est pas un défaut mais
+   un chemin de promotion `objet → visage` majoritairement bénéfique.
 3. **Faux positifs à faible score** (seuil 0,3 du modèle) : le correctif n'en ajoute pas mais ne les filtre
    pas. Si le recentrage s'avère bruité, le levier propre est un seuil dédié (`person` uniquement), pas un
    élargissement du gate STEP6.
 4. **Périmètre** : seules les **personnes** passent le gate STEP6. Transporter d'autres classes (véhicules,
    objets) demanderait de modifier le gate STEP6 **et** les filtres des panneaux EC/CEP.
-5. **Pièce connexe identifiée, non traitée** : la STEP5 écrit `active_speakers` alors que la STEP6 lit
-   `video_speakers` → la branche de confirmation audio (`best_audio_person`) ne se déclenche jamais dans le
-   flux standard. À traiter séparément, avec sa propre mesure.
+5. **Confirmation audio** : le décalage `active_speakers` / `video_speakers` est **corrigé** (§ 9.1).
+
+## 9. Pièces connexes
+
+### 9.1 Confirmation audio : `active_speakers` (STEP5) vs `video_speakers` (STEP6)
+
+**Diagnostic.** La STEP5 publie `active_speakers` (alimenté par la diarisation via
+`speaking_sources.audio.active_speakers`) tandis que la STEP6 lit `video_speakers` — le champ qu'elle écrit
+elle-même en sortie. Le champ d'entrée était donc **toujours vide** dans le flux standard : la confirmation
+audio (`audio_confirm_count`, paliers `best_audio_face` / `best_audio_person`) ne se déclenchait jamais.
+
+**Portée.** Les deux panneaux AE normalisent eux-mêmes `active_speakers` → `video_speakers` quand ils lisent
+un JSON brut (`MediaSolution.jsx` EC l.451, CEP l.1503/1569) et le panneau EffectCraft n'utilise pas les
+orateurs : le **recentrage EC n'est pas concerné**. Le consommateur réellement cassé est l'**analyseur STEP6**
+(`--manifest_path`, utilisé par le panneau CEP et le script AE d'analyse), donc la **sélection du sujet**
+côté After Effects.
+
+**Correctif.** `_object_speakers()` dans la STEP6 : lit `video_speakers` et retombe sur `active_speakers`,
+aux deux points d'entrée (production de `_ae.json` et mode analyseur). Aucun renommage côté STEP5, donc
+**aucun re-run de STEP4 nécessaire**.
+
+**Mesure (clip « Greg craque », 23 segments).** Dans `_ae.json` : **6 525 / 6 594** objets portent désormais
+leurs orateurs (0 avant). Une piste audio-confirmée est disponible sur **22 des 23 segments**, et le sujet
+retenu change sur **1 segment** — le segment 1 passe du gagnant présence×confiance à la piste confirmée par
+la diarisation sur 272 frames, c'est-à-dire à la personne qui parle réellement.
+
+**Test de non-régression** : `test_analyze_manifest_accepts_step5_active_speakers`, vérifié discriminant
+(sans le repli on obtient `face2 / face_presence` au lieu de `face1 / audio_confirm_face`).
+
+### 9.2 Bascules de `source` d'une piste (24 pistes sur 10 vidéos)
+
+**Mesure.** Sur les 10 JSON publiés, **24 pistes** changent de `source` au cours de leur vie —
+**toutes dans le sens `object_detector` → `face_landmarker`**, jamais l'inverse. Ce n'est donc pas un
+« détournement » mais une **promotion** : une personne d'abord détectée comme objet devient la piste visage
+quand le détecteur de visage la retrouve — l'`id` est conservé, la piste gagne des blendshapes et la
+confiance visage. 11 de ces promotions partent de `person` (légitimes) mais **13 partent d'un libellé
+non-personne** (chaise, plante, téléphone, carotte…) : une détection parasite devient alors une piste
+« visage » à confiance 0,95.
+
+**Impact sur le recentrage** (485 segments sur les 10 vidéos, sélection du panneau reproduite) :
+**7 segments** sont gagnés par une piste à bascule, dont **5 légitimes** (la phase visage domine largement :
+56/1, 46/12, 67/8 frames) et **2 parasites** — une piste « cell phone » (26 frames visage / 1 objet) et une
+piste « carrot » (1 frame visage / 4 frames objet). Seul ce dernier cas est réellement pathologique :
+**1 segment sur 485**.
+
+**Recommandation.** Conserver le comportement actuel : la promotion apporte la continuité d'`id` (clé
+d'agrégation du panneau) et des pistes plus denses, et son bénéfice dépasse largement ces deux cas. Le
+garde-fou propre — n'autoriser la promotion que si la phase objet est étiquetée `person` — vit dans
+`utils/tracking_optimizations.py`, **partagé par les trois chemins de tracking** (TPU, OpenCV 5, legacy) :
+il exige donc sa propre campagne de mesure (re-run STEP4 puis comparaison par segment) avant adoption.
+
