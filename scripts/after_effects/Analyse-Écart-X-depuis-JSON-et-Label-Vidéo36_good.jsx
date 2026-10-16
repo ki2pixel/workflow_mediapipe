@@ -416,6 +416,19 @@ function closeLog() {
 	return false;
  }
 
+// L'ancre de recentrage est exprimée en pixels de la source : avec un calque positionné au
+// centre de la composition, celle-ci n'est entièrement couverte que si l'ancre reste dans
+// [demiComp/échelle, largeurSource - demiComp/échelle]. Hors de cette plage, le recentrage
+// pousse le calque hors champ et laisse apparaître le fond (bug historique).
+function clampAnchorToCoverage(centerX, compWidth, sourceWidth, scalePercent) {
+	var scale = Math.abs(parseFloat(scalePercent)) / 100;
+	if (!(scale > 0) || !(sourceWidth > 0) || !(compWidth > 0)) return centerX;
+	var halfCompInLayer = (compWidth / 2) / scale;
+	var maxAnchor = sourceWidth - halfCompInLayer;
+	if (maxAnchor < halfCompInLayer) return sourceWidth / 2;
+	return Math.min(Math.max(centerX, halfCompInLayer), maxAnchor);
+}
+
 function calculateStats(numberArray) {
 	if (!numberArray || numberArray.length === 0) {
 		return {
@@ -1139,7 +1152,12 @@ function optimizedScanEngine(content) {
 				removeAllKeys(anchorPointProp);
 				var originalPos = positionProp.value;
 				var originalAnchor = anchorPointProp.value;
-				anchorPointProp.setValue([centerToAim, originalAnchor[1], originalAnchor.length > 2 ? originalAnchor[2] : 0]);
+				var layerScale = transform.property("Scale").value[0] || CONFIG.defaultVideoScaleX || 100;
+				var anchorToApply = clampAnchorToCoverage(centerToAim, compCenterX * 2, layer.width, layerScale);
+				if (Math.abs(anchorToApply - centerToAim) > 0.5) {
+					writeToLog("  - ancre ramenée de " + centerToAim.toFixed(1) + " à " + anchorToApply.toFixed(1) + " px (couverture de la composition)");
+				}
+				anchorPointProp.setValue([anchorToApply, originalAnchor[1], originalAnchor.length > 2 ? originalAnchor[2] : 0]);
 				positionProp.setValue([compCenterX, originalPos[1], originalPos.length > 2 ? originalPos[2] : 0]);
 				writeToLog("  - [PY] Calque=" + layer.name + " center_x=" + centerToAim.toFixed(1) + " label=" + labelToApply + " reason=" + (res.reason || "") + " id=" + (res.selected_id || ""));
 			}
@@ -1386,7 +1404,12 @@ function optimizedScanEngine(content) {
 			removeAllKeys(anchorPointProp);
 			var originalPos = positionProp.value;
 			var originalAnchor = anchorPointProp.value;
-			anchorPointProp.setValue([centerToAim, originalAnchor[1], originalAnchor.length > 2 ? originalAnchor[2] : 0]);
+			var layerScale2 = transform.property("Scale").value[0] || CONFIG.defaultVideoScaleX || 100;
+			var anchorToApply2 = clampAnchorToCoverage(centerToAim, compCenterX * 2, layer.width, layerScale2);
+			if (Math.abs(anchorToApply2 - centerToAim) > 0.5) {
+				writeToLog("  - ancre ramenée de " + centerToAim.toFixed(1) + " à " + anchorToApply2.toFixed(1) + " px (couverture de la composition)");
+			}
+			anchorPointProp.setValue([anchorToApply2, originalAnchor[1], originalAnchor.length > 2 ? originalAnchor[2] : 0]);
 			positionProp.setValue([compCenterX, originalPos[1], originalPos.length > 2 ? originalPos[2] : 0]);
 			writeToLog("  - Centre=" + centerToAim.toFixed(1) + ", Label=" + labelToApply + ". Recadrage OK.");
 		}

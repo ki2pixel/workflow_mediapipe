@@ -217,8 +217,10 @@ class TestFastLevelFlags:
             if saved is not None:
                 sys.modules[module_name] = saved
 
-    def test_object_detection_hysteresis_defaults(self):
-        # Given: le niveau d'optimisation historique puis le niveau sûr
+    def test_object_detection_hysteresis_defaults(self, monkeypatch):
+        # Given: le niveau d'optimisation historique puis le niveau sûr, sans surcharge d'environnement
+        # (le .env du projet peut définir explicitement le seuil, ce qui masquerait le défaut du niveau)
+        monkeypatch.delenv("STEP4_TPU_OBJECT_DETECTION_MIN_MISSING", raising=False)
         legacy = self._load_script(0)
         optimized = self._load_script(1)
 
@@ -242,8 +244,9 @@ class TestFastLevelFlags:
         finally:
             os.environ.pop("STEP4_TPU_OBJECT_DETECTION_MIN_MISSING", None)
 
-    def test_object_detection_face_reset_defaults_to_legacy(self):
-        # Given: les deux niveaux d'optimisation
+    def test_object_detection_face_reset_defaults_to_legacy(self, monkeypatch):
+        # Given: les deux niveaux d'optimisation, sans surcharge d'environnement
+        monkeypatch.delenv("STEP4_TPU_OBJECT_DETECTION_FACE_RESET_FRAMES", raising=False)
         legacy = self._load_script(0)
         optimized = self._load_script(1)
 

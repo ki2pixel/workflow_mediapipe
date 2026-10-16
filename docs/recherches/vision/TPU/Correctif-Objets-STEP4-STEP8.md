@@ -184,3 +184,37 @@ visage — un gain sémantique (une piste « chaise » ne devient plus « visage
 recentrage**. Au prix d'une modification d'un composant partagé et d'un re-run complet de la STEP4, il n'est
 pas retenu ; à reconsidérer si un consommateur futur exploite le champ `source` de façon décisionnelle.
 
+## 10. Ancre de recentrage hors couverture (panneaux AE)
+
+**Symptôme** (relevé en vérifiant les rendus) : certains segments sont cadrés hors champ et laissent
+apparaître le fond — exemple « Andy avoue à Maeva qu'il veut participer au jeu des problèmes », segment
+157,80-160,48 s, ancre `1752,5` px avec `Position = [50 %]`.
+
+**Mécanique.** L'ancre est posée directement depuis `centerX` (moyenne des `centroid_x` de la piste retenue,
+en **pixels de la source**) : `Anchor Point = [centerX, 0]` avec `Position = [comp.width / 2, 0]`. Pour une
+source de 1920 px dans une composition de 1080 px à l'échelle 180 %, le calque ne couvre la composition que
+si l'ancre reste dans **[300, 1620]**, soit `[demiComp/échelle, largeurSource - demiComp/échelle]`. Au-delà
+(sujet détecté près d'un bord du cadre), le calque glisse hors champ et découvre le fond. Aucun bornage
+n'existait : bug historique conservé du panneau CEP lors de la migration vers EffectCraft.
+
+**Incidence mesurée** sur les 15 projets de `/mnt/cache/*/projets` : **15 segments sur 599 (2,5 %)** hors
+couverture, dans les deux directions (ancres de 221,5 à 1853,2 px), avec des décalages de 9 à 420 px une fois
+bornés.
+
+**Correctif** : `clampAnchorToCoverage()` appliquée aux cinq sites de recentrage —
+`scripts/MediaSolution-EC/MediaSolution.jsx` (EffectCraft), `MediaSolution-CEP/host/MediaSolution.jsx` (CEP),
+les deux du script `Analyse-Écart-X-depuis-JSON-et-Label-Vidéo36_good.jsx`, et le script autonome
+`Media-Solution-v11.2-production.jsx`. Un avertissement est journalisé quand le cadrage est limité par la
+couverture.
+
+**Tests** : `tests/unit/test_recentering_anchor_clamp.py` extrait la fonction des quatre fichiers livrés et
+l'**exécute sous Node** — sur les valeurs réelles (1752,5 → 1620 ; 231,5 → 300 ; 1161 inchangée), sur un
+balayage 0-1920 px qui vérifie que la composition reste couverte et que le bornage est idempotent, et sur les
+entrées dégénérées (échelle nulle, source ou composition absente). Un garde-fou vérifie en outre qu'aucune
+ancre n'est posée depuis un centre de tracking non borné.
+
+**Conséquence opérationnelle** : les `.ecproj` déjà générés conservent leurs anciennes ancres — les 15
+segments concernés ne seront corrigés qu'au prochain passage du panneau (STEP8), avec un cadrage légèrement
+différent puisque le sujet reste au plus près du centre que la couverture autorise.
+
+

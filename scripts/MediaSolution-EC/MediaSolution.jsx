@@ -741,6 +741,23 @@
     msLog("Recentrage par défaut appliqué (centre comp X=" + centerX + ")", "info");
   }
 
+  // Bornage de l'ancre de recentrage à ce que le calque peut réellement couvrir.
+  //
+  // L'ancre est exprimée en pixels de la source, l'échelle en pourcentage. Avec un
+  // calque positionné au centre de la composition (Position = [comp.width / 2, 0]),
+  // la composition n'est entièrement couverte que si l'ancre reste dans
+  // [demiComp / échelle, largeurSource - demiComp / échelle] : au-delà, le recentrage
+  // pousse le calque hors champ et laisse apparaître le fond (bug historique conservé
+  // du panneau CEP - ex. source 1920 px à 180 % dans une comp de 1080 px : [300, 1620]).
+  function clampAnchorToCoverage(centerX, compWidth, sourceWidth, scalePercent) {
+    var scale = Math.abs(scalePercent) / 100;
+    if (!(scale > 0) || !(sourceWidth > 0) || !(compWidth > 0)) return centerX;
+    var halfCompInLayer = (compWidth / 2) / scale;
+    var maxAnchor = sourceWidth - halfCompInLayer;
+    if (maxAnchor < halfCompInLayer) return sourceWidth / 2; // calque plus étroit que la composition
+    return Math.min(Math.max(centerX, halfCompInLayer), maxAnchor);
+  }
+
   function findMatchingCsv(docsFolder, compName, cfg) {
     var csvFiles = getFilesByExtensions(docsFolder, ["csv"]);
     var baseName = compName;
@@ -882,7 +899,13 @@
           var labelColor = (pick.spread > cfg.SPREAD_THRESHOLD && pick.source === "face_landmarker")
             ? cfg.LABEL_HIGH_SPREAD : cfg.LABEL_STABLE;
           var currentAnchor = msProp(newLayer, "Anchor Point").value;
-          msProp(newLayer, "Anchor Point").setValue([pick.centerX, currentAnchor[1], 0]);
+          var layerScale = msProp(newLayer, "Scale").value[0] || cfg.defaultVideoScaleX || 100;
+          var anchorX = clampAnchorToCoverage(pick.centerX, comp.width, newLayer.width, layerScale);
+          if (Math.abs(anchorX - pick.centerX) > 0.5) {
+            msLog("Segment " + segment.num + " : ancre ramenée de " + Math.round(pick.centerX) +
+              " à " + Math.round(anchorX) + " px (cadrage limité par la couverture de la composition)", "warning");
+          }
+          msProp(newLayer, "Anchor Point").setValue([anchorX, currentAnchor[1], 0]);
           msProp(newLayer, "Position").setValue([comp.width / 2, 0, 0]);
           newLayer.label = labelColor;
           recentered = true;

@@ -565,7 +565,12 @@ function closeLogFile() {
 		var posProp = targetLayer.property("Position");
 		var anchorV = anchorProp.value;
 		var posV = posProp.value;
-		var anchorOut = [centerX, anchorV[1]];
+		var layerScale = targetLayer.property("Scale").value[0] || 100;
+		var anchorToAim = clampAnchorToCoverage(centerX, comp.width, targetLayer.width, layerScale);
+		if (Math.abs(anchorToAim - centerX) > 0.5) {
+			logMessage(" (PY) ancre ramenée de " + centerX.toFixed(1) + " à " + anchorToAim.toFixed(1) + " px (couverture de la composition)");
+		}
+		var anchorOut = [anchorToAim, anchorV[1]];
 		if (anchorV && anchorV.length > 2) anchorOut.push(anchorV[2]);
 		var posOut = [compCenterX, posV[1]];
 		if (posV && posV.length > 2) posOut.push(posV[2]);
@@ -760,6 +765,19 @@ function closeLogFile() {
 		for (var j = 0; j < loadReport.warnings.length; j++) logMessage("WARN (Config): " + loadReport.warnings[j]);
 	}
  }
+
+// L'ancre de recentrage est exprimée en pixels de la source : avec un calque positionné au
+// centre de la composition, celle-ci n'est entièrement couverte que si l'ancre reste dans
+// [demiComp/échelle, largeurSource - demiComp/échelle]. Hors de cette plage, le recentrage
+// pousse le calque hors champ et laisse apparaître le fond (bug historique).
+function clampAnchorToCoverage(centerX, compWidth, sourceWidth, scalePercent) {
+	var scale = Math.abs(parseFloat(scalePercent)) / 100;
+	if (!(scale > 0) || !(sourceWidth > 0) || !(compWidth > 0)) return centerX;
+	var halfCompInLayer = (compWidth / 2) / scale;
+	var maxAnchor = sourceWidth - halfCompInLayer;
+	if (maxAnchor < halfCompInLayer) return sourceWidth / 2;
+	return Math.min(Math.max(centerX, halfCompInLayer), maxAnchor);
+}
 
 function csvTimecodeToSeconds(tc) {
 	try {

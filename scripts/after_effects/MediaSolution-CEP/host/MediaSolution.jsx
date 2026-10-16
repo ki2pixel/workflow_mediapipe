@@ -1180,9 +1180,15 @@
                   var spread = stats.spread;
                   var labelColor = (spread > G.CONFIG.SPREAD_THRESHOLD && bestCandidate.source === "face_landmarker") ? G.CONFIG.LABEL_HIGH_SPREAD : G.CONFIG.LABEL_STABLE;
 
-                  // Use target average X as new Anchor Point X
+                  // Use target average X as new Anchor Point X, borné à la couverture du calque
                   var currentAnchor = newLayer.property("Anchor Point").value;
-                  newLayer.property("Anchor Point").setValue([centerX, currentAnchor[1], 0]);
+                  var layerScale = newLayer.property("Scale").value[0] || G.CONFIG.defaultVideoScaleX || 100;
+                  var anchorX = clampAnchorToCoverage(centerX, layerCache.compWidth, newLayer.width, layerScale);
+                  if (Math.abs(anchorX - centerX) > 0.5) {
+                     logMessage("Segment " + currentSegment.num + " : ancre ramenée de " + Math.round(centerX) +
+                        " à " + Math.round(anchorX) + " px (cadrage limité par la couverture de la composition)", 'warning');
+                  }
+                  newLayer.property("Anchor Point").setValue([anchorX, currentAnchor[1], 0]);
                   // Center the layer in the comp
                   newLayer.property("Position").setValue([layerCache.compWidth / 2, 0, 0]);
                   newLayer.label = labelColor;
@@ -1392,6 +1398,19 @@
       var w = parseFloat(G.CONFIG.CONFIDENCE_WEIGHT);
       if (isNaN(w) || w < 0) w = 0;
       return presence * (1 + (clamp01(avg_confidence) * w));
+   }
+
+   // L'ancre de recentrage est exprimée en pixels de la source : avec un calque positionné
+   // au centre de la composition, celle-ci n'est entièrement couverte que si l'ancre reste
+   // dans [demiComp/échelle, largeurSource - demiComp/échelle]. Hors de cette plage le
+   // recentrage pousse le calque hors champ et laisse apparaître le fond (bug historique).
+   function clampAnchorToCoverage(centerX, compWidth, sourceWidth, scalePercent) {
+      var scale = Math.abs(parseFloat(scalePercent)) / 100;
+      if (!(scale > 0) || !(sourceWidth > 0) || !(compWidth > 0)) return centerX;
+      var halfCompInLayer = (compWidth / 2) / scale;
+      var maxAnchor = sourceWidth - halfCompInLayer;
+      if (maxAnchor < halfCompInLayer) return sourceWidth / 2;
+      return Math.min(Math.max(centerX, halfCompInLayer), maxAnchor);
    }
 
    // Note: 'removeKey' works on Property object. We create a valid helper for removing all keys.
