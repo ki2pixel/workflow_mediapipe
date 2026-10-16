@@ -312,7 +312,11 @@ class TestStepConfigurations:
 
     def test_step4_uses_opencv5(self, temp_base_path):
         """Test that STEP4 uses OpenCV 5.0 when enabled."""
-        with patch.object(config, 'USE_OPENCV5_STEP4', True, create=True):
+        with patch.object(config, 'USE_OPENCV5_STEP4', True, create=True), \
+             patch.object(config, 'STEP4_CV5_WORKER_MODE', 'auto', create=True), \
+             patch.object(config, 'STEP4_CV5_INFERENCE_DEVICE', 'cpu', create=True), \
+             patch.object(config, 'STEP4_CV5_CPU_BUDGET', 15, create=True), \
+             patch.object(config, 'STEP4_CV5_MAX_ACTIVE_VIDEOS', 4, create=True):
             # Create the virtual environment directory structure for CV5
             (temp_base_path / "tracking_cv5_env" / "bin").mkdir(parents=True, exist_ok=True)
             commands = WorkflowCommandsConfig(base_path=temp_base_path)

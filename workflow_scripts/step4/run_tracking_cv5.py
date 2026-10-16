@@ -90,19 +90,12 @@ BLENDSHAPE_136_INDICES = [
     384, 385, 386, 387, 388, 389, 390, 397, 398, 400, 402, 405, 409, 415, 454, 466
 ]
 
-# --- Configuration du Logger ---
+# --- Répertoire des logs ---
+# Le handler est configuré dans main() et non à l'import : les workers 'spawn'
+# réimportent ce module et créaient sinon un fichier tpu_tracking_cv5_*.log vide
+# par processus (avant remplacement du handler par celui du worker).
 LOG_DIR = BASE_DIR / "logs" / "step4"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-log_file = LOG_DIR / f"tpu_tracking_cv5_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
 
 # ONNX model paths
 ONNX_MODELS_DIR = BASE_DIR / "assets" / "models" / "onnx"
@@ -1476,6 +1469,17 @@ def main():
     args.min_frames_per_worker = max(1, args.min_frames_per_worker)
     args.chunk_frames = max(1, args.chunk_frames)
     args.max_workers_by_memory = max(1, args.max_workers_by_memory or args.cpu_budget)
+
+    log_file = LOG_DIR / f"tpu_tracking_cv5_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
     if args.inference_device == "cuda" and args.worker_mode == "video" and args.num_workers > 1:
         logging.warning("Le mode CV5 CUDA limite le mode vidéo à un worker pour éviter la contention VRAM")
         args.num_workers = 1

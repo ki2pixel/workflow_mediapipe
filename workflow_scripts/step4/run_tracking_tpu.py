@@ -60,19 +60,11 @@ except ImportError as e:
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
 
-# --- Configuration du Logger ---
+# --- Répertoire des logs ---
+# Le handler est configuré dans main() et non à l'import : les processus 'spawn'
+# réimportent ce module et créaient sinon un fichier tpu_tracking_*.log par processus.
 LOG_DIR = BASE_DIR / "logs" / "step4"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-log_file = LOG_DIR / f"tpu_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
 
 class StreamingList:
     def __init__(self, file_obj):
@@ -823,6 +815,16 @@ def main():
     parser.add_argument("--sequential", action="store_true", help="Désactiver le mode multi-thread et utiliser le pipeline séquentiel")
     parser.add_argument("--device", type=str, default="TPU", choices=["CPU", "TPU"], help="Force le device à utiliser (défaut: TPU)")
     args = parser.parse_args()
+
+    log_file = LOG_DIR / f"tpu_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 
     logging.info("--- Démarrage de l'analyse Tracking TPU (Cascade) ---")
 

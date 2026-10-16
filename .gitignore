@@ -99,3 +99,7 @@ libedgetpu.deb
 
 # commandcode
 .commandcode/
+
+# assets
+assets/
+
