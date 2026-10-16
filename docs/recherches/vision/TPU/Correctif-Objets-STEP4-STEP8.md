@@ -170,6 +170,17 @@ piste « carrot » (1 frame visage / 4 frames objet). Seul ce dernier cas est r�
 **Recommandation.** Conserver le comportement actuel : la promotion apporte la continuité d'`id` (clé
 d'agrégation du panneau) et des pistes plus denses, et son bénéfice dépasse largement ces deux cas. Le
 garde-fou propre — n'autoriser la promotion que si la phase objet est étiquetée `person` — vit dans
-`utils/tracking_optimizations.py`, **partagé par les trois chemins de tracking** (TPU, OpenCV 5, legacy) :
-il exige donc sa propre campagne de mesure (re-run STEP4 puis comparaison par segment) avant adoption.
+`utils/tracking_optimizations.py`, **partagé par les trois chemins de tracking** (TPU, OpenCV 5, legacy).
+
+**Simulation du garde-fou (485 segments).** Le garde-fou a été simulé hors ligne en scindant l'identité des
+pistes promues depuis un libellé non-personne (14 pistes) : **aucun changement de sujet et aucun déplacement
+de centre**. Les 2 seuls segments concernés passent de `obj_549`/`obj_214` à `obj_549__new`/`obj_214__new`,
+avec la même source (`face_landmarker`), la même présence et le **même centre** (1161 px dans les deux cas
+pour le segment 39).
+
+La raison est structurelle : la STEP6 filtre déjà les frames d'objets non-personnes, seules les frames
+visage de ces pistes entrent dans `_ae.json`. Le garde-fou ne modifie donc **que l'identifiant** de la phase
+visage — un gain sémantique (une piste « chaise » ne devient plus « visage ») **sans effet mesurable sur le
+recentrage**. Au prix d'une modification d'un composant partagé et d'un re-run complet de la STEP4, il n'est
+pas retenu ; à reconsidérer si un consommateur futur exploite le champ `source` de façon décisionnelle.
 
