@@ -1,9 +1,21 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active (dernière tâche clôturée : synchronisation dépôt ↔ copie déployée de MediaSolution-EC, 2026-10-13).
+- Aucune tâche active (dernière tâche clôturée : enrichissement .prproj - Solides, Calques d'effet, 27 Modes de fusion, Masques inversés/modes, pont py_premiere, 2026-10-15).
 
 ## Dernière Session Clôturée
+- [2026-10-15 22:15:00] Enrichissement chirurgical ecproj_to_prproj.py & intégration py_premiere (COMPLET) :
+  - **Contexte** : Rétro-ingénierie du repo `py-premiere-0.1.0` et alignement avec les sources EffectCraft 0.10.0 (`crates/color/src/blend.rs`, `crates/project/src/lib.rs`).
+  - **Évolutions apportées dans `ecproj_to_prproj.py`** :
+    - *Solides & Calques d'effet* : Reconnaissance des sources `Solid` (ItemKind::Solid), génération des tokens synthétiques Premiere `COLR` (`TOKEN_COLOR_MATTE` = `1129270354`) et `BLAK` (`TOKEN_BLACK_VIDEO` = `1112293707`), balise `<IsAdjustmentLayer>true</IsAdjustmentLayer>` sur `MasterClip`, `ImplementationID = 42008e7a-de6f-4270-96de-7e287abb9b4b` et `OfflineReason = 0`.
+    - *Modes de fusion* : Table `BLEND_MODE_MAP` mappant les 38 modes EC vers les 27 modes Premiere Pro natifs avec encodage des jumeaux ParameterID 2 (API/UXP 0..27) et ParameterID 3 (GUI 0..31).
+    - *Opacité* : Composant intrinsèque `AE.ADBE Opacity` matérialisé dynamiquement (statique ou keyframes animées) sans `DefaultOpacity` sur la chaîne, omission propre de `SubComponents` si aucun masque n'est présent.
+    - *Masques* : Extension de `MASK_TYPE_ENUM` aux modes `Subtract` (3), `Intersect` (4), `Difference` (1), et support complet de l'inversion de masque via ParameterID 17 (`VideoComponentParam`).
+    - *Pont bibliothèque Level 2* : Intégration de `load_py_premiere(explicit)` avec auto-découverte dans `Media_Solution/Scripts/py-premiere-0.1.0/src`.
+  - **Validation & Déploiement** :
+    - 26 tests unitaires passés avec succès (`tests/unit/test_ecproj_to_prproj_masks.py`).
+    - Suite complète backend : 562 passés, 25 ignorés, 0 régression.
+    - Déploiement exécuté via `deploy.sh` vers `~/Media_Solution/MediaSolution-EC`.
 - [2026-10-13 18:38:59] Synchronisation `scripts/MediaSolution-EC` ↔ `~/Media_Solution/MediaSolution-EC` (COMPLET) :
   - **Constat** : les deux arbres vivaient en deux contextes (dépôt = source de l'étape 8 et des tests ; copie déployée = cible des raccourcis du Bureau/menu), maintenus à la main. Comparaison intégrale : 26/28 fichiers identiques, seul `CLI_AUTOMATION.md` manquait côté déployé (corrigé ; 7 liens `file://…effectcraft-0.7.0` pointaient le checkout supprimé → 0.9.2), seuls les journaux `tools/*.log` (gitignorés) divergent volontairement. Panel installé dans EffectCraft + `install.sh` vérifiés identiques.
   - **Livrable** : `scripts/MediaSolution-EC/deploy.sh` — `rsync --checksum` dépôt → `~/Media_Solution/MediaSolution-EC` (exclusions `*.log`, `__pycache__/`, `*.pyc`, `.pytest_cache/`), options `--check` (sort en 1 si écart), `--dry-run`, `--prune` (fichiers en trop), `--no-panel`, `--dest`/`MEDIASOLUTION_DEPLOY_DIR` ; réinstalle automatiquement le panel dans EffectCraft quand `MediaSolution.jsx` change ; garde-fou contre l'auto-synchronisation depuis la copie déployée. Piège corrigé pendant les tests : `rsync -a` compare taille+date (une modification de même taille dans la même seconde passait inaperçue) → `--checksum`.

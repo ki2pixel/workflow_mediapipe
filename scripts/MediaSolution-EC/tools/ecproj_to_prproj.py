@@ -37,14 +37,18 @@ valeur par valeur avec le .ecproj d'origine. Correspondances vérifiées :
 Les temps écrits sont ceux du .ecproj. La chaîne Adobe .aep→Premiere décalait les clés de
 1 à 4 images (`floor(image × 25/24)`, artefact de timebase) : ce décalage n'est pas reproduit.
 
-Limites v1 (avertissement, non exporté) : sources autres que Footage (Solid/Text/Shape/Camera/
-Light/comp imbriquée), plus d'une comp, blend ≠ Normal, opacité ≠ 100, stretch ≠ 100.
+Limites (avertissement, non exporté) : sources autres que Footage et Solid (Text/Shape/Camera/
+Light/comp imbriquée), plus d'une comp, stretch ≠ 100.
 
-Masques et effets — structures relevées sur un projet Premiere 2026 de référence (masque et
-Gaussian Blur créés dans l'application). Un projet dont le masque utilise un autre mode que
-« Add », une inversion ou une option non reprise, ou un effet hors table, n'est **pas exporté
-en .prproj** (le fichier serait incomplet) — seul le .aep est produit, et un .prproj voisin
-devenu obsolète est supprimé. `--force` passe outre.
+Masques, opacité, fusion et effets — structures relevées sur un projet Premiere 2026 de référence.
+Sont exportés :
+  - Masques : modes Add, Subtract, Intersect, Difference, ainsi que l'inversion (paramètre 17) ;
+  - Opacité : valeur fixe ou animée par keyframes (paramètre 1) ;
+  - Modes de fusion : les 27 modes de compositing Premiere (paramètres 2 et 3) ;
+  - Solides & Calques d'effet : générateurs Color Matte (COLR) et Black Video (BLAK + IsAdjustmentLayer) ;
+  - Effets : Gaussian Blur (AE.Impact_Blur_FX).
+Seuls les cas non repris (mode de masque exotique, feather par points, roto-bezier, effet hors table)
+bloquent l'export en .prproj. `--force` passe outre.
 
 Usage :
   python3 ecproj_to_prproj.py <projet.ecproj> [-o sortie.prproj] [--path-map SRC=DST] [--verify]
@@ -167,7 +171,30 @@ GUID_MEDIA_VIDEO = "228cda18-3625-4d2d-951e-348879e4ed93"
 GUID_MEDIA_AUDIO = "80b8e3d5-6dca-4195-aefb-cb5f407ab009"
 GUID_MEDIA_DATA = "d8143ffe-eec4-4d2a-a909-d5f7bf094dc5"
 GUID_IMPLEMENTATION = "bf7c0e58-488e-4211-9dad-8a71d808748f"
+GUID_GENERATOR_IMPLEMENTATION = "42008e7a-de6f-4270-96de-7e287abb9b4b"
+TOKEN_BLACK_VIDEO = "1112293707"
+TOKEN_COLOR_MATTE = "1129270354"
 GUID_EDITING_MODE = "5125b1eb-7925-433f-beea-f5d884227812"
+
+PY_PREMIERE_SEARCH_ROOTS = [
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+                 "Media_Solution", "Scripts", "py-premiere-0.1.0", "src"),
+    os.path.join(os.path.expanduser("~"), "Media_Solution", "Scripts", "py-premiere-0.1.0", "src"),
+]
+
+
+def load_py_premiere(explicit: str | None = None):
+    """Charge dynamiquement la bibliothèque py_premiere si demandée ou disponible."""
+    if explicit:
+        sys.path.insert(0, explicit)
+    for root in PY_PREMIERE_SEARCH_ROOTS:
+        if os.path.isdir(root) and root not in sys.path:
+            sys.path.insert(0, root)
+    try:
+        import py_premiere
+        return py_premiere
+    except ImportError:
+        return None
 
 SENTINEL = "-91445760000000000"
 AUDIO_LAYOUT = '[{"channellabel":100},{"channellabel":101}]'
@@ -207,9 +234,51 @@ MASK_KNOWN_HASHES = {
     MASK_INTERACTIONS_DATA: "c40c6399-6b26-8c2c-feaf-d01b0000000d",
     MASK_EMPTY_PATH: "5b3d1e1b-2b68-8c23-e1d2-827a00000014",
 }
-# Paramètre « Type » du masque = mode (enum AE MaskMode : 2 = Add). Les autres modes
-# (Subtract, Intersect…) restent à calibrer : seuls les masques « Add » sont exportés (v1).
-MASK_TYPE_ENUM = {"Add": 2}
+# Paramètre « Type » du masque = mode (0 = None, 1 = Difference, 2 = Add, 3 = Subtract, 4 = Intersect).
+MASK_TYPE_ENUM: dict[str, int] = {
+    "None": 0,
+    "Difference": 1,
+    "Add": 2,
+    "Subtract": 3,
+    "Intersect": 4,
+}
+
+# Mapping des 38 modes de fusion EffectCraft vers les jumeaux Premiere Pro (AE.ADBE Opacity) :
+# ParameterID 2 (API/UXP 0..27) et ParameterID 3 (GUI 0..31).
+BLEND_MODE_MAP: dict[str, tuple[int, int]] = {
+    "Normal": (18, 0),
+    "Dissolve": (6, 1),
+    "DancingDissolve": (6, 1),
+    "Darken": (3, 3),
+    "Multiply": (17, 4),
+    "ColorBurn": (1, 5),
+    "ClassicColorBurn": (1, 5),
+    "LinearBurn": (13, 6),
+    "DarkerColor": (4, 7),
+    "Lighten": (11, 9),
+    "Screen": (22, 10),
+    "ColorDodge": (2, 11),
+    "ClassicColorDodge": (2, 11),
+    "LinearDodge": (14, 12),
+    "Add": (14, 12),
+    "LighterColor": (12, 13),
+    "Overlay": (19, 15),
+    "SoftLight": (23, 16),
+    "HardLight": (8, 17),
+    "VividLight": (24, 18),
+    "LinearLight": (15, 19),
+    "PinLight": (20, 20),
+    "HardMix": (9, 21),
+    "Difference": (5, 23),
+    "ClassicDifference": (5, 23),
+    "Exclusion": (7, 24),
+    "Subtract": (25, 25),
+    "Divide": (26, 26),
+    "Hue": (10, 28),
+    "Saturation": (21, 29),
+    "Color": (0, 30),
+    "Luminosity": (16, 31),
+}
 PP_BLUR_MATCH_NAME = "AE.Impact_Blur_FX"
 PP_BLUR_DISPLAY_NAME = "Gaussian Blur"
 PP_BLUR_EFFECTS = ("ec.blur.gaussian",)
@@ -804,8 +873,7 @@ def build_mask_component(mask: dict, index: int, source_w: float, source_h: floa
     mode = str(kind.get("mode") or "Add")
     if mode not in MASK_TYPE_ENUM:
         warn(f"masque « {name} » : mode {mode} non repris (v1), écrit comme Add")
-    if bool(kind.get("inverted")):
-        warn(f"masque « {name} » : masque inversé non repris (v1)")
+    is_inverted = bool(kind.get("inverted"))
     if path_node is not None and vertices and node_keys(path_node) and any(
             key.get("value") != node_keys(path_node)[0].get("value")
             for key in node_keys(path_node)):
@@ -840,7 +908,7 @@ def build_mask_component(mask: dict, index: int, source_w: float, source_h: floa
         make_mask_scalar_param(15, "Opacity", children.get("opacity"), 100.0, 0, 100),
         make_mask_scalar_param(16, "Expansion", children.get("expansion"), 0.0, -5000, 5000,
                                lower_ui=-300, upper_ui=300),
-        make_mask_bool_param(17),
+        make_mask_bool_param(17, value=is_inverted),
         make_mask_scalar_param(25, None, None, 32.0, 0, 192),
         make_mask_enum_param(21, "Blend Mode", 0, 0, 2),
         make_mask_enum_param(22, "Type", mask_type, 0, 4, control=10),
@@ -863,33 +931,47 @@ def build_mask_component(mask: dict, index: int, source_w: float, source_h: floa
     return filter_obj, params
 
 
-def build_opacity_component(mask_filters: list[Obj]) -> tuple[Obj, list[Obj]]:
-    """Filtre Opacité explicite (`AE.ADBE Opacity`) portant les masques en sous-composants.
-
-    Relevé sur le projet de référence : quand un clip a un masque, Premiere matérialise
-    l'Opacité (3 paramètres) et la chaîne du clip ne porte plus `DefaultOpacity`.
+def build_opacity_component(mask_filters: list[Obj] | None = None,
+                            opacity_node: dict | None = None,
+                            blend_mode: str = "Normal") -> tuple[Obj, list[Obj]]:
+    """Filtre Opacité explicite (`AE.ADBE Opacity`) portant les masques en sous-composants,
+    le mode de fusion et l'opacité (statique ou animée).
     """
+    mask_filters = list(mask_filters or [])
+    api_val, gui_val = BLEND_MODE_MAP.get(blend_mode, (18, 0))
+
     opacity = Obj("VideoComponentParam")
     opacity.txt("ParameterID", "1")
     opacity.txt("Name", "Opacity")
-    opacity.txt("StartKeyframe", scalar_start(100.0))
+    if opacity_node is not None and node_keys(opacity_node) and not keys_are_constant(opacity_node):
+        start, rows = scalar_keyframes(opacity_node)
+        opacity.txt("StartKeyframe", start)
+        if rows is not None:
+            opacity.txt("Keyframes", rows)
+    else:
+        op_val = scalar_of(node_value(opacity_node), 100.0) if opacity_node is not None else 100.0
+        opacity.txt("StartKeyframe", scalar_start(op_val))
+        opacity.txt("CurrentValue", f"{op_val:g}")
     opacity.txt("LowerBound", "0")
     opacity.txt("UpperBound", "100")
+
     blend = Obj("VideoComponentParam", classid_version=CLASS_ENUM_PARAM)
     blend.txt("DiscontinuousInterpolate", "true")
     blend.txt("ParameterControlType", "10")
     blend.txt("ParameterID", "2")
     blend.txt("Name", "Blend Mode")
-    blend.txt("StartKeyframe", f"{SENTINEL},18,0,0,0,0,0,0")
+    blend.txt("StartKeyframe", f"{SENTINEL},{api_val},0,0,0,0,0,0")
     blend.txt("LowerBound", "0")
     blend.txt("UpperBound", "27")
+
     matte = Obj("VideoComponentParam", classid_version=CLASS_ENUM_PARAM)
     matte.txt("DiscontinuousInterpolate", "true")
     matte.txt("ParameterID", "3")
     matte.txt("Name", "Blend Mode")
-    matte.txt("StartKeyframe", f"{SENTINEL},0,0,0,0,0,0,0")
+    matte.txt("StartKeyframe", f"{SENTINEL},{gui_val},0,0,0,0,0,0")
     matte.txt("LowerBound", "0")
     matte.txt("UpperBound", "31")
+
     filter_obj = Obj("VideoFilterComponent")
     filter_obj.el(E("Component", {"Version": "7"}, children=[
         E("Params", {"Version": "1"}, children=[
@@ -901,10 +983,11 @@ def build_opacity_component(mask_filters: list[Obj]) -> tuple[Obj, list[Obj]]:
         E("Intrinsic", text="true"),
         E("ID", text="1"),
     ]))
-    filter_obj.el(E("SubComponents", {"Version": "1"}, children=[
-        E("SubComponent", {"Index": str(index), "ref": mask})
-        for index, mask in enumerate(mask_filters)
-    ]))
+    if mask_filters:
+        filter_obj.el(E("SubComponents", {"Version": "1"}, children=[
+            E("SubComponent", {"Index": str(index), "ref": mask})
+            for index, mask in enumerate(mask_filters)
+        ]))
     filter_obj.txt("MatchName", "AE.ADBE Opacity")
     filter_obj.txt("VideoFilterType", "2")
     return filter_obj, [opacity, blend, matte]
@@ -1122,8 +1205,37 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
     bundles: dict[str, dict] = {}
     for item_id, item in items.items():
         item_kind = item.get("kind") or {}
-        if item_kind.get("type") != "Footage":
+        itype = item_kind.get("type")
+        if itype not in ("Footage", "Solid"):
             continue
+
+        if itype == "Solid":
+            is_adj = any(
+                str((l.get("source") or {}).get("item")) == str(item_id)
+                and (l.get("switches") or {}).get("adjustment")
+                for l in (comp_kind.get("layers") or [])
+            )
+            name = str(item.get("name") or ("Adjustment Layer" if is_adj else "Color Matte"))
+            token = TOKEN_BLACK_VIDEO if is_adj else TOKEN_COLOR_MATTE
+            sw = int(item_kind.get("width") or cw)
+            sh = int(item_kind.get("height") or ch)
+            bundles[str(item_id)] = {
+                "id": item_id,
+                "name": name,
+                "stored_path": token,
+                "real_path": "",
+                "width": sw,
+                "height": sh,
+                "frame_rate": comp_kind.get("frame_rate") or {"num": 25, "den": 1},
+                "duration": STILL_DURATION_TICKS,
+                "has_audio": False,
+                "has_video": True,
+                "is_still": True,
+                "is_generator": True,
+                "is_adjustment": is_adj,
+            }
+            continue
+
         real_path = str(item_kind.get("path") or "")
         if not real_path:
             warn(f"média « {item.get('name')} » sans chemin, ignoré")
@@ -1150,6 +1262,8 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             "has_audio": bool(item_kind.get("has_audio", True)) and not is_still,
             "has_video": bool(item_kind.get("has_video", True)),
             "is_still": is_still,
+            "is_generator": False,
+            "is_adjustment": False,
         }
         if not bundles[str(item_id)]["has_video"] and not bundles[str(item_id)]["has_audio"]:
             warn(f"média « {item.get('name')} » sans vidéo ni audio : traité comme vidéo")
@@ -1172,14 +1286,14 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         stype = source.get("type") or ""
         if stype == "Null":
             continue
-        if stype != "Footage" or str(source.get("item")) not in bundles:
+        if stype not in ("Footage", "Solid") or str(source.get("item")) not in bundles:
             warn(f"calque « {layer.get('name')} » : source {stype or '?'} non exportée (v1)")
             continue
         if abs(float(layer.get("stretch") or 100.0) - 100.0) > 1e-6:
             warn(f"calque « {layer.get('name')} » : stretch ≠ 100 % non géré (v1), ignoré")
             continue
         blend = str(layer.get("blend_mode") or "Normal")
-        if blend != "Normal":
+        if blend not in BLEND_MODE_MAP:
             warn(f"calque « {layer.get('name')} » : mode de fusion {blend} non géré (v1)")
         start = int(layer.get("in_point") or 0)
         end = int(layer.get("out_point") or 0)
@@ -1384,6 +1498,8 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         has_audio = bundle["has_audio"]
         is_still = bundle["is_still"]
         master = Obj("MasterClip", uid=True)
+        if bundle.get("is_adjustment"):
+            master.txt("IsAdjustmentLayer", "true")
         logging = Obj("ClipLoggingInfo")
         if is_still:
             logging.txt("CaptureMode", "2")
@@ -1633,12 +1749,20 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             media_obj.ref("AudioStream", audio_stream)
         if video_stream is not None:
             media_obj.ref("VideoStream", video_stream)
-        media_obj.txt("FilePath", bundle["stored_path"])
-        media_obj.txt("ImplementationID", GUID_IMPLEMENTATION)
-        media_obj.txt("Title", os.path.basename(bundle["real_path"]) or bundle["name"])
-        if bundle["is_still"]:
+        if bundle.get("is_generator"):
+            media_obj.txt("FilePath", bundle["stored_path"])
+            media_obj.txt("ImplementationID", GUID_GENERATOR_IMPLEMENTATION)
+            media_obj.txt("Title", bundle["name"])
             media_obj.txt("Infinite", "true")
-        media_obj.txt("OfflineReason", "1")
+            media_obj.txt("OfflineReason", "0")
+            media_obj.txt("ActualMediaFilePath", bundle["stored_path"])
+        else:
+            media_obj.txt("FilePath", bundle["stored_path"])
+            media_obj.txt("ImplementationID", GUID_IMPLEMENTATION)
+            media_obj.txt("Title", os.path.basename(bundle["real_path"]) or bundle["name"])
+            if bundle["is_still"]:
+                media_obj.txt("Infinite", "true")
+            media_obj.txt("OfflineReason", "1")
         bundle["media_obj"] = media_obj
         bundle["audio_stream"] = audio_stream
         bundle["video_stream"] = video_stream
@@ -1732,8 +1856,22 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             mask_filter, params = build_mask_component(mask, len(mask_filters), sw, sh, warn)
             mask_filters.append(mask_filter)
             mask_params += params
-        opacity_filter, opacity_params = (build_opacity_component(mask_filters)
-                                          if mask_filters else (None, []))
+
+        opacity_node = conv.find_transform_node(layer, "opacity")
+        has_animated_opacity = animated(opacity_node)
+        opacity_val = scalar_of(node_value(opacity_node), 100.0) if opacity_node is not None else 100.0
+        has_custom_opacity = has_animated_opacity or (abs(opacity_val - 100.0) > 1e-6)
+        has_custom_blend = (blend != "Normal" and blend in BLEND_MODE_MAP)
+
+        if mask_filters or has_custom_opacity or has_custom_blend:
+            opacity_filter, opacity_params = build_opacity_component(
+                mask_filters=mask_filters,
+                opacity_node=opacity_node if has_custom_opacity else None,
+                blend_mode=blend if has_custom_blend else "Normal",
+            )
+        else:
+            opacity_filter, opacity_params = None, []
+
         blur_filters: list[Obj] = []
         blur_params: list[Obj] = []
         for effect in conv.collect_effects(layer):
@@ -1746,9 +1884,8 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             blur_filter, params = build_blur_component(effect, warn)
             blur_filters.append(blur_filter)
             blur_params += params
-        if mask_filters and default_motion:
-            # masque + Transform par défaut : écrire un filtre Motion explicite (aucune
-            # référence Adobe pour « composants intrinsèques + sous-composants »)
+        if (mask_filters or opacity_filter is not None or blur_filters) and default_motion:
+            # masque, opacité personnalisée ou effet + Transform par défaut : écrire un filtre Motion explicite
             default_motion = False
 
         if default_motion:
@@ -2342,15 +2479,13 @@ def compare_prproj(ours_path: str, ref_path: str) -> None:
 
 
 def mask_unsupported_reason(mask: dict) -> str | None:
-    """Ce que l'écriture .prproj v1 ne reprend pas d'un masque .ecproj, sinon None."""
+    """Ce que l'écriture .prproj ne reprend pas d'un masque .ecproj, sinon None."""
     if not mask_is_applied(mask):
         return None            # EffectCraft ne l'applique pas non plus : rien à reprendre
     kind = mask.get("kind") or {}
     mode = str(kind.get("mode") or "Add")
     if mode not in MASK_TYPE_ENUM:
         return f"mode {mode} non repris (v1)"
-    if kind.get("inverted"):
-        return "masque inversé non repris (v1)"
     if kind.get("roto_bezier"):
         return "roto-bezier non repris (v1)"
     if mask_path_value(mask_children(mask).get("path")).get("feather"):
@@ -2363,7 +2498,7 @@ def mask_unsupported_reason(mask: dict) -> str | None:
 
 
 def pp_unsupported_reasons(ec: dict) -> list[str]:
-    """Éléments du .ecproj que l'écriture .prproj v1 ne reprend pas (masques, effets)."""
+    """Éléments du .ecproj que l'écriture .prproj ne reprend pas (masques, effets, modes)."""
     reasons: list[str] = []
     for item in (ec.get("items") or {}).values():
         kind = item.get("kind") or {}
@@ -2373,6 +2508,9 @@ def pp_unsupported_reasons(ec: dict) -> list[str]:
             if (layer.get("source") or {}).get("type") == "Null":
                 continue
             layer_name = layer.get("name")
+            blend = str(layer.get("blend_mode") or "Normal")
+            if blend not in BLEND_MODE_MAP:
+                reasons.append(f"calque « {layer_name} » : mode de fusion « {blend} » non repris (v1)")
             for mask in conv.enabled_masks(layer):
                 reason = mask_unsupported_reason(mask)
                 if reason:

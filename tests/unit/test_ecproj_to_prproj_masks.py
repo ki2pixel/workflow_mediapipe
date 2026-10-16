@@ -78,7 +78,51 @@ def blur_node(effect="ec.blur.gaussian", blurriness=30.0):
     }
 
 
-def ec_project(masks=(), effects=(), width=1080, height=1920):
+def opacity_prop(value=100.0, keys=None):
+    prop = {
+        "node": "Prop", "uid": 50, "match": "opacity", "name": "Opacity",
+        "value": {"t": "Scalar", "v": float(value)},
+    }
+    if keys:
+        prop["keys"] = keys
+    return prop
+
+
+def ec_solid_project(name="Solid 1", adjustment=False, color=(1.0, 0.0, 0.0), width=1080, height=1920):
+    layer = {
+        "id": 11, "name": name, "label": "Red", "comment": "",
+        "source": {"type": "Solid", "item": 1},
+        "start_time": 0, "in_point": 0, "out_point": 254016000000,
+        "stretch": 100.0,
+        "switches": {"video": True, "audio": False, "solo": False, "locked": False,
+                     "effects": True, "motion_blur": False, "adjustment": adjustment,
+                     "three_d": False},
+        "blend_mode": "Normal", "preserve_transparency": False, "track_matte": None,
+        "parent": None, "markers": [], "auto_orient": "Off",
+        "props": {"uid": 40, "match": "layer", "name": name,
+                  "kind": {"kind": "Plain"}, "enabled": True, "children": []},
+    }
+    return {
+        "savedBy": "0.10.0", "schema": 2,
+        "settings": {"audio_sample_rate": 48000},
+        "items": {
+            "1": {"id": 1, "name": name, "label": "Red", "parent": None,
+                  "kind": {"type": "Solid", "color": list(color),
+                           "width": width, "height": height, "pixel_aspect": 1.0}},
+            "2": {"id": 2, "name": "comp", "parent": None,
+                  "kind": {"type": "Comp", "width": width, "height": height,
+                           "pixel_aspect": 1.0, "frame_rate": {"num": 25, "den": 1},
+                           "duration": 254016000000, "display_start": 0,
+                           "background": [0, 0, 0], "work_area": [0, 254016000000],
+                           "layers": [layer], "markers": [], "renderer": "Classic3D",
+                           "shutter_angle": 180.0, "enable_motion_blur": True}},
+        },
+        "next_id": 99,
+    }
+
+
+def ec_project(masks=(), effects=(), transform=(), blend_mode="Normal",
+               adjustment=False, width=1080, height=1920):
     props_children = []
     if masks:
         props_children.append({"node": "Group", "uid": 41, "match": "masks", "name": "Masks",
@@ -88,15 +132,19 @@ def ec_project(masks=(), effects=(), width=1080, height=1920):
         props_children.append({"node": "Group", "uid": 48, "match": "effects", "name": "Effects",
                                "kind": {"kind": "Plain"}, "enabled": True,
                                "children": list(effects)})
+    if transform:
+        props_children.append({"node": "Group", "uid": 49, "match": "transform", "name": "Transform",
+                               "kind": {"kind": "Plain"}, "enabled": True,
+                               "children": list(transform)})
     layer = {
         "id": 11, "name": "clip.mp4", "label": "Aqua", "comment": "",
         "source": {"type": "Footage", "item": 1},
         "start_time": 0, "in_point": 0, "out_point": 254016000000,
         "stretch": 100.0,
         "switches": {"video": True, "audio": False, "solo": False, "locked": False,
-                     "effects": True, "motion_blur": False, "adjustment": False,
+                     "effects": True, "motion_blur": False, "adjustment": adjustment,
                      "three_d": False},
-        "blend_mode": "Normal", "preserve_transparency": False, "track_matte": None,
+        "blend_mode": blend_mode, "preserve_transparency": False, "track_matte": None,
         "parent": None, "markers": [], "auto_orient": "Off",
         "props": {"uid": 40, "match": "layer", "name": "clip.mp4",
                   "kind": {"kind": "Plain"}, "enabled": True, "children": props_children},
@@ -337,17 +385,28 @@ def test_skip_reason_is_none_for_supported_masks_and_blur(tmp_path):
 
 
 @pytest.mark.parametrize("mask", [
-    mask_node(RECT_PX, mode="Subtract"),
-    mask_node(RECT_PX, inverted=True),
+    {**mask_node(RECT_PX), "kind": {**mask_node(RECT_PX)["kind"], "roto_bezier": True}},
+    {**mask_node(RECT_PX), "kind": {**mask_node(RECT_PX)["kind"], "mode": "Darken"}},
+    {**mask_node(RECT_PX), "kind": {**mask_node(RECT_PX)["kind"], "feather_falloff": "Linear"}},
 ])
 def test_skip_reason_blocks_masks_out_of_scope(tmp_path, mask):
-    # Given : un masque hors périmètre v1 (autre mode, inversion)
+    # Given : un masque hors périmètre (roto-bezier, mode exotique, feather falloff non-Smooth)
     path = write_ec(tmp_path, ec_project(masks=[mask]))
     # When : la raison de ne pas exporter est demandée
     reason = pp.premiere_skip_reason(path)
     # Then : l'export .prproj est refusé avec une raison explicite
     assert reason is not None
     assert "masque" in reason
+
+
+def test_skip_reason_blocks_unknown_blend_modes(tmp_path):
+    # Given : un mode de fusion hors de la table des 27 modes Premiere (ex: StencilAlpha)
+    path = write_ec(tmp_path, ec_project(blend_mode="StencilAlpha"))
+    # When : la raison de ne pas exporter est demandée
+    reason = pp.premiere_skip_reason(path)
+    # Then : l'export est refusé avec indication du mode non supporté
+    assert reason is not None
+    assert "mode de fusion" in reason
 
 
 def test_skip_reason_blocks_unknown_effects(tmp_path):
@@ -358,3 +417,123 @@ def test_skip_reason_blocks_unknown_effects(tmp_path):
     # Then : l'export .prproj est refusé (effet non repris)
     assert reason is not None
     assert "effet" in reason
+
+
+def test_convert_writes_inverted_mask(tmp_path):
+    # Given : un masque avec inverted=True
+    ec = ec_project(masks=[mask_node(RECT_PX, inverted=True)])
+    # When : il est converti
+    _out, _xml, (root, by_id, by_uid) = convert(tmp_path, ec)
+    # Then : le filtre masque est créé et le paramètre 17 est true
+    assert pp.check_references(root, by_id, by_uid) == []
+    mask = filters_by_match(root, pp.MASK2_MATCH_NAME)[0]
+    params = params_by_id(root, by_id, mask)
+    assert params[17].findtext("StartKeyframe") == "-91445760000000000,true,0,0,0,0,0,0"
+
+
+@pytest.mark.parametrize("mode,expected_type", [
+    ("Difference", 1),
+    ("Add", 2),
+    ("Subtract", 3),
+    ("Intersect", 4),
+])
+def test_convert_writes_mask_modes(tmp_path, mode, expected_type):
+    # Given : un masque avec un mode supporté
+    ec = ec_project(masks=[mask_node(RECT_PX, mode=mode)])
+    # When : il est converti
+    _out, _xml, (root, by_id, by_uid) = convert(tmp_path, ec)
+    # Then : le paramètre 22 Type porte l'index correspondant
+    assert pp.check_references(root, by_id, by_uid) == []
+    mask = filters_by_match(root, pp.MASK2_MATCH_NAME)[0]
+    params = params_by_id(root, by_id, mask)
+    assert params[22].findtext("StartKeyframe") == f"-91445760000000000,{expected_type},0,0,0,0,0,0"
+
+
+def test_convert_writes_blend_modes(tmp_path):
+    # Given : un calque avec mode de fusion Multiply (sans masque)
+    ec = ec_project(blend_mode="Multiply")
+    # When : il est converti
+    _out, _xml, (root, by_id, by_uid) = convert(tmp_path, ec)
+    # Then : l'Opacité explicite est créée sans SubComponents, avec les deux jumeaux de fusion
+    assert pp.check_references(root, by_id, by_uid) == []
+    opacities = filters_by_match(root, "AE.ADBE Opacity")
+    assert len(opacities) == 1
+    assert opacities[0].find("SubComponents") is None
+    params = params_by_id(root, by_id, opacities[0])
+    # Multiply : param 2 (API) = 17, param 3 (GUI) = 4
+    assert params[2].findtext("StartKeyframe") == "-91445760000000000,17,0,0,0,0,0,0"
+    assert params[3].findtext("StartKeyframe") == "-91445760000000000,4,0,0,0,0,0,0"
+
+
+def test_convert_writes_custom_and_animated_opacity(tmp_path):
+    # Given : un calque avec opacité statique à 42%
+    ec = ec_project(transform=[opacity_prop(42.0)])
+    # When : il est converti
+    _out, _xml, (root, by_id, by_uid) = convert(tmp_path, ec)
+    # Then : l'Opacité explicite est créée avec 42%
+    assert pp.check_references(root, by_id, by_uid) == []
+    opacities = filters_by_match(root, "AE.ADBE Opacity")
+    assert len(opacities) == 1
+    params = params_by_id(root, by_id, opacities[0])
+    assert ",42." in params[1].findtext("StartKeyframe")
+    assert params[1].findtext("CurrentValue") == "42"
+
+    # Given : un calque avec opacité animée par keyframes
+    keys = [
+        {"time": 0, "value": {"t": "Scalar", "v": 0.0}, "interpolation": "Linear"},
+        {"time": 254016000000, "value": {"t": "Scalar", "v": 100.0}, "interpolation": "Linear"},
+    ]
+    ec_anim = ec_project(transform=[opacity_prop(0.0, keys=keys)])
+    _out2, _xml2, (root2, by_id2, by_uid2) = convert(tmp_path, ec_anim)
+    assert pp.check_references(root2, by_id2, by_uid2) == []
+    opacities2 = filters_by_match(root2, "AE.ADBE Opacity")
+    assert len(opacities2) == 1
+    params2 = params_by_id(root2, by_id2, opacities2[0])
+    assert params2[1].find("Keyframes") is not None
+
+
+def test_convert_writes_color_matte_solid(tmp_path):
+    # Given : un calque solide Color Matte
+    ec = ec_solid_project("Color Matte 1", adjustment=False, color=(0.2, 0.4, 0.8))
+    # When : il est converti
+    _out, _xml, (root, by_id, by_uid) = convert(tmp_path, ec)
+    # Then : le média est un générateur Color Matte avec TOKEN_COLOR_MATTE (1129270354)
+    assert pp.check_references(root, by_id, by_uid) == []
+    medias = [elem for elem in root if elem.tag == "Media"]
+    assert len(medias) == 1
+    media = medias[0]
+    assert media.findtext("FilePath") == pp.TOKEN_COLOR_MATTE
+    assert media.findtext("ImplementationID") == pp.GUID_GENERATOR_IMPLEMENTATION
+    assert media.findtext("Infinite") == "true"
+    assert media.findtext("OfflineReason") == "0"
+    masters = [elem for elem in root if elem.tag == "MasterClip" and elem.findtext("Name") == "Color Matte 1"]
+    assert len(masters) == 1
+    assert masters[0].findtext("IsAdjustmentLayer") is None
+
+
+def test_convert_writes_adjustment_layer(tmp_path):
+    # Given : un calque d'effet (Solid + adjustment switch = True)
+    ec = ec_solid_project("Adjustment Layer 1", adjustment=True)
+    # When : il est converti
+    _out, _xml, (root, by_id, by_uid) = convert(tmp_path, ec)
+    # Then : le média est Black Video (1112293707) et MasterClip a IsAdjustmentLayer = true
+    assert pp.check_references(root, by_id, by_uid) == []
+    medias = [elem for elem in root if elem.tag == "Media"]
+    assert len(medias) == 1
+    media = medias[0]
+    assert media.findtext("FilePath") == pp.TOKEN_BLACK_VIDEO
+    assert media.findtext("ImplementationID") == pp.GUID_GENERATOR_IMPLEMENTATION
+    assert media.findtext("OfflineReason") == "0"
+    masters = [elem for elem in root if elem.tag == "MasterClip" and elem.findtext("Name") == "Adjustment Layer 1"]
+    assert len(masters) == 1
+    assert masters[0].findtext("IsAdjustmentLayer") == "true"
+
+
+def test_load_py_premiere_bridge():
+    # Given : le loader py_premiere
+    # When : on l'invoque
+    py_premiere = pp.load_py_premiere()
+    # Then : la bibliothèque est chargée et utilisable
+    assert py_premiere is not None
+    assert hasattr(py_premiere, "parse")
+    assert hasattr(py_premiere, "enums")
