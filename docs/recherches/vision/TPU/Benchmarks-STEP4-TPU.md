@@ -155,13 +155,23 @@ Chaque hypothèse des rapports d'optimisation a été mesurée avant décision :
 
 1. **Décider du sort du détecteur d'objets** (§ 3.2) : corriger le label COCO ou le désactiver
    (−1,8 ms/frame supplémentaire, soit ≈ 131 fps).
-2. **Cadence BlazeFace** : prochain levier sur le worker (≈ 1,5 ms/frame). Le harnais et le
+2. **Pipelining CPU ↔ TPU intra-worker** : les deux invocations TPU représentent désormais
+   **58 % du budget worker** (4,8 ms sur 8,31 ms/frame), ce qui satisfait le critère de décision
+   fixé en début de campagne (≥ 40 %). Le recouvrement du post-traitement CPU (blendshapes + recadrage,
+   ≈ 2,4 ms) derrière l'invocation TPU de la frame suivante est le levier restant le plus rentable.
+   Complexité élevée : threading dans le worker, un seul consommateur `/dev/apex_0`, ordre de
+   destruction delegate/interpréteurs.
+3. **Cadence BlazeFace** : prochain levier simple sur le worker (≈ 1,5 ms/frame). Le harnais et le
    comparateur sont en place pour valider la non-régression ; à activer seulement si les seuils de
    précision passent.
-3. **Transport YUV/PyAV** : à réévaluer une fois le worker descendu sous ~5,3 ms/frame (c'est alors
+4. **Transport YUV/PyAV** : à réévaluer une fois le worker descendu sous ~5,3 ms/frame (c'est alors
    le décodage qui devient limitant, et le gain devient réel).
-4. **Fiabiliser le couplage visage/objet** du tracker partagé (le détournement de piste fausse la
+5. **Fiabiliser le couplage visage/objet** du tracker partagé (le détournement de piste fausse la
    sortie `source` et donc le filtrage STEP6).
+6. **Dette cosmétique** : la métadonnée `tracking_method` vaut encore `kdtree_tpu` (et `kdtree_cv5`
+   côté OpenCV 5) alors que l'appariement est un plus-proche-centroïde NumPy partagé. Le champ n'est
+   lu par aucun consommateur du dépôt ; il a été conservé pour ne pas invalider les sorties déjà
+   publiées.
 
 ## 8. Reproduction
 
@@ -179,7 +189,7 @@ python3 scripts/compare_step4_tracking_outputs.py \
     --faces-only --markdown rapport.md
 
 # Tests
-bash scripts/run_step4_tests.sh    # profiler, optimisations, pipeline TPU (43 passés)
+bash scripts/run_step4_tests.sh    # profiler, optimisations, pipeline TPU (55 passés)
 bash scripts/run_main_tests.sh     # harnais, comparateur (652 passés)
 ```
 
