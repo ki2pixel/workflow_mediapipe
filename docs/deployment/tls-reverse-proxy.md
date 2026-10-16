@@ -215,7 +215,7 @@ workflow.example.com {
 
 ```bash
 # Depuis le répertoire du projet
-gunicorn -c gunicorn.conf.py wsgi:APP_FLASK
+gunicorn -c gunicorn.conf.py wsgi:app
 ```
 
 Contenu minimal de `gunicorn.conf.py` :

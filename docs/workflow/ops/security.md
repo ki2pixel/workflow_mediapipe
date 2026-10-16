@@ -202,14 +202,14 @@ function parseAndStyleLogContent(content) {
 
 ```python
 # Configuration
-INTERNAL_WORKER_TOKEN = os.getenv('INTERNAL_WORKER_TOKEN', 'secure-token-here')
+INTERNAL_WORKER_COMMS_TOKEN = os.getenv('INTERNAL_WORKER_COMMS_TOKEN', 'secure-token-here')
 
 # Décorateur de sécurité
 def require_internal_worker_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('X-Worker-Token')
-        if token != current_app.config['INTERNAL_WORKER_TOKEN']:
+        if token != current_app.config['INTERNAL_WORKER_COMMS_TOKEN']:
             abort(401, description="Invalid worker token")
         return f(*args, **kwargs)
     return decorated
@@ -218,7 +218,7 @@ def require_internal_worker_token(f):
 ### Application et Transmission Frontend
 
 1. **Backend** : Le décorateur `@require_internal_worker_token` est appliqué sur les routes sensibles (ex. `/api/cache/open`, `/run/<step_key>`).
-2. **Transmission de session** : Lors du chargement de la page principale (GET `/`), Flask récupère `INTERNAL_WORKER_TOKEN` depuis la configuration et l'injecte dans la page via une balise méta CSP-compliant :
+2. **Transmission de session** : Lors du chargement de la page principale (GET `/`), Flask récupère `INTERNAL_WORKER_COMMS_TOKEN` depuis la configuration et l'injecte dans la page via une balise méta CSP-compliant :
    ```html
    <meta name="worker-token" content="{{ worker_token }}">
    ```
@@ -280,7 +280,7 @@ L'application intègre des mécanismes de verrouillage stricts pour empêcher to
 ### Diagnostic Pré-vol et Démarrage (`validate_startup.py`)
 
 Avant de démarrer le serveur Web, le script de diagnostic global `scripts/validate_startup.py` est obligatoirement exécuté. Son rôle principal est d'appliquer un **crash strict au démarrage si des secrets de développement (`dev-*`) sont configurés en production (`DEBUG=False`)**.
-- **Sécurité des Tokens** : Le script valide la configuration et échoue immédiatement (code d'erreur `1`) s'il détecte que `SECRET_KEY` ou `INTERNAL_WORKER_TOKEN` utilisent des valeurs par défaut ou commencent par `dev-` en environnement de production.
+- **Sécurité des Tokens** : Le script valide la configuration et échoue immédiatement (code d'erreur `1`) s'il détecte que `SECRET_KEY` ou `INTERNAL_WORKER_COMMS_TOKEN` utilisent des valeurs par défaut ou commencent par `dev-` en environnement de production.
 - **Version Python & Environnement virtuel** : Vérification de l'isolation du runtime.
 - **Intégrité Services & Imports** : Vérification préventive de la chargeabilité des dépendances critiques.
 - **Fichiers Frontend** : Validation de la présence des couches DOM batching et AppState.
@@ -295,7 +295,7 @@ Ce mécanisme est la première et principale ligne de défense pour éviter une 
 
 ```bash
 # Sécurité
-INTERNAL_WORKER_TOKEN=your-secure-token-here
+INTERNAL_WORKER_COMMS_TOKEN=your-secure-token-here
 FLASK_SECRET_KEY=your-flask-secret-key
 
 # Monitoring
@@ -318,7 +318,7 @@ FALLBACK_OUTPUT_DIR=/tmp/projets_extraits
 from config.security import require_internal_worker_token
 from config.settings import config
 
-app.config['INTERNAL_WORKER_TOKEN'] = config.INTERNAL_WORKER_TOKEN
+app.config['INTERNAL_WORKER_COMMS_TOKEN'] = config.INTERNAL_WORKER_COMMS_TOKEN
 app.config['FLASK_SECRET_KEY'] = config.FLASK_SECRET_KEY
 ```
 
@@ -328,11 +328,11 @@ app.config['FLASK_SECRET_KEY'] = config.FLASK_SECRET_KEY
 
 ```bash
 # Diagnostic
-curl -H "X-Worker-Token: invalid" http://localhost:5000/api/cache/open
+curl -H "X-Worker-Token: invalid" http://127.0.0.1:5003/api/cache/open
 
 # Solution
 # Vérifier la configuration
-echo $INTERNAL_WORKER_TOKEN
+echo $INTERNAL_WORKER_COMMS_TOKEN
 # Utiliser le token correct dans les headers
 ```
 
@@ -448,7 +448,7 @@ api → token_validation → services délégués
 ## Pièges Courants et Solutions
 
 ### Piège #1 : Token Manquant
-**Solution** : Configurer `INTERNAL_WORKER_TOKEN` et l'envoyer dans le header `X-Worker-Token`.
+**Solution** : Configurer `INTERNAL_WORKER_COMMS_TOKEN` et l'envoyer dans le header `X-Worker-Token`.
 
 ### Piège #2 : Path Traversal
 **Solution** : `FilenameSanitizer` + validation systématique des chemins relatifs.

@@ -49,10 +49,10 @@ else:
 # Clique sur "Étape 4 : Tracking vidéo" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP4
+curl -X POST http://127.0.0.1:5003/run/STEP4
 
 # Dans une séquence complète
-const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6'];
+const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6', 'STEP7', 'STEP8'];
 await apiService.runCustomSequence(steps);
 ```
 
@@ -110,6 +110,11 @@ projets_extraits/projet_camille_001/docs/video1_tracking.json
 ```bash
 # Accélération matérielle
 ENABLE_CORAL_TPU_ACCELERATION=false # true pour activer l'Edge TPU (PCIe/USB)
+
+# Optimisations du chemin Coral TPU (run_tracking_tpu.py)
+STEP4_TPU_FAST=1                    # 0 = historique, 1 = gains validés (défaut), 2 = réservé
+STEP4_TPU_CPU_THREADS=1             # Threads TFLite du modèle Blendshapes (CPU)
+STEP4_TPU_PROFILING_DIR=            # Répertoire des rapports de profilage (vide = désactivé)
 
 # Moteur de tracking (lorsque TPU désactivé - défaut: MediaPipe)
 STEP4_TRACKING_ENGINE=              # vide = MediaPipe, "insightface" = GPU
@@ -217,7 +222,7 @@ STEP4_EXPORT_VERBOSE_FIELDS=0        # Export landmarks/verbose
 |--------|-----------|------------|---------|---------|-----------------|
 | **MediaPipe CPU** | Bonne (478 landmarks) | 15 workers CPU | 15 | Lent sur vidéos longues | Production stable, batch massif |
 | **InsightFace GPU** | Excellente (embeddings) | 1 worker GPU | 1 | VRAM limitée, CUDA requis | Haute précision, contenus courts |
-| **Edge TPU Cascade** | Élevée (Kalman lissé) | 1 worker TPU | 1 | Inférence séquentielle | Matériel Edge basse consommation (2-4W) sans GPU dédié |
+| **Edge TPU Cascade** | Élevée (One Euro lissé) | 1 worker TPU | 1 | Inférence séquentielle | Matériel Edge basse consommation (2-4W) sans GPU dédié |
 | **OpenCV 5.0 DNN** | Élevée (BlazeFace + FaceMesh) | Multi-workers CPU | Configurable | Légère latence de chargement | Alternative stable sans MediaPipe, optimisée pour processeurs x86 (AVX2/AVX-512) |
 | **Hybrid Auto** | Adaptatif | Variable | Variable | Complexité configuration | Environnements mixtes |
 
@@ -231,9 +236,11 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
   2. **Alignement Affine** : Recadrage géométrique et alignement affine du visage à 192x192 pixels.
   3. **Landmarks (FaceMesh)** : Inférence de `facemesh_quantized_edgetpu.tflite` pour extraire les 468 landmarks 3D.
   4. **Animation (Face Blendshapes)** : Inférence de `face_blendshapes.tflite` (exécuté sur le CPU en raison du padding de 146 points requis pour l'iris).
-  5. **Lissage temporel (Filtre de Kalman)** : Application d'un filtre de Kalman vectorisé à 52 dimensions (coefficients ARKit) pour gommer le sautillement (jittering) lié à la quantification INT8.
+  5. **Lissage temporel (filtre One Euro)** : Application d'un filtre One Euro vectorisé à 52 dimensions (coefficients ARKit, `min_cutoff=1.0`, `beta=0.007`) pour gommer le sautillement (jittering) lié à la quantification INT8.
   6. **Object Detection Fallback (EfficientDet Lite0)** : Exécuté uniquement si BlazeFace ne détecte aucun visage, éliminant ainsi le basculement coûteux de contexte TPU (TPU Context Switch).
   7. **Export Streaming** : Utilisation de `StreamingJSONOutput` pour écrire les frames à la volée sur le disque, garantissant une complexité mémoire constante **O(1)**.
+
+**Optimisations et profilage** : les gains sûrs validés par benchmark (hystérésis du détecteur d'objets, cache des ancres BlazeFace, cache des métadonnées d'interpréteur, écriture JSON tamponnée) sont activés par `STEP4_TPU_FAST` (`0` = comportement historique, `1` = défaut livré, temps par frame réduit d'environ 34 % ; `2` réservé). Le profilage par étage s'active via `STEP4_TPU_PROFILING_DIR` (ou `--profile-dir`) et produit un rapport JSON par vidéo (étages `blazeface_tpu`, `facemesh_tpu`, `one_euro`, `object_detector_tpu`…) grâce à `utils/step4_tpu_profiler.py`. Mesures détaillées et variantes écartées : `docs/recherches/vision/TPU/Benchmarks-STEP4-TPU.md`.
 
 ## Mode Expérimental OpenCV 5.0 DNN
 
@@ -242,14 +249,14 @@ Lorsque `USE_OPENCV5_STEP4=true` est configuré dans le fichier `.env`, l'étape
 * **Script d'exécution** : `workflow_scripts/step4/run_tracking_cv5.py`
 * **Architecture de Planification Adaptative** :
   Le traitement n'utilise plus un parallélisme simpliste par vidéo, mais s'appuie sur un **pool global adaptatif de workers** (`ProcessPoolExecutor` initialisé en mode `spawn`) distribuant des chunks de frames (`STEP4_CV5_CHUNK_FRAMES`, défaut `32`) de manière dynamique.
-  - **Orchestration Parent** : Le processus parent coordonne la lecture des vidéos (décodage), découpe les frames en lots de taille fixe, les envoie au pool de workers, collecte les résultats asynchrones, réassemble les frames dans le bon ordre chronologique (`_flush_cv5_ready_chunks`), applique le lissage temporel (filtres One Euro et Kalman), préserve la continuité du tracking et sérialise les résultats de manière atomique sur le disque.
+  - **Orchestration Parent** : Le processus parent coordonne la lecture des vidéos (décodage), découpe les frames en lots de taille fixe, les envoie au pool de workers, collecte les résultats asynchrones, réassemble les frames dans le bon ordre chronologique (`_flush_cv5_ready_chunks`), applique le lissage temporel (filtre One Euro), préserve la continuité du tracking et sérialise les résultats de manière atomique sur le disque.
   - **Workers autonomes** : Les workers se contentent de réaliser les inférences sur les chunks reçus sans interagir avec l'état global ou le système de fichiers, éliminant ainsi toute contention.
 * **Cascade d'Inférence** :
   1. **Détection (BlazeFace)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `blazeface.onnx`) pour obtenir la boîte englobante et l'emplacement des yeux.
   2. **Alignement Géométrique** : Crop du visage et transformation affine à 192x192 pixels.
   3. **Landmarks (FaceMesh)** : Inférence ONNX via OpenCV 5.0 DNN (modèle `facemesh.onnx`) pour extraire 468 points faciaux 3D.
   4. **Animation (Face Blendshapes)** : Inférence du modèle TFLite `face_blendshapes.tflite` effectuée sur le CPU (en raison du padding 146 points pour l'iris).
-  5. **Lissage Temporel (Parent)** : Application des filtres stabilisateurs (One Euro et Kalman) sur les 52 coefficients ARKit par le processus parent.
+  5. **Lissage Temporel (Parent)** : Application du filtre stabilisateur One Euro sur les 52 coefficients ARKit par le processus parent.
 * **Détecteur d'Objets Fallback (YOLOv11 ONNX)** : Si `STEP4_ENABLE_OBJECT_DETECTION=1` est activé, YOLOv11 ONNX (`yolo11n.onnx`) prend le relais si aucun visage n'est détecté.
 * **Séparation de Matériel et GPU Decoupling** :
   - La variable d'environnement `STEP4_CV5_INFERENCE_DEVICE` (valeurs `cpu` ou `cuda`) détermine l'appareil d'inférence d'OpenCV DNN, de manière totalement découplée de `STEP4_ENABLE_GPU` (qui reste réservé pour InsightFace).

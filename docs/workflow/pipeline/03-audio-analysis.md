@@ -41,10 +41,10 @@ AUDIO_PROFILE=gpu_fp32  # FP32 pur, pas d'AMP
 # Clique sur "Étape 3 : Analyse audio" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP4
+curl -X POST http://127.0.0.1:5003/run/STEP3
 
 # Dans une séquence complète
-const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6'];
+const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6', 'STEP7', 'STEP8'];
 await apiService.runCustomSequence(steps);
 ```
 
@@ -143,7 +143,7 @@ Le pipeline impose `AUDIO_GPU_ISOLATION=1` pour exécuter l'analyse Pyannote dan
 
 ```bash
 # Activation Lemonfox
-STEP3_USE_LEMONFOX=1
+STEP3_METHOD=lemonfox
 LEMONFOX_API_KEY=votre_cle_api_ici
 
 # Configuration Lemonfox
@@ -457,7 +457,7 @@ curl -H "Authorization: Bearer $LEMONFOX_API_KEY" https://api.lemonfox.ai/v1/sta
 # Solutions
 # 1. Vérifier clé API et quota
 # 2. Désactiver Lemonfox (fallback Pyannote)
-export STEP3_USE_LEMONFOX=0
+export STEP3_METHOD=pyannote
 ```
 
 ### DeepInfra API Erreurs

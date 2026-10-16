@@ -46,10 +46,10 @@ def finalize_projects():
 # Clique sur "Étape 7 : Finalisation" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP7
+curl -X POST http://127.0.0.1:5003/run/STEP7
 
 # Dans une séquence complète
-const steps = ['STEP1', '2', '3', '4', '5', '6', '7', '8'];
+const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6', 'STEP7', 'STEP8'];
 await apiService.runCustomSequence(steps);
 ```
 

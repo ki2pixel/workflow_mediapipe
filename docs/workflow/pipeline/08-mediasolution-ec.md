@@ -63,7 +63,7 @@ l'application (Préférences ▸ Scripting & Expressions) — le pré-vol tente 
 ### Lancement via API
 
 ```bash
-curl -X POST http://localhost:5003/run/STEP8
+curl -X POST http://127.0.0.1:5003/run/STEP8
 ```
 
 ### Exécution manuelle (debug)

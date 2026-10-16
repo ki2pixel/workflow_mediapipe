@@ -37,16 +37,16 @@ Le pipeline traite les vidéos en 8 étapes séquentielles, chacune dans son env
 # 1. Installation
 git clone <repository>
 cd workflow_mediapipe
-source env/bin/activate
-pip install -r requirements.txt
+source "${VENV_BASE_DIR:-.}/env/bin/activate"
+pip install -r requirements_env.txt
 
 # 2. Configuration
 cp .env.example .env
 # Éditer .env avec tes clés API et chemins
 
 # 3. Lancement
-python app_new.py
-# Ouvre http://localhost:5000
+./start_workflow.sh
+# Ouvre http://127.0.0.1:5003
 ```
 
 ## Navigation dans la Documentation
@@ -104,12 +104,15 @@ python app_new.py
 ## Environnements Virtuels
 
 ```bash
-env/                    # Application principale
-├── tracking_env_slim/   # MediaPipe CPU (STEP4)
-├── audio_env/           # Analyse audio (STEP4)
-├── transnet_env/        # Détection scènes (STEP3)
-├── coral_env/           # Détection scènes/audio/tracking sur Coral TPU (optionnel)
-└── insightface_env/     # InsightFace GPU (optionnel)
+${VENV_BASE_DIR:-.}/       # Emplacement des venvs (défaut : racine du projet, cf. .env)
+├── env/                   # Application principale (Flask) et étapes 5 à 8
+├── transnet_env/          # Détection de scènes (STEP2, PyTorch)
+├── transnet_cv5_env/      # Détection de scènes OpenCV 5.0 (STEP2, expérimental)
+├── audio_env/             # Analyse audio (STEP3)
+├── tracking_env_slim/     # Tracking MediaPipe CPU (STEP4)
+├── tracking_cv5_env/      # Tracking OpenCV 5.0 (STEP4, expérimental)
+├── insightface_env/       # Tracking InsightFace GPU (STEP4, optionnel)
+└── coral_env/             # Coral Edge TPU (STEP2/STEP3/STEP4, optionnel)
 ```
 
 ## Variables d'Environnement Essentielles
@@ -117,16 +120,16 @@ env/                    # Application principale
 ```bash
 # Application
 FLASK_SECRET_KEY=your-secret-key
-INTERNAL_WORKER_TOKEN=your-worker-token
+INTERNAL_WORKER_COMMS_TOKEN=your-worker-token
 
 # Pipeline
 WEBHOOK_JSON_URL=https://webhook.kidpixel.fr/data/webhook_links.json
-STEP4_TRACKING_ENGINE=mediapipe  # ou insightface
-STEP3_USE_LEMONFOX=0              # ou 1 pour SaaS
+STEP4_TRACKING_ENGINE=            # vide = MediaPipe, "insightface" = GPU
+STEP3_METHOD=                     # pyannote (défaut) | lemonfox | deepinfra
 
 # Monitoring
 ENABLE_GPU_MONITORING=true
-SYSTEM_MONITOR_POLLING_INTERVAL=2000
+SYSTEM_MONITOR_POLLING_INTERVAL=5000   # défaut
 ```
 
 ## Cas d'Usage

@@ -91,7 +91,7 @@ def cache_open():
 
 **Objectif** : Déclencher l'exécution d'une étape du pipeline.
 
-**Sécurité** : Nécessite `INTERNAL_WORKER_TOKEN` dans le header `X-Worker-Token`.
+**Sécurité** : Nécessite `INTERNAL_WORKER_COMMS_TOKEN` dans le header `X-Worker-Token`.
 
 **Entrée** : (Aucune payload requise en entrée, les paramètres proviennent de la configuration d'état globale).
 
@@ -144,7 +144,7 @@ def cache_open():
 
 **Objectif** : Ouvrir un dossier du cache sur l'explorateur de fichiers du serveur (server-side).
 
-**Sécurité** : Nécessite `INTERNAL_WORKER_TOKEN` dans le header `X-Worker-Token`.
+**Sécurité** : Nécessite `INTERNAL_WORKER_COMMS_TOKEN` dans le header `X-Worker-Token`.
 
 **Entrée** :
 ```json
@@ -190,14 +190,14 @@ Pense aux routes API comme un **contrôle aérien** vs une **porte automatique**
 
 ```python
 # Configuration
-INTERNAL_WORKER_TOKEN = os.getenv('INTERNAL_WORKER_TOKEN', 'default-dev-token')
+INTERNAL_WORKER_COMMS_TOKEN = os.getenv('INTERNAL_WORKER_COMMS_TOKEN', 'default-dev-token')
 
 # Décorateur de sécurité
 def require_internal_worker_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('X-Worker-Token')
-        if token != current_app.config['INTERNAL_WORKER_TOKEN']:
+        if token != current_app.config['INTERNAL_WORKER_COMMS_TOKEN']:
             abort(401, description="Invalid worker token")
         return f(*args, **kwargs)
     return decorated
@@ -378,7 +378,7 @@ def test_internal_endpoint_without_token():
 
 def test_internal_endpoint_with_token():
     """Test accès autorisé."""
-    headers = {'X-Worker-Token': app.config['INTERNAL_WORKER_TOKEN']}
+    headers = {'X-Worker-Token': app.config['INTERNAL_WORKER_COMMS_TOKEN']}
     response = client.post('/api/cache/open', json={"folder_number": 1}, headers=headers)
     assert response.status_code == 200
 ```
@@ -389,7 +389,7 @@ def test_internal_endpoint_with_token():
 
 ```bash
 # Sécurité
-INTERNAL_WORKER_TOKEN=your-secure-token-here
+INTERNAL_WORKER_COMMS_TOKEN=your-secure-token-here
 FLASK_SECRET_KEY=your-flask-secret-key
 
 # Performance
@@ -410,7 +410,7 @@ from routes.api_routes import api_bp
 from config.settings import config
 
 app.register_blueprint(api_bp, url_prefix='/api')
-app.config['INTERNAL_WORKER_TOKEN'] = config.INTERNAL_WORKER_TOKEN
+app.config['INTERNAL_WORKER_COMMS_TOKEN'] = config.INTERNAL_WORKER_COMMS_TOKEN
 ```
 
 ## Résolution de Problèmes
@@ -419,11 +419,11 @@ app.config['INTERNAL_WORKER_TOKEN'] = config.INTERNAL_WORKER_TOKEN
 
 ```bash
 # Diagnostic
-curl -H "X-Worker-Token: invalid-token" http://localhost:5000/api/cache/open
+curl -H "X-Worker-Token: invalid-token" http://127.0.0.1:5003/api/cache/open
 
 # Solution
-# Vérifier la configuration INTERNAL_WORKER_TOKEN
-echo $INTERNAL_WORKER_TOKEN
+# Vérifier la configuration INTERNAL_WORKER_COMMS_TOKEN
+echo $INTERNAL_WORKER_COMMS_TOKEN
 # Utiliser le token correct dans les headers
 ```
 
@@ -431,11 +431,11 @@ echo $INTERNAL_WORKER_TOKEN
 
 ```bash
 # Diagnostic
-curl -X POST http://localhost:5000/api/invalid_step/run -H "Content-Type: application/json" -d '{"project_name": "test"}'
+curl -X POST http://127.0.0.1:5003/api/invalid_step/run -H "Content-Type: application/json" -d '{"project_name": "test"}'
 
 # Solution
 # Vérifier les étapes disponibles
-curl http://localhost:5000/api/step_status/STEP4
+curl http://127.0.0.1:5003/api/step_status/STEP4
 # Utiliser une clé d'étape valide (step1-8)
 ```
 
@@ -443,7 +443,7 @@ curl http://localhost:5000/api/step_status/STEP4
 
 ```bash
 # Diagnostic
-curl -X POST http://localhost:5000/api/audio/lemonfox -H "Content-Type: application/json" -d '{"project_name": "test"}' --max-time 5
+curl -X POST http://127.0.0.1:5003/api/audio/lemonfox -H "Content-Type: application/json" -d '{"project_name": "test"}' --max-time 5
 
 # Solution
 # Augmenter timeout dans configuration
@@ -455,7 +455,7 @@ curl -X POST http://localhost:5000/api/audio/lemonfox -H "Content-Type: applicat
 
 ```bash
 # Diagnostic
-curl http://localhost:5000/api/performance/metrics
+curl http://127.0.0.1:5003/api/performance/metrics
 
 # Solution
 # Activer sampling pour les endpoints lourds

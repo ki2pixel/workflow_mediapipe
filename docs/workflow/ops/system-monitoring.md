@@ -359,7 +359,7 @@ python -c "import pynvml; pynvml.nvmlInit()"
 
 ```bash
 # Diagnostic
-curl http://localhost:5000/api/performance/metrics
+curl http://127.0.0.1:5003/api/performance/metrics
 
 # Solution
 # Vérifier que @measure_api est appliqué

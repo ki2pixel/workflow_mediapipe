@@ -48,10 +48,10 @@ for (var frame = 1; frame <= totalFrames; frame++) {
 # Clique sur "Étape 6 : Pré-traitement AE" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP6
+curl -X POST http://127.0.0.1:5003/run/STEP6
 
 # Dans une séquence complète
-const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', '5', 'STEP6', 'STEP7'];
+const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6', 'STEP7', 'STEP8'];
 await apiService.runCustomSequence(steps);
 ```
 
@@ -626,7 +626,7 @@ L'étape 6 transforme les données de tracking en un format parfaitement optimis
 1. **Validation plages** : `in_frame`/`out_frame`, calcul plage temporelle
 2. **Scaling vidéo** : Ajustement frame rate si vidéo ≠ AE (ex: 25fps → 30fps)
 3. **Indexation objets** : Collecte par `obj_id` avec métriques frame-by-frame
-4. **Confirmation audio** : Vérification chevauchement speakers si `source == face_landmarker`
+4. **Confirmation audio** : Normalisation des orateurs (`_object_speakers()` : `video_speakers` du schéma AE, repli sur `active_speakers` publié par STEP5), puis vérification du chevauchement avec les segments de parole si `source == face_landmarker`
 5. **Calculs statistiques** : Moyennes confidence/position, surfaces bbox, scores présence
 6. **Sélection meilleurs** : Hiérarchie audio > face > person > fallback
 

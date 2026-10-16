@@ -1,6 +1,6 @@
 # Démarrage Rapide
 
-**TL;DR** : Installe les dépendances, configure `.env`, lance `./start_workflow.sh`, et ouvre `http://localhost:5000`. Tu seras prêt à analyser des vidéos en moins de 5 minutes.
+**TL;DR** : Installe les dépendances, configure `.env`, lance `./start_workflow.sh`, et ouvre `http://127.0.0.1:5003`. Tu seras prêt à analyser des vidéos en moins de 5 minutes.
 
 ## Le Problème : Tu Veux Analyser des Vidéos Maintenant
 
@@ -71,7 +71,7 @@ RENDER_REGISTER_TOKEN=your-render-token-here
 
 # Application
 FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
+FLASK_PORT=5003
 DEBUG=false
 
 # Environnements (optionnel - pour les déplacer sur SSD/NAS)
@@ -95,7 +95,7 @@ python3 -m venv "${VENV_BASE_DIR:-.}/tracking_env_slim"
 
 # Environnement principal
 source "${VENV_BASE_DIR:-.}/env/bin/activate"
-pip install -r requirements.txt
+pip install -r requirements_env.txt
 
 # Environnement TransNet (détection scènes)
 source "${VENV_BASE_DIR:-.}/transnet_env/bin/activate"
@@ -117,7 +117,7 @@ deactivate
 
 ```bash
 # Retour à l'environnement principal
-source env/bin/activate
+source "${VENV_BASE_DIR:-.}/env/bin/activate"
 
 # Lance le serveur
 ./start_workflow.sh
@@ -127,11 +127,11 @@ source env/bin/activate
 ```
 ========================================================
 Le serveur Flask a été lancé avec succès!
-Interface web: http://127.0.0.1:5000/
+Interface web: http://127.0.0.1:5003/
 ========================================================
 ```
 
-Ouvre ton navigateur à `http://localhost:5000`.
+Ouvre ton navigateur à `http://127.0.0.1:5003`.
 
 ## Ta Première Analyse Vidéo
 
@@ -150,7 +150,7 @@ projets_extraits/
 ### Lance le Pipeline Complet
 
 Dans l'interface web :
-1. Sélectionne toutes les étapes (STEP1 à STEP7)
+1. Sélectionne toutes les étapes (STEP1 à STEP8)
 2. Clique sur "Exécuter la séquence"
 3. Regarde la progression en temps réel
 
@@ -162,15 +162,16 @@ Les fichiers de sortie apparaissent dans ton projet :
 ```
 mon_projet_001/
 ├── video1.mp4              # Original
-├── video1.csv              # Scènes (STEP3)
-├── video1_audio.json       # Audio (STEP4)
-├── video1_tracking.json    # Tracking optimisé pour AE (STEP5)
+├── video1.csv              # Scènes (STEP2)
+├── video1_audio.json       # Audio (STEP3)
+├── video1.json             # Tracking dense (STEP4)
+├── video1_tracking.json    # Tracking réduit, optimisé AE (STEP5)
 └── video1_ae.json          # Pré-traitement AE (STEP6)
 ```
 
 ## Configuration Essentielle par Étape
 
-### STEP4 - Analyse Audio
+### STEP3 - Analyse Audio
 
 **Pyannote (défaut, GPU si disponible)** :
 ```bash
@@ -180,7 +181,7 @@ AUDIO_DISABLE_GPU=0          # 1 pour forcer CPU
 
 **Lemonfox (alternative cloud)** :
 ```bash
-STEP3_USE_LEMONFOX=1
+STEP3_METHOD=lemonfox
 LEMONFOX_API_KEY=ta_cle_api
 LEMONFOX_DEFAULT_LANGUAGE=fr
 ```
@@ -215,10 +216,10 @@ STEP5_INCLUDE_EXPRESSION_SUMMARY=1
 
 ```bash
 # Test l'API
-curl http://localhost:5000/api/system_monitor
+curl http://127.0.0.1:5003/api/system_monitor
 
 # Statut d'une étape
-curl http://localhost:5000/api/step_status/STEP1
+curl http://127.0.0.1:5003/api/step_status/STEP1
 
 # Logs en temps réel
 tail -f logs/app.log
@@ -231,9 +232,9 @@ tail -f logs/step3/*.log
 
 **Port déjà utilisé** :
 ```bash
-lsof -i :5000
+lsof -i :5003
 kill -9 <PID>
-# ou utilise FLASK_PORT=5001
+# ou utilise FLASK_PORT=5004
 ```
 
 **FFmpeg manquant** :
@@ -245,10 +246,10 @@ brew install ffmpeg    # macOS
 
 **Environnement corrompu** :
 ```bash
-rm -rf env/
-python3 -m venv env
-source env/bin/activate
-pip install -r requirements.txt
+rm -rf "${VENV_BASE_DIR:-.}/env"
+python3 -m venv "${VENV_BASE_DIR:-.}/env"
+source "${VENV_BASE_DIR:-.}/env/bin/activate"
+pip install -r requirements_env.txt
 ```
 
 ## Trade-offs par Mode d'Installation
@@ -283,7 +284,7 @@ python -c "from config.settings import config; config.validate(); print('Config 
 
 ```bash
 # Diagnostics complets
-curl http://localhost:5000/api/system/diagnostics | jq
+curl http://127.0.0.1:5003/api/system/diagnostics | jq
 ```
 
 ## Pièges Courants et Solutions
@@ -315,7 +316,8 @@ FLASK_ENV=production
 **Avec Gunicorn** :
 ```bash
 pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app_new:APP_FLASK
+gunicorn -c gunicorn.conf.py wsgi:app
+# gunicorn.conf.py : 1 worker obligatoire (WorkflowState en mémoire) + FLASK_PORT (5003 par défaut)
 ```
 
 **Sécurité** :

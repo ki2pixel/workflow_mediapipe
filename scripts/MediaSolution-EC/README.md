@@ -231,7 +231,7 @@ projet de référence généré par Adobe et vérifiée valeur par valeur :
   audio) ; un calque dont le Transform est celui par défaut utilise les composants
   Motion/Opacity intrinsèques de Premiere, comme le fait l'import Adobe ;
 - **audio seul** (mp3, wav…) → média audio sans flux vidéo, comme Adobe ;
-- **masques** « Add » non inversés → filtre `AE.ADBE AEMask2` (27 paramètres) sous-composant de
+- **masques** (modes « Add », « Subtract », « Intersect », « Difference », inversion comprise) → filtre `AE.ADBE AEMask2` (27 paramètres) sous-composant de
   l'**Opacité** du clip (matérialisée, comme Adobe) ; tracé en blob binaire (points normalisés
   par la taille **source** du média — espace du calque, comme After Effects —, 3 points par
   sommet, tangentes absolues), payloads avec `BinaryHash`, Position/Anchor au centre de la
@@ -244,12 +244,16 @@ projet de référence généré par Adobe et vérifiée valeur par valeur :
 - **Gaussian Blur** (`ec.blur.gaussian`) → filtre `AE.Impact_Blur_FX` de Premiere (18
   paramètres) : `blurriness` → « Amount » (borné 0-100) ; `dimensions`/`repeatEdge` d'EffectCraft
   ne sont pas repris (avertissement) ;
+- **solides & calques d'effet** → générateurs « Color Matte » (COLR) et « Black Video »
+  (BLAK + `IsAdjustmentLayer`) de Premiere, comme le fait l'import Adobe ;
+- **modes de fusion** → les 27 modes natifs de Premiere (doubles paramètres « Blend Mode » 2 et 3
+  de l'Opacité, table `BLEND_MODE_MAP` des 38 noms EffectCraft ; « Normal » reste implicite) ;
 - médias référencés par leur chemin écrit (**par défaut `PATH_MAP`, `/mnt/cache ⇒ F:`**,
   pour l'ouverture sous Windows ; `--no-path-map` écrit les chemins Linux tels quels).
 
-**Ce qui reste hors périmètre** (masques d'un autre mode que « Add », inversés, roto-bezier /
-feather non lisse, feather variable par points, motion blur, effets hors table — seul
-`ec.blur.gaussian` est repris) est signalé projet par projet : le `.prproj` n'est alors pas
+**Ce qui reste hors périmètre** (tracé de masque non fermé, roto-bezier /
+  feather non lisse, feather variable par points, motion blur, effets hors table — seul
+  `ec.blur.gaussian` est repris) est signalé projet par projet : le `.prproj` n'est alors pas
 écrit, seul le `.aep` est produit et un `.prproj` voisin devenu obsolète est supprimé (le
 journal et l'interface le signalent). `--force` passe outre — le rendu Premiere sera amputé de
 ces éléments.
@@ -278,14 +282,16 @@ dénormalisées) ; `--compare-with` fait le diff sémantique avec un `.prproj` d
 (items, temps, valeurs Position/Anchor) — les seuls écarts attendus sont le décalage de
 temps de la chaîne Adobe et la précision d'affichage des flottants.
 
-Limites v1 (avertissement explicite, non exporté) : sources autres que Footage (Solid/
-Text/Shape/Camera/Light, comp imbriquée), plus d'une comp, mode de fusion ≠ Normal,
-opacité ≠ 100, `stretch` ≠ 100. Masques : seuls les « Add » non inversés sont écrits ; ceux
-qu'EffectCraft n'applique pas (tracé ouvert, mode « None ») sont ignorés — le clip reste
-entier, comme dans EffectCraft ; autre mode, inversion, options exotiques et feather variable
-par points → `.aep` uniquement (cf. ci-dessus) ; le feather `Vec2` d'EffectCraft est ramené au
-plus grand des deux axes (Premiere n'a qu'un scalaire) ; les clés animées d'échelle/rotation/
-ancre sont encodées en « expérimental ». Format ciblé : **Premiere Pro 2026**.
+Limites v1 (avertissement explicite, non exporté) : sources autres que Footage et Solid
+(Text/Shape/Camera/Light, comp imbriquée), plus d'une comp, `stretch` ≠ 100. Sont repris à
+l'inverse : solides et calques d'effet (Color Matte / Black Video + Adjustment), les 27 modes
+de fusion de Premiere, l'opacité (fixe ou animée) et les quatre modes de masque
+(Add/Subtract/Intersect/Difference, inversion comprise). Masques : ceux qu'EffectCraft
+n'applique pas (tracé ouvert, mode « None », masque désactivé) sont ignorés — le clip reste
+entier, comme dans EffectCraft ; options exotiques et feather variable par points → `.aep`
+uniquement (cf. ci-dessus) ; le feather `Vec2` d'EffectCraft est ramené au plus grand des deux
+axes (Premiere n'a qu'un scalaire) ; les clés animées d'échelle/rotation/ancre sont encodées en
+« expérimental ». Format ciblé : **Premiere Pro 2026**.
 
 ## Copie de travail (~/Media_Solution/MediaSolution-EC) et synchronisation
 

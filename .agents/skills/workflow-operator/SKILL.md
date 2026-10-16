@@ -97,7 +97,7 @@ env/bin/python workflow_scripts/step7/finalize_and_copy.py
 ### Source de Vérité (State)
 L'état n'est pas dans les fichiers logs, mais dans la mémoire du backend via `WorkflowState`.
 Pour diagnostiquer un état incohérent :
-1. Interroger l'API : `curl http://localhost:5000/api/step_status/STEP4`
+1. Interroger l'API : `curl http://127.0.0.1:5003/api/step_status/STEP4`
 2. Vérifier si `is_any_sequence_running` est cohérent avec les logs.
 
 ### Logs & Monitoring

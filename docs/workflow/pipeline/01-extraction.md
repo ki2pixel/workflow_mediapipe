@@ -48,7 +48,7 @@ def extract_archive_securely(archive_path, target_dir):
 # Clique sur "Étape 1 : Extraction" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP1
+curl -X POST http://127.0.0.1:5003/run/STEP1
 
 # En ligne de commande (développement)
 source env/bin/activate

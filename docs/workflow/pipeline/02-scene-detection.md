@@ -52,10 +52,10 @@ def detect_scenes_adaptive(video, base_threshold=0.5):
 # Clique sur "Étape 2 : Détection de scènes" dans l'interface
 
 # Via API
-curl -X POST http://localhost:5000/run/STEP3
+curl -X POST http://127.0.0.1:5003/run/STEP2
 
 # Dans une séquence complète
-const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6'];
+const steps = ['STEP1', 'STEP2', 'STEP3', 'STEP4', 'STEP5', 'STEP6', 'STEP7', 'STEP8'];
 await apiService.runCustomSequence(steps);
 ```
 

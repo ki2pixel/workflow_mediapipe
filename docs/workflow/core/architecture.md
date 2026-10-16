@@ -150,7 +150,7 @@ Identifie les changements de scène avec TransNetV2 :
 ### Étape 3 : Analyse Audio (`audio_env/`)
 Diarisation et analyse des locuteurs :
 - **Pyannote.audio 3.1** par défaut (profil TV optimisé)
-- **Lemonfox** en fallback si `STEP3_USE_LEMONFOX=1`
+- **Lemonfox** en fallback (`STEP3_METHOD=lemonfox`)
 - Extraction audio via ffmpeg (remplace MoviePy)
 - Support embeddings locuteurs avec `AUDIO_INCLUDE_SPEAKER_EMBEDDINGS=1`
 
@@ -158,7 +158,7 @@ Diarisation et analyse des locuteurs :
 ```bash
 AUDIO_DISABLE_GPU=0          # Forcer CPU si nécessaire
 HF_AUTH_TOKEN=your_token     # Token Hugging Face
-STEP3_USE_LEMONFOX=0         # Activer Lemonfox
+STEP3_METHOD=                # pyannote (défaut) | lemonfox | deepinfra
 ```
 
 ### Étape 4 : Suivi Vidéo (`tracking_env_slim/` ou `insightface_env/`)
@@ -221,7 +221,7 @@ Génère les projets EffectCraft en headless :
 # Base
 FLASK_SECRET_KEY=your-secret-key
 INTERNAL_WORKER_COMMS_TOKEN=secure-token
-FLASK_PORT=5000
+FLASK_PORT=5003
 DEBUG=false
 
 # Monitoring (source unique)
@@ -233,17 +233,17 @@ WEBHOOK_CACHE_TTL=60
 CACHE_ROOT_DIR=/mnt/cache          # Remplace /mnt/cache hardcodé
 DISABLE_EXPLORER_OPEN=1           # Sécurité prod/headless
 
-# STEP4 Audio
+# STEP3 Audio
 HF_AUTH_TOKEN=your-hf-token
 AUDIO_DISABLE_GPU=0
-STEP3_USE_LEMONFOX=0
+STEP3_METHOD=
 
-# STEP5 Tracking
+# STEP4 Tracking
 STEP4_TRACKING_ENGINE=           # vide ou "insightface"
 STEP4_ENABLE_GPU=0
 TRACKING_CPU_WORKERS=15
 
-# STEP6 Réduction
+# STEP5 Réduction
 STEP5_INCLUDE_TRACKING_ANALYTICS=1
 STEP5_INCLUDE_EXPRESSION_SUMMARY=1
 ```
@@ -285,7 +285,7 @@ if (result.status === 'initiated') {
 
 ### 3. Séquence complète
 ```javascript
-const steps = ['STEP1','STEP2','STEP3','STEP4','STEP5','STEP6','STEP7'];
+const steps = ['STEP1','STEP2','STEP3','STEP4','STEP5','STEP6','STEP7','STEP8'];
 await apiService.runCustomSequence(steps);
 ```
 

@@ -72,7 +72,7 @@ workflow_service.get_step_status("STEP3")
 FLASK_SECRET_KEY=your-secret-key
 INTERNAL_WORKER_COMMS_TOKEN=your-worker-token
 RENDER_REGISTER_TOKEN=your-render-token
-FLASK_PORT=5000
+FLASK_PORT=5003
 DEBUG=false
 
 # Environnements virtuels
@@ -253,7 +253,7 @@ logger.warning(f"STEP{step_key} retry in {retry_delay}s")
 
 ```bash
 # Diagnostic
-curl http://localhost:5000/api/step_status/STEP3
+curl http://127.0.0.1:5003/api/step_status/STEP3
 
 # Solution
 # 1. Vérifier les prérequis dans logs
