@@ -22,6 +22,13 @@ def _smoothing_factor(t_e, cutoff):
     return r / (r + 1.0)
 
 @njit(cache=True)
+def _smoothing_factors(t_e, cutoffs, out):
+    """Version vectorisée : un seul appel JIT pour les N coefficients (au lieu de N appels)."""
+    for i in range(cutoffs.shape[0]):
+        r = 2.0 * math.pi * cutoffs[i] * t_e
+        out[i] = r / (r + 1.0)
+
+@njit(cache=True)
 def _exponential_smoothing(a, x, x_prev):
     return a * x + (1.0 - a) * x_prev
 
@@ -40,6 +47,7 @@ class OneEuroFilterND:
         self.d_cutoff = d_cutoff
         self.x_prev = np.zeros(dim, dtype=np.float64)
         self.dx_prev = np.zeros(dim, dtype=np.float64)
+        self._alpha = np.empty(dim, dtype=np.float64)
         self.is_initialized = False
     
     def update(self, x):
@@ -60,10 +68,10 @@ class OneEuroFilterND:
         # 2. Adaptation du cutoff en fonction de la vélocité
         cutoff = self.min_cutoff + self.beta * np.abs(dx_hat)
         
-        # 3. Lissage exponentiel avec le nouveau cutoff
-        # La boucle list-comprehension est compatible @njit si factorisée correctement,
-        # mais ici numpy array broadcasting est plus rapide et propre:
-        a = np.array([_smoothing_factor(t_e, c) for c in cutoff], dtype=np.float64)
+        # 3. Lissage exponentiel avec le nouveau cutoff : un seul appel JIT pour
+        #    les N coefficients, calculé dans un buffer préalloué.
+        a = self._alpha[: x.shape[0]]
+        _smoothing_factors(t_e, cutoff, a)
         x_hat = _exponential_smoothing(a, x, self.x_prev)
         
         # Mémorisation

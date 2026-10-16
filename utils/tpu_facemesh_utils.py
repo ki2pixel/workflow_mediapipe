@@ -2,28 +2,33 @@ import math
 import numpy as np
 import cv2
 
+# Les ancres SSD de BlazeFace sont constantes : elles étaient régénérées à chaque
+# frame par une boucle Python (0,45 ms/frame mesurés), d'où cette mémoïsation.
+_ANCHORS_CACHE = None
+
+
+def _build_blazeface_anchors():
+    """Construit les 896 ancres SSD (16x16x2 puis 8x8x6) de façon vectorisée."""
+    blocks = []
+    for stride, anchors_per_layer in ((8, 2), (16, 6)):
+        grid = int(128.0 / stride)
+        coords = (np.arange(grid) + 0.5) / grid
+        ys, xs = np.meshgrid(coords, coords, indexing="ij")
+        centers = np.stack([xs.ravel(), ys.ravel()], axis=1)
+        block = np.concatenate([centers, np.ones((centers.shape[0], 2), dtype=np.float64)], axis=1)
+        blocks.append(np.repeat(block, anchors_per_layer, axis=0))
+    return np.concatenate(blocks, axis=0).astype(np.float32)
+
+
 def generate_blazeface_anchors():
     """
     Génère les 896 ancres SSD pour le modèle BlazeFace 128x128.
     Feature maps : 16x16 (2 ancres) et 8x8 (6 ancres).
     """
-    anchors = []
-    # Paramètres standard BlazeFace
-    strides = [8, 16]
-    anchors_per_layer = [2, 6]
-    image_size = 128.0
-
-    for i, stride in enumerate(strides):
-        grid_rows = int(image_size / stride)
-        grid_cols = int(image_size / stride)
-        for r in range(grid_rows):
-            for c in range(grid_cols):
-                y_center = (r + 0.5) / grid_rows
-                x_center = (c + 0.5) / grid_cols
-                for _ in range(anchors_per_layer[i]):
-                    anchors.append([x_center, y_center, 1.0, 1.0])
-    
-    return np.array(anchors, dtype=np.float32)
+    global _ANCHORS_CACHE
+    if _ANCHORS_CACHE is None:
+        _ANCHORS_CACHE = _build_blazeface_anchors()
+    return _ANCHORS_CACHE
 
 def decode_blazeface_boxes(regressors, anchors):
     """

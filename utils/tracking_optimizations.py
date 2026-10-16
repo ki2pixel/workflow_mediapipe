@@ -2,9 +2,22 @@
 
 import os
 import numpy as np
-from scipy.spatial import KDTree
 import sys
 from typing import Dict, List, Tuple, Any, Optional
+
+
+def _nearest_tracked_indices(tracked_centroids: np.ndarray, detection_centroids: np.ndarray):
+    """Indices du centroïde suivi le plus proche pour chaque détection (remplace un KDTree).
+
+    Le nombre d'objets suivis par frame reste faible (N <= 20) : une matrice de
+    distances N x M en NumPy est plus rapide que la construction d'un KDTree par
+    frame, et évite la dépendance scipy dans la boucle temps réel.
+    """
+    deltas = detection_centroids[:, None, :] - tracked_centroids[None, :, :]
+    squared = np.einsum('ijk,ijk->ij', deltas, deltas)
+    nearest = np.argmin(squared, axis=1)
+    distances = np.sqrt(squared[np.arange(detection_centroids.shape[0]), nearest])
+    return distances, nearest
 
 
 def _filter_blendshapes_for_export(blendshapes: Any) -> Any:
@@ -79,13 +92,17 @@ def apply_tracking_and_management(
     # --- Phase 2: Appariement si des objets actifs ET des détections existent ---
     if active_objects and current_detections:
         active_obj_ids = list(active_objects.keys())
-        tracked_centroids = np.array([obj["centroid"] for obj in active_objects.values()])
-        detection_centroids = np.array([det["centroid"] for det in current_detections])
+        tracked_centroids = np.array([obj["centroid"] for obj in active_objects.values()], dtype=np.float64)
+        detection_centroids = np.array([det["centroid"] for det in current_detections], dtype=np.float64)
 
-        kdtree = KDTree(tracked_centroids)
-        distances, indices = kdtree.query(detection_centroids, k=1)
+        distances, indices = _nearest_tracked_indices(tracked_centroids, detection_centroids)
 
-        potential_matches = sorted(zip(distances, indices, range(len(current_detections))))
+        # Même ordre de résolution que la version KDTree : distance, puis index
+        # d'objet suivi, puis index de détection.
+        potential_matches = sorted(
+            (float(distances[row]), int(indices[row]), row)
+            for row in range(len(current_detections))
+        )
         
         matched_tracked_indices = set()
 

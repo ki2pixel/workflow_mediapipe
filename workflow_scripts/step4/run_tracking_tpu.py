@@ -9,6 +9,7 @@ Version Ubuntu - Étape 5 (Alternative à MediaPipe/InsightFace CPU)
 import os
 import sys
 import json
+import time
 import argparse
 import logging
 import subprocess
@@ -54,9 +55,205 @@ try:
     from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
     from utils import tpu_facemesh_utils as face_utils
     from utils.media_filters import split_preserved_media
+    from utils.step4_tpu_profiler import (
+        StageProfiler,
+        merge_reports,
+        profiling_capacity,
+        resolve_profile_dir,
+    )
 except ImportError as e:
     logging.critical(f"ERREUR: Impossible d'importer les utilitaires. Vérifiez PYTHONPATH: {e}")
     sys.exit(1)
+
+
+def _now_ns() -> int:
+    """Horodatage monotone (CLOCK_MONOTONIC, comparable entre processus Linux)."""
+    return time.perf_counter_ns()
+
+
+def _record(profiler, stage: str, start_ns: int) -> None:
+    """Clôture un étage de mesure ; no-op si le profilage est désactivé."""
+    if profiler is not None:
+        profiler.add(stage, time.perf_counter_ns() - start_ns)
+
+
+_FAST_LEVEL = None
+
+# Niveau d'optimisation du pipeline :
+#   0 = comportement historique (référence A/B)
+#   1 = gains sûrs validés par benchmark (cache d'ancres, cache d'interpréteur,
+#       hystérésis du détecteur d'objets, écriture JSON tamponnée)
+#   2 = réservé aux optimisations structurelles (transport YUV/PyAV)
+def fast_level() -> int:
+    """Niveau d'optimisation demandé (lu une fois par processus)."""
+    global _FAST_LEVEL
+    if _FAST_LEVEL is None:
+        try:
+            _FAST_LEVEL = max(0, min(int(os.environ.get("STEP4_TPU_FAST", "1")), 2))
+        except (TypeError, ValueError):
+            _FAST_LEVEL = 1
+    return _FAST_LEVEL
+
+
+def object_detection_min_missing_frames() -> int:
+    """Nombre de frames consécutives sans visage avant d'invoquer le détecteur d'objets.
+
+    Chaque invocation coûte ~15 ms sur le TPU et évince la SRAM des modèles
+    co-compilés BlazeFace/FaceMesh (mesuré : 6 ms/frame en moyenne sans garde-fou).
+    """
+    default = "25" if fast_level() >= 1 else "1"
+    try:
+        return max(1, int(os.environ.get("STEP4_TPU_OBJECT_DETECTION_MIN_MISSING", default)))
+    except (TypeError, ValueError):
+        return 25 if fast_level() >= 1 else 1
+
+
+# Métadonnées d'interpréteur résolues une fois par modèle (les get_input_details()
+# allouaient des dictionnaires à chaque frame).
+_INTERP_META = {}
+
+# Le stream JSON était vidé vers le disque à chaque frame (un appel write par frame) :
+# on tamponne comme le chemin NDJSON.
+_JSON_FLUSH_EVERY = 100 if fast_level() >= 1 else 1
+
+
+def _interpreter_meta(interpreter):
+    meta = _INTERP_META.get(id(interpreter))
+    if meta is None:
+        input_details = interpreter.get_input_details()[0]
+        output_details = interpreter.get_output_details()
+        shape = tuple(int(size) for size in input_details['shape'])
+        meta = {
+            "input_index": int(input_details['index']),
+            "input_dtype": input_details['dtype'],
+            "input_shape": shape,
+            "input_height": shape[1] if len(shape) > 1 else None,
+            "input_width": shape[2] if len(shape) > 2 else None,
+            "input_tensor_factory": interpreter.tensor(input_details['index']),
+            "output_indices": [int(detail['index']) for detail in output_details],
+        }
+        _INTERP_META[id(interpreter)] = meta
+    return meta
+
+
+def load_profile_json(path):
+    """Charge un rapport de profilage écrit par un autre processus (best effort)."""
+    try:
+        with open(path, 'r', encoding='utf-8') as file_obj:
+            return json.load(file_obj)
+    except Exception:
+        return None
+
+
+def write_video_profile(profile_path, video_label, parent_profiler, acq_profiler=None, worker_profile_path=None):
+    """Écrit le rapport fusionné (parent + thread d'acquisition + worker) d'une vidéo."""
+    report = parent_profiler.finalize()
+    report["video"] = video_label
+    sources = {}
+    if acq_profiler is not None:
+        sources["acq"] = acq_profiler.finalize()
+    if worker_profile_path is not None:
+        sources["worker"] = load_profile_json(worker_profile_path)
+        if sources["worker"] is not None:
+            try:
+                os.remove(worker_profile_path)
+            except OSError:
+                pass
+    merge_reports(report, sources)
+
+    profile_path = Path(profile_path)
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(profile_path, 'w', encoding='utf-8') as file_obj:
+            json.dump(report, file_obj, indent=2, ensure_ascii=False)
+        logging.info(f"Profil vidéo écrit: {profile_path}")
+    except Exception as exc:
+        logging.error(f"Écriture du profil vidéo impossible: {exc}")
+
+
+def _sha256_short(path, length=12):
+    """Empreinte courte d'un fichier (identifie sans ambiguïté le modèle utilisé)."""
+    import hashlib
+    try:
+        digest = hashlib.sha256()
+        with open(path, 'rb') as file_obj:
+            for chunk in iter(lambda: file_obj.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()[:length]
+    except Exception:
+        return None
+
+
+def _git_revision():
+    try:
+        commit = subprocess.run(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            capture_output=True, text=True, cwd=str(BASE_DIR), timeout=5, check=False
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ['git', 'status', '--porcelain'],
+            capture_output=True, text=True, cwd=str(BASE_DIR), timeout=5, check=False
+        ).stdout.strip()
+        return {"commit": commit or None, "dirty": bool(dirty)}
+    except Exception:
+        return {"commit": None, "dirty": None}
+
+
+def build_run_fingerprint(videos, model_paths, delegate_path, pipeline_mode, use_cocompiled):
+    """Décrit le run (modèles, matériel, code) pour rendre les mesures auditables."""
+    import platform
+
+    step4_env = {key: value for key, value in os.environ.items() if key.startswith(("STEP4_", "ENABLE_CORAL_TPU"))}
+
+    kernel_cmdline = ""
+    try:
+        with open('/proc/cmdline', 'r', encoding='utf-8') as file_obj:
+            kernel_cmdline = file_obj.read().strip()
+    except Exception:
+        pass
+
+    models = {}
+    for name, path in model_paths.items():
+        if path is None:
+            continue
+        path = Path(path)
+        models[name] = {
+            "path": str(path),
+            "exists": path.exists(),
+            "size": path.stat().st_size if path.exists() else None,
+            "sha256_12": _sha256_short(path) if path.exists() else None,
+        }
+
+    try:
+        import cv2 as _cv2
+        cv2_version = _cv2.__version__
+    except Exception:
+        cv2_version = None
+
+    try:
+        import numba as _numba
+        numba_version = _numba.__version__
+    except Exception:
+        numba_version = None
+
+    return {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "pipeline_mode": pipeline_mode,
+        "cocompiled_models": bool(use_cocompiled),
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "numpy": np.__version__,
+        "cv2": cv2_version,
+        "numba": numba_version,
+        "orjson": _HAS_ORJSON,
+        "delegate": {"path": str(delegate_path) if delegate_path else None, "exists": Path(delegate_path).exists() if delegate_path else False},
+        "models": models,
+        "step4_env": step4_env,
+        "git": _git_revision(),
+        "apex_device": os.path.exists('/dev/apex_0'),
+        "kernel_cmdline": kernel_cmdline,
+        "videos": [str(path) for path in videos],
+    }
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
 
@@ -87,7 +284,8 @@ class StreamingList:
             
         self.file_obj.write("    " + frame_json)
         self.count += 1
-        self.file_obj.flush()
+        if _JSON_FLUSH_EVERY <= 1 or self.count % _JSON_FLUSH_EVERY == 0:
+            self.file_obj.flush()
         
     def __len__(self):
         return self.count
@@ -174,6 +372,14 @@ class KalmanFilterND:
         
         return self.x
 
+def _cpu_threads() -> int:
+    """Threads TFLite pour les modèles exécutés sur CPU (1 = comportement historique)."""
+    try:
+        return max(1, int(os.environ.get("STEP4_TPU_CPU_THREADS", "1")))
+    except (TypeError, ValueError):
+        return 1
+
+
 def load_tpu_model(model_path: Path, delegate=None):
     """Charge un modèle TFLite sur le delegate TPU ou CPU"""
     import tflite_runtime.interpreter as tflite
@@ -182,8 +388,8 @@ def load_tpu_model(model_path: Path, delegate=None):
         return None
     try:
         delegates = [delegate] if delegate else []
-        # Limiter à 1 thread si l'exécution se fait sur CPU (sans delegate) pour éviter l'oversubscription
-        num_threads = 1 if not delegate else None
+        # Limiter les threads si l'exécution se fait sur CPU (sans delegate) pour éviter l'oversubscription
+        num_threads = _cpu_threads() if not delegate else None
         interpreter = tflite.Interpreter(
             model_path=str(model_path),
             experimental_delegates=delegates,
@@ -201,23 +407,23 @@ def detect_face(interpreter, image):
         return [0.2, 0.2, 0.8, 0.8], None # Bounding box mock [ymin, xmin, ymax, xmax]
     
     try:
-        input_details = interpreter.get_input_details()[0]
-        h, w = input_details['shape'][1], input_details['shape'][2]
+        meta = _interpreter_meta(interpreter)
+        h, w = meta['input_height'], meta['input_width']
         
         if image.shape[0] != h or image.shape[1] != w:
             input_image = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
         else:
             input_image = image
             
-        if input_details['dtype'] == np.float32:
+        if meta['input_dtype'] == np.float32:
             input_image = (input_image.astype(np.float32) / 127.5) - 1.0
             
-        interpreter.tensor(input_details['index'])()[0][:, :] = input_image
+        meta['input_tensor_factory']()[0][:, :] = input_image
         interpreter.invoke()
         
-        output_details = interpreter.get_output_details()
-        tensor_0 = interpreter.get_tensor(output_details[0]['index'])[0]
-        tensor_1 = interpreter.get_tensor(output_details[1]['index'])[0]
+        output_indices = meta['output_indices']
+        tensor_0 = interpreter.get_tensor(output_indices[0])[0]
+        tensor_1 = interpreter.get_tensor(output_indices[1])[0]
         
         # Le compilateur Edge TPU peut inverser l'ordre des tenseurs
         if tensor_0.shape[-1] == 1:
@@ -254,21 +460,20 @@ def extract_landmarks(interpreter, image_crop):
         return np.random.rand(468, 3) # Mock 468 landmarks
         
     try:
-        input_details = interpreter.get_input_details()[0]
-        h, w = input_details['shape'][1], input_details['shape'][2]
+        meta = _interpreter_meta(interpreter)
+        h, w = meta['input_height'], meta['input_width']
         if image_crop.shape[0] != h or image_crop.shape[1] != w:
             input_image = cv2.resize(image_crop, (w, h), interpolation=cv2.INTER_LINEAR)
         else:
             input_image = image_crop
             
-        if input_details['dtype'] == np.float32:
+        if meta['input_dtype'] == np.float32:
             input_image = (input_image.astype(np.float32) / 127.5) - 1.0
             
-        interpreter.tensor(input_details['index'])()[0][:, :] = input_image
+        meta['input_tensor_factory']()[0][:, :] = input_image
         interpreter.invoke()
         
-        output_details = interpreter.get_output_details()
-        output = interpreter.get_tensor(output_details[0]['index'])[0].copy()
+        output = interpreter.get_tensor(meta['output_indices'][0])[0].copy()
         return output.reshape(-1, 3)
     except Exception as e:
         logging.error(f"Erreur FaceMesh: {e}")
@@ -309,16 +514,15 @@ def extract_blendshapes(interpreter, landmarks):
         # 3. Concaténer pour former les 146 points exacts
         input_146 = np.vstack((subset_136, left_iris_padding, right_iris_padding))
         
-        input_details = interpreter.get_input_details()[0]
+        meta = _interpreter_meta(interpreter)
         
         # 4. Formater pour le tenseur [1, 146, 2]
-        input_data = input_146.reshape(input_details['shape']).astype(input_details['dtype'])
+        input_data = input_146.reshape(meta['input_shape']).astype(meta['input_dtype'], copy=False)
         
-        interpreter.set_tensor(input_details['index'], input_data)
+        interpreter.set_tensor(meta['input_index'], input_data)
         interpreter.invoke()
         
-        output_details = interpreter.get_output_details()[0]
-        logits = interpreter.get_tensor(output_details['index']).flatten()
+        logits = interpreter.get_tensor(meta['output_indices'][0]).flatten()
         
         # Application Sigmoïde (certains modèles retournent déjà des probas, d'autres des logits)
         scores = 1.0 / (1.0 + np.exp(-logits))
@@ -354,7 +558,7 @@ def get_video_metadata_ffprobe(video_path: Path):
         logging.warning(f"Impossible de lire les métadonnées de {video_path.name} via ffprobe: {e}")
         return 1280, 720, 25.0, None
 
-def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, object_detector_tpu, width, height, fps, total_frames, speaking_detector, stream_out):
+def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, object_detector_tpu, width, height, fps, total_frames, speaking_detector, stream_out, profiler=None):
     """
     Exécute la cascade d'inférence TPU sur chaque frame vidéo via FFmpeg.
     """
@@ -369,30 +573,36 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
     
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8)
     frame_size = model_width * model_height * 3
-    
-    kalman_filter = KalmanFilterND(dim=52, process_variance=1e-3, measurement_variance=2e-2)
-    
+
     frame_idx = 0
     
     # Tracking states
     active_objects = {}
     next_id_counter = {"value": 0}
-    
+
+    object_detection_min_missing = object_detection_min_missing_frames()
+    frames_without_face = 0
+
     logging.info(f"Démarrage de la cascade TPU pour {video_path.name}")
     
     while True:
+        t_stage = _now_ns()
         raw_image = process.stdout.read(frame_size)
+        _record(profiler, "acq_read_pipe", t_stage)
         if len(raw_image) != frame_size:
             break
-            
+
+        t_frame_start = _now_ns()
         image = np.frombuffer(raw_image, dtype=np.uint8).reshape((model_height, model_width, 3))
-        
+
         current_detections = []
-        
+
         # 1. Détection (BlazeFace)
         # Mock: detect_face return [ymin, xmin, ymax, xmax] in normalized coordinates (0 to 1)
+        t_stage = _now_ns()
         res = detect_face(blazeface, image)
-        
+        _record(profiler, "blazeface_tpu", t_stage)
+
         if res != (None, None):
             raw_bbox, eyes = res
             ymin, xmin, ymax, xmax = raw_bbox
@@ -406,32 +616,40 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
             centroid_y = int(bbox_ymin + bbox_height / 2)
             
             # 2. Découpage et Alignement Affine du visage
+            t_stage = _now_ns()
             if eyes:
                 right_eye, left_eye = eyes
                 transform_params = face_utils.get_affine_transform(right_eye, left_eye, output_size=192)
                 face_crop_192 = face_utils.apply_affine_crop(image, transform_params)
             else:
                 face_crop_192 = cv2.resize(image, (192, 192))
-                
+            _record(profiler, "affine_crop", t_stage)
+
             # 3. Landmarks (FaceMesh TPU)
+            t_stage = _now_ns()
             landmarks = extract_landmarks(facemesh, face_crop_192)
-            
+            _record(profiler, "facemesh_tpu", t_stage)
+
             # 4. Blendshapes (CPU fallback)
+            t_stage = _now_ns()
             raw_blendshapes = extract_blendshapes(blendshapes, landmarks)
-            
+            _record(profiler, "blendshapes_cpu", t_stage)
+
             # 5. Filtrage Temporel (One-Euro Filter @njit)
             if frame_idx == 0:
                 from utils.one_euro_filter import OneEuroFilterND
                 temporal_filter = OneEuroFilterND(dim=52, rate=fps, min_cutoff=1.0, beta=0.007)
-                
+
+            t_stage = _now_ns()
             smoothed_blendshapes = temporal_filter.update(raw_blendshapes).tolist()
-            
+
             # Convert list to dict with ARKit names
             blendshapes_dict = dict(zip(
                 ARKIT_52_BLENDSHAPE_NAMES,
                 (float(v) for v in smoothed_blendshapes)
             ))
-            
+            _record(profiler, "one_euro", t_stage)
+
             # Construct current detections list
             current_detections.append({
                 "centroid": (centroid_x, centroid_y),
@@ -443,49 +661,61 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
             })
             
         # 6. Object Detection (Fallback conditionnel pour éviter le TPU Context Switch)
-        if not current_detections and object_detector_tpu:
-            input_details = object_detector_tpu.get_input_details()[0]
-            od_height, od_width = input_details['shape'][1], input_details['shape'][2]
-            
-            # Remplacement de Pillow par OpenCV cv2.resize beaucoup plus rapide sous Linux (vectorisé AVX2)
-            img_od = cv2.resize(image, (od_width, od_height), interpolation=cv2.INTER_NEAREST)
-            common.set_input(object_detector_tpu, img_od)
+        if current_detections:
+            frames_without_face = 0
+        else:
+            frames_without_face += 1
+
+        if not current_detections and object_detector_tpu and frames_without_face >= object_detection_min_missing:
+            t_stage = _now_ns()
+            meta = _interpreter_meta(object_detector_tpu)
+            od_height, od_width = meta['input_height'], meta['input_width']
+
+            if image.shape[0] != od_height or image.shape[1] != od_width:
+                img_od = cv2.resize(image, (od_width, od_height), interpolation=cv2.INTER_NEAREST)
+            else:
+                img_od = image
+
+            if meta['input_dtype'] == np.float32:
+                img_od = (img_od.astype(np.float32) / 127.5) - 1.0
+
+            meta['input_tensor_factory']()[0][:, :] = img_od
             object_detector_tpu.invoke()
-            
-            objs = detect.get_objects(object_detector_tpu, score_threshold=0.3)
-            
-            # Filtrage anticipé par slicing (complexité O(1)) pour restreindre les objets suivis
-            max_results = 5
-            objs = objs[:max_results]
-            
-            for obj in objs:
-                # obj.bbox contains xmin, ymin, xmax, ymax
-                o_xmin = int((obj.bbox.xmin / od_width) * width)
-                o_ymin = int((obj.bbox.ymin / od_height) * height)
-                o_xmax = int((obj.bbox.xmax / od_width) * width)
-                o_ymax = int((obj.bbox.ymax / od_height) * height)
-                
-                # Clip coordinates
-                o_xmin = max(0, o_xmin)
-                o_ymin = max(0, o_ymin)
-                o_xmax = min(width, o_xmax)
-                o_ymax = min(height, o_ymax)
-                
+
+            output_indices = meta['output_indices']
+            boxes = object_detector_tpu.get_tensor(output_indices[0])[0]
+            classes = object_detector_tpu.get_tensor(output_indices[1])[0]
+            scores = object_detector_tpu.get_tensor(output_indices[2])[0]
+            count = int(object_detector_tpu.get_tensor(output_indices[3])[0])
+
+            for i in range(min(count, 5)):
+                if scores[i] < 0.3:
+                    continue
+
+                ymin, xmin, ymax, xmax = boxes[i]
+
+                o_xmin = max(0, int(xmin * width))
+                o_ymin = max(0, int(ymin * height))
+                o_xmax = min(width, int(xmax * width))
+                o_ymax = min(height, int(ymax * height))
+
                 o_width_px = o_xmax - o_xmin
                 o_height_px = o_ymax - o_ymin
                 o_cx = o_xmin + o_width_px // 2
                 o_cy = o_ymin + o_height_px // 2
-                
+
                 current_detections.append({
                     "centroid": (o_cx, o_cy),
                     "bbox": (o_xmin, o_ymin, o_width_px, o_height_px),
                     "blendshapes": {},
                     "source_detector": "object_detector",
-                    "label": f"class_{obj.id}",
-                    "confidence": float(obj.score)
+                    "label": f"class_{int(classes[i])}",
+                    "confidence": float(scores[i])
                 })
-        
+            _record(profiler, "object_detector_tpu", t_stage)
+
         # 7. Apply Tracking and Management
+        t_stage = _now_ns()
         tracked_objects = apply_tracking_and_management(
             active_objects=active_objects,
             current_detections=current_detections,
@@ -496,12 +726,19 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
             enhanced_speaking_detector=speaking_detector,
             current_frame_num=frame_idx + 1
         )
-        
+        _record(profiler, "tracking_serial", t_stage)
+
+        t_stage = _now_ns()
         stream_out.add_frame({
             "frame": frame_idx + 1,
             "tracked_objects": tracked_objects
         })
-        
+        _record(profiler, "json_write", t_stage)
+        _record(profiler, "parent_total", t_frame_start)
+
+        if profiler is not None:
+            profiler.count_frame()
+
         frame_idx += 1
         if frame_idx % 25 == 0:
             progress_percent = int((frame_idx / total_frames) * 100) if total_frames else 0
@@ -517,14 +754,20 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
     
     return frame_idx
 
-def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, input_queue, output_queue, ipc_lock=None):
+def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, input_queue, output_queue, ipc_lock=None, profile_path=None, video_label="", free_slots=None):
     import logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - INFERENCE - %(message)s')
     logging.info("Starting _inference_process")
+    import time
     import numpy as np
     import cv2
     from multiprocessing import shared_memory
     import tflite_runtime.interpreter as tflite
+
+    worker_profiler = StageProfiler(video_label, profiling_capacity(None)) if profile_path else None
+    if worker_profiler is not None:
+        worker_profiler.start()
+        logging.info(f"Profiling du worker activé: {profile_path}")
         
     try:
         if ipc_lock:
@@ -561,17 +804,35 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
         
         from utils.one_euro_filter import OneEuroFilterND
         temporal_filter = OneEuroFilterND(dim=52, rate=fps, min_cutoff=1.0, beta=0.007)
+
+        object_detection_min_missing = object_detection_min_missing_frames()
+        frames_without_face = 0
         
         while True:
+            prof = worker_profiler
+            if prof is not None:
+                try:
+                    prof.gauge("queue_fill", input_queue.qsize())
+                except (NotImplementedError, OSError):
+                    pass
+                t_wait = _now_ns()
             item = input_queue.get()
             if item is None:
                 output_queue.put(None)
                 break
-                
-            frame_idx, buffer_idx, tracked_objects_metadata = item
-            
+
+            t_frame_start = _now_ns()
+            if prof is not None:
+                prof.add("queue_wait", t_frame_start - t_wait)
+
+            frame_idx = item[0]
+            buffer_idx = item[1]
+            tracked_objects_metadata = item[2]
+            t_acq_ns = item[3] if len(item) > 3 else 0
+
             # Zero-copy read
             image = shared_array[buffer_idx]
+            slot_released = False
             
             # The rest is the inference logic, similar to before
             current_detections = []
@@ -580,9 +841,11 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
                 input_image = cv2.resize(image, (width, height), interpolation=cv2.INTER_NEAREST)
             else:
                 input_image = image
-                
+
+            t_stage = _now_ns()
             res = detect_face(blazeface, input_image)
-            
+            _record(prof, "blazeface_tpu", t_stage)
+
             if res != (None, None):
                 raw_bbox, eyes = res
                 ymin, xmin, ymax, xmax = raw_bbox
@@ -593,22 +856,38 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
                 bbox_height = int((ymax - ymin) * height)
                 centroid_x = int(bbox_xmin + bbox_width / 2)
                 centroid_y = int(bbox_ymin + bbox_height / 2)
-                
+
+                t_stage = _now_ns()
                 if eyes:
                     right_eye, left_eye = eyes
                     transform_params = face_utils.get_affine_transform(right_eye, left_eye, output_size=192)
                     face_crop_192 = face_utils.apply_affine_crop(image, transform_params)
                 else:
                     face_crop_192 = cv2.resize(image, (192, 192))
-                    
+                _record(prof, "affine_crop", t_stage)
+
+                # Dernier accès aux pixels de la frame (le bloc détecteur d'objets est
+                # ignoré dès qu'un visage est détecté) : le slot peut être recyclé.
+                if free_slots is not None:
+                    free_slots.put(buffer_idx)
+                    slot_released = True
+
+                t_stage = _now_ns()
                 landmarks = extract_landmarks(facemesh, face_crop_192)
+                _record(prof, "facemesh_tpu", t_stage)
+
+                t_stage = _now_ns()
                 raw_blendshapes = extract_blendshapes(blendshapes, landmarks)
+                _record(prof, "blendshapes_cpu", t_stage)
+
+                t_stage = _now_ns()
                 smoothed_blendshapes = temporal_filter.update(raw_blendshapes).tolist()
                 
                 blendshapes_dict = dict(zip(
                     ARKIT_52_BLENDSHAPE_NAMES,
                     (float(v) for v in smoothed_blendshapes)
                 ))
+                _record(prof, "one_euro", t_stage)
                 
                 current_detections.append({
                     "centroid": (centroid_x, centroid_y),
@@ -618,25 +897,31 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
                     "confidence": 1.0
                 })
             
-            if not current_detections and object_detector_tpu:
-                input_details = object_detector_tpu.get_input_details()[0]
-                od_height, od_width = input_details['shape'][1:3]
+            if current_detections:
+                frames_without_face = 0
+            else:
+                frames_without_face += 1
+
+            if not current_detections and object_detector_tpu and frames_without_face >= object_detection_min_missing:
+                t_stage = _now_ns()
+                meta = _interpreter_meta(object_detector_tpu)
+                od_height, od_width = meta['input_height'], meta['input_width']
                 if image.shape[0] != od_height or image.shape[1] != od_width:
                     img_od = cv2.resize(image, (od_width, od_height), interpolation=cv2.INTER_NEAREST)
                 else:
                     img_od = image
                     
-                if input_details['dtype'] == np.float32:
+                if meta['input_dtype'] == np.float32:
                     img_od = (img_od.astype(np.float32) / 127.5) - 1.0
                     
-                object_detector_tpu.tensor(input_details['index'])()[0][:, :] = img_od
+                meta['input_tensor_factory']()[0][:, :] = img_od
                 object_detector_tpu.invoke()
                 
-                output_details = object_detector_tpu.get_output_details()
-                boxes = object_detector_tpu.get_tensor(output_details[0]['index'])[0]
-                classes = object_detector_tpu.get_tensor(output_details[1]['index'])[0]
-                scores = object_detector_tpu.get_tensor(output_details[2]['index'])[0]
-                count = int(object_detector_tpu.get_tensor(output_details[3]['index'])[0])
+                output_indices = meta['output_indices']
+                boxes = object_detector_tpu.get_tensor(output_indices[0])[0]
+                classes = object_detector_tpu.get_tensor(output_indices[1])[0]
+                scores = object_detector_tpu.get_tensor(output_indices[2])[0]
+                count = int(object_detector_tpu.get_tensor(output_indices[3])[0])
                 
                 for i in range(min(count, 5)):
                     if scores[i] < 0.3:
@@ -662,37 +947,73 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
                         "label": f"class_{int(classes[i])}",
                         "confidence": float(scores[i])
                     })
-            
-            output_queue.put({
+                _record(prof, "object_detector_tpu", t_stage)
+
+            # Libération du slot SHM sur les frames sans visage : le détecteur d'objets
+            # a été le dernier consommateur des pixels.
+            if free_slots is not None and not slot_released:
+                free_slots.put(buffer_idx)
+
+            payload = {
                 "frame_idx": frame_idx,
                 "current_detections": current_detections,
                 "tracked_objects_metadata": tracked_objects_metadata # jaw open threshold etc will be done in parent
-            })
+            }
+            if prof is not None:
+                _record(prof, "worker_total", t_frame_start)
+                prof.count_frame()
+                payload["t_acq_ns"] = t_acq_ns
+            output_queue.put(payload)
             
     except Exception as e:
         import traceback
         traceback.print_exc()
         output_queue.put(e)
     finally:
+        if worker_profiler is not None:
+            try:
+                worker_profiler.stop()
+                worker_profiler.write(Path(profile_path))
+                logging.info(f"Profil worker écrit: {profile_path}")
+            except Exception as exc:
+                logging.error(f"Écriture du profil worker impossible: {exc}")
         try:
             shm.close()
         except:
             pass
 
-def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, width, height, fps, total_frames, speaking_detector, stream_out):
+def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, width, height, fps, total_frames, speaking_detector, stream_out, profile_path=None, video_label=""):
     RING_BUFFER_SIZE = 8
     frame_size = width * height * 3
     shm_size = RING_BUFFER_SIZE * frame_size
-    
+
+    parent_profiler = None
+    acq_profiler = None
+    worker_profile_path = None
+    if profile_path is not None:
+        capacity = profiling_capacity(total_frames)
+        parent_profiler = StageProfiler(f"{video_label}:parent", capacity)
+        acq_profiler = StageProfiler(f"{video_label}:acq", capacity)
+        worker_profile_path = Path(profile_path).with_suffix(".worker.json")
+
     shm = mp.shared_memory.SharedMemory(create=True, size=shm_size)
     shared_array = np.ndarray((RING_BUFFER_SIZE, height, width, 3), dtype=np.uint8, buffer=shm.buf)
     
     input_queue = mp.Queue(maxsize=RING_BUFFER_SIZE)
     output_queue = mp.Queue(maxsize=RING_BUFFER_SIZE)
     ipc_lock = mp.Lock()
-    
+
+    # Protocole de jetons : un slot ne peut être réécrit par l'acquisition qu'une fois
+    # libéré par le worker (sinon le worker lisait une zone en cours d'écrasement, ce qui
+    # rendait les sorties non déterministes d'un run à l'autre).
+    free_slots = None
+    if fast_level() >= 1:
+        free_slots = mp.Queue(maxsize=RING_BUFFER_SIZE)
+        for slot_index in range(RING_BUFFER_SIZE):
+            free_slots.put(slot_index)
+
     inference_proc = mp.Process(target=_inference_process, args=(
-        shm.name, width, height, fps, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, input_queue, output_queue, ipc_lock
+        shm.name, width, height, fps, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection, input_queue, output_queue, ipc_lock, worker_profile_path, video_label, free_slots
     ))
     inference_proc.start()
     logging.info("Inference process spawned")
@@ -738,19 +1059,30 @@ def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_p
         frame_idx = 0
         try:
             while True:
+                t_stage = _now_ns()
                 raw_frame = process.stdout.read(frame_size)
+                _record(acq_profiler, "acq_read_pipe", t_stage)
                 if len(raw_frame) != frame_size:
                     logging.info(f"Acquisition finished at frame {frame_idx}")
                     break
-                
-                buffer_idx = frame_idx % RING_BUFFER_SIZE
+
+                buffer_idx = free_slots.get() if free_slots is not None else frame_idx % RING_BUFFER_SIZE
                 # Zero-copy write
+                t_stage = _now_ns()
                 shared_array[buffer_idx] = np.frombuffer(raw_frame, dtype=np.uint8).reshape((height, width, 3))
-                
+                _record(acq_profiler, "acq_shm_write", t_stage)
+
                 if frame_idx % 25 == 0:
                     logging.info(f"Acquisition pushed frame {frame_idx} to queue")
-                
-                input_queue.put((frame_idx, buffer_idx, None))
+
+                t_stage = _now_ns()
+                if acq_profiler is not None:
+                    input_queue.put((frame_idx, buffer_idx, None, _now_ns()))
+                else:
+                    input_queue.put((frame_idx, buffer_idx, None))
+                _record(acq_profiler, "acq_push", t_stage)
+                if acq_profiler is not None:
+                    acq_profiler.count_frame()
                 frame_idx += 1
             input_queue.put(None)
         except Exception as e:
@@ -758,6 +1090,8 @@ def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_p
             input_queue.put(None)
 
     acq_thread = threading.Thread(target=_acquisition_thread)
+    if parent_profiler is not None:
+        parent_profiler.start()
     acq_thread.start()
     
     try:
@@ -767,10 +1101,12 @@ def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_p
                 break
             if isinstance(item, Exception):
                 raise item
-                
+
+            t_frame_start = _now_ns()
             frame_idx = item["frame_idx"]
             current_detections = item["current_detections"]
-            
+
+            t_stage = _now_ns()
             tracked_objects = apply_tracking_and_management(
                 active_objects=active_objects,
                 current_detections=current_detections,
@@ -781,12 +1117,23 @@ def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_p
                 enhanced_speaking_detector=speaking_detector,
                 current_frame_num=frame_idx + 1
             )
-            
+            _record(parent_profiler, "tracking_serial", t_stage)
+
+            t_stage = _now_ns()
             stream_out.add_frame({
                 "frame": frame_idx + 1,
                 "tracked_objects": tracked_objects
             })
-            
+            _record(parent_profiler, "json_write", t_stage)
+
+            if parent_profiler is not None:
+                parent_profiler.gauge("active_objects", len(active_objects))
+                t_acq_ns = item.get("t_acq_ns") or 0
+                if t_acq_ns:
+                    parent_profiler.add("e2e_frame", _now_ns() - t_acq_ns)
+                parent_profiler.add("parent_total", _now_ns() - t_frame_start)
+                parent_profiler.count_frame()
+
             final_frame_count = frame_idx + 1
             if final_frame_count % 25 == 0:
                 progress_percent = int((final_frame_count / total_frames) * 100) if total_frames else 0
@@ -803,7 +1150,11 @@ def run_tracking_pipeline_multiprocessing(video_path, blazeface_path, facemesh_p
         
         shm.close()
         shm.unlink()
-        
+
+        if parent_profiler is not None:
+            parent_profiler.stop()
+            write_video_profile(profile_path, video_label, parent_profiler, acq_profiler, worker_profile_path)
+
     return final_frame_count
 
 def main():
@@ -814,6 +1165,7 @@ def main():
     parser.add_argument("--ndjson", action="store_true", help="Utiliser le format de sortie NDJSON")
     parser.add_argument("--sequential", action="store_true", help="Désactiver le mode multi-thread et utiliser le pipeline séquentiel")
     parser.add_argument("--device", type=str, default="TPU", choices=["CPU", "TPU"], help="Force le device à utiliser (défaut: TPU)")
+    parser.add_argument("--profile-dir", type=str, default=None, help="Répertoire des rapports de profilage par étage (active le benchmark)")
     args = parser.parse_args()
 
     log_file = LOG_DIR / f"tpu_tracking_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -828,6 +1180,11 @@ def main():
 
     logging.info("--- Démarrage de l'analyse Tracking TPU (Cascade) ---")
 
+    profile_dir = resolve_profile_dir(args.profile_dir)
+    if profile_dir is not None:
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Profilage par étage activé: {profile_dir}")
+    
     assets_dir = BASE_DIR / "assets"
     
     cocompiled_dir = assets_dir / "cocompiled"
@@ -854,12 +1211,13 @@ def main():
     
     enable_object_detection = os.environ.get('STEP4_ENABLE_OBJECT_DETECTION', '0') == '1'
 
+    delegate_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tmp_lib', 'usr', 'lib', 'x86_64-linux-gnu', 'libedgetpu.so.1'))
+    if not os.path.exists(delegate_path):
+        delegate_path = 'libedgetpu.so.1'
+
     if args.sequential:
         try:
             import tflite_runtime.interpreter as tflite
-            delegate_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tmp_lib', 'usr', 'lib', 'x86_64-linux-gnu', 'libedgetpu.so.1'))
-            if not os.path.exists(delegate_path):
-                delegate_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tmp_lib', 'usr', 'lib', 'x86_64-linux-gnu', 'libedgetpu.so.1'))
             delegate = tflite.load_delegate(delegate_path)
             logging.info("Délégué Edge TPU initialisé.")
         except Exception as e:
@@ -874,8 +1232,26 @@ def main():
         if enable_object_detection:
             logging.info("Fallback object detection enabled on CPU")
             object_detector_tpu = load_tpu_model(object_detector_path, delegate=None)
+
+        if profile_dir is not None and any(model is None for model in (blazeface, facemesh, blendshapes)):
+            logging.critical(
+                "Profilage annulé: un modèle est indisponible (interpréteur None) — le pipeline tournerait en simulation."
+            )
+            sys.exit(2)
     else:
         blazeface = facemesh = blendshapes = object_detector_tpu = None
+
+        if profile_dir is not None:
+            missing_models = [
+                str(path) for path in (blazeface_path, facemesh_path, blendshapes_path)
+                if not Path(path).exists()
+            ]
+            if missing_models:
+                logging.critical(
+                    "Profilage annulé: modèle(s) manquant(s) %s — le pipeline tournerait en simulation.",
+                    ", ".join(missing_models)
+                )
+                sys.exit(2)
 
     if args.videos_json_path:
         logging.info(f"Chargement des vidéos depuis le fichier temporaire: {args.videos_json_path}")
@@ -903,6 +1279,27 @@ def main():
     logging.info(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}")
     print(f"TOTAL_VIDEOS_TO_PROCESS: {total_videos}", flush=True)
 
+    if profile_dir is not None:
+        try:
+            fingerprint = build_run_fingerprint(
+                videos,
+                model_paths={
+                    "blazeface": blazeface_path,
+                    "facemesh": facemesh_path,
+                    "blendshapes": blendshapes_path,
+                    "object_detector": object_detector_path if enable_object_detection else None,
+                },
+                delegate_path=delegate_path,
+                pipeline_mode="sequential" if args.sequential else "multiprocessing",
+                use_cocompiled=use_cocompiled,
+            )
+            fingerprint_path = profile_dir / "run_fingerprint.json"
+            with open(fingerprint_path, 'w', encoding='utf-8') as file_obj:
+                json.dump(fingerprint, file_obj, indent=2, ensure_ascii=False)
+            logging.info(f"Fingerprint du run écrit: {fingerprint_path}")
+        except Exception as exc:
+            logging.error(f"Fingerprint du run impossible: {exc}")
+
     successful_count = 0
     for idx, video_path in enumerate(videos):
         logging.info(f"PROCESSING_VIDEO: {video_path.name}")
@@ -928,18 +1325,29 @@ def main():
                 stream_out = StreamingNDJSONOutput(output_json, metadata)
             else:
                 stream_out = StreamingJSONOutput(output_json, metadata)
-            
+
+            video_profile_path = profile_dir / f"{video_path.stem}.json" if profile_dir is not None else None
+
             if args.sequential:
+                sequential_profiler = None
+                if video_profile_path is not None:
+                    sequential_profiler = StageProfiler(video_path.stem, profiling_capacity(vid_total_frames))
+                    sequential_profiler.start()
                 frame_count = run_tracking_pipeline(
                     video_path, blazeface, facemesh, blendshapes, object_detector_tpu,
                     width=vid_width, height=vid_height, fps=vid_fps, total_frames=vid_total_frames,
-                    speaking_detector=speaking_detector, stream_out=stream_out
+                    speaking_detector=speaking_detector, stream_out=stream_out,
+                    profiler=sequential_profiler
                 )
+                if sequential_profiler is not None:
+                    sequential_profiler.stop()
+                    write_video_profile(video_profile_path, video_path.stem, sequential_profiler)
             else:
                 frame_count = run_tracking_pipeline_multiprocessing(
                     video_path, blazeface_path, facemesh_path, blendshapes_path, object_detector_path, enable_object_detection,
                     width=vid_width, height=vid_height, fps=vid_fps, total_frames=vid_total_frames,
-                    speaking_detector=speaking_detector, stream_out=stream_out
+                    speaking_detector=speaking_detector, stream_out=stream_out,
+                    profile_path=video_profile_path, video_label=video_path.stem
                 )
             stream_out.close()
                 
