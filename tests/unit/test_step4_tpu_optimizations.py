@@ -242,6 +242,28 @@ class TestFastLevelFlags:
         finally:
             os.environ.pop("STEP4_TPU_OBJECT_DETECTION_MIN_MISSING", None)
 
+    def test_object_detection_face_reset_defaults_to_legacy(self):
+        # Given: les deux niveaux d'optimisation
+        legacy = self._load_script(0)
+        optimized = self._load_script(1)
+
+        # When/Then: le réarmement reste historique (toute détection de visage réarme)
+        assert legacy.object_detection_reset_frames() == 1
+        assert optimized.object_detection_reset_frames() == 1
+
+    def test_object_detection_face_reset_override(self):
+        # Given: l'exigence d'un visage soutenu avant de réarmer le compteur
+        import os
+
+        optimized = self._load_script(1)
+        os.environ["STEP4_TPU_OBJECT_DETECTION_FACE_RESET_FRAMES"] = "3"
+
+        # When/Then: la valeur explicite est retenue
+        try:
+            assert optimized.object_detection_reset_frames() == 3
+        finally:
+            os.environ.pop("STEP4_TPU_OBJECT_DETECTION_FACE_RESET_FRAMES", None)
+
     def test_json_flush_frequency_follows_level(self):
         # Given/When: les deux niveaux
         legacy = self._load_script(0)

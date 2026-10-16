@@ -55,6 +55,11 @@ try:
     from utils.enhanced_speaking_detection import EnhancedSpeakingDetector
     from utils import tpu_facemesh_utils as face_utils
     from utils.media_filters import split_preserved_media
+    from utils.step4_tpu_detections import (
+        build_face_detection,
+        build_object_detections,
+        verify_labelmap_file,
+    )
     from utils.step4_tpu_profiler import (
         StageProfiler,
         merge_reports,
@@ -106,6 +111,21 @@ def object_detection_min_missing_frames() -> int:
         return max(1, int(os.environ.get("STEP4_TPU_OBJECT_DETECTION_MIN_MISSING", default)))
     except (TypeError, ValueError):
         return 25 if fast_level() >= 1 else 1
+
+
+def object_detection_reset_frames() -> int:
+    """Frames consécutives AVEC visage nécessaires pour réarmer le compteur ci-dessus.
+
+    Valeur 1 = comportement historique (toute détection de visage réarme le compteur).
+    Au-delà, une ou deux frames de visage isolées (faux négatif du détecteur) ne
+    reportent plus l'invocation du détecteur d'objets : les pistes d'objets sont donc
+    plus denses dans les séquences à visage intermittent, au prix de quelques
+    invocations TPU supplémentaires.
+    """
+    try:
+        return max(1, int(os.environ.get("STEP4_TPU_OBJECT_DETECTION_FACE_RESET_FRAMES", "1")))
+    except (TypeError, ValueError):
+        return 1
 
 
 # Métadonnées d'interpréteur résolues une fois par modèle (les get_input_details()
@@ -581,7 +601,9 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
     next_id_counter = {"value": 0}
 
     object_detection_min_missing = object_detection_min_missing_frames()
+    object_detection_reset = object_detection_reset_frames()
     frames_without_face = 0
+    frames_with_face_consecutive = 0
 
     logging.info(f"Démarrage de la cascade TPU pour {video_path.name}")
     
@@ -651,19 +673,19 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
             _record(profiler, "one_euro", t_stage)
 
             # Construct current detections list
-            current_detections.append({
-                "centroid": (centroid_x, centroid_y),
-                "bbox": (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
-                "blendshapes": blendshapes_dict,
-                "source_detector": "face_landmarker",
-                "label": "face",
-                "confidence": 0.95
-            })
+            current_detections.append(build_face_detection(
+                (centroid_x, centroid_y),
+                (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
+                blendshapes_dict,
+            ))
             
         # 6. Object Detection (Fallback conditionnel pour éviter le TPU Context Switch)
         if current_detections:
-            frames_without_face = 0
+            frames_with_face_consecutive += 1
+            if frames_with_face_consecutive >= object_detection_reset:
+                frames_without_face = 0
         else:
+            frames_with_face_consecutive = 0
             frames_without_face += 1
 
         if not current_detections and object_detector_tpu and frames_without_face >= object_detection_min_missing:
@@ -688,30 +710,9 @@ def run_tracking_pipeline(video_path: Path, blazeface, facemesh, blendshapes, ob
             scores = object_detector_tpu.get_tensor(output_indices[2])[0]
             count = int(object_detector_tpu.get_tensor(output_indices[3])[0])
 
-            for i in range(min(count, 5)):
-                if scores[i] < 0.3:
-                    continue
-
-                ymin, xmin, ymax, xmax = boxes[i]
-
-                o_xmin = max(0, int(xmin * width))
-                o_ymin = max(0, int(ymin * height))
-                o_xmax = min(width, int(xmax * width))
-                o_ymax = min(height, int(ymax * height))
-
-                o_width_px = o_xmax - o_xmin
-                o_height_px = o_ymax - o_ymin
-                o_cx = o_xmin + o_width_px // 2
-                o_cy = o_ymin + o_height_px // 2
-
-                current_detections.append({
-                    "centroid": (o_cx, o_cy),
-                    "bbox": (o_xmin, o_ymin, o_width_px, o_height_px),
-                    "blendshapes": {},
-                    "source_detector": "object_detector",
-                    "label": f"class_{int(classes[i])}",
-                    "confidence": float(scores[i])
-                })
+            current_detections.extend(
+                build_object_detections(boxes, classes, scores, count, width, height)
+            )
             _record(profiler, "object_detector_tpu", t_stage)
 
         # 7. Apply Tracking and Management
@@ -806,8 +807,10 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
         temporal_filter = OneEuroFilterND(dim=52, rate=fps, min_cutoff=1.0, beta=0.007)
 
         object_detection_min_missing = object_detection_min_missing_frames()
+        object_detection_reset = object_detection_reset_frames()
         frames_without_face = 0
-        
+        frames_with_face_consecutive = 0
+
         while True:
             prof = worker_profiler
             if prof is not None:
@@ -889,17 +892,19 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
                 ))
                 _record(prof, "one_euro", t_stage)
                 
-                current_detections.append({
-                    "centroid": (centroid_x, centroid_y),
-                    "bbox": (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
-                    "blendshapes": blendshapes_dict,
-                    "source_detector": "face_landmarker",
-                    "confidence": 1.0
-                })
+                current_detections.append(build_face_detection(
+                    (centroid_x, centroid_y),
+                    (bbox_xmin, bbox_ymin, bbox_width, bbox_height),
+                    blendshapes_dict,
+                    confidence=1.0,
+                ))
             
             if current_detections:
-                frames_without_face = 0
+                frames_with_face_consecutive += 1
+                if frames_with_face_consecutive >= object_detection_reset:
+                    frames_without_face = 0
             else:
+                frames_with_face_consecutive = 0
                 frames_without_face += 1
 
             if not current_detections and object_detector_tpu and frames_without_face >= object_detection_min_missing:
@@ -923,30 +928,9 @@ def _inference_process(shm_name, width, height, fps, blazeface_path, facemesh_pa
                 scores = object_detector_tpu.get_tensor(output_indices[2])[0]
                 count = int(object_detector_tpu.get_tensor(output_indices[3])[0])
                 
-                for i in range(min(count, 5)):
-                    if scores[i] < 0.3:
-                        continue
-                        
-                    ymin, xmin, ymax, xmax = boxes[i]
-                    
-                    o_xmin = max(0, int(xmin * width))
-                    o_ymin = max(0, int(ymin * height))
-                    o_xmax = min(width, int(xmax * width))
-                    o_ymax = min(height, int(ymax * height))
-                    
-                    o_width_px = o_xmax - o_xmin
-                    o_height_px = o_ymax - o_ymin
-                    o_cx = o_xmin + o_width_px // 2
-                    o_cy = o_ymin + o_height_px // 2
-                    
-                    current_detections.append({
-                        "centroid": (o_cx, o_cy),
-                        "bbox": (o_xmin, o_ymin, o_width_px, o_height_px),
-                        "blendshapes": {},
-                        "source_detector": "object_detector",
-                        "label": f"class_{int(classes[i])}",
-                        "confidence": float(scores[i])
-                    })
+                current_detections.extend(
+                    build_object_detections(boxes, classes, scores, count, width, height)
+                )
                 _record(prof, "object_detector_tpu", t_stage)
 
             # Libération du slot SHM sur les frames sans visage : le détecteur d'objets
@@ -1299,6 +1283,12 @@ def main():
             logging.info(f"Fingerprint du run écrit: {fingerprint_path}")
         except Exception as exc:
             logging.error(f"Fingerprint du run impossible: {exc}")
+
+    labelmap_divergence = verify_labelmap_file()
+    if labelmap_divergence:
+        logging.warning(f"Mapping de classes d'objets: {labelmap_divergence}")
+    else:
+        logging.info("Mapping de classes d'objets cohérent avec le labelmap du modèle.")
 
     successful_count = 0
     for idx, video_path in enumerate(videos):

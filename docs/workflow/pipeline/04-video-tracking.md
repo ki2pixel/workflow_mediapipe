@@ -450,7 +450,40 @@ Les poids des modèles quantifiés doivent être positionnés dans le répertoir
 - `blazeface_front_quantized_edgetpu.tflite` : Détection de visage quantifiée pour Edge TPU.
 - `facemesh_quantized_edgetpu.tflite` : Extraction des 468 repères quantifiés pour Edge TPU.
 - `face_blendshapes.tflite` : Modèle de blendshapes ARKit standard (exécuté sur CPU).
-- `efficientdet_lite0_edgetpu.tflite` : Détecteur d'objets quantifié pour Edge TPU (utilisé comme fallback).
+- `detect_edgetpu.tflite` : Détecteur d'objets EfficientDet quantifié pour Edge TPU (fallback du chemin `run_tracking_tpu.py`, chargé en dur). Le chemin TPU n'utilise **pas** `STEP4_OBJECT_DETECTOR_MODEL_PATH`, contrairement au registre MediaPipe.
+
+### Étiquetage des objets détectés (chemin Coral TPU)
+
+Le modèle EfficientDet embarqué émet des **indices de classe 0-based dans l'espace COCO 1-90** :
+l'indice `0` correspond à `person`, `89` à `toothbrush`, et les dix identifiants morts du COCO
+(11, 25, 28, 29, 44, 65, 67, 68, 70, 82) ne sont jamais émis. Le libellé se lit donc
+`labelmap[indice + 1]` dans `workflow_scripts/step4/models/metadata/labelmap.txt` (91 lignes, la
+première étant le padding `???`), via `utils/step4_tpu_detections.py`.
+
+Vérification reproductible : `coral_env/bin/python scripts/inspect_coral_object_detector.py
+--video <clip> --json <clip>.json --frames 25,413,1741` (reproduit les détections publiées avec un
+IoU de 0,96-0,99, contrôle les indices morts et exporte les crops pour contrôle visuel).
+
+> ⚠️ Le chemin OpenCV 5 (`run_tracking_cv5.py`) utilise un modèle YOLO/ONNX en **COCO-80 contigu** :
+> son espace d'index est différent, les deux listes ne sont pas interchangeables.
+
+La STEP6 ne conserve un objet que si `source == "object_detector"` **et** `label == "person"`
+(`workflow_scripts/step6/preprocess_ae_json.py`) : un libellé non mappé fait donc disparaître
+silencieusement toutes les pistes d'objets du flux aval, et prive le recentrage par segment du
+panneau EffectCraft (STEP8) de son signal dans les séquences sans visage.
+
+### Hystérésis du détecteur d'objets (chemin Coral TPU)
+
+Le détecteur d'objets n'est invoqué que lorsque le détecteur de visage ne trouve rien. Deux réglages :
+
+- `STEP4_TPU_OBJECT_DETECTION_MIN_MISSING` (défaut `25`) : nombre de frames consécutives sans visage
+  avant l'invocation. Chaque invocation coûte ~15 ms sur le TPU et évince la SRAM des modèles
+  co-compilés BlazeFace/FaceMesh (mesuré : ~6 ms/frame amorti sans garde-fou).
+- `STEP4_TPU_OBJECT_DETECTION_FACE_RESET_FRAMES` (défaut `1`) : nombre de frames consécutives **avec**
+  visage nécessaires pour réarmer le compteur. `1` = comportement historique ; une valeur supérieure
+  ignore les faux négatifs d'une ou deux frames et densifie les pistes d'objets lorsque le visage
+  n'est détecté qu'épisodiquement.
+
 
 ### Environnement InsightFace (GPU)
 
