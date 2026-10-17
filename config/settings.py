@@ -399,6 +399,8 @@ class Config:
         
         # OpenCV 5.0 Experimental
         self.USE_OPENCV5_STEP2 = _parse_bool(os.environ.get('USE_OPENCV5_STEP2'), default=False)
+        self.STEP2_CV5_FORCE_CPU = _parse_bool(os.environ.get('STEP2_CV5_FORCE_CPU'), default=False)
+        self.STEP2_CUDNN_ALGO_SEARCH = os.environ.get('STEP2_CUDNN_ALGO_SEARCH', 'EXHAUSTIVE').strip().upper()
         self.USE_OPENCV5_STEP4 = _parse_bool(os.environ.get('USE_OPENCV5_STEP4'), default=False)
         self.STEP4_CV5_NUM_WORKERS = _parse_optional_positive_int(os.environ.get('STEP4_CV5_NUM_WORKERS')) or 4
         step5_cv5_worker_mode = os.environ.get('STEP4_CV5_WORKER_MODE', 'auto').strip().lower()
@@ -1018,6 +1020,8 @@ class Config:
     # OpenCV 5.0 Experimental
     # ========================
     USE_OPENCV5_STEP2: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP2'), default=False)
+    STEP2_CV5_FORCE_CPU: bool = _parse_bool(os.environ.get('STEP2_CV5_FORCE_CPU'), default=False)
+    STEP2_CUDNN_ALGO_SEARCH: str = os.environ.get('STEP2_CUDNN_ALGO_SEARCH', 'EXHAUSTIVE').strip().upper()
     USE_OPENCV5_STEP4: bool = _parse_bool(os.environ.get('USE_OPENCV5_STEP4'), default=False)
 
     # ========================

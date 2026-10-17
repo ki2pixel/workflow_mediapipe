@@ -28,6 +28,10 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+STEP2_DIR = Path(__file__).resolve().parent
+if str(STEP2_DIR) not in sys.path:
+    sys.path.insert(0, str(STEP2_DIR))
+
 from utils.media_filters import split_preserved_media
 from utils.media_normalizer import check_fps_conformance
 
@@ -60,182 +64,52 @@ except ImportError:
     sys.exit(1)
 
 
+import warnings
+from zero_copy_pipeline import ZeroCopyTransNetPipeline, predictions_to_scenes, write_scenes_to_csv
+
+WINDOW_SIZE = 100
+WINDOW_STRIDE = 50
+PADDING_FRAMES = 25
+BATCH_SIZE = 25
+FFMPEG_THREADS = 0
+USE_AMP = False
+AMP_DTYPE = torch.float16
+
 def get_video_fps(video_path):
     """Retourne toujours 25.0 FPS pour stabiliser les timecodes (Étape 2 force 25 FPS)."""
     return 25.0
 
 
-def detect_scenes_with_pytorch(video_path, model, device, threshold=0.5):
-    """Détection de scènes avec lecture streaming (chunked), gestion mémoire glissante, I/O asynchrone et batching glissant.
-
-    - Décodage FFmpeg en streaming (48x27, fps=25) avec run_async.
-    - Lecture FFmpeg asynchrone via Threading (Producer/Consumer) pour éviter le blocage I/O.
-    - Pruning de la liste 'frames' pour une empreinte RAM O(1).
-    - Traitement par lots (Batch Size > 1) pour accélérer l'inférence GPU.
+def detect_scenes_with_pytorch(video_path, model, device, threshold=0.5, batch_size=None):
+    """Détection de scènes avec ingestion asynchrone zéro-copie en double tampon Ping-Pong (2600 trames)
+    et fenêtrage vectorisé O(1) via sliding_window_view, avec inférence PyTorch batchée.
     """
+    if batch_size is None:
+        batch_size = BATCH_SIZE
+
+    pipeline = ZeroCopyTransNetPipeline(
+        ffmpeg_threads=FFMPEG_THREADS,
+        windows_per_chunk=50,
+    )
+
+    video_path = Path(video_path)
+    video_name = video_path.name
+    all_predictions = []
+    total_frames = 0
+    batch_count = 0
+    processed_windows = 0
+
+    warnings.filterwarnings("ignore", message="The given NumPy array is not writable")
+
     try:
-        process = (
-            ffmpeg
-            .input(str(video_path))
-            .output(
-                'pipe:',
-                format='rawvideo',
-                pix_fmt='rgb24',
-                s='48x27',
-                r=25  # forcer 25 FPS
-            )
-            .global_args('-threads', str(FFMPEG_THREADS) if FFMPEG_THREADS is not None else '0')
-            .run_async(pipe_stdout=True, pipe_stderr=True, quiet=True)
-        )
-
-        FRAME_H, FRAME_W, FRAME_C = 27, 48, 3
-        FRAME_SIZE = FRAME_H * FRAME_W * FRAME_C
-
-        frame_queue = queue.Queue(maxsize=1000)  # Limiter pour ne pas exploser la RAM si FFmpeg va plus vite que le GPU
-        read_error = []
-        
-        def ffmpeg_reader():
-            try:
-                while True:
-                    buf = bytearray()
-                    # On lit de quoi faire plusieurs frames d'un coup pour l'efficacité (ex: 50 frames)
-                    target = 50 * FRAME_SIZE
-                    while len(buf) < target:
-                        chunk = process.stdout.read(target - len(buf))
-                        if not chunk:
-                            break
-                        buf.extend(chunk)
-                    
-                    if not buf:
-                        frame_queue.put(None) # Signal de fin
-                        break
-                        
-                    total_bytes = len(buf)
-                    frames_count = total_bytes // FRAME_SIZE
-                    if frames_count > 0:
-                        arr = np.frombuffer(bytes(buf[:frames_count * FRAME_SIZE]), np.uint8)
-                        arr_split = list(arr.reshape([frames_count, FRAME_H, FRAME_W, FRAME_C]))
-                        for f in arr_split:
-                            frame_queue.put(f)
-                    
-                    if len(buf) < target:
-                        frame_queue.put(None)
-                        break
-            except Exception as e:
-                read_error.append(e)
-                frame_queue.put(None)
-
-        reader_thread = threading.Thread(target=ffmpeg_reader, daemon=True)
-        reader_thread.start()
-
-        frames = []  # tampon de frames décodées glissant
-        predictions = []
-        batch_count = 0
-        global_start_idx = 0  # Index absolu de la frame de départ
-        total_frames_read = 0
-        frames_eof = False
-
         with torch.inference_mode():
-            
-            def get_more_frames(needed):
-                nonlocal frames_eof, total_frames_read
-                count = 0
-                while count < needed and not frames_eof:
-                    try:
-                        f = frame_queue.get(timeout=5.0)
-                        if f is None:
-                            frames_eof = True
-                        else:
-                            frames.append(f)
-                            total_frames_read += 1
-                            count += 1
-                    except queue.Empty:
-                        if read_error:
-                            raise read_error[0]
-                        frames_eof = True
-                return count
+            for windows_5d, frames_read, total_so_far, is_eof in pipeline.iter_video_windows(video_path):
+                total_frames = total_so_far
+                num_win = windows_5d.shape[0]
 
-            # Remplir suffisamment pour la première fenêtre (WINDOW_SIZE-PADDING_FRAMES) + PADDING_FRAMES à droite
-            get_more_frames(WINDOW_SIZE)
-
-            # Si aucune frame
-            if total_frames_read == 0:
-                logging.warning(f"Aucune frame extraite pour {video_path.name}.")
-                return []
-
-            def build_window(start_idx, available_right):
-                """Construit une fenêtre de longueur WINDOW_SIZE autour de start_idx (relatif) avec padding bords.
-
-                start_idx est l'index de départ des frames réelles dans le buffer 'frames'.
-                available_right indique combien de frames réelles existent à droite à partir de start_idx.
-                """
-                left_needed = PADDING_FRAMES
-                right_needed = PADDING_FRAMES
-
-                # gauche
-                if start_idx >= left_needed:
-                    left_part = frames[start_idx - left_needed: start_idx]
-                else:
-                    pad = [frames[0]] * (left_needed - start_idx)
-                    left_part = pad + frames[0:start_idx]
-
-                # milieu
-                mid_len = WINDOW_SIZE - PADDING_FRAMES - PADDING_FRAMES
-                mid_part = frames[start_idx: start_idx + mid_len]
-
-                # droite
-                right_have = max(0, available_right - mid_len)
-                if right_have >= right_needed:
-                    right_part = frames[start_idx + mid_len: start_idx + mid_len + right_needed]
-                else:
-                    # compléter avec la dernière frame disponible
-                    base = frames[start_idx + mid_len - 1] if (start_idx + mid_len - 1) < len(frames) else frames[-1]
-                    right_part = frames[start_idx + mid_len: start_idx + mid_len + right_have] + [base] * (right_needed - right_have)
-
-                window = left_part + mid_part + right_part
-                return np.asarray(window, dtype=np.uint8)
-
-            windows_batch = []
-            
-            while True:
-                frames_offset = total_frames_read - len(frames)
-                local_start_idx = global_start_idx - frames_offset
-                
-                # S'assurer qu'on a assez de frames pour avancer d'un STRIDE
-                to_read = max(0, (local_start_idx + WINDOW_SIZE) - len(frames))
-                if to_read > 0:
-                    get_more_frames(to_read)
-                
-                frames_offset = total_frames_read - len(frames)
-                local_start_idx = global_start_idx - frames_offset
-
-                if local_start_idx >= len(frames):
-                    # Fin de flux atteinte, traiter le dernier lot s'il n'est pas vide
-                    break
-
-                # combien de frames réelles dispo à droite de idx
-                available_right = max(0, len(frames) - local_start_idx)
-                # Construire la fenêtre avec padding si nécessaire
-                window_np = build_window(local_start_idx, available_right)
-                
-                if window_np.shape[0] != WINDOW_SIZE:
-                    # cas limite si frames < 1
-                    if len(frames) == 0:
-                        break
-                    # compléter strictement à WINDOW_SIZE
-                    lastf = frames[-1]
-                    add = WINDOW_SIZE - window_np.shape[0]
-                    window_np = np.concatenate([window_np, np.repeat(np.expand_dims(lastf, 0), add, axis=0)], axis=0)
-
-                windows_batch.append(window_np)
-                global_start_idx += WINDOW_STRIDE
-                
-                is_eof = (global_start_idx - (total_frames_read - len(frames))) >= len(frames) and frames_eof
-
-                # Exécuter l'inférence si le lot est plein ou si on est à la fin du flux
-                if len(windows_batch) == BATCH_SIZE or is_eof:
-                    batch_np = np.stack(windows_batch)
-                    batch_torch = torch.from_numpy(batch_np).to(device, dtype=torch.uint8)
+                for start_idx in range(0, num_win, batch_size):
+                    sub_batch_np = windows_5d[start_idx : start_idx + batch_size]
+                    batch_torch = torch.from_numpy(sub_batch_np).to(device, dtype=torch.uint8)
 
                     if USE_AMP and device.type == 'cuda':
                         try:
@@ -247,58 +121,28 @@ def detect_scenes_with_pytorch(video_path, model, device, threshold=0.5):
                     else:
                         out = model(batch_torch)
 
-                    # Normaliser la sortie: prendre le tenseur principal si tuple/list
                     single_frame_pred_logits = out[0] if isinstance(out, (tuple, list)) else out
-
-                    batch_preds = torch.sigmoid(single_frame_pred_logits).cpu().numpy()
-                    for b_idx in range(batch_preds.shape[0]):
-                        pred_slice = batch_preds[b_idx, PADDING_FRAMES:WINDOW_SIZE - PADDING_FRAMES, 0]
-                        predictions.append(pred_slice)
                     
+                    # Sigmoïde sur GPU directement sur les trames centrales utiles [25:75]
+                    logits_central = single_frame_pred_logits[:, PADDING_FRAMES : WINDOW_SIZE - PADDING_FRAMES, 0]
+                    chunk_preds = torch.sigmoid(logits_central).cpu().numpy().reshape(-1)
+                    all_predictions.append(chunk_preds)
                     batch_count += 1
-                    windows_batch = []
 
-                    # progression
-                    if batch_count % 10 == 0:
-                        logging.info(f"INTERNAL_PROGRESS: {batch_count} batches processed - {video_path.name}")
-                        print(f"INTERNAL_PROGRESS: {batch_count} batches processed - {video_path.name}")
-                
-                # Pruning du tampon RAM
-                frames_offset = total_frames_read - len(frames)
-                next_local_start_idx = global_start_idx - frames_offset
-                drop_count = max(0, next_local_start_idx - PADDING_FRAMES)
-                if drop_count > 0 and len(frames) > drop_count:
-                    frames = frames[drop_count:]
+                processed_windows += num_win
+                # Progression UI Flask
+                processed_frames = min(processed_windows * WINDOW_STRIDE, total_frames) if total_frames > 0 else 0
+                pct = int((processed_frames / total_frames * 100.0)) if total_frames > 0 else 0
+                progress_msg = f"INTERNAL_PROGRESS: {processed_frames}/{total_frames} frames ({pct}%) - {video_name}"
+                logging.info(progress_msg)
+                print(progress_msg, flush=True)
 
-        # Attendre la fermeture propre du thread de lecture
-        try:
-            process.stdout.close()
-            process.stderr.close()
-            process.wait(timeout=2)
-        except Exception:
-            pass
+        if total_frames == 0 or not all_predictions:
+            logging.warning(f"Aucune frame extraite pour {video_path.name}.")
+            return []
 
-        # concat predictions and trim to actual frame count
-        if not predictions:
-            return [[0, total_frames_read - 1]] if total_frames_read > 0 else []
-
-        final_predictions = np.concatenate(predictions)[:total_frames_read]
-        shot_boundaries = np.where(final_predictions > threshold)[0]
-
-        if len(shot_boundaries) == 0:
-            return [[0, total_frames_read - 1]] if total_frames_read > 0 else []
-
-        # Création des scènes
-        detected_scenes = []
-        last_cut = -1
-        for cut in shot_boundaries:
-            if cut > last_cut:
-                detected_scenes.append([last_cut + 1, cut])
-            last_cut = cut
-        if last_cut < total_frames_read - 1:
-            detected_scenes.append([last_cut + 1, total_frames_read - 1])
-
-        return detected_scenes
+        final_predictions = np.concatenate(all_predictions)[:total_frames]
+        return predictions_to_scenes(final_predictions, threshold=threshold)
 
     except Exception as e:
         logging.exception(f"Erreur lors de la détection de scènes pour {video_path.name}: {e}")

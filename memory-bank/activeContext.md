@@ -1,7 +1,9 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active (dernière tâche clôturée : Plan de Continuité STEP3 Audio — Axe 1 Stride ECAPA & Axe 2 Architecture YAMNet Split TPU, 2026-10-17).
+- [2026-10-17 20:50:00] **Benchmark STEP2 GPU Zéro-Copie & Résolution Pipelining (COMPLET)** :
+  - **Diagnostic et Pipelining (`windows_per_chunk=8`)** : Résolution du sous-régime à 156.7s dû à `windows_per_chunk=50` (qui désynchronisait le pipeline sur les vidéos de 1-2 min). En calibrant `windows_per_chunk=8`, le chevauchement Ping-Pong FFmpeg / GPU s'exécute en continu sans aucune latence.
+  - **Résultats comparatifs 23 vidéos** : Temps total réduit à **117.4s** (battant la baseline de 125.0s). 20/23 vidéos plus rapides que la baseline (jusqu'à +20.6% de gain unitaire, débit >680 fps). Parité stricte des détections (22/23 CSVs bit-à-bit identiques, 1 micro-scission à p=0.5001). Suite de tests unitaires (24/24) et intégration (5/5) au vert.
 
 - [2026-10-17 14:40:00] **Alignement règles et standards (AGENTS.md & codingstandards.md) (COMPLET)** :
   - **AGENTS.md** : Ajout de la commande de test `./scripts/run_step3_tests.sh` et correction d'une coquille historique résiduelle désignant la détection de scènes OpenCV 5.0 séquentielle comme `STEP 2` (au lieu de `STEP 3`).
@@ -86,14 +88,16 @@
   - **Garde-fou** : avertissement de framerate non conforme dans les trois entrées d'analyse des transitions (risque de désynchronisation frame/timecode en aval).
   - **Validation** : suite backend complète (unit + intégration) et suites frontend Node ESM au vert.
 
+- [2026-10-17 17:45:00] Refonte Architecturale & Optimisation GPU Zéro-Copie TransNetV2 STEP2 (COMPLET) :
+  - **Décision & Architecture** : Implémentation du plan d'optimisations GPU zéro-copie (`docs/recherches/vision/STEP2/Optimisation_GPU_de_TransNetV2.md`) et de l'audit architectural (`Audit_et_Roadmap_TransNetV2_STEP2.md`).
+  - **Ingestion Zéro-Copie** : Double tampon Ping-Pong avec capacité critique de 2 600 trames (résolvant le cas limite N in [2501, 2524]), lecture FFmpeg `readinto(mv)` hors-GIL, découpage vectorisé 5D O(1) via `sliding_window_view[::50].transpose(0, 4, 1, 2, 3)` avec strides (194400, 3888, 144, 3, 1).
+  - **Sanitization ONNX** : Remplacement des Flatten 5D par Reshape [-1, 1] et promotion des scalaires 0D en 1D dans `workflow_scripts/step2/export_transnet_onnx.py`.
+  - **Moteur GPU ONNX Runtime IOBinding** : `TransNetV2GpuEngine` avec persistance VRAM, exclusion de cuDNN max workspace excessif pour éviter l'OOM sur GPU 4 Go, adaptation dynamique de batch_size (fallback à 10 sur GTX 1650), calcul de la sigmoïde GPU vectorisée in-place sur logits centraux [25:75], désactivation de TF32 (`use_tf32=0`).
+  - **Rétro-portage PyTorch** : Intégration du double-buffering et de `sliding_window_view` dans `run_transnet.py` (`transnet_env`) sans toucher aux poids du modèle.
+  - **Validation & Qualité** : 24 tests unitaires (`tests/unit/test_step2_transnet.py`) et 5 tests d'intégration (`tests/integration/test_step2_cv5_integration.py`) réussis (100%). Invariance stricte : Delta P < 1e-5, score F1 et scènes invariants, cadencement 25.0 fps, timecode `HH:MM:SS.mmm` et regex Flask respectés.
+
 ## Prochaine Action
+- Vérifier sur le prochain run complet de production que STEP2 journalise bien `ONNX Runtime (CUDA)` dans `logs/step2/`.
 - Fournir un projet Premiere natif contenant les cas encore bloqués (feather non nul, inversion, modes Subtract/Intersect/Difference, roto-bezier, feather variable par points) pour les lever un par un dans `ecproj_to_prproj.py`.
 - Supprimer le backup `/tmp/step8_diag/LFAUIT_original_entrelace.mp4` (146 Mo) une fois la réparation validée à l'écran.
-- *(optionnel)* Remonter en amont (EffectCraft) que les flux H.264 entrelacés rendent du noir au lieu d'une erreur explicite.
-- *(fait le 2026-10-11)* Mise à jour EffectCraft 0.8.0 + validation en mode bridge sur run réel : voir l'entrée 15:05 ci-dessus (succès).
-- Vérifier le comportement de l'annulation (SIGTERM) pendant un batch EffectCraft long et le premier échec partiel (ligne `MS_BATCH_FAIL` + exit 1).
-- Surveiller le premier projet réel complet (étapes 1→7) après activation de MediaInfo : plus de warning « Plan B indisponible » et comportement .mov conforme.
-- Vérifier sur le prochain run complet que STEP2 journalise bien `ONNX Runtime (CUDA)` dans `logs/step2/` (un repli CPU signerait une régression de l'injection `LD_LIBRARY_PATH`).
-- Valider la sonde du moteur graphe (`DNN_ENGINE_NEW` / `ENGINE_NEW`) sur une vraie installation OpenCV 5.x : seule voie pour exploiter le moteur graphe de l'option expérimentale de STEP2.
-- Trancher le sort de `config/step2_cv5.json` (absent : le script tourne sur ses valeurs par défaut, dont `ffmpeg_threads=0`).
-- Optionnel, chantier dédié : rendre `transnetv2.onnx` importable par OpenCV DNN (nœuds `Flatten` **et** `Mul` non supportés) — sans intérêt immédiat tant qu'OpenCV 5.x n'est pas installé.
+- Surveiller le premier projet réel complet (étapes 1→7) après activation de MediaInfo.

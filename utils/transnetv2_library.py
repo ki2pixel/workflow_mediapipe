@@ -1,11 +1,28 @@
 import os
 import numpy as np
-import tensorflow as tf
+
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = None
+
+try:
+    from workflow_scripts.step2.zero_copy_pipeline import (
+        ZeroCopyTransNetPipeline,
+        extract_windows_chunked_zero_copy,
+        build_reference_windows_global_pad,
+        predictions_to_scenes,
+        write_scenes_to_csv,
+    )
+except ImportError:
+    pass
 
 
 class TransNetV2:
 
     def __init__(self, model_dir=None):
+        if tf is None:
+            raise ImportError("[TransNetV2] TensorFlow n'est pas installé dans cet environnement.")
         if model_dir is None:
             model_dir = os.path.join(os.path.dirname(__file__), "transnetv2-weights/")
             if not os.path.isdir(model_dir):
