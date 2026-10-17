@@ -59,6 +59,8 @@ def _jit(*args, **kwargs):
 # --- Process-level globals ---
 _tpu_lock = threading.Lock()
 _yamnet_interp = None
+_yamnet_is_split = False
+_yamnet_mel_matrix = None
 _thread_local = threading.local()
 _ecapa_session = None
 _ecapa_session_path = None
@@ -206,6 +208,28 @@ from utils.media_filters import split_preserved_media
 WORK_DIR = Path(os.getcwd())
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
+
+
+def _load_step3_env_defaults(env_file=None):
+    """Charge les variables STEP3_* et TPU depuis le fichier .env si non déjà présentes."""
+    target_env = env_file or (BASE_DIR / ".env")
+    if not target_env.exists():
+        return
+    try:
+        with open(target_env, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    if k.startswith(("STEP3_", "ENABLE_CORAL_TPU")):
+                        os.environ.setdefault(k, v)
+    except Exception:
+        pass
+
+
+_load_step3_env_defaults()
 
 # Modèles TPU par défaut
 YAMNET_URL = "https://s3.ap-northeast-2.wasabisys.com/pinto-model-zoo/097_YAMNet/resources.tar.gz"
@@ -808,9 +832,28 @@ def _compute_window_starts(total_samples, segment_size, hop_size):
     return starts
 
 
-def _get_embedding_stride():
+def _get_embedding_stride(num_speech_windows: int = 0) -> int:
+    """Détermine le stride temporel d'extraction ECAPA-TDNN.
+
+    Supporte :
+    - Valeur entière explicite : '1', '2', etc. (rétrocompatibilité stricte).
+    - Mode adaptatif : 'auto' ou 'adaptive' (ou si STEP3_ADAPTIVE_STRIDE=1).
+      Active stride=2 uniquement si num_speech_windows >= STEP3_ADAPTIVE_THRESHOLD (défaut: 500),
+      sinon conserve stride=1 pour préserver la précision sur les clips courts ou à forte alternance.
+    - Repli par défaut : 1 (déterministe, zéro régression acoustique).
+    """
+    val = os.environ.get("STEP3_EMBEDDING_STRIDE", "1").strip().lower()
+    adaptive_flag = os.environ.get("STEP3_ADAPTIVE_STRIDE", "0").strip().lower() in ("1", "true", "yes")
+
+    if val in ("auto", "adaptive") or adaptive_flag:
+        try:
+            threshold = int(os.environ.get("STEP3_ADAPTIVE_THRESHOLD", "500"))
+        except ValueError:
+            threshold = 500
+        return 2 if num_speech_windows >= threshold else 1
+
     try:
-        return max(1, int(os.environ.get("STEP3_EMBEDDING_STRIDE", "1")))
+        return max(1, int(val))
     except ValueError:
         return 1
 
@@ -840,22 +883,43 @@ def _make_tensor_accessor(interpreter, tensor_index):
 
 def _run_yamnet_windows_blockwise(data, interpreter, input_details, output_details,
                                   window_starts, segment_size, collect_embeddings=False,
-                                  block_size=256):
+                                  block_size=256, is_split=False, mel_matrix=None):
     """Pipeline producteur-consommateur Ping-Pong pour les fenêtres YAMNet.
 
-    Le producteur quantifie un bloc de fenêtres en RAM hôte pendant que le
-    consommateur enchaîne les invocations Edge TPU sous un verrou unique par bloc.
+    Supporte :
+    - Mode split (is_split=True) : le producteur extrait et quantifie les patches
+      log-mel (96, 64) en RAM hôte (NumPy/yamnet_frontend), puis le consommateur
+      exécute les convolutions MobileNetV1 sur l'Edge TPU via edgetpu-custom-op.
+    - Mode monolithique (is_split=False) : quantification des formes d'onde audio
+      brutes dans ping_pong_buffers et inférence sur le graphe complet.
     """
+    total_windows = len(window_starts)
     input_dtype = input_details['dtype']
     input_scale, input_zero_point = input_details.get('quantization', (0.0, 0))
-    output_dtype = output_details[0]['dtype']
-    output_scale, output_zero_point = output_details[0].get('quantization', (0.0, 0))
-    total_windows = len(window_starts)
 
-    ping_pong_buffers = [
-        np.empty((block_size, segment_size), dtype=input_dtype),
-        np.empty((block_size, segment_size), dtype=input_dtype),
-    ]
+    if is_split:
+        pred_detail = next((o for o in output_details if len(o.get('shape', [])) == 2 and o['shape'][1] == 521), output_details[0])
+        emb_detail = next((o for o in output_details if len(o.get('shape', [])) == 2 and o['shape'][1] == 1024), None)
+        output_dtype = pred_detail['dtype']
+        output_scale, output_zero_point = pred_detail.get('quantization', (0.0, 0))
+        output_index = pred_detail['index']
+        embedding_index = emb_detail['index'] if emb_detail else None
+
+        ping_pong_buffers = [
+            np.empty((block_size, 96, 64), dtype=input_dtype),
+            np.empty((block_size, 96, 64), dtype=input_dtype),
+        ]
+    else:
+        output_dtype = output_details[0]['dtype']
+        output_scale, output_zero_point = output_details[0].get('quantization', (0.0, 0))
+        output_index = output_details[0]['index']
+        embedding_index = output_details[2]['index'] if (collect_embeddings and len(output_details) > 2) else None
+
+        ping_pong_buffers = [
+            np.empty((block_size, segment_size), dtype=input_dtype),
+            np.empty((block_size, segment_size), dtype=input_dtype),
+        ]
+
     ready_queue = queue.Queue(maxsize=1)
     free_queue = queue.Queue(maxsize=2)
     free_queue.put(0)
@@ -864,39 +928,53 @@ def _run_yamnet_windows_blockwise(data, interpreter, input_details, output_detai
 
     def _producer():
         try:
-            for start_index in range(0, total_windows, block_size):
-                end_index = min(start_index + block_size, total_windows)
-                buffer_id = free_queue.get()
-                buffer = ping_pong_buffers[buffer_id]
-                for row, window_start in enumerate(window_starts[start_index:end_index]):
-                    segment = data[window_start:window_start + segment_size]
-                    if input_dtype == np.int16:
-                        buffer[row] = segment
-                    elif input_dtype in (np.int8, np.uint8):
-                        segment_float = segment.astype(np.float32) / 32768.0
-                        if input_scale > 0.0:
-                            np.clip(
-                                np.rint(segment_float / np.float32(input_scale) + np.float32(input_zero_point)),
-                                np.iinfo(input_dtype).min,
-                                np.iinfo(input_dtype).max,
-                                out=buffer[row],
-                                casting="unsafe",
-                            )
+            if is_split:
+                import yamnet_frontend
+                for start_index in range(0, total_windows, block_size):
+                    end_index = min(start_index + block_size, total_windows)
+                    buffer_id = free_queue.get()
+                    buffer = ping_pong_buffers[buffer_id]
+                    batch_starts = window_starts[start_index:end_index]
+                    patches_f32 = yamnet_frontend.extract_patches_for_window_starts(
+                        data, batch_starts, segment_size=segment_size, mel_matrix=mel_matrix
+                    )
+                    quantized_patches = yamnet_frontend.quantize_log_mel_patch(
+                        patches_f32, input_scale, input_zero_point
+                    )
+                    buffer[:len(batch_starts)] = quantized_patches
+                    ready_queue.put((buffer_id, start_index, end_index - start_index))
+            else:
+                for start_index in range(0, total_windows, block_size):
+                    end_index = min(start_index + block_size, total_windows)
+                    buffer_id = free_queue.get()
+                    buffer = ping_pong_buffers[buffer_id]
+                    for row, window_start in enumerate(window_starts[start_index:end_index]):
+                        segment = data[window_start:window_start + segment_size]
+                        if input_dtype == np.int16:
+                            buffer[row] = segment
+                        elif input_dtype in (np.int8, np.uint8):
+                            segment_float = segment.astype(np.float32) / 32768.0
+                            if input_scale > 0.0:
+                                np.clip(
+                                    np.rint(segment_float / np.float32(input_scale) + np.float32(input_zero_point)),
+                                    np.iinfo(input_dtype).min,
+                                    np.iinfo(input_dtype).max,
+                                    out=buffer[row],
+                                    casting="unsafe",
+                                )
+                            else:
+                                buffer[row] = segment_float
                         else:
-                            buffer[row] = segment_float
-                    else:
-                        buffer[row] = segment.astype(np.float32) / 32768.0
-                ready_queue.put((buffer_id, start_index, end_index - start_index))
+                            buffer[row] = segment.astype(np.float32) / 32768.0
+                    ready_queue.put((buffer_id, start_index, end_index - start_index))
         except Exception as exc:
             producer_errors.append(exc)
         finally:
             ready_queue.put(None)
 
     input_accessor = _make_tensor_accessor(interpreter, input_details['index'])
-    output_accessor = _make_tensor_accessor(interpreter, output_details[0]['index'])
-    embedding_accessor = None
-    if collect_embeddings and len(output_details) > 2:
-        embedding_accessor = _make_tensor_accessor(interpreter, output_details[2]['index'])
+    output_accessor = _make_tensor_accessor(interpreter, output_index)
+    embedding_accessor = _make_tensor_accessor(interpreter, embedding_index) if embedding_index is not None else None
 
     raw_probabilities = np.empty(total_windows, dtype=np.float32)
     raw_embeddings = []
@@ -925,18 +1003,19 @@ def _run_yamnet_windows_blockwise(data, interpreter, input_details, output_detai
                         speech_probability = float(scores.reshape(-1)[0])
                         del scores
                     else:
-                        scores = interpreter.get_tensor(output_details[0]['index'])
+                        scores = interpreter.get_tensor(output_index)
                         speech_probability = float(scores.reshape(-1)[0])
                         del scores
                     raw_probabilities[start_index + offset] = speech_probability
-                    if collect_embeddings:
+                    if collect_embeddings and embedding_index is not None:
                         try:
                             if embedding_accessor is not None:
                                 embedding = embedding_accessor()
                             else:
-                                embedding = interpreter.get_tensor(output_details[2]['index'])
-                            if output_details[2]['dtype'] in (np.int8, np.uint8):
-                                scale, zero_point = output_details[2].get('quantization', (0.0, 0))
+                                embedding = interpreter.get_tensor(embedding_index)
+                            emb_detail_target = next((o for o in output_details if o['index'] == embedding_index), None)
+                            if emb_detail_target and emb_detail_target.get('dtype') in (np.int8, np.uint8):
+                                scale, zero_point = emb_detail_target.get('quantization', (0.0, 0))
                                 embedding = (embedding.astype(np.float32) - zero_point) * scale
                             raw_embeddings.append(embedding.reshape(-1).copy())
                             del embedding
@@ -952,6 +1031,7 @@ def _run_yamnet_windows_blockwise(data, interpreter, input_details, output_detai
     if output_dtype in (np.int8, np.uint8) and output_scale > 0.0:
         raw_probabilities = (raw_probabilities - np.float32(output_zero_point)) * np.float32(output_scale)
     return raw_probabilities.tolist(), raw_embeddings
+
 
 
 def run_vad_and_embedding(wav_path, extractor_model_path=None,
@@ -985,7 +1065,7 @@ def run_vad_and_embedding(wav_path, extractor_model_path=None,
           (répliqué depuis l'embedding temporellement le plus proche si
           ``STEP3_EMBEDDING_STRIDE`` > 1).
     """
-    global _tpu_lock, _yamnet_interp
+    global _tpu_lock, _yamnet_interp, _yamnet_is_split, _yamnet_mel_matrix
     yamnet_interpreter = _yamnet_interp
 
     sample_rate, data = wavfile.read(wav_path)
@@ -1009,6 +1089,8 @@ def run_vad_and_embedding(wav_path, extractor_model_path=None,
         data, yamnet_interpreter, input_details, output_details,
         window_starts, segment_size,
         collect_embeddings=not extractor_model_path,
+        is_split=_yamnet_is_split,
+        mel_matrix=_yamnet_mel_matrix,
     )
 
     if not raw_probabilities:
@@ -1041,7 +1123,7 @@ def run_vad_and_embedding(wav_path, extractor_model_path=None,
             model_to_load = model_str
             logging.info(f"ECAPA-TDNN: Utilisation du moteur TFLite Float32 (Batch 1) via {model_to_load}")
 
-        stride = _get_embedding_stride()
+        stride = _get_embedding_stride(len(speech_indices))
         selected_positions = list(range(0, len(speech_indices), stride))
         if selected_positions[-1] != len(speech_indices) - 1:
             selected_positions.append(len(speech_indices) - 1)
@@ -1474,26 +1556,57 @@ def main():
     assets_dir = BASE_DIR / "assets"
     yamnet_quantized = assets_dir / "yamnet_audio_classificator_quantized_edgetpu.tflite"
     yamnet_compiled = assets_dir / "yamnet_audio_classificator_edgetpu_compiled.tflite"
+    yamnet_split_compiled = assets_dir / "yamnet_split_edgetpu_compiled.tflite"
+    yamnet_split_quantized = assets_dir / "yamnet_split_quantized.tflite"
     # ECAPA-TDNN : modèle Float32 exécuté sur CPU (ONNX Runtime) — évite la perte de précision INT8
     extractor_model = assets_dir / "ecapa_tdnn_speaker_float.tflite"
 
     download_model(YAMNET_URL, yamnet_quantized)
     yamnet_model = yamnet_compiled if yamnet_compiled.exists() else yamnet_quantized
 
-    global _yamnet_interp
-    try:
-        import tflite_runtime.interpreter as tflite
-        delegate_path = _resolve_edgetpu_delegate()
-        delegate = tflite.load_delegate(delegate_path)
-        logging.info(f"Délégué Edge TPU chargé depuis {delegate_path}")
-        _yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
-        _yamnet_interp.resize_tensor_input(0, [15360])
-        _yamnet_interp.allocate_tensors()
-        _assert_edgetpu_delegate_active(_yamnet_interp, yamnet_model)
-        logging.info("Modèle YAMNet Edge TPU chargé dans le processus principal.")
-    except Exception as e:
-        logging.critical(f"Erreur Edge TPU: {e}")
-        sys.exit(1)
+    global _yamnet_interp, _yamnet_is_split, _yamnet_mel_matrix
+    use_split = os.environ.get("STEP3_YAMNET_SPLIT", "0").strip().lower() in ("1", "true", "yes")
+    split_candidate = yamnet_split_compiled if yamnet_split_compiled.exists() else yamnet_split_quantized
+
+    if use_split and split_candidate.exists():
+        try:
+            import tflite_runtime.interpreter as tflite
+            import yamnet_frontend
+            delegate_path = _resolve_edgetpu_delegate()
+            delegate = tflite.load_delegate(delegate_path)
+            logging.info(f"Délégué Edge TPU chargé depuis {delegate_path}")
+            interp = tflite.Interpreter(model_path=str(split_candidate), experimental_delegates=[delegate])
+            interp.allocate_tensors()
+            _assert_edgetpu_delegate_active(interp, split_candidate)
+            _yamnet_interp = interp
+            _yamnet_is_split = True
+            mel_file = assets_dir / "yamnet_mel_matrix.npy"
+            if mel_file.exists():
+                _yamnet_mel_matrix = np.load(mel_file)
+            else:
+                _yamnet_mel_matrix = yamnet_frontend.get_yamnet_mel_filterbank(sr=16000)
+            logging.info(f"Modèle YAMNet Split Edge TPU chargé avec succès ({split_candidate.name}).")
+        except Exception as e:
+            if _require_edgetpu():
+                logging.critical(f"Erreur Edge TPU en mode strict STEP3_REQUIRE_EDGETPU=1 (YAMNet Split): {e}")
+                sys.exit(1)
+            logging.warning(f"Échec du chargement YAMNet Split TPU ({e}), repli automatique vers le modèle legacy.")
+            _yamnet_is_split = False
+
+    if not _yamnet_is_split:
+        try:
+            import tflite_runtime.interpreter as tflite
+            delegate_path = _resolve_edgetpu_delegate()
+            delegate = tflite.load_delegate(delegate_path)
+            logging.info(f"Délégué Edge TPU chargé depuis {delegate_path}")
+            _yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
+            _yamnet_interp.resize_tensor_input(0, [15360])
+            _yamnet_interp.allocate_tensors()
+            _assert_edgetpu_delegate_active(_yamnet_interp, yamnet_model)
+            logging.info("Modèle YAMNet Edge TPU (legacy) chargé dans le processus principal.")
+        except Exception as e:
+            logging.critical(f"Erreur Edge TPU: {e}")
+            sys.exit(1)
 
     videos = [p for ext in VIDEO_EXTENSIONS for p in WORK_DIR.rglob(f'*{ext}') if not p.with_name(f"{p.stem}_audio.json").exists()]
     videos, preserved_logos = split_preserved_media(videos)
@@ -1507,16 +1620,7 @@ def main():
     if total_videos == 0:
         return
 
-    env_path = BASE_DIR / ".env"
-    if env_path.exists():
-        with open(env_path, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    if k.strip() == "STEP3_MAX_WORKERS":
-                        os.environ.setdefault("STEP3_MAX_WORKERS", v.strip())
-                        break
+    _load_step3_env_defaults()
 
     audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
     if audio_workers_str.isdigit():

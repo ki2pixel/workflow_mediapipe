@@ -110,15 +110,65 @@ def active_tpu_consumers() -> list:
     return consumers
 
 
-def select_clips(corpus: Path, limit: int) -> list:
+def load_stems_from_clips_file(path: Path) -> list:
+    stems = []
+    content = path.read_text(encoding="utf-8")
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        stem = Path(line).stem
+        if stem not in stems:
+            stems.append(stem)
+    return stems
+
+
+def load_stems_from_manifest(path: Path) -> list:
+    stems = []
+    if path.suffix.lower() == ".json":
+        data = json.loads(path.read_text(encoding="utf-8"))
+        items = data.get("clips", data) if isinstance(data, dict) else data
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, str):
+                    stems.append(Path(item).stem)
+                elif isinstance(item, dict):
+                    stem = item.get("stem") or item.get("id") or item.get("name") or item.get("video")
+                    if stem:
+                        stems.append(Path(str(stem)).stem)
+    elif path.suffix.lower() in (".csv", ".tsv"):
+        import csv
+        delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
+        with open(path, "r", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter=delimiter)
+            for row in reader:
+                stem = row.get("stem") or row.get("id") or row.get("name") or row.get("filename") or row.get("video")
+                if stem:
+                    stems.append(Path(str(stem)).stem)
+    return list(dict.fromkeys(stems))
+
+
+def select_clips(corpus: Path, limit: int = 0, stems_filter: list = None) -> list:
     rttm_dir = corpus / "rttm"
     wav_dir = corpus / "wav"
-    clips = []
+    available = {}
     for rttm_path in sorted(rttm_dir.glob("*.rttm")):
         wav_path = wav_dir / f"{rttm_path.stem}.wav"
         if wav_path.exists():
-            clips.append((rttm_path.stem, wav_path, rttm_path))
+            available[rttm_path.stem] = (rttm_path.stem, wav_path, rttm_path)
+
+    if stems_filter is not None:
+        clips = []
+        for stem in stems_filter:
+            if stem in available:
+                clips.append(available[stem])
+            else:
+                print(f"Avertissement: extrait '{stem}' introuvable dans {corpus}", file=sys.stderr)
+    else:
+        clips = [available[k] for k in sorted(available.keys())]
+
     return clips[:limit] if limit else clips
+
 
 
 def mux_clips(clips: list, clips_dir: Path) -> None:
@@ -159,12 +209,14 @@ def run_step3(clips_dir: Path, run_dir: Path, python_exe: Path, environment: dic
 
 def collect_outputs(clips_dir: Path, outputs_dir: Path) -> list:
     outputs_dir.mkdir(parents=True, exist_ok=True)
-    for stale in outputs_dir.glob("*_audio.json"):
-        stale.unlink()
     produced = sorted(clips_dir.glob("*_audio.json"))
-    for path in produced:
-        shutil.copy2(path, outputs_dir / path.name)
-    return [path.name for path in produced]
+    if produced:
+        for stale in outputs_dir.glob("*_audio.json"):
+            stale.unlink()
+        for path in produced:
+            shutil.copy2(path, outputs_dir / path.name)
+        return [path.name for path in produced]
+    return [path.name for path in sorted(outputs_dir.glob("*_audio.json"))]
 
 
 def parse_run_log(log_path: Path) -> dict:
@@ -211,7 +263,8 @@ def parse_run_log(log_path: Path) -> dict:
 
 
 def evaluate(reference_dir: Path, hypothesis_dir: Path, run_dir: Path, python_exe: Path,
-             baseline: str = None, require_parity: bool = False) -> tuple:
+             baseline: str = None, require_parity: bool = False,
+             clips_file: str = None, manifest: str = None) -> tuple:
     report_path = run_dir / "der_report.json"
     command = [
         str(python_exe), str(EVAL_SCRIPT),
@@ -223,6 +276,10 @@ def evaluate(reference_dir: Path, hypothesis_dir: Path, run_dir: Path, python_ex
         command.extend(["--baseline", str(Path(baseline).resolve())])
     if require_parity:
         command.append("--require-parity")
+    if clips_file:
+        command.extend(["--clips-file", str(Path(clips_file).resolve())])
+    if manifest:
+        command.extend(["--manifest", str(Path(manifest).resolve())])
     process = subprocess.run(command, text=True)
     return process.returncode, report_path
 
@@ -305,7 +362,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark DER/JER de la STEP3 audio TPU")
     parser.add_argument("--corpus", default=str(DEFAULT_CORPUS), help="Corpus (wav/ + rttm/)")
     parser.add_argument("--out", default=None, help="Répertoire de sortie (défaut: horodaté)")
-    parser.add_argument("--limit", type=int, default=5, help="Nombre d'extraits (0 = tous)")
+    parser.add_argument("--limit", type=int, default=None, help="Nombre d'extraits (défaut: 5 sans clips-file/manifest, sinon tous)")
+    parser.add_argument("--clips-file", default=None, help="Fichier texte listant les stems des extraits à évaluer")
+    parser.add_argument("--manifest", default=None, help="Fichier CSV ou JSON décrivant les extraits à évaluer")
     parser.add_argument("--baseline", default=None, help="Rapport DER de référence pour le contrôle ΔDER")
     parser.add_argument("--require-parity", action="store_true",
                         help="Interdire aussi les améliorations (|ΔDER| ≤ limite)")
@@ -332,7 +391,22 @@ def main() -> int:
         print("Lancer d'abord: python3 scripts/fetch_voxconverse_dev.py", file=sys.stderr)
         return 2
 
-    clips = select_clips(corpus, args.limit)
+    stems_filter = None
+    if args.clips_file:
+        clips_file_path = Path(args.clips_file).resolve()
+        if not clips_file_path.exists():
+            print(f"Fichier de clips introuvable : {clips_file_path}", file=sys.stderr)
+            return 2
+        stems_filter = load_stems_from_clips_file(clips_file_path)
+    elif args.manifest:
+        manifest_path = Path(args.manifest).resolve()
+        if not manifest_path.exists():
+            print(f"Fichier manifest introuvable : {manifest_path}", file=sys.stderr)
+            return 2
+        stems_filter = load_stems_from_manifest(manifest_path)
+
+    effective_limit = args.limit if args.limit is not None else (0 if stems_filter is not None else 5)
+    clips = select_clips(corpus, effective_limit, stems_filter)
     if not clips:
         print("Aucun couple WAV/RTTM trouvé.", file=sys.stderr)
         return 2
@@ -388,7 +462,8 @@ def main() -> int:
 
     timings = parse_run_log(log_path) if log_path.exists() else {"stages": {}, "segments": {}, "embeddings": {}}
     eval_code, der_report_path = evaluate(
-        corpus / "rttm", outputs_dir, run_dir, python_audio, args.baseline, args.require_parity
+        corpus / "rttm", outputs_dir, run_dir, python_audio, args.baseline, args.require_parity,
+        clips_file=args.clips_file, manifest=args.manifest,
     )
     der_report = {}
     if der_report_path.exists():
@@ -398,6 +473,8 @@ def main() -> int:
         "corpus": str(corpus),
         "clips_count": len(clips),
         "clips": [stem for stem, _, _ in clips],
+        "clips_file": str(args.clips_file) if args.clips_file else None,
+        "manifest": str(args.manifest) if args.manifest else None,
         "return_code": return_code,
         "wall_seconds": wall_seconds,
         "python_coral": str(python_coral),

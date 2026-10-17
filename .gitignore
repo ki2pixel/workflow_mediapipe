@@ -103,3 +103,6 @@ libedgetpu.deb
 # assets
 assets/
 
+# Shrimp Task Manager
+.shrimp_task_manager/
+

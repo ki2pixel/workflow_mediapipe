@@ -25,6 +25,44 @@ from pyannote.metrics.diarization import DiarizationErrorRate, JaccardErrorRate
 DEFAULT_FPS = 25.0
 
 
+def load_stems_from_clips_file(path: Path) -> list:
+    stems = []
+    content = path.read_text(encoding="utf-8")
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        stem = Path(line).stem
+        if stem not in stems:
+            stems.append(stem)
+    return stems
+
+
+def load_stems_from_manifest(path: Path) -> list:
+    stems = []
+    if path.suffix.lower() == ".json":
+        data = json.loads(path.read_text(encoding="utf-8"))
+        items = data.get("clips", data) if isinstance(data, dict) else data
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, str):
+                    stems.append(Path(item).stem)
+                elif isinstance(item, dict):
+                    stem = item.get("stem") or item.get("id") or item.get("name") or item.get("video")
+                    if stem:
+                        stems.append(Path(str(stem)).stem)
+    elif path.suffix.lower() in (".csv", ".tsv"):
+        import csv
+        delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
+        with open(path, "r", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter=delimiter)
+            for row in reader:
+                stem = row.get("stem") or row.get("id") or row.get("name") or row.get("filename") or row.get("video")
+                if stem:
+                    stems.append(Path(str(stem)).stem)
+    return list(dict.fromkeys(stems))
+
+
 def load_reference_rttm(rttm_path: Path) -> Annotation:
     """Charge une référence NIST RTTM dans une Annotation pyannote."""
     annotation = Annotation(uri=rttm_path.stem)
@@ -45,7 +83,7 @@ def load_reference_rttm(rttm_path: Path) -> Annotation:
 
 
 def load_hypothesis_json(json_path: Path) -> Annotation:
-    """Reconstruit l'hypothèse depuis ``frames_analysis`` (1 segment par frame)."""
+    """Reconstruit l'hypothèse depuis ``frames_analysis`` en fusionnant les trames contiguës de même locuteur."""
     with open(json_path, "r", encoding="utf-8") as handle:
         payload = json.load(handle)
 
@@ -56,14 +94,33 @@ def load_hypothesis_json(json_path: Path) -> Annotation:
     fps = float(payload.get("fps") or DEFAULT_FPS)
     frame_duration = 1.0 / fps
     annotation = Annotation(uri=json_path.stem)
+
+    active_segments = {}  # speaker -> [start_sec, end_sec]
+
     for item in frames:
         info = item.get("audio_info") or {}
-        if not info.get("is_speech_present"):
-            continue
         start = float(info.get("timecode_sec", 0.0))
-        frame_index = item.get("frame", 0)
-        for speaker in info.get("active_speaker_labels") or []:
-            annotation[Segment(start, start + frame_duration), f"{frame_index}_{speaker}"] = str(speaker)
+        end = start + frame_duration
+        is_speech = bool(info.get("is_speech_present"))
+        current_speakers = set(str(s) for s in (info.get("active_speaker_labels") or [])) if is_speech else set()
+
+        # Fermer les locuteurs qui ne parlent plus ou s'il y a un trou temporel
+        for speaker in list(active_segments.keys()):
+            seg_start, seg_end = active_segments[speaker]
+            if speaker not in current_speakers or abs(start - seg_end) > (frame_duration * 0.5):
+                annotation[Segment(seg_start, seg_end)] = speaker
+                del active_segments[speaker]
+
+        # Prolonger ou ouvrir les locuteurs actuels
+        for speaker in current_speakers:
+            if speaker in active_segments:
+                active_segments[speaker][1] = end
+            else:
+                active_segments[speaker] = [start, end]
+
+    for speaker, (seg_start, seg_end) in active_segments.items():
+        annotation[Segment(seg_start, seg_end)] = speaker
+
     return annotation
 
 
@@ -113,6 +170,8 @@ def main() -> int:
     parser.add_argument("--reference-dir", required=True, help="Répertoire des fichiers RTTM")
     parser.add_argument("--hypothesis-dir", required=True, help="Répertoire des fichiers <uri>_audio.json")
     parser.add_argument("--output", required=True, help="Rapport JSON de sortie")
+    parser.add_argument("--clips-file", default=None, help="Fichier texte listant les stems des extraits à évaluer")
+    parser.add_argument("--manifest", default=None, help="Fichier CSV ou JSON décrivant les extraits à évaluer")
     parser.add_argument("--baseline", default=None, help="Rapport JSON de référence (contrôle ΔDER)")
     parser.add_argument("--max-delta", type=float, default=0.05, help="ΔDER maximal autorisé (points de %%)")
     parser.add_argument("--require-parity", action="store_true",
@@ -121,13 +180,38 @@ def main() -> int:
 
     reference_dir = Path(args.reference_dir).resolve()
     hypothesis_dir = Path(args.hypothesis_dir).resolve()
-    rttm_files = sorted(reference_dir.glob("*.rttm"))
+
+    expected_stems = None
+    if args.clips_file:
+        clips_file_path = Path(args.clips_file).resolve()
+        if not clips_file_path.exists():
+            print(f"Fichier de clips introuvable : {clips_file_path}", file=sys.stderr)
+            return 1
+        expected_stems = load_stems_from_clips_file(clips_file_path)
+    elif args.manifest:
+        manifest_path = Path(args.manifest).resolve()
+        if not manifest_path.exists():
+            print(f"Fichier manifest introuvable : {manifest_path}", file=sys.stderr)
+            return 1
+        expected_stems = load_stems_from_manifest(manifest_path)
+
+    missing = []
+    if expected_stems is not None:
+        rttm_files = []
+        for stem in expected_stems:
+            rttm_path = reference_dir / f"{stem}.rttm"
+            if rttm_path.exists():
+                rttm_files.append(rttm_path)
+            else:
+                missing.append(stem)
+    else:
+        rttm_files = sorted(reference_dir.glob("*.rttm"))
+
     if not rttm_files:
-        print(f"Aucune annotation RTTM dans {reference_dir}", file=sys.stderr)
+        print(f"Aucune annotation RTTM trouvée pour l'évaluation dans {reference_dir}", file=sys.stderr)
         return 1
 
     per_file = {}
-    missing = []
     for rttm_path in rttm_files:
         hypothesis_path = hypothesis_dir / f"{rttm_path.stem}_audio.json"
         if not hypothesis_path.exists():

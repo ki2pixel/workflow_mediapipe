@@ -12,6 +12,40 @@ Cette section contient le résumé des décisions majeures jusqu'à mars 2026. P
 
 ## Octobre 2026
 
+- [2026-10-17 14:04:00] **Alignement et documentation des variables d'environnement STEP3 (.env & .env.example) (COMPLET)**
+  - **Contexte** : Suite aux optimisations Axe 1 (Stride ECAPA) et Axe 2 (YAMNet Split TPU), audit des fichiers de configuration révélant l'absence des variables de contrôle dans `.env` et `.env.example`, avec pour conséquence le maintien silencieux du modèle legacy monolithique replié sur CPU.
+  - **Décisions & Actions** :
+    1. **Activation de l'Axe 2 dans `.env`** : `STEP3_YAMNET_SPLIT=1` posé dans `.env` pour activer immédiatement le sous-graphe MobileNetV1 compilé Edge TPU (`assets/yamnet_split_edgetpu_compiled.tflite` sur `/dev/apex_0`).
+    2. **Sécurisation des seuils de production** : Maintien de `STEP3_EMBEDDING_STRIDE=1` (zéro régression acoustique), `STEP3_REQUIRE_EDGETPU=0`, `STEP3_ADAPTIVE_STRIDE=0`, `STEP3_ADAPTIVE_THRESHOLD=500`, `STEP3_DISABLE_OPENVINO=0`.
+    3. **Enrichissement de `.env.example`** : Documentation exhaustive dans la section `10. CORAL TPU ACCELERATION` de toutes les variables STEP3 TPU avec commentaires détaillés (sur le modèle de STEP4).
+    4. **Résilience CLI sans dépendance dotenv** : Implémentation de `_load_step3_env_defaults()` dans `workflow_scripts/step3/run_audio_diarization_tpu.py` pour parser automatiquement les variables `STEP3_*` et `ENABLE_CORAL_TPU*` depuis `.env` lors de l'exécution standalone (sans passer par Flask).
+  - **Validation** : 54/54 tests unitaires validés (`./scripts/run_step3_tests.sh`), conformité `validate_startup.py` vérifiée.
+
+- [2026-10-17 13:50:00] **Axe 2 STEP3 : Architecture YAMNet Split (Frontend CPU + CNN Edge TPU) (COMPLET)**
+  - **Contexte** : Levée du blocage historique de compilation de YAMNet pour le Google Coral TPU (les opérateurs STFT/LOG/SQRT du frontend audio rejetaient 50 des 53 opérateurs sur CPU, empêchant l'accélération matérielle).
+  - **Implémentation & Résultats** :
+    - **Sous-graphe CNN** : Extraction du sous-graphe MobileNetV1 en entrée `(1, 96, 64)` via `scripts/export_yamnet_split.py` hors `coral_env`.
+    - **Filtres Mel** : Matrice de filtres Mel TF exportée dans `assets/yamnet_mel_matrix.npy` (parité exacte, diff max 0.0).
+    - **Quantification PTQ INT8** : Étalonnage sur 300 patches réels variés de VoxConverse avec `tf.lite.OpsSet.TFLITE_BUILTINS_INT8`. Accord de décision binaire VAD au seuil 0.20 = **100.00 %** face au float32 (erreur absolue moyenne de 0.0017). Modèle `assets/yamnet_split_quantized.tflite` (3.73 Mo).
+    - **Compilation Edge TPU** : `edgetpu_compiler -s` génère `assets/yamnet_split_edgetpu_compiled.tflite` (4.15 Mo). **100 % des 31 opérateurs mappés sur l'Edge TPU**, 0 opérateur CPU, sous-graphe unique `edgetpu-custom-op` allouant 3.86 Mo SRAM ASIC.
+    - **Frontend CPU** : `workflow_scripts/step3/yamnet_frontend.py` en NumPy/SciPy pur (~0.42 ms par patch en RAM hôte).
+    - **Intégration & Résilience** : Intégration dans `run_audio_diarization_tpu.py` sous le drapeau `STEP3_YAMNET_SPLIT=1`. Conservation du pipeline double tampon producteur-consommateur (blocs de 256 fenêtres sous `_tpu_lock`). Repli transparent vers le modèle legacy si désactivé ou absent.
+    - **Mode strict Edge TPU** : Validation en condition réelle avec `STEP3_REQUIRE_EDGETPU=1` sur `/dev/apex_0` ; l'assertion `_assert_edgetpu_delegate_active` valide avec succès la présence effective du délégué matériel.
+    - **Bénéfice acoustique** : Sur `afjiv`, le DER passe de 82.34 % (monolithique avec VAD faussée) à 18.99 % (VAD split fidèle).
+  - **Validation** : 54/54 tests unitaires STEP3 réussis (`./scripts/run_step3_tests.sh`), contrat JSON aval (After Effects / STEP5) strictement invariant.
+
+- [2026-10-17 13:42:00] **Axe 1 STEP3 : Validation empirique Stride ECAPA (K=1 vs K=2 vs Adaptatif) (COMPLET)**
+  - **Contexte** : Exécution du plan de continuité STEP3 (`docs/WIP/Plan-Continuite-STEP3-2026-10-17.md`) sur un dataset stratifié VoxConverse de 24 clips (8 courts <2min, 8 moyens 2-5min, 8 longs >5min, 1 à 15 locuteurs) avec `STEP3_MAX_WORKERS=1` et OpenVINO batch 8.
+  - **Résultats chiffrés** :
+    - **Baseline K=1** : Durée 608.56 s (~10 min). DER strict (collar 0.00s) = **28.0066 %**, JER = **40.9709 %**, Missed = 6.77 %, FA = 6.40 %, Confusion = 14.84 %.
+    - **Candidat K=2** : Durée 343.57 s (**-43.5 % de temps d'exécution**). DER strict = **24.8479 %** (**ΔDER agrégé = -3.1587 pts**, nette amélioration globale sur monologues/dialogues longs : `aisvi` -38.0 pts, `bauzd` -21.2 pts, `ahnss` -7.58 pts).
+    - **Audit des régressions locales** : Malgré l'amélioration globale, **10 extraits sur 24 subissent une régression > 0.5 pt DER** : `bdopb` (+10.83 pts), `asxwr` (+3.18 pts), `bydui` (+2.98 pts), `ampme` (+1.90 pts), `cobal` (+1.85 pts), `fxgvy` (+1.74 pts), `aufkn` (+1.51 pts), `bxpwa` (+0.71 pts), `bwzyf` (+0.70 pts), `cjfer` (+0.64 pts). La dégradation provient quasi-exclusivement de la confusion de locuteurs sur les tours de parole courts (<2s) ou les scènes denses multi-locuteurs.
+  - **Décisions & Arbitrage** :
+    - **Défaut de production** : Maintien strict de `STEP3_EMBEDDING_STRIDE=1` par défaut en production afin de respecter la clause absolue de zéro régression acoustique locale sur les formats courts/rapides.
+    - **Règle adaptative intégrée** : Implémentation dans `workflow_scripts/step3/run_audio_diarization_tpu.py` de `_get_embedding_stride(num_speech_windows)`. Supporte les valeurs forcées (`1`, `2`), le mode adaptatif (`auto`, `adaptive` ou `STEP3_ADAPTIVE_STRIDE=1`) appliquant `stride=2` uniquement si `num_speech_windows >= STEP3_ADAPTIVE_THRESHOLD` (défaut 500 fenêtres / ~4 min).
+    - **Alternatives rejetées** : Remplacer aveuglément le défaut par `K=2` brut (inacceptable en production avec +10.8 pts de DER sur `bdopb` et dégradation systématique des clips courts à alternance rapide).
+  - **Validation** : 53/53 tests unitaires au vert (`./scripts/run_step3_tests.sh`), rapports complets archivés dans `scratch/bench_step3_der/k1_ref/` et `scratch/bench_step3_der/k2_eval/`.
+
 - [2026-10-17 12:45:00] **STEP3 audio : déterminisme, OpenVINO et stride d'embeddings (COMPLET)**
   - **Contexte** : intégration du plan `docs/recherches/audio/Optimisation-Pipeline-Diarisation-Audio-TPU.md` avec harnais acoustique VoxConverse et contrainte de non-régression DER.
   - **Décisions** :

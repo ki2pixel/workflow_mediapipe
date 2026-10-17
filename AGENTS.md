@@ -41,6 +41,7 @@ pytest tests/unit tests/integration                  # backend default
 npm run test:frontend                                # Node ESM frontend
 ./scripts/run_tests.sh                               # full coverage
 ./scripts/run_step2_tests.sh                         # scene detection only (sets PYTHONPATH)
+./scripts/run_step3_tests.sh                         # audio diarization only (TPU/ECAPA)
 ./scripts/run_step4_tests.sh                         # tracking only
 ./scripts/diagnose_tests.sh                          # drift diagnostics
 python scripts/validate_startup.py                   # blocks prod on default secrets
@@ -56,7 +57,7 @@ Authoritative rules: `./.agents/rules/codingstandards.md` (mirrored in
 - All I/O via `FilesystemService.open_path_in_explorer()` with locks; logs are
   raw `progress_text` plus streamed JSON.
 - OpenCV 5.0 workers must use `multiprocessing.get_context("spawn")` and
-  `cv2.setNumThreads(1)` (STEP 3 stays sequential — spawn cost too high).
+  `cv2.setNumThreads(1)` (STEP 2 stays sequential — spawn cost too high).
 - Frontend is immutable: `appState.setState()` shallow-diff, mutations through
   `DOMBatcher.scheduleUpdate()`, polling only via `PollingManager`. Dynamic
   HTML must pass through `DOMUpdateUtils.escapeHtml()`.

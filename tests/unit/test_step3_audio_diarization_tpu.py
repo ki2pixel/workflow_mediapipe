@@ -60,6 +60,7 @@ try:
         _get_embedding_stride,
         _nearest_embedding_indices,
         _ecapa_session_batch_size,
+        _run_yamnet_windows_blockwise,
         ECAPA_N_MELS,
         ECAPA_FIXED_N_FRAMES,
     )
@@ -476,6 +477,30 @@ class TestStep3EmbeddingStride:
         monkeypatch.setenv("STEP3_EMBEDDING_STRIDE", "invalid")
         assert _get_embedding_stride() == 1
 
+    def test_embedding_stride_adaptive(self, monkeypatch):
+        # Given: Mode auto configuré
+        monkeypatch.setenv("STEP3_EMBEDDING_STRIDE", "auto")
+        monkeypatch.delenv("STEP3_ADAPTIVE_THRESHOLD", raising=False)
+        monkeypatch.delenv("STEP3_ADAPTIVE_STRIDE", raising=False)
+
+        # When/Then: Sous le seuil (500 par défaut), reste en K=1
+        assert _get_embedding_stride(num_speech_windows=499) == 1
+
+        # When/Then: Au-delà du seuil, passe en K=2
+        assert _get_embedding_stride(num_speech_windows=500) == 2
+        assert _get_embedding_stride(num_speech_windows=1200) == 2
+
+        # Given: Seuil personnalisé via STEP3_ADAPTIVE_THRESHOLD
+        monkeypatch.setenv("STEP3_ADAPTIVE_THRESHOLD", "300")
+        assert _get_embedding_stride(num_speech_windows=299) == 1
+        assert _get_embedding_stride(num_speech_windows=300) == 2
+
+        # Given: Drapeau STEP3_ADAPTIVE_STRIDE=1 sans 'auto' explicite
+        monkeypatch.setenv("STEP3_EMBEDDING_STRIDE", "1")
+        monkeypatch.setenv("STEP3_ADAPTIVE_STRIDE", "1")
+        assert _get_embedding_stride(num_speech_windows=350) == 2
+        assert _get_embedding_stride(num_speech_windows=250) == 1
+
     def test_ecapa_batch_size_depends_on_provider(self):
         # Given: Sessions CPU et OpenVINO
         cpu_session = MagicMock()
@@ -748,6 +773,54 @@ class TestStep3EdgeTPUGuard:
 
         # When/Then: Aucune exception n'est levée
         _assert_edgetpu_delegate_active(interpreter, model_path)
+
+
+class TestStep3YamnetSplit:
+    """Validation de l'architecture YAMNet Split (Frontend CPU + CNN Edge TPU)"""
+
+    def test_run_yamnet_windows_blockwise_split_mock(self):
+        # Given: Un interpréteur split mocké
+        interpreter = MagicMock()
+        input_details = {
+            'index': 0,
+            'shape': np.array([1, 96, 64]),
+            'dtype': np.int8,
+            'quantization': (0.04, 30),
+        }
+        output_details = [
+            {'index': 1, 'shape': np.array([1, 1024]), 'dtype': np.int8, 'quantization': (0.02, -128)},
+            {'index': 2, 'shape': np.array([1, 521]), 'dtype': np.int8, 'quantization': (0.0039, -128)},
+        ]
+        interpreter.tensor.return_value = None
+
+        def get_tensor_mock(idx):
+            if idx == 2:
+                arr = np.zeros((1, 521), dtype=np.int8)
+                arr[0, 0] = 100
+                return arr
+            elif idx == 1:
+                return np.zeros((1, 1024), dtype=np.int8)
+            return None
+
+        interpreter.get_tensor.side_effect = get_tensor_mock
+
+        # When: Exécution par blocs en mode split
+        dummy_audio = np.zeros(32000, dtype=np.int16)
+        window_starts = [0, 7680]
+        mel_matrix = np.zeros((257, 64), dtype=np.float32)
+
+        probs, embeddings = _run_yamnet_windows_blockwise(
+            dummy_audio, interpreter, input_details, output_details,
+            window_starts, 15360, collect_embeddings=True,
+            is_split=True, mel_matrix=mel_matrix
+        )
+
+        # Then: Probabilités et embeddings collectés avec dé-quantification
+        assert len(probs) == 2
+        assert abs(probs[0] - (100 - (-128)) * 0.0039) < 1e-4
+        assert len(embeddings) == 2
+        assert embeddings[0].shape == (1024,)
+        assert interpreter.invoke.call_count == 2
 
 
 if __name__ == "__main__":

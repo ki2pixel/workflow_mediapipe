@@ -218,38 +218,43 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
      - Fusion des segments contigus (< 1.0s) et renommage `SPEAKER_XX` par durée décroissante.
   6. **Timeline & Export JSON Standardisé** : Alignement des segments de voix détectés à 25 fps et écriture du JSON en streaming. Le contrat aval est inchangé : clé racine `speaker_stats` (`total_time_sec`/`percentage` par locuteur) et clé `num_distinct_speakers_audio` dans `audio_info`.
 
-> **État du modèle YAMNet (constat 2026-10)** : le modèle téléchargé automatiquement
-> (`yamnet_audio_classificator_quantized_edgetpu.tflite`) **n'est pas compilé pour l'Edge TPU**.
-> Le compilateur ne mappe que 3 opérations sur 53 (frontend log-mel `LOG`/`SQRT`/`MEAN` non
-> supporté, un seul sous-graphe TPU autorisé), et la variante compilée reste à ~5,3 ms/fenêtre
-> contre ~4,9 ms sur CPU/XNNPACK. L'inférence s'exécute donc sur CPU et le script émet une
-> **erreur explicite** au démarrage (plus de repli silencieux). Pour exiger le TPU, fournir un
-> modèle réellement compilé (`edgetpu-custom-op` présent dans le flatbuffer) et définir
-> `STEP3_REQUIRE_EDGETPU=1` ; le script échoue alors si le délégué n'est pas actif.
-
+> **Architecture YAMNet Split (Edge TPU & Frontend CPU)** : Pour surmonter l'incompatibilité des
+> opérateurs du frontend Log-Mel (`STFT`, `LOG`, `SQRT`) avec le compilateur Edge TPU, le pipeline supporte
+> une architecture découplée activée via `STEP3_YAMNET_SPLIT=1` :
+> - **Frontend CPU Log-Mel** (`workflow_scripts/step3/yamnet_frontend.py`) : calcul vectorisé en NumPy (STFT 512,
+>   Hann 400, hop 160, 64 filtres Mel triangulaires pré-exportés dans `assets/yamnet_mel_matrix.npy`,
+>   log-compression et quantification INT8) avec une latence de ~0,7 ms par patch (15360 échantillons).
+> - **CNN MobileNetV1 compilé Edge TPU** (`assets/yamnet_split_edgetpu_compiled.tflite`) : sous-graphe convolutif
+>   en entrée `(1, 96, 64)` INT8, compilé à 100% sur l'Edge TPU (31/31 opérateurs mappés sur l'ASIC, 0 opérateur CPU,
+>   sous-graphe unique `edgetpu-custom-op`), exécutant chaque inférence en ~0,7 ms sur le Coral TPU.
+> - **Mode strict `STEP3_REQUIRE_EDGETPU=1`** : avec le modèle split compilé, l'accélération matérielle Edge TPU
+>   est totale et validée sans aucun repli CPU/XNNPACK.
+> - **Rétrocompatibilité** : si `STEP3_YAMNET_SPLIT=0` ou en l'absence du modèle compilé, le script bascule
+>   automatiquement sur le modèle monolithique legacy (`yamnet_audio_classificator_quantized_edgetpu.tflite`).
+>
 > ⚠️ **Ne pas utiliser `OMP_PROC_BIND=CLOSE` avec `OMP_PLACES=cores`** : dès que scikit-learn initialise
 > libgomp, l'affinité du processus est restreinte à 2 cœurs et l'inférence ECAPA devient ~5× plus lente.
 > `OMP_PROC_BIND=FALSE` (défaut du script) conserve l'affinité complète.
-
-> **Réduction du coût ECAPA** : `STEP3_EMBEDDING_STRIDE` (défaut `1`) sélectionne un d-vector toutes
-> les K fenêtres de parole et l'assigne aux fenêtres voisines par proximité temporelle. Mesures
-> VoxConverse dev (1 worker) :
 >
-> | Configuration | Extraits | Total | DER strict | Effet par extrait |
-> |---|---|---|---|---|
-> | K=1 CPU | 5 | 186 s | 36,85 % | référence |
-> | K=2 CPU | 5 | 101 s | 21,53 % | aucun extrait dégradé |
-> | K=4 CPU | 5 | 60 s | 23,90 % | akthc +4,1 pts |
-> | K=1 OpenVINO | 5 | 121 s | 36,85 % | parité exacte (ΔDER 0) |
-> | K=2 OpenVINO | 5 | **73 s** | **21,53 %** | identique au K=2 CPU |
-> | K=1 OpenVINO | 10 | 211 s | 30,25 % | référence élargie |
-> | K=2 OpenVINO | 10 | **122 s** | **21,12 %** | 3 extraits +1,5 à +3,2 pts |
+> **Réduction du coût ECAPA et Stratégie de Stride** : `STEP3_EMBEDDING_STRIDE` contrôle l'échantillonnage temporel
+> des d-vectors ECAPA-TDNN (assignation au plus proche des fenêtres non calculées) :
+> - `STEP3_EMBEDDING_STRIDE=1` (**défaut de production**) : calcul exhaustif, zéro régression acoustique.
+> - `STEP3_EMBEDDING_STRIDE=2` : sous-échantillonnage 1 sur 2 (gain de ~43,5 % sur le temps global du pipeline).
+> - `STEP3_EMBEDDING_STRIDE=auto` (ou `adaptive`, ou `STEP3_ADAPTIVE_STRIDE=1`) : règle adaptative basculant à
+>   $K=2$ uniquement si `len(speech_indices) >= STEP3_ADAPTIVE_THRESHOLD` (défaut `500` fenêtres, ~4 min de parole).
 >
-> **OpenVINO est un gain sûr** (1,5–1,7×, parité stricte) et reste le défaut. Le stride K=2 apporte
-> ~1,8× sur ECAPA et améliore le DER agrégé, mais la validation à 10 extraits montre une variabilité
-> par extrait : l'activer via `.env` (`STEP3_EMBEDDING_STRIDE=2`) **après vérification du DER par
-> extrait** sur le corpus cible. Le défaut `1` conserve la parité stricte. Le harnais contrôle la
-> non-régression agrégée (une amélioration est acceptée) ; `--require-parity` impose `|ΔDER| ≤ limite`.
+> Mesures sur le dataset stratifié VoxConverse dev (24 extraits, 1 worker OpenVINO batch 8) :
+>
+> | Configuration | Extraits | Durée totale | DER strict | JER | Régressions locales (>0,5 pt) |
+> |---|---|---|---|---|---|
+> | K=1 OpenVINO (Référence) | 24 | 608,56 s | 28,0066 % | 40,9709 % | Référence absolue |
+> | K=2 OpenVINO (Candidat) | 24 | **343,57 s** (-43,5 %) | **24,8479 %** (-3,16 pts) | 41,3107 % | **10 extraits dégradés** (+0,6 à +10,8 pts) |
+>
+> **Arbitrage industriel** : Bien que le DER agrégé s'améliore globalement de 3,16 points grâce aux monologues/dialogues
+> longs (`aisvi` -38 pts, `bauzd` -21 pts), 10 clips sur 24 subissent une régression locale significative (confusion
+> de locuteurs sur les répliques brèves <2s ou scènes denses comme `bdopb` +10,8 pts, `asxwr` +3,18 pts, `bydui` +2,98 pts).
+> Le **défaut reste donc strictement $K=1$**, garantissant une qualité acoustique déterministe sans compromis,
+> le mode adaptatif ou K=2 pouvant être activé au besoin pour les flux longs et peu denses.
 
 ## Analogie : Studio Mixage vs Transcription Cloud
 
