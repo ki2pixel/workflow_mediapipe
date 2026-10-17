@@ -1,6 +1,23 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
+- [2026-10-18 00:50:00] **Optimisations de recadrage P0 & P1 (MediaSolution-EC & After Effects CEP Panel) (COMPLET)** :
+  - **Priorité P0 (`scripts/MediaSolution-EC/MediaSolution.jsx` & `scripts/after_effects/MediaSolution-CEP/host/MediaSolution.jsx`)** :
+    - *Arbitrage audio (`audioByFrame`)* : Branchement effectif de la diarisation (`is_speech_present`, correspondance `speaker_label`/`active_speakers`/`video_speakers`, repli `jawOpen > 0.12`).
+    - *Hiérarchie 4 paliers stricte* : Parité STEP6 (`Tier 4: best_audio_face` > `Tier 3: best_audio_person` > `Tier 2: best_face` > `Tier 1: best_person`). Rejet des pistes parasites (<10% du segment et <3 frames), départage par surface moyenne de bbox (`avgArea`) en cas d'égalité stricte.
+    - *Moyenne tronquée robuste en X* : Élimination des 10% extrêmes (anti-outliers) pour les segments > 10 frames, bornage systématique via `clampAnchorToCoverage()`.
+    - *Taxonomie d'observabilité* : Extension de `LABEL_HIGH_SPREAD` (12) à tout objet (visage ou corps) ayant un spread > 200px, et ajout de `LABEL_FALLBACK_CENTER` (Rouge / 1) pour les segments non recentrés (centrage 50% par défaut). Maintien de `LABEL_STABLE: 3`.
+  - **Priorité P1 (`workflow_scripts/step6/preprocess_ae_json.py`)** :
+    - *Enrichissement frame metadata* : Injection systématique de `is_speaking` (bool) et `tier` (1..4) sur chaque objet indexé.
+    - *Pré-agrégation `segment_recommendations`* : Détection et parsing du `.csv` de scène STEP2 pour pré-calculer en amont (`recommended_object_id`, `tier`, `target_anchor_x`, `spread_x`, `needs_review`) par segment CSV.
+    - *Consommation $O(1)$ dans les deux panels JSX* : Lecture directe prioritaire de `segmentRecommendations[segment.num]`, avec maintien de `pickBestObjectInRange()` comme repli résilient.
+  - **Exclusion stricte P2** : Aucun objet nul additionnel ni animation de keyframes pour garantir l'interchangeabilité Premiere Pro (`ecproj_to_prproj.py`).
+  - **Validation & Recette** :
+    - Tests unitaires JSX unifiés (`test_step8_mediasolution.py` paramétré sur les deux `.jsx`) : conformité stricte ES3 (aucun const/let/arrow), logique moyenne tronquée, arbitrage audio, hiérarchie 4 tiers et rejet de ghost tracks testés sous Node.
+    - Suite de tests complète : **823 passés, 3 ignorés, 0 échec (100%)**.
+    - Validation sur projet réel `1795 Camille` (26 segments réels : 18 Tier 4, 6 Tier 3, 2 Tier 0 fallback).
+    - Déploiement EffectCraft synchronisé via `deploy.sh`.
+
 - [2026-10-17 20:50:00] **Benchmark STEP2 GPU Zéro-Copie & Résolution Pipelining (COMPLET)** :
   - **Diagnostic et Pipelining (`windows_per_chunk=8`)** : Résolution du sous-régime à 156.7s dû à `windows_per_chunk=50` (qui désynchronisait le pipeline sur les vidéos de 1-2 min). En calibrant `windows_per_chunk=8`, le chevauchement Ping-Pong FFmpeg / GPU s'exécute en continu sans aucune latence.
   - **Résultats comparatifs 23 vidéos** : Temps total réduit à **117.4s** (battant la baseline de 125.0s). 20/23 vidéos plus rapides que la baseline (jusqu'à +20.6% de gain unitaire, débit >680 fps). Parité stricte des détections (22/23 CSVs bit-à-bit identiques, 1 micro-scission à p=0.5001). Suite de tests unitaires (24/24) et intégration (5/5) au vert.

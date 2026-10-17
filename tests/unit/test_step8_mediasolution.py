@@ -5,6 +5,9 @@
 
 import importlib.util
 import json
+import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -579,3 +582,177 @@ class TestProgressPatterns:
         assert state.get_step_field('STEP8', 'progress_total') == 2
         assert state.get_step_field('STEP8', 'progress_current') == 1
         assert state.get_step_field('STEP8', 'progress_text') == 'clip1_9x16.ecproj'
+
+
+def _extract_jsx_function(source: str, name: str) -> str:
+    match = re.search(r"function\s+" + re.escape(name) + r"\s*\(", source)
+    assert match, f"fonction {name} introuvable"
+    start = source.index("{", match.end() - 1)
+    depth = 0
+    for index in range(start, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start():index + 1]
+    raise AssertionError(f"accolades non équilibrées pour {name}")
+
+
+def _run_node_code(code: str):
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node indisponible")
+    res = subprocess.run([node, "-e", code], capture_output=True, text=True, check=False)
+    assert res.returncode == 0, f"node error: {res.stderr}"
+    return json.loads(res.stdout.strip().splitlines()[-1])
+
+
+class TestMediaSolutionP0Optimization:
+    """Validation de la parité P0/P1 et du moteur ES3 dans MediaSolution.jsx."""
+
+    @pytest.fixture(params=[
+        "scripts/MediaSolution-EC/MediaSolution.jsx",
+        "scripts/after_effects/MediaSolution-CEP/host/MediaSolution.jsx",
+    ])
+    def jsx_source(self, request):
+        project_root = Path(__file__).resolve().parents[2]
+        jsx_path = project_root / request.param
+        return jsx_path.read_text(encoding="utf-8")
+
+    def test_es3_compliance_no_es6_features(self, jsx_source):
+        # Given: le code source de MediaSolution.jsx
+        # When: recherche des mots-clés interdits en ES3 (const, let, arrow functions)
+        has_const = bool(re.search(r"\bconst\s+[a-zA-Z_$]", jsx_source))
+        has_let = bool(re.search(r"\blet\s+[a-zA-Z_$]", jsx_source))
+        has_arrow = bool(re.search(r"\)\s*=>", jsx_source))
+
+        # Then: strict respect de la norme ES3
+        assert not has_const, "const détecté dans MediaSolution.jsx (ES3 requis)"
+        assert not has_let, "let détecté dans MediaSolution.jsx (ES3 requis)"
+        assert not has_arrow, "Fonction fléchée détectée dans MediaSolution.jsx (ES3 requis)"
+
+    def test_calculate_trimmed_stats_node(self, jsx_source):
+        # Given: fonction calculateTrimmedStats extraite du JSX
+        fn_code = _extract_jsx_function(jsx_source, "calculateTrimmedStats")
+
+        # When: exécution sur <= 10 items (arithmétique) et > 10 items (moyenne tronquée 10%)
+        js = (
+            fn_code
+            + "\nvar shortArr = [10, 20, 30];\n"
+            + "var longArr = [0, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 1000];\n"  # 14 items, k=1 -> élague 0 et 1000
+            + "var resShort = calculateTrimmedStats(shortArr);\n"
+            + "var resLong = calculateTrimmedStats(longArr);\n"
+            + "console.log(JSON.stringify({ short: resShort, long: resLong }));\n"
+        )
+        out = _run_node_code(js)
+
+        # Then:
+        assert out["short"]["average"] == 20.0
+        assert out["short"]["spread"] == 20.0
+        # Pour longArr: 14 items, les 12 du milieu valent 100 -> moyenne tronquée = 100.0, spread = 1000.0
+        assert out["long"]["average"] == 100.0
+        assert out["long"]["spread"] == 1000.0
+
+    def test_is_object_speaking_in_frame_node(self, jsx_source):
+        # Given: isFaceCandidate et isObjectSpeakingInFrame extraits du JSX
+        fn_face = _extract_jsx_function(jsx_source, "isFaceCandidate")
+        fn_speaking = _extract_jsx_function(jsx_source, "isObjectSpeakingInFrame")
+
+        # When: test des cas parole inactive, correspondance locuteur et jawOpen
+        js = (
+            fn_face + "\n" + fn_speaking + "\n"
+            + "var aSilent = { is_speech_present: false, active_speaker_labels: ['SPK1'] };\n"
+            + "var aSpeech = { is_speech_present: true, active_speaker_labels: ['SPK1'] };\n"
+            + "var objSpkMatch = { source: 'face_landmarker', speaker_label: 'SPK1' };\n"
+            + "var objSpkOther = { source: 'face_landmarker', speaker_label: 'SPK2' };\n"
+            + "var objJawOpen = { source: 'face_landmarker', jawOpen: 0.25 };\n"
+            + "var objJawClosed = { source: 'face_landmarker', jawOpen: 0.05 };\n"
+            + "console.log(JSON.stringify({\n"
+            + "  silent: isObjectSpeakingInFrame(objSpkMatch, aSilent),\n"
+            + "  match: isObjectSpeakingInFrame(objSpkMatch, aSpeech),\n"
+            + "  other: isObjectSpeakingInFrame(objSpkOther, aSpeech),\n"
+            + "  jaw: isObjectSpeakingInFrame(objJawOpen, aSpeech),\n"
+            + "  jawClosed: isObjectSpeakingInFrame(objJawClosed, aSpeech)\n"
+            + "}));\n"
+        )
+        out = _run_node_code(js)
+
+        # Then:
+        assert out["silent"] is False
+        assert out["match"] is True
+        assert out["other"] is False
+        assert out["jaw"] is True
+        assert out["jawClosed"] is False
+
+    def test_pick_best_object_in_range_4_tier_hierarchy_node(self, jsx_source):
+        # Given: fonctions extraites du JSX
+        fn_stats = _extract_jsx_function(jsx_source, "calculateTrimmedStats")
+        fn_face = _extract_jsx_function(jsx_source, "isFaceCandidate")
+        fn_speaking = _extract_jsx_function(jsx_source, "isObjectSpeakingInFrame")
+        fn_pick = _extract_jsx_function(jsx_source, "pickBestObjectInRange")
+
+        # When: scénario interview : 2 personnes à l'écran
+        # faceSilent a une surface supérieure (5000) et confiance (0.95), mais faceSpeaking a le support audio (Tier 4 vs Tier 2)
+        js = (
+            fn_stats + "\n" + fn_face + "\n" + fn_speaking + "\n" + fn_pick + "\n"
+            + "var trackingData = {\n"
+            + "  dataByFrame: {\n"
+            + "    1: [\n"
+            + "      { id: 'faceSpeaking', source: 'face_landmarker', centroid_x: 200, confidence: 0.85, bbox_surface: 1000, video_speakers: ['SPK1'] },\n"
+            + "      { id: 'faceSilent', source: 'face_landmarker', centroid_x: 800, confidence: 0.95, bbox_surface: 5000, video_speakers: [] }\n"
+            + "    ],\n"
+            + "    2: [\n"
+            + "      { id: 'faceSpeaking', source: 'face_landmarker', centroid_x: 205, confidence: 0.85, bbox_surface: 1000, video_speakers: ['SPK1'] },\n"
+            + "      { id: 'faceSilent', source: 'face_landmarker', centroid_x: 800, confidence: 0.95, bbox_surface: 5000, video_speakers: [] }\n"
+            + "    ],\n"
+            + "    3: [\n"
+            + "      { id: 'faceSpeaking', source: 'face_landmarker', centroid_x: 202, confidence: 0.85, bbox_surface: 1000, video_speakers: ['SPK1'] },\n"
+            + "      { id: 'faceSilent', source: 'face_landmarker', centroid_x: 800, confidence: 0.95, bbox_surface: 5000, video_speakers: [] }\n"
+            + "    ]\n"
+            + "  },\n"
+            + "  audioByFrame: {\n"
+            + "    1: { is_speech_present: true, active_speaker_labels: ['SPK1'] },\n"
+            + "    2: { is_speech_present: true, active_speaker_labels: ['SPK1'] },\n"
+            + "    3: { is_speech_present: true, active_speaker_labels: ['SPK1'] }\n"
+            + "  }\n"
+            + "};\n"
+            + "var pick = pickBestObjectInRange(trackingData, 1, 3, {});\n"
+            + "console.log(JSON.stringify(pick));\n"
+        )
+        out = _run_node_code(js)
+
+        # Then: Tier 4 l'emporte strictement sur Tier 2 malgré la taille supérieure du silencieux
+        assert out is not None
+        assert out["id"] == "faceSpeaking"
+        assert out["tier"] == 4
+        assert out["centerX"] == pytest.approx(202.33, abs=0.5)
+
+    def test_pick_best_object_ghost_track_rejection_node(self, jsx_source):
+        # Given: fonctions extraites du JSX
+        fn_stats = _extract_jsx_function(jsx_source, "calculateTrimmedStats")
+        fn_face = _extract_jsx_function(jsx_source, "isFaceCandidate")
+        fn_speaking = _extract_jsx_function(jsx_source, "isObjectSpeakingInFrame")
+        fn_pick = _extract_jsx_function(jsx_source, "pickBestObjectInRange")
+
+        # When: un segment de 30 frames où ghost n'apparaît que sur 1 frame (< 3 frames et 1/30 < 10%)
+        # et realFace apparaît sur 25 frames
+        js = (
+            fn_stats + "\n" + fn_face + "\n" + fn_speaking + "\n" + fn_pick + "\n"
+            + "var dataByFrame = {};\n"
+            + "for (var f = 1; f <= 25; f++) {\n"
+            + "  dataByFrame[f] = [{ id: 'realFace', source: 'face_landmarker', centroid_x: 400, confidence: 0.8, bbox_surface: 1500 }];\n"
+            + "}\n"
+            + "dataByFrame[26] = [{ id: 'ghost', source: 'face_landmarker', centroid_x: 900, confidence: 0.99, bbox_surface: 9000 }];\n"
+            + "var trackingData = { dataByFrame: dataByFrame, audioByFrame: {} };\n"
+            + "var pick = pickBestObjectInRange(trackingData, 1, 30, {});\n"
+            + "console.log(JSON.stringify(pick));\n"
+        )
+        out = _run_node_code(js)
+
+        # Then: realFace est sélectionné, le ghost est ignoré
+        assert out is not None
+        assert out["id"] == "realFace"
+        assert out["tier"] == 2
+

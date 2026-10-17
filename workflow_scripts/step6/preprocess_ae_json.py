@@ -29,6 +29,7 @@ DEFAULT_ANALYZER_CONFIG: Dict[str, Any] = {
     "CONFIDENCE_WEIGHT": 0.35,
     "LABEL_HIGH_SPREAD": 12,
     "LABEL_STABLE": 3,
+    "LABEL_FALLBACK_CENTER": 1,
 }
 
 def setup_logging(log_dir: str) -> str:
@@ -100,18 +101,29 @@ def _object_speakers(obj: Dict[str, Any]) -> List[str]:
     return _normalize_str_list(obj.get("video_speakers") or obj.get("active_speakers"))
 
 
-def _calculate_stats(values: List[float]) -> Dict[str, float]:
+def _calculate_trimmed_stats(values: List[float]) -> Dict[str, float]:
     if not values:
         return {"min": 0.0, "max": 0.0, "spread": 0.0, "average": 0.0}
     min_v = values[0]
     max_v = values[0]
-    s = 0.0
     for v in values:
-        s += v
         if v < min_v: min_v = v
         if v > max_v: max_v = v
-    avg = s / float(len(values))
-    return {"min": float(min_v), "max": float(max_v), "spread": float(max_v - min_v), "average": float(avg)}
+    spread = float(max_v - min_v)
+    count = len(values)
+    if count <= 10:
+        avg = sum(values) / float(count)
+        return {"min": float(min_v), "max": float(max_v), "spread": spread, "average": float(avg)}
+
+    sorted_v = sorted(values)
+    k = max(1, int(math.floor(count * 0.10)))
+    trimmed = sorted_v[k : count - k]
+    avg = (sum(trimmed) / float(len(trimmed))) if trimmed else (sum(values) / float(count))
+    return {"min": float(min_v), "max": float(max_v), "spread": spread, "average": float(avg)}
+
+
+def _calculate_stats(values: List[float]) -> Dict[str, float]:
+    return _calculate_trimmed_stats(values)
 
 def _compute_presence_score(presence: int, avg_confidence: float, config: Dict[str, Any]) -> float:
     if not config.get("ENABLE_CONFIDENCE_WEIGHTING", True):
@@ -263,12 +275,27 @@ def _stream_index_tracking(video_json_path: Path) -> Optional[Dict[str, Any]]:
                     conf_f = max(0.0, min(1.0, conf_f))
                     
                     speakers_out = _object_speakers(obj)
-                    
-                    out_tracked.append({
+                    jaw_open_raw = obj.get("jawOpen") if "jawOpen" in obj else obj.get("jaw_open")
+                    try: jaw_open_f = float(jaw_open_raw) if jaw_open_raw is not None else None
+                    except Exception: jaw_open_f = None
+                    speaker_label = obj.get("speaker_label")
+                    speaker_label_str = str(speaker_label) if speaker_label else None
+
+                    tracked_item: Dict[str, Any] = {
                         "id": obj_id, "centroid_x": cx_f, "source": source, "label": label,
                         "video_speakers": speakers_out, "bbox_width": bbox_w_f, "bbox_height": bbox_h_f,
                         "bbox_surface": bbox_surface, "confidence": conf_f
-                    })
+                    }
+                    if speaker_label_str:
+                        tracked_item["speaker_label"] = speaker_label_str
+                    if jaw_open_f is not None:
+                        tracked_item["jawOpen"] = jaw_open_f
+                    if "is_speaking" in obj:
+                        tracked_item["is_speaking"] = bool(obj["is_speaking"])
+                    if "tier" in obj:
+                        try: tracked_item["tier"] = int(obj["tier"])
+                        except Exception: pass
+                    out_tracked.append(tracked_item)
                 if out_tracked:
                     data_by_frame[frame_i] = out_tracked
     except ijson.JSONError as e:
@@ -448,7 +475,7 @@ def _analyze_layer(
     label_stable = int(config.get("LABEL_STABLE", DEFAULT_ANALYZER_CONFIG["LABEL_STABLE"]))
 
     label_to_apply = label_stable
-    if stats["spread"] > spread_threshold_f and target.get("source") == "face_landmarker":
+    if stats["spread"] > spread_threshold_f:
         label_to_apply = label_high
 
     reason = "fallback"
@@ -509,24 +536,291 @@ def analyze_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
 
     return results
 
-def build_ae_payload_streaming(tracking_in: Path, audio_path: Optional[Path]) -> Optional[Dict[str, Any]]:
+def _tc_to_seconds(tc: str) -> float:
+    try:
+        parts = tc.replace(",", ".").split(":")
+        if len(parts) == 3:
+            return float(parts[0]) * 3600.0 + float(parts[1]) * 60.0 + float(parts[2])
+        if len(parts) == 2:
+            return float(parts[0]) * 60.0 + float(parts[1])
+        return float(tc)
+    except Exception:
+        return 0.0
+
+
+def _parse_csv_segments(csv_path: Path, fps: float = 25.0) -> List[Dict[str, Any]]:
+    segments: List[Dict[str, Any]] = []
+    if not csv_path.exists():
+        return segments
+    try:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            lines = [line.strip() for line in f if line.strip()]
+        if not lines:
+            return segments
+
+        header = [h.strip() for h in lines[0].split(",")]
+        has_frame_cols = ("Frame In" in header and "Frame Out" in header)
+        frame_in_idx = header.index("Frame In") if "Frame In" in header else -1
+        frame_out_idx = header.index("Frame Out") if "Frame Out" in header else -1
+        no_idx = header.index("No") if "No" in header else 0
+        tc_in_idx = header.index("Timecode In") if "Timecode In" in header else 1
+        tc_out_idx = header.index("Timecode Out") if "Timecode Out" in header else 2
+
+        for i, line in enumerate(lines[1:], start=1):
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 3:
+                continue
+            seg_num = parts[no_idx] if no_idx < len(parts) else str(i)
+
+            frame_in = None
+            frame_out = None
+            if has_frame_cols and frame_in_idx < len(parts) and frame_out_idx < len(parts):
+                try:
+                    frame_in = int(parts[frame_in_idx])
+                    frame_out = int(parts[frame_out_idx])
+                except Exception:
+                    frame_in, frame_out = None, None
+
+            if frame_in is None or frame_out is None:
+                tc_in = parts[tc_in_idx] if tc_in_idx < len(parts) else "00:00:00.000"
+                tc_out = parts[tc_out_idx] if tc_out_idx < len(parts) else "00:00:00.000"
+                s_in = _tc_to_seconds(tc_in)
+                s_out = _tc_to_seconds(tc_out)
+                frame_in = int(round(s_in * fps))
+                frame_out = int(round(s_out * fps))
+
+            if frame_in is not None and frame_out is not None and frame_out >= frame_in:
+                segments.append({
+                    "num": seg_num,
+                    "start_frame": frame_in,
+                    "end_frame": frame_out
+                })
+    except Exception as e:
+        logger.warning("Erreur lecture CSV '%s': %s", csv_path, e)
+    return segments
+
+
+def compute_segment_recommendations(
+    data_by_frame: Dict[int, List[Dict[str, Any]]],
+    audio_by_frame: Dict[int, Dict[str, Any]],
+    segments: List[Dict[str, Any]],
+    config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    cfg = dict(DEFAULT_ANALYZER_CONFIG)
+    if config:
+        cfg.update(config)
+    spread_threshold = float(cfg.get("SPREAD_THRESHOLD", 200))
+    conf_weight = float(cfg.get("CONFIDENCE_WEIGHT", 0.35))
+
+    recommendations: Dict[str, Any] = {}
+
+    for seg in segments:
+        seg_num = str(seg.get("num", ""))
+        start_frame = int(seg.get("start_frame", 1))
+        end_frame = int(seg.get("end_frame", 1))
+        total_frames = max(1, end_frame - start_frame + 1)
+
+        stats_by_id: Dict[str, Dict[str, Any]] = {}
+
+        for f in range(start_frame, end_frame + 1):
+            frame_objs = data_by_frame.get(f) or []
+            audio_info = audio_by_frame.get(f)
+            speech_active = bool(audio_info and audio_info.get("is_speech_present"))
+
+            for obj in frame_objs:
+                oid = str(obj.get("id"))
+                if not oid:
+                    continue
+                is_face = (obj.get("source") == "face_landmarker" or obj.get("label") == "face")
+                if oid not in stats_by_id:
+                    stats_by_id[oid] = {
+                        "id": oid,
+                        "source": obj.get("source"),
+                        "is_face": is_face,
+                        "presence": 0,
+                        "speech_frames": 0,
+                        "conf_sum": 0.0,
+                        "area_sum": 0.0,
+                        "x_values": [],
+                    }
+                st = stats_by_id[oid]
+                if is_face:
+                    st["is_face"] = True
+                    st["source"] = "face_landmarker"
+                st["presence"] += 1
+                conf = float(obj.get("confidence", 0.5) or 0.5)
+                st["conf_sum"] += conf
+
+                surf = float(obj.get("bbox_surface") or 0.0)
+                if surf <= 0:
+                    w = float(obj.get("bbox_width") or obj.get("width") or 0.0)
+                    h = float(obj.get("bbox_height") or obj.get("height") or 0.0)
+                    surf = max(0.0, w) * max(0.0, h)
+                st["area_sum"] += surf
+
+                cx = obj.get("centroid_x") if "centroid_x" in obj else obj.get("center_x")
+                if cx is not None:
+                    try:
+                        st["x_values"].append(float(cx))
+                    except Exception:
+                        pass
+
+                if obj.get("is_speaking") or (speech_active and len(frame_objs) == 1):
+                    st["speech_frames"] += 1
+
+        best_candidate = None
+        for oid, cand in stats_by_id.items():
+            if cand["presence"] <= 0 or not cand["x_values"]:
+                continue
+            if cand["presence"] < 3 and (cand["presence"] / float(total_frames)) < 0.10:
+                continue
+
+            avg_conf = cand["conf_sum"] / float(cand["presence"])
+            speech_ratio = cand["speech_frames"] / float(cand["presence"])
+            has_audio = (cand["speech_frames"] >= 3) or (speech_ratio >= 0.20)
+
+            if has_audio and cand["is_face"]:
+                cand["tier"] = 4
+            elif has_audio and not cand["is_face"]:
+                cand["tier"] = 3
+            elif cand["is_face"]:
+                cand["tier"] = 2
+            else:
+                cand["tier"] = 1
+
+            cand["score"] = cand["presence"] * (1.0 + (avg_conf * conf_weight) + (speech_ratio * 0.50))
+            cand["avg_area"] = cand["area_sum"] / float(cand["presence"])
+
+            if best_candidate is None:
+                best_candidate = cand
+            elif cand["tier"] > best_candidate["tier"]:
+                best_candidate = cand
+            elif cand["tier"] == best_candidate["tier"]:
+                if cand["score"] > best_candidate["score"]:
+                    best_candidate = cand
+                elif math.isclose(cand["score"], best_candidate["score"], abs_tol=1e-4) and cand["avg_area"] > best_candidate["avg_area"]:
+                    best_candidate = cand
+
+        if best_candidate is not None:
+            stats = _calculate_trimmed_stats(best_candidate["x_values"])
+            spread_x = round(float(stats["spread"]), 2)
+            needs_review = bool(spread_x > spread_threshold)
+            recommendations[seg_num] = {
+                "recommended_object_id": best_candidate["id"],
+                "tier": best_candidate["tier"],
+                "target_anchor_x": round(float(stats["average"]), 2),
+                "spread_x": spread_x,
+                "needs_review": needs_review,
+                "start_frame": start_frame,
+                "end_frame": end_frame,
+            }
+        else:
+            recommendations[seg_num] = {
+                "recommended_object_id": None,
+                "tier": 0,
+                "target_anchor_x": None,
+                "spread_x": 0.0,
+                "needs_review": True,
+                "start_frame": start_frame,
+                "end_frame": end_frame,
+            }
+
+    return recommendations
+
+
+def build_ae_payload_streaming(
+    tracking_in: Path,
+    audio_path: Optional[Path],
+    csv_path: Optional[Path] = None,
+    config: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
     idx = _stream_index_tracking(tracking_in)
-    if not idx: return None
-    
+    if not idx:
+        return None
+
     audio_by_frame, audio_max_frame = _stream_index_audio(audio_path) if audio_path else ({}, None)
-    
+
+    data_by_frame_dict = idx.get("dataByFrame", {})
+    # Enrichir chaque objet frame par frame avec is_speaking (bool) et tier (1..4)
+    for frame_key, objs in data_by_frame_dict.items():
+        try:
+            frame_i = int(frame_key)
+        except Exception:
+            continue
+        audio_info = audio_by_frame.get(frame_i)
+        is_speech = bool(audio_info and audio_info.get("is_speech_present"))
+        active_speakers = _normalize_str_list(
+            (audio_info.get("active_speaker_labels") or audio_info.get("active_speakers") or audio_info.get("video_speakers"))
+            if audio_info else None
+        )
+        for obj in objs:
+            is_speaking = False
+            if is_speech:
+                if obj.get("is_speaking") is True:
+                    is_speaking = True
+                else:
+                    obj_speakers = _object_speakers(obj)
+                    if obj.get("speaker_label"):
+                        obj_speakers.append(str(obj["speaker_label"]))
+                    if active_speakers and obj_speakers and (set(active_speakers) & set(obj_speakers)):
+                        is_speaking = True
+                    elif len(objs) == 1:
+                        is_speaking = True
+                    elif (obj.get("source") == "face_landmarker" or obj.get("label") == "face") and obj.get("jawOpen") is not None and float(obj["jawOpen"]) > 0.12:
+                        is_speaking = True
+
+            is_face = (obj.get("source") == "face_landmarker" or obj.get("label") == "face")
+            if is_speaking and is_face:
+                tier = 4
+            elif is_speaking and not is_face:
+                tier = 3
+            elif is_face:
+                tier = 2
+            else:
+                tier = 1
+
+            obj["is_speaking"] = is_speaking
+            obj["tier"] = tier
+
+    # Chercher le CSV s'il n'est pas fourni explicitement
+    resolved_csv = csv_path
+    if resolved_csv is None and tracking_in.exists():
+        stem = tracking_in.stem
+        if stem.lower().endswith("_tracking"):
+            stem = stem[:-len("_tracking")]
+        elif stem.lower().endswith("_ae"):
+            stem = stem[:-len("_ae")]
+        cand_csv = tracking_in.parent / f"{stem}.csv"
+        if cand_csv.exists():
+            resolved_csv = cand_csv
+
+    segment_recommendations = None
+    if resolved_csv and resolved_csv.exists():
+        fps = float(idx.get("fps") or 25.0)
+        segments = _parse_csv_segments(resolved_csv, fps=fps)
+        if segments:
+            data_by_frame_int = _to_int_keyed_map(data_by_frame_dict)
+            segment_recommendations = compute_segment_recommendations(
+                data_by_frame_int, audio_by_frame, segments, config
+            )
+
     out: Dict[str, Any] = {
-        "schema": "ae_preprocessed", "schema_version": 1,
-        "dataByFrame": idx.get("dataByFrame", {}),
+        "schema": "ae_preprocessed",
+        "schema_version": 1,
+        "dataByFrame": data_by_frame_dict,
         "maxFrame": idx.get("maxFrame", 0),
         "audioByFrame": {str(k): v for k, v in audio_by_frame.items()},
         "audioMaxFrame": audio_max_frame,
     }
-    
+    if segment_recommendations is not None:
+        out["segment_recommendations"] = segment_recommendations
+
     for k in ('fps', 'total_frames', 'tracking_analytics', 'expression_summary', 'temporal_alignment', 'speaker_embeddings'):
-        if k in idx: out[k] = idx[k]
-        
+        if k in idx:
+            out[k] = idx[k]
+
     return out
+
 
 def _find_docs_dirs(work_dir: Path, keyword: str) -> List[Path]:
     if not work_dir.is_dir(): return []
@@ -568,8 +862,10 @@ def preprocess_docs_dir(docs_dir: Path) -> int:
 
         audio_path = docs_dir / f"{stem}{AUDIO_SUFFIX}"
         audio_path_real = audio_path if audio_path.exists() else None
+        csv_path = docs_dir / f"{stem}.csv"
+        csv_path_real = csv_path if csv_path.exists() else None
 
-        payload = build_ae_payload_streaming(tracking_in, audio_path_real)
+        payload = build_ae_payload_streaming(tracking_in, audio_path_real, csv_path_real)
         if payload is None:
             continue
 

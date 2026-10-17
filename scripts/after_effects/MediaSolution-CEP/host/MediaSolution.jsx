@@ -151,8 +151,9 @@
          SPREAD_THRESHOLD: 200,
          ENABLE_CONFIDENCE_WEIGHTING: true,
          CONFIDENCE_WEIGHT: 0.35,
-         LABEL_HIGH_SPREAD: 12, // Red/Purple
-         LABEL_STABLE: 3,       // Green
+         LABEL_HIGH_SPREAD: 12, // Brown / High horizontal spread (> 200px)
+         LABEL_STABLE: 3,       // Aqua / Stable recentered
+         LABEL_FALLBACK_CENTER: 1, // Red / Centered fallback
          JSON_CHUNK_SIZE_CHARS: (256 * 1024),
          MAX_FULL_JSON_READ_BYTES: (50 * 1024 * 1024)
       },
@@ -1117,83 +1118,43 @@
 
             // Apply Intelligent Recentering if data exists
             var recenteringApplied = false;
-            if (trackingData && trackingData.dataByFrame && Object.keys(trackingData.dataByFrame).length > 0) {
-               var minFrame = Math.floor(layerInPoint * frameRate);
-               var maxFrame = Math.ceil(layerOutPoint * frameRate);
-               var objectsInSegment = {};
+            var pick = null;
+            var segRec = (trackingData && trackingData.segmentRecommendations)
+               ? trackingData.segmentRecommendations[currentSegment.num]
+               : null;
 
-               for (var f = minFrame; f <= maxFrame; f++) {
-                  var frameObjs = trackingData.dataByFrame[f];
-                  if (frameObjs) {
-                     for (var k = 0; k < frameObjs.length; k++) {
-                        var obj = frameObjs[k];
-                        if (!objectsInSegment[obj.id]) {
-                           objectsInSegment[obj.id] = {
-                              id: obj.id,
-                              source: obj.source,
-                              x_values: [],
-                              confidence_values: [],
-                              bbox_surfaces: [],
-                              total_bbox_surface: 0
-                           };
-                        }
-                        objectsInSegment[obj.id].x_values.push(obj.centroid_x);
-                        objectsInSegment[obj.id].confidence_values.push(obj.confidence);
-                        objectsInSegment[obj.id].bbox_surfaces.push(obj.bbox_surface);
-                        objectsInSegment[obj.id].total_bbox_surface += obj.bbox_surface;
-                     }
-                  }
+            if (segRec && segRec.target_anchor_x !== undefined && segRec.target_anchor_x !== null) {
+               var isFaceRec = (segRec.recommended_tier === 4 || segRec.recommended_tier === 2 ||
+                  segRec.recommended_tier_name === "best_audio_face" || segRec.recommended_tier_name === "best_face");
+               pick = {
+                  id: segRec.recommended_object_id,
+                  source: isFaceRec ? "face_landmarker" : "object_detector",
+                  centerX: segRec.target_anchor_x,
+                  spread: (typeof segRec.spread_x === "number") ? segRec.spread_x : 0,
+                  tier: segRec.tier,
+                  fromRecommendation: true
+               };
+            } else if (trackingData && trackingData.dataByFrame) {
+               pick = pickBestObjectInRange(trackingData, frameRate, layerInPoint, layerOutPoint, G.CONFIG);
+            }
+
+            if (pick) {
+               var isHighSpread = (pick.spread > G.CONFIG.SPREAD_THRESHOLD);
+               var labelColor = isHighSpread ? G.CONFIG.LABEL_HIGH_SPREAD : G.CONFIG.LABEL_STABLE;
+
+               // Use target average X as new Anchor Point X, borné à la couverture du calque
+               var currentAnchor = newLayer.property("Anchor Point").value;
+               var layerScale = newLayer.property("Scale").value[0] || G.CONFIG.defaultVideoScaleX || 100;
+               var anchorX = clampAnchorToCoverage(pick.centerX, layerCache.compWidth, newLayer.width, layerScale);
+               if (Math.abs(anchorX - pick.centerX) > 0.5) {
+                  logMessage("Segment " + currentSegment.num + " : ancre ramenée de " + Math.round(pick.centerX) +
+                     " à " + Math.round(anchorX) + " px (cadrage limité par la couverture de la composition)", 'warning');
                }
-
-               var bestCandidate = null;
-               var maxScore = -1;
-
-               for (var id in objectsInSegment) {
-                  var cand = objectsInSegment[id];
-                  // Safe reduce
-                  var avgConf = 0;
-                  if (cand.confidence_values.length > 0) {
-                     var sumConf = 0;
-                     for (var ci = 0; ci < cand.confidence_values.length; ci++) sumConf += cand.confidence_values[ci];
-                     avgConf = sumConf / cand.confidence_values.length;
-                  }
-
-                  var presence = cand.x_values.length;
-                  var score = computePresenceScore(presence, avgConf);
-
-                  if (score > maxScore) {
-                     maxScore = score;
-                     bestCandidate = cand;
-                  } else if (score === maxScore) {
-                     var avgSurf = cand.bbox_surfaces.length ? cand.total_bbox_surface / cand.bbox_surfaces.length : 0;
-                     var bestAvgSurf = 0;
-                     if (bestCandidate && bestCandidate.bbox_surfaces.length) {
-                        bestAvgSurf = bestCandidate.total_bbox_surface / bestCandidate.bbox_surfaces.length;
-                     }
-                     if (avgSurf > bestAvgSurf) bestCandidate = cand;
-                  }
-               }
-
-               if (bestCandidate) {
-                  var stats = calculateStats(bestCandidate.x_values);
-                  var centerX = stats.average;
-                  var spread = stats.spread;
-                  var labelColor = (spread > G.CONFIG.SPREAD_THRESHOLD && bestCandidate.source === "face_landmarker") ? G.CONFIG.LABEL_HIGH_SPREAD : G.CONFIG.LABEL_STABLE;
-
-                  // Use target average X as new Anchor Point X, borné à la couverture du calque
-                  var currentAnchor = newLayer.property("Anchor Point").value;
-                  var layerScale = newLayer.property("Scale").value[0] || G.CONFIG.defaultVideoScaleX || 100;
-                  var anchorX = clampAnchorToCoverage(centerX, layerCache.compWidth, newLayer.width, layerScale);
-                  if (Math.abs(anchorX - centerX) > 0.5) {
-                     logMessage("Segment " + currentSegment.num + " : ancre ramenée de " + Math.round(centerX) +
-                        " à " + Math.round(anchorX) + " px (cadrage limité par la couverture de la composition)", 'warning');
-                  }
-                  newLayer.property("Anchor Point").setValue([anchorX, currentAnchor[1], 0]);
-                  // Center the layer in the comp
-                  newLayer.property("Position").setValue([layerCache.compWidth / 2, 0, 0]);
-                  newLayer.label = labelColor;
-                  recenteringApplied = true;
-               }
+               newLayer.property("Anchor Point").setValue([anchorX, currentAnchor[1], 0]);
+               // Center the layer in the comp
+               newLayer.property("Position").setValue([layerCache.compWidth / 2, 0, 0]);
+               newLayer.label = labelColor;
+               recenteringApplied = true;
             }
 
             // Fallback if no recentering applied (or no data found)
@@ -1201,6 +1162,9 @@
                newLayer.property("Scale").setValue(layerCache.scale);
                newLayer.property("Anchor Point").setValue(layerCache.anchorPoint);
                newLayer.property("Position").setValue(layerCache.position);
+               try {
+                  newLayer.label = G.CONFIG.LABEL_FALLBACK_CENTER || 1;
+               } catch (eFallbackLabel) { }
             }
 
             createdCount++;
@@ -1381,6 +1345,221 @@
          spread: maxVal - minVal,
          average: sum / len,
          count: len
+      };
+   }
+
+   function calculateTrimmedStats(numberArray) {
+      if (!numberArray || numberArray.length === 0) return { min: 0, max: 0, spread: 0, average: 0, count: 0 };
+      var count = numberArray.length;
+      var sum = 0;
+      var minVal = numberArray[0];
+      var maxVal = numberArray[0];
+      for (var i = 0; i < count; i++) {
+         var v = numberArray[i];
+         sum += v;
+         if (v < minVal) minVal = v;
+         if (v > maxVal) maxVal = v;
+      }
+      var spread = maxVal - minVal;
+      if (count <= 10) {
+         return { min: minVal, max: maxVal, spread: spread, average: sum / count, count: count };
+      }
+
+      var sorted = [];
+      for (var s = 0; s < count; s++) sorted.push(numberArray[s]);
+      sorted.sort(function (a, b) { return a - b; });
+
+      var k = Math.floor(count * 0.10);
+      if (k < 1) k = 1;
+      var trimmedSum = 0;
+      var trimmedCount = 0;
+      for (var t = k; t < count - k; t++) {
+         trimmedSum += sorted[t];
+         trimmedCount++;
+      }
+      var trimmedAvg = (trimmedCount > 0) ? (trimmedSum / trimmedCount) : (sum / count);
+      return { min: minVal, max: maxVal, spread: spread, average: trimmedAvg, count: count };
+   }
+
+   function isFaceCandidate(obj) {
+      if (!obj) return false;
+      var src = (obj.source || obj.label || "").toLowerCase();
+      return src.indexOf("face") !== -1;
+   }
+
+   function isObjectSpeakingInFrame(obj, audioFrame) {
+      if (!audioFrame || !audioFrame.is_speech_present) {
+         return false;
+      }
+      if (obj.is_speaking === true || obj.audio_match === true) {
+         return true;
+      }
+      var activeSpeakers = audioFrame.active_speaker_labels || audioFrame.active_speakers || audioFrame.video_speakers || [];
+      if (activeSpeakers && activeSpeakers.length > 0) {
+         if (obj.speaker_label) {
+            for (var s = 0; s < activeSpeakers.length; s++) {
+               if (activeSpeakers[s] === obj.speaker_label) return true;
+            }
+         }
+         var objSpeakers = obj.video_speakers || obj.active_speakers || [];
+         if (objSpeakers && objSpeakers.length > 0) {
+            for (var os = 0; os < objSpeakers.length; os++) {
+               for (var as = 0; as < activeSpeakers.length; as++) {
+                  if (objSpeakers[os] === activeSpeakers[as]) return true;
+               }
+            }
+         }
+      }
+      var jaw = (typeof obj.jawOpen === "number") ? obj.jawOpen : (typeof obj.jaw_open === "number" ? obj.jaw_open : null);
+      if (isFaceCandidate(obj) && jaw !== null && jaw > 0.12) {
+         return true;
+      }
+      return false;
+   }
+
+   // Sélection robuste alignée STEP6 (4 paliers + arbitrage audio + moyenne tronquée)
+   function pickBestObjectInRange(trackingData, p2, p3, p4, p5) {
+      var dataByFrame = trackingData && trackingData.dataByFrame ? trackingData.dataByFrame : null;
+      if (!dataByFrame) return null;
+      var audioByFrame = trackingData.audioByFrame || {};
+
+      var minFrame, maxFrame, cfg;
+      if (arguments.length >= 4 && typeof p3 === "number" && typeof p4 === "number") {
+         var frameRate = p2;
+         var inPoint = p3;
+         var outPoint = p4;
+         cfg = p5 || G.CONFIG || {};
+         minFrame = Math.floor(inPoint * frameRate);
+         maxFrame = Math.ceil(outPoint * frameRate);
+      } else {
+         minFrame = p2;
+         maxFrame = p3;
+         cfg = p4 || G.CONFIG || {};
+      }
+
+      var totalSegmentFrames = Math.max(1, maxFrame - minFrame + 1);
+      var statsById = {};
+      var seen = 0;
+
+      for (var f = minFrame; f <= maxFrame; f++) {
+         var frameObjs = dataByFrame[f];
+         if (!frameObjs || !frameObjs.length) continue;
+         var audioFrame = audioByFrame[f] || null;
+         var speechActiveOnFrame = Boolean(audioFrame && audioFrame.is_speech_present);
+
+         for (var i = 0; i < frameObjs.length; i++) {
+            var obj = frameObjs[i];
+            if (!obj) continue;
+            var id = String(obj.id !== undefined ? obj.id : obj.object_id);
+            if (!statsById[id]) {
+               statsById[id] = {
+                  id: id,
+                  source: obj.source,
+                  isFace: isFaceCandidate(obj),
+                  presence: 0,
+                  speechFrames: 0,
+                  confSum: 0,
+                  areaSum: 0,
+                  xValues: [],
+                  minX: Infinity,
+                  maxX: -Infinity
+               };
+            }
+            var st = statsById[id];
+            if (isFaceCandidate(obj)) {
+               st.isFace = true;
+               st.source = "face_landmarker";
+            }
+            st.presence += 1;
+            var conf = (typeof obj.confidence === "number") ? obj.confidence : 0.5;
+            st.confSum += conf;
+
+            var surf = 0;
+            if (typeof obj.bbox_surface === "number" && obj.bbox_surface > 0) {
+               surf = obj.bbox_surface;
+            } else if (typeof obj.bbox_width === "number" && typeof obj.bbox_height === "number") {
+               surf = obj.bbox_width * obj.bbox_height;
+            } else if (typeof obj.width === "number" && typeof obj.height === "number") {
+               surf = obj.width * obj.height;
+            }
+            st.areaSum += surf;
+
+            var cx = (typeof obj.centroid_x === "number") ? obj.centroid_x : ((typeof obj.center_x === "number") ? obj.center_x : null);
+            if (cx !== null && !isNaN(cx)) {
+               st.xValues.push(cx);
+               if (cx < st.minX) st.minX = cx;
+               if (cx > st.maxX) st.maxX = cx;
+            }
+
+            if (isObjectSpeakingInFrame(obj, audioFrame) || (speechActiveOnFrame && frameObjs.length === 1)) {
+               st.speechFrames += 1;
+            }
+            seen++;
+         }
+      }
+
+      if (seen === 0) return null;
+
+      var bestCandidate = null;
+      var confWeight = (cfg && typeof cfg.CONFIDENCE_WEIGHT === "number") ? cfg.CONFIDENCE_WEIGHT : 0.35;
+
+      for (var key in statsById) {
+         if (!Object.prototype.hasOwnProperty.call(statsById, key)) continue;
+         var cand = statsById[key];
+         if (cand.presence <= 0 || cand.xValues.length === 0) continue;
+
+         // Rejeter les pistes parasites / fantômes (< 10 % du segment et < 3 frames)
+         if (cand.presence < 3 && (cand.presence / totalSegmentFrames) < 0.10) {
+            continue;
+         }
+
+         var avgConf = cand.confSum / cand.presence;
+         var speechRatio = cand.speechFrames / cand.presence;
+         var hasAudioSupport = (cand.speechFrames >= 3) || (speechRatio >= 0.20);
+
+         // Hiérarchie de sélection à 4 paliers (Parité STEP6) :
+         // Tier 4: best_audio_face
+         // Tier 3: best_audio_person
+         // Tier 2: best_face
+         // Tier 1: best_person
+         if (hasAudioSupport && cand.isFace) {
+            cand.tier = 4;
+         } else if (hasAudioSupport && !cand.isFace) {
+            cand.tier = 3;
+         } else if (cand.isFace) {
+            cand.tier = 2;
+         } else {
+            cand.tier = 1;
+         }
+
+         cand.score = cand.presence * (1.0 + (avgConf * confWeight) + (speechRatio * 0.50));
+         cand.avgArea = cand.areaSum / cand.presence;
+         cand.spreadX = (cand.maxX > cand.minX && cand.maxX !== -Infinity) ? (cand.maxX - cand.minX) : 0;
+
+         if (!bestCandidate) {
+            bestCandidate = cand;
+         } else if (cand.tier > bestCandidate.tier) {
+            bestCandidate = cand;
+         } else if (cand.tier === bestCandidate.tier) {
+            if (cand.score > bestCandidate.score) {
+               bestCandidate = cand;
+            } else if (Math.abs(cand.score - bestCandidate.score) < 1e-4 && cand.avgArea > bestCandidate.avgArea) {
+               bestCandidate = cand;
+            }
+         }
+      }
+
+      if (!bestCandidate) return null;
+
+      // Moyenne tronquée robuste en X (Anti-Outliers)
+      var stats = calculateTrimmedStats(bestCandidate.xValues);
+      return {
+         id: bestCandidate.id,
+         source: bestCandidate.source || (bestCandidate.isFace ? "face_landmarker" : "object_detector"),
+         centerX: stats.average,
+         spread: stats.spread,
+         samples: stats.count,
+         tier: bestCandidate.tier
       };
    }
 
@@ -1578,6 +1757,12 @@
             var bbox_surface = (!isNaN(bbox_width) && !isNaN(bbox_height)) ? bbox_width * bbox_height : 0;
             var confidence = parseFloat(obj.confidence);
             if (isNaN(confidence)) confidence = 0;
+            var jawOpenVal = null;
+            if (typeof obj.jawOpen === "number") jawOpenVal = obj.jawOpen;
+            else if (typeof obj.jaw_open === "number") jawOpenVal = obj.jaw_open;
+            var isSpeakingVal = (obj.is_speaking === true || obj.is_speaking === 1);
+            var tierVal = (typeof obj.tier === "number") ? obj.tier : null;
+            var speakerLabelVal = obj.speaker_label ? String(obj.speaker_label) : null;
 
             if (!extractedData[frameNum]) extractedData[frameNum] = [];
             extractedData[frameNum].push({
@@ -1585,11 +1770,15 @@
                centroid_x: centroid_x,
                source: source,
                label: label,
-               video_speakers: normalizeToStringArray(obj.active_speakers),
+               speaker_label: speakerLabelVal,
+               video_speakers: normalizeToStringArray(obj.active_speakers || obj.video_speakers),
                bbox_width: bbox_width || 0,
                bbox_height: bbox_height || 0,
                bbox_surface: bbox_surface,
-               confidence: confidence
+               confidence: confidence,
+               jawOpen: jawOpenVal,
+               is_speaking: isSpeakingVal,
+               tier: tierVal
             });
          }
       }
@@ -1597,25 +1786,58 @@
    }
 
    function loadVideoTrackingData(videoJsonFile, minFrame, maxFrame) {
-      if (!videoJsonFile || !videoJsonFile.exists) return { dataByFrame: {}, maxFrame: 0 };
+      var empty = { dataByFrame: {}, maxFrame: 0, audioByFrame: {}, segmentRecommendations: null };
+      if (!videoJsonFile || !videoJsonFile.exists) return empty;
 
+      var root = null;
       if (isAePreprocessedJsonFile(videoJsonFile)) {
-         var root = readAndParseJsonRoot(videoJsonFile.fsName);
+         root = readAndParseJsonRoot(videoJsonFile.fsName);
          if (root && root.dataByFrame) {
             return {
                dataByFrame: root.dataByFrame || {},
                maxFrame: root.maxFrame || 0,
-               audioByFrame: root.audioByFrame || {}
+               audioByFrame: root.audioByFrame || {},
+               segmentRecommendations: root.segment_recommendations || root.segmentRecommendations || null
             };
          }
       }
 
       try {
          if (videoJsonFile.length && videoJsonFile.length < G.CONFIG.MAX_FULL_JSON_READ_BYTES) {
-            var root = readAndParseJsonRoot(videoJsonFile.fsName);
+            root = readAndParseJsonRoot(videoJsonFile.fsName);
             if (root && root.frames_analysis && (root.frames_analysis instanceof Array)) {
                var idx = indexReducedTrackingFrames(root.frames_analysis);
-               return idx;
+               var segRec = root.segment_recommendations || root.segmentRecommendations || null;
+               var audioByFrame = {};
+               try {
+                  var jsonName = videoJsonFile.name;
+                  var audioStem = jsonName;
+                  if (audioStem.lastIndexOf("_tracking.json") > -1) {
+                     audioStem = audioStem.substring(0, audioStem.lastIndexOf("_tracking.json"));
+                  } else if (audioStem.lastIndexOf(".json") > -1) {
+                     audioStem = audioStem.substring(0, audioStem.lastIndexOf(".json"));
+                  }
+                  var audioFile = new File(videoJsonFile.parent.fsName + "/" + audioStem + "_audio.json");
+                  if (audioFile.exists) {
+                     var audioRoot = readAndParseJsonRoot(audioFile.fsName);
+                     if (audioRoot && audioRoot.frames && (audioRoot.frames instanceof Array)) {
+                        for (var af = 0; af < audioRoot.frames.length; af++) {
+                           var aFrame = audioRoot.frames[af];
+                           if (aFrame && aFrame.audio_info) {
+                              audioByFrame[parseInt(aFrame.frame, 10)] = aFrame.audio_info;
+                           }
+                        }
+                     } else if (audioRoot && audioRoot.audioByFrame) {
+                        audioByFrame = audioRoot.audioByFrame;
+                     }
+                  }
+               } catch (eAudio) { }
+               return {
+                  dataByFrame: idx.dataByFrame,
+                  maxFrame: idx.maxFrame,
+                  audioByFrame: audioByFrame,
+                  segmentRecommendations: segRec
+               };
             }
          }
       } catch (e) { }

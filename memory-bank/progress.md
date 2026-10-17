@@ -1,9 +1,13 @@
 # Suivi de Progression
 
 ## Statut de Session
-- Aucune tâche active (dernière tâche clôturée : modernisation STEP3 audio TPU — DER/JER VoxConverse, OpenVINO, stride, 2026-10-17).
+- Optimisations P0/P1 de cadrage STEP8 appliquées et validées sur les deux déclinaisons (EffectCraft et After Effects CEP Panel).
 
-- [2026-10-17 14:40:00] **Alignement règles et standards (AGENTS.md & codingstandards.md) (COMPLET)** :
+- [2026-10-18 00:50:00] **Parité Cadrage STEP8 P0/P1 sur After Effects CEP Panel (COMPLET)** :
+  - **Alignement `scripts/after_effects/MediaSolution-CEP/host/MediaSolution.jsx`** : Intégration de l'arbitrage audio (`isObjectSpeakingInFrame`), de la sélection à 4 tiers (`best_audio_face` > `best_audio_person` > `best_face` > `best_person`), de la moyenne tronquée en X à 10% (`calculateTrimmedStats`), du rejet des pistes fantômes (<10% et <3 frames), de la consommation $O(1)$ de `segment_recommendations` pré-agrégés en STEP6, et de la gestion des libellés (`LABEL_HIGH_SPREAD: 12`, `LABEL_FALLBACK_CENTER: 1`, `LABEL_STABLE: 3`).
+  - **Harnais de test unifié** : Paramétrage de la fixture `jsx_source` dans `tests/unit/test_step8_mediasolution.py` pour tester systématiquement les deux variantes (.jsx EffectCraft et .jsx CEP). Validation 100% de conformité ES3 et de logique sous Node.
+  - **Validation suite complète** : 823/823 tests passés avec succès (0 régression).
+
   - **AGENTS.md** : Ajout de la commande dédiée `./scripts/run_step3_tests.sh` et correction d'une coquille historique résiduelle désignant la détection de transitions séquentielle comme `STEP 2` (au lieu de `STEP 3`).
   - **codingstandards.md** : Rectification des numérotations d'étapes (audio = STEP3, transitions = STEP2, AE preprocessing = STEP6), enrichissement de la STEP3 TPU avec l'architecture YAMNet Split (`STEP3_YAMNET_SPLIT=1`) et la règle adaptative de Stride ECAPA, ajout du niveau `STEP4_TPU_FAST=1` (-34% temps/frame) et du profilage d'étages `STEP4_TPU_PROFILING_DIR`. Validation : tests STEP3 (54/54) et STEP4 (67/67) au vert.
 
