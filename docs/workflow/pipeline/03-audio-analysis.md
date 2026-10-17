@@ -208,15 +208,48 @@ Lorsque `ENABLE_CORAL_TPU_ACCELERATION=true` est configuré dans le fichier `.en
 * **Script d'exécution** : `workflow_scripts/step3/run_audio_diarization_tpu.py`
 * **Fonctionnement** :
   1. **Extraction audio** : FFmpeg convertit la vidéo en fichier audio WAV 16kHz mono.
-  2. **VAD par fenêtrage glissant (Edge TPU)** : Inférence séquentielle du modèle quantifié YAMNet INT8 sur le Coral TPU avec 50% de recouvrement (hop size de 0.48s pour une fenêtre d'analyse de 0.96s), préservant la sensibilité pour les interjections et mots courts.
-  3. **Lissage VAD et FSM Hangover** : Application d'un filtre médian 1D (taille 5) sur les probabilités de parole et application d'un seuil calibré à $0.20$ pour compenser le tassement probabiliste (Softmax squashing) de la quantification INT8. Une Machine à États Finis (FSM) avec temps de maintien (*hangover*) de 1.0s relie les micro-silences physiologiques intra-mots.
-  4. **Speaker Embedding (ECAPA-TDNN CPU)** : Pour chaque fenêtre de parole valide, extraction de d-vectors (embeddings de locuteur) de 192 dimensions via le modèle ECAPA-TDNN Float32 s'exécutant sur le CPU (XNNPACK). Cela évite les pertes de précision massives inhérentes à la quantification INT8 des embeddings.
-  5. **Diarisation (AHC adaptatif sur CPU)** : 
-     - Calcul des distances cosinus sur les d-vectors normalisés L2.
-     - Clustering par Agglomération Hiérarchique (AHC) avec liaison moyenne et seuil de distance optimal de 0.32.
-     - Estimation automatique du nombre de locuteurs par Eigen-gap et Silhouette Score (évitant la division fictive des monologues).
-     - Réassignation des locuteurs mineurs (durée cumulée de parole < 7.0s) vers les locuteurs majeurs.
-  6. **Timeline & Export JSON Standardisé** : Alignement des segments de voix détectés à 25 fps et écriture du JSON en streaming. Pour une compatibilité structurelle totale avec STEP4/6, le fichier JSON contient la clé racine `speaker_stats` (durée et pourcentage par locuteur) et la clé `num_distinct_speakers_audio` dans `audio_info`.
+  2. **VAD par fenêtrage glissant (Edge TPU)** : Inférence du modèle quantifié YAMNet INT8 sur le Coral TPU avec 50% de recouvrement (hop size de 0.48s pour une fenêtre d'analyse de 0.96s). Un pipeline producteur-consommateur à double tampon (blocs de 256 fenêtres) quantifie le bloc suivant en RAM hôte pendant que l'ASIC traite le bloc courant ; le verrou TPU est acquis une fois par bloc et les tenseurs transitent par les vues directes `interpreter.tensor()` (sans copie `set_tensor`/`get_tensor`). L'activation effective du délégué est vérifiée au démarrage via la présence de `edgetpu-custom-op` ; le repli CPU/XNNPACK est journalisé en erreur (bloquant avec `STEP3_REQUIRE_EDGETPU=1`).
+  3. **Lissage VAD et FSM Hangover** : Noyau Numba JIT fusionnant le filtre médian 1D (taille 5, bordure zéro identique à `scipy.signal.medfilt`), le seuillage strict à $0.20$ et la Machine à États Finis (FSM) avec *hangover* de 1.0s (3 trames à 0.48s) qui relie les micro-silences physiologiques intra-mots.
+  4. **Speaker Embedding (ECAPA-TDNN CPU)** : Extraction de d-vectors 192D via **ONNX Runtime FP32** (jamais de quantification INT8). Session unique partagée (`ORT_SEQUENTIAL`, `intra_op_num_threads = cœurs physiques − 1`, `OMP_WAIT_POLICY=PASSIVE`, `OMP_PROC_BIND=FALSE`, `allow_spinning=0`), IOBinding zéro-copie sur l'entrée (`OrtValue`) et inférence sérialisée. Si `onnxruntime-openvino` est installé, l'**EP OpenVINO CPU FP32** est sélectionné automatiquement (batch 8, +1,5× mesuré) ; `STEP3_DISABLE_OPENVINO=1` force le CPU. Le Log-Mel est calculé par lots (vue glissante zéro-copie + `scipy.fft.rfft` multithreadé + projection Mel BLAS + CMN NumPy en place), avec une erreur maximale < 1e-6 par rapport à la chaîne SciPy historique.
+  5. **Diarisation (AHC sur CPU)** :
+     - Normalisation L2, matrice de Gram BLAS et vecteur de distances cosinus condensé (`N(N−1)/2`).
+     - `fastcluster.linkage(method='average')` (repli automatique sur `scipy.cluster.hierarchy`) avec coupure stricte `t = np.nextafter(0.32, 0.0)` pour une parité exacte avec scikit-learn.
+     - Réassignation des locuteurs mineurs (durée cumulée de parole < 7.0s) vectorisée par produit matriciel BLAS.
+     - Fusion des segments contigus (< 1.0s) et renommage `SPEAKER_XX` par durée décroissante.
+  6. **Timeline & Export JSON Standardisé** : Alignement des segments de voix détectés à 25 fps et écriture du JSON en streaming. Le contrat aval est inchangé : clé racine `speaker_stats` (`total_time_sec`/`percentage` par locuteur) et clé `num_distinct_speakers_audio` dans `audio_info`.
+
+> **État du modèle YAMNet (constat 2026-10)** : le modèle téléchargé automatiquement
+> (`yamnet_audio_classificator_quantized_edgetpu.tflite`) **n'est pas compilé pour l'Edge TPU**.
+> Le compilateur ne mappe que 3 opérations sur 53 (frontend log-mel `LOG`/`SQRT`/`MEAN` non
+> supporté, un seul sous-graphe TPU autorisé), et la variante compilée reste à ~5,3 ms/fenêtre
+> contre ~4,9 ms sur CPU/XNNPACK. L'inférence s'exécute donc sur CPU et le script émet une
+> **erreur explicite** au démarrage (plus de repli silencieux). Pour exiger le TPU, fournir un
+> modèle réellement compilé (`edgetpu-custom-op` présent dans le flatbuffer) et définir
+> `STEP3_REQUIRE_EDGETPU=1` ; le script échoue alors si le délégué n'est pas actif.
+
+> ⚠️ **Ne pas utiliser `OMP_PROC_BIND=CLOSE` avec `OMP_PLACES=cores`** : dès que scikit-learn initialise
+> libgomp, l'affinité du processus est restreinte à 2 cœurs et l'inférence ECAPA devient ~5× plus lente.
+> `OMP_PROC_BIND=FALSE` (défaut du script) conserve l'affinité complète.
+
+> **Réduction du coût ECAPA** : `STEP3_EMBEDDING_STRIDE` (défaut `1`) sélectionne un d-vector toutes
+> les K fenêtres de parole et l'assigne aux fenêtres voisines par proximité temporelle. Mesures
+> VoxConverse dev (1 worker) :
+>
+> | Configuration | Extraits | Total | DER strict | Effet par extrait |
+> |---|---|---|---|---|
+> | K=1 CPU | 5 | 186 s | 36,85 % | référence |
+> | K=2 CPU | 5 | 101 s | 21,53 % | aucun extrait dégradé |
+> | K=4 CPU | 5 | 60 s | 23,90 % | akthc +4,1 pts |
+> | K=1 OpenVINO | 5 | 121 s | 36,85 % | parité exacte (ΔDER 0) |
+> | K=2 OpenVINO | 5 | **73 s** | **21,53 %** | identique au K=2 CPU |
+> | K=1 OpenVINO | 10 | 211 s | 30,25 % | référence élargie |
+> | K=2 OpenVINO | 10 | **122 s** | **21,12 %** | 3 extraits +1,5 à +3,2 pts |
+>
+> **OpenVINO est un gain sûr** (1,5–1,7×, parité stricte) et reste le défaut. Le stride K=2 apporte
+> ~1,8× sur ECAPA et améliore le DER agrégé, mais la validation à 10 extraits montre une variabilité
+> par extrait : l'activer via `.env` (`STEP3_EMBEDDING_STRIDE=2`) **après vérification du DER par
+> extrait** sur le corpus cible. Le défaut `1` conserve la parité stricte. Le harnais contrôle la
+> non-régression agrégée (une amélioration est acceptée) ; `--require-parity` impose `|ΔDER| ≤ limite`.
 
 ## Analogie : Studio Mixage vs Transcription Cloud
 
@@ -361,14 +394,29 @@ Pour exécuter l'analyse audio sous accélération TPU, configurez l'environneme
 # Configuration des pilotes et règles udev (requis une seule fois)
 sudo bash scripts/install_coral_udev.sh
 
-# Création et activation de l'environnement virtuel (Python 3.10 requis pour pycoral)
-python3.10 -m venv coral_env
+# Désactiver l'ASPM PCIe dans GRUB (évite le blocage D3 de l'Apex : "RAM did not enable")
+# Ajouter pcie_aspm=off à GRUB_CMDLINE_LINUX puis : sudo update-grub && sudo reboot
+grep -o 'pcie_aspm=off' /proc/cmdline
+
+# Création et activation de l'environnement virtuel (Python 3.11 validé)
+python3.11 -m venv coral_env
 source coral_env/bin/activate
 
-# Installation des paquets Coral, TFLite Runtime et dépendances mathématiques
-pip install tflite-runtime==2.17.1 pycoral==2.0.2 numpy
-pip install scipy scikit-learn
+# Dépendances épinglées (voir requirements-coral_env.txt)
+pip install -r requirements-coral_env.txt
 ```
+
+`requirements-coral_env.txt` fige : `numpy==1.26.4`, `numba==0.65.1`, `scipy==1.15.3`,
+`scikit-learn==1.7.2`, `onnxruntime-openvino==1.24.1` (module `onnxruntime` + EP OpenVINO CPU),
+`tflite-runtime==2.16.1`, `pycoral==2.0.1`, `opencv-python-headless==4.9.0.80`,
+`fastcluster==1.2.6` et `psutil>=5.9`. Pour un CPU strict, remplacer par `onnxruntime==1.23.2`.
+
+> ⚠️ `fastcluster` est épinglé en 1.2.6 : la version 1.3.0 impose `numpy>=2`, incompatible
+> avec numba 0.65, tflite-runtime et pycoral. En l'absence de `fastcluster`, le script
+> retombe automatiquement sur `scipy.cluster.hierarchy.linkage`.
+
+`python scripts/validate_startup.py` vérifie `pcie_aspm=off`, la présence de `/dev/apex_0`
+et l'appartenance au groupe `apex` lorsque `ENABLE_CORAL_TPU_ACCELERATION=true`.
 
 ### PyTorch CUDA Compatibilité
 
@@ -496,6 +544,43 @@ python ../workflow_scripts/step3/run_audio_analysis.py
 # Vérifier résultat
 head docs/test_speech_audio.json | jq '.frames_analysis[0].audio_info'
 ```
+
+### Tests Automatisés STEP3 TPU
+
+```bash
+# Suite unitaire STEP3 + non-régression du contrat JSON STEP5
+./scripts/run_step3_tests.sh
+```
+
+La suite couvre : équivalence Log-Mel par lots vs chaîne SciPy (`< 1e-6`), parité AHC
+(`ARI = 1.0` vs scikit-learn), noyau VAD fusionné (médian + seuil strict + hangover),
+garde-fou anti-fallback (`edgetpu-custom-op` + mode strict `STEP3_REQUIRE_EDGETPU=1`),
+embeddings ECAPA par lots et schéma JSON.
+
+### Benchmark Acoustique DER/JER (VoxConverse)
+
+Le harnais mesure le DER et le JER (collar 0.0s et 0.25s, `skip_overlap=False`) en
+reconstruisant l'hypothèse depuis `frames_analysis` (granularité 25 fps) :
+
+```bash
+# Téléchargement du corpus dev (WAV + RTTM, ~2 Go, une seule fois)
+python3 scripts/fetch_voxconverse_dev.py
+
+# Capture de la référence (à exécuter avant toute optimisation)
+python3 scripts/bench_step3_tpu_der.py --limit 5 --out scratch/bench_step3_der/baseline
+
+# Contrôle de non-régression après optimisation (dégradation ≤ 0.05 point)
+python3 scripts/bench_step3_tpu_der.py --limit 5 \
+    --baseline scratch/bench_step3_der/baseline/der_report.json
+
+# Parité stricte (interdit aussi les améliorations, |ΔDER| ≤ 0.05)
+python3 scripts/bench_step3_tpu_der.py --limit 5 --require-parity \
+    --baseline scratch/bench_step3_der/baseline/der_report.json
+```
+
+Le rapport (`report.md` + `der_report.json`) contient les composantes *Missed Speech*,
+*False Alarm* et *Speaker Confusion*, ainsi que les timings `STAGE_TIMING` par étage
+(VAD, ECAPA, clustering, écriture JSON).
 
 ### Validation Automatique
 

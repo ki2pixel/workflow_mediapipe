@@ -1,9 +1,10 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
-- Aucune tâche active (dernière tâche clôturée : enrichissement .prproj - Solides, Calques d'effet, 27 Modes de fusion, Masques inversés/modes, pont py_premiere, 2026-10-15).
+- Aucune tâche active (dernière tâche clôturée : modernisation STEP3 audio TPU — DER/JER VoxConverse, OpenVINO, stride, 2026-10-17).
 
 ## Dernière Session Clôturée
+- [2026-10-17] Modernisation STEP3 audio TPU (COMPLET) : intégration du plan `docs/recherches/audio/Optimisation-Pipeline-Diarisation-Audio-TPU.md` — harnais DER/JER VoxConverse (`scripts/fetch_voxconverse_dev.py`, `bench_step3_tpu_der.py`, `bench_step3_der_eval.py`), Log-Mel par lots à parité exacte, AHC `fastcluster` + Gram BLAS, post-filtrage VAD Numba, double buffering producteur-consommateur, session ONNX partagée + IOBinding, EP OpenVINO CPU (1,5–1,7×, parité stricte), `STEP3_EMBEDDING_STRIDE` (K=2 opt-in), garde-fous `validate_startup` et `edgetpu-custom-op`. Constats : course tenseurs legacy corrigée (déterminisme), YAMNet non compilable pour l'Edge TPU (repli CPU journalisé), affinité OMP corrigée. Validation : 93 tests, JSON identiques et ΔDER 0 sur 5 clips ; suite de continuité dans `docs/WIP/`.
 - [2026-10-16] Resynchronisation documentation (workflow docs-updater) : 18 fichiers alignés sur le code des 09→16/10 — `04-video-tracking` (lissage One Euro, `STEP4_TPU_FAST`/`CPU_THREADS`/`PROFILING_DIR`), `06-ae-preprocessing` (`_object_speakers`), `docs/workflow/README` + `quickstart` + `architecture` (port 5003, `requirements_env.txt`, venvs réels, `STEP3_METHOD`, `INTERNAL_WORKER_COMMS_TOKEN`), pipelines 01/02/03/07/08 (curl : port + étapes), ops (`api-routes`, `security`, `system-monitoring`, `testing-strategy`), `services/workflow-service`, `scripts/MediaSolution-EC/README` (solides/fusions/masques), `tls-reverse-proxy` (`wsgi:app`), skill `workflow-operator`.
 - [2026-10-15 22:15:00] Enrichissement chirurgical ecproj_to_prproj.py & intégration py_premiere (COMPLET) :
   - **Contexte** : Rétro-ingénierie du repo `py-premiere-0.1.0` et alignement avec les sources EffectCraft 0.10.0 (`crates/color/src/blend.rs`, `crates/project/src/lib.rs`).

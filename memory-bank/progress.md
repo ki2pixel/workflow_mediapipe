@@ -1,7 +1,15 @@
 # Suivi de Progression
 
 ## Statut de Session
-- Aucune tâche active (dernière tâche clôturée : enrichissement .prproj - Solides, Calques d'effet, 27 Modes de fusion, Masques inversés/modes, pont py_premiere, 2026-10-15).
+- Aucune tâche active (dernière tâche clôturée : modernisation STEP3 audio TPU — DER/JER VoxConverse, OpenVINO, stride, 2026-10-17).
+
+- [2026-10-17 12:45:00] **Modernisation STEP3 audio TPU + harnais DER/JER VoxConverse (COMPLET)** :
+  - **Harnais** : téléchargement/extraction VoxConverse dev (216 clips WAV+RTTM), évaluateur pyannote (`DiarizationErrorRate`/`JaccardErrorRate`, collar 0 et 0,25, hypothèse reconstruite depuis `frames_analysis`), orchestrateur `bench_step3_tpu_der.py` (mux MKV/PCM, timings par étage, contrôle de non-régression, option `--require-parity`).
+  - **Correction majeure** : la baseline legacy multi-worker était corrompue par une course (`set_tensor`/`get_tensor` hors verrou avec interpréteur partagé ; afjiv : 301 fenêtres VAD à 4 workers contre 105 à 1 worker). Le pipeline écrit, invoque et lit désormais sous le même verrou par bloc → déterministe ; la baseline corrigée à 1 worker reproduit exactement les JSON du nouveau pipeline.
+  - **Optimisations** : Log-Mel par lots à parité exacte (écart max 0,0), AHC condensé `fastcluster` (ARI 1,0 vs scikit-learn), noyau Numba médian+seuil+hangover (parité exacte), double buffering YAMNet (blocs 256), session ONNX partagée + IOBinding, EP OpenVINO CPU (batch 8), `STEP3_EMBEDDING_STRIDE` avec assignation au plus proche.
+  - **Constats** : YAMNet fourni **non compilé** pour l'Edge TPU (3 ops sur 53 ; aucun modèle compilé dans le tarball officiel) → repli CPU/XNNPACK journalisé en erreur, mode strict `STEP3_REQUIRE_EDGETPU=1` ; `OMP_PROC_BIND=CLOSE`+`OMP_PLACES=cores` épinglait le processus sur 2 cœurs après initialisation de libgomp par scikit-learn (ECAPA ×5 plus lent) → `OMP_PROC_BIND=FALSE`.
+  - **Mesures (VoxConverse dev, 1 worker)** : 5 clips CPU K=1 186 s / DER 36,85 % ; OV K=1 121 s / DER identique ; K=2+OV 73 s / DER 21,53 % (2,5×). 10 clips OV : K=1 211 s / 30,25 %, K=2 122 s / 21,12 % (3 extraits dégradés de +1,5 à +3,2 pts → stride opt-in). K=4 CPU 60 s mais akthc +4,1 pts (rejeté).
+  - **Validation** : 93 tests backend (dont 52 STEP3) au vert, `validate_startup.py` (pcie_aspm=off, /dev/apex_0), JSON identiques et ΔDER 0 sur 5 clips pour l'EP OpenVINO. Docs pipeline 03, skill `coral-tpu-hybrid-algorithms`, `codingstandards.md`, `requirements-coral_env.txt` mis à jour.
 
 - [2026-10-15 22:15:00] **Enrichissement chirurgical `ecproj_to_prproj.py` & intégration py_premiere (COMPLET)** : suite à l'investigation de `py-premiere-0.1.0` et l'alignement avec EffectCraft 0.10.0 (`crates/color/src/blend.rs`, `crates/project/src/lib.rs`), extension complète des capacités d'export `.prproj` sans toucher aux étapes amont du pipeline :
   - **Solides & Calques d'effet** : prise en charge des sources `Solid` (ItemKind::Solid), génération des tokens synthétiques Premiere `COLR` (`TOKEN_COLOR_MATTE` = `1129270354`) et `BLAK` (`TOKEN_BLACK_VIDEO` = `1112293707`), balise `<IsAdjustmentLayer>true</IsAdjustmentLayer>` sur `MasterClip` pour les calques d'effet (`layer.switches.adjustment`), `ImplementationID = 42008e7a-de6f-4270-96de-7e287abb9b4b` et `OfflineReason = 0`.

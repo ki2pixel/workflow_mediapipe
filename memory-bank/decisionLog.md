@@ -12,6 +12,18 @@ Cette section contient le résumé des décisions majeures jusqu'à mars 2026. P
 
 ## Octobre 2026
 
+- [2026-10-17 12:45:00] **STEP3 audio : déterminisme, OpenVINO et stride d'embeddings (COMPLET)**
+  - **Contexte** : intégration du plan `docs/recherches/audio/Optimisation-Pipeline-Diarisation-Audio-TPU.md` avec harnais acoustique VoxConverse et contrainte de non-régression DER.
+  - **Décisions** :
+    - **Déterminisme** : l'interpréteur TFLite YAMNet partagé est piloté par un verrou unique couvrant écriture du tenseur, `invoke()` et lecture ; un verrou par bloc (256 fenêtres) suffit. La course legacy (`set_tensor`/`get_tensor` hors verrou) corrompait les scores VAD et rendait la baseline multi-worker non reproductible.
+    - **YAMNet / Edge TPU** : le modèle téléchargé n'est pas compilable utilement (frontend log-mel non supporté, un seul sous-graphe TPU, 3 ops sur 53 ; aucun modèle compilé dans le tarball PINTO). Repli CPU/XNNPACK **explicite** (erreur journalisée) et mode bloquant `STEP3_REQUIRE_EDGETPU=1` ; le chantier « frontend CPU + CNN compilé » est renvoyé au plan de continuité `docs/WIP/`.
+    - **OpenVINO** : adoption de `onnxruntime-openvino==1.24.1` ; EP CPU FP32 sélectionné automatiquement, batch 8, `STEP3_DISABLE_OPENVINO=1` pour le CPU strict. Gain mesuré 1,5–1,7× sur le pipeline, parité stricte (ΔDER 0, JSON identiques).
+    - **Stride ECAPA** : `STEP3_EMBEDDING_STRIDE` (défaut 1) ; K=2 validé en opt-in (1,8× ECAPA, DER agrégé amélioré) mais 3/10 extraits dégradés de +1,5 à +3,2 pts ; K=4 rejeté (akthc +4,1). Validation par extrait requise avant activation.
+    - **Affinité** : `OMP_PROC_BIND=FALSE` par défaut ; `CLOSE`+`OMP_PLACES=cores` restreint l'affinité à 2 cœurs dès l'initialisation de libgomp par scikit-learn (ECAPA ×5 plus lent).
+    - **Harnais** : contrôle par défaut = non-régression agrégée (une amélioration est acceptée) ; `--require-parity` pour les optimisations strictement neutres.
+  - **Alternatives rejetées** : conserver le modèle YAMNet non compilé sans avertissement ; installer OpenVINO sans A/B ; activer K=2/K=4 par défaut sur la seule base de 5 clips ; conserver `OMP_PROC_BIND=CLOSE`.
+  - **Validation** : 93 tests backend (52 STEP3) au vert ; JSON identiques et ΔDER 0 sur 5 clips avec OpenVINO ; K=2 mesuré sur 5 et 10 clips ; `validate_startup.py` couvre `pcie_aspm=off` et `/dev/apex_0`.
+
 - [2026-10-13 18:26:41] **Export `.prproj` : masques natifs et flou gaussien repris depuis le `.ecproj` (COMPLET)**
   - **Contexte** : l'écriture Premiere (`scripts/MediaSolution-EC/tools/ecproj_to_prproj.py`, format relevé sur un projet Adobe de référence) ignorait les masques et les effets — dès qu'un masque était détecté dans le `.ecproj`, seul le `.aep` était produit. Or masques et `ec.blur.gaussian` sont les deux seuls cas réellement utilisés en post-production.
   - **Démarche** : relevé du format sur un projet Premiere **natif** (`W9 - … _9x16_mask_blur.prproj` : masque `AE.ADBE AEMask2` à 27 paramètres, flou `AE.Impact_Blur_FX` à 18 paramètres), codec du blob de tracé en round-trip **octet-exact**, puis trois passes de validation dans Premiere 2026 sur notre propre export, chaque échec étant diagnostiqué sur le fichier ré-enregistré par Premiere (témoin).

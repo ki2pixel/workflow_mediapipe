@@ -166,6 +166,59 @@ def validate_configuration():
     
     return issues, warnings
 
+def validate_tpu_environment():
+    """Validate Coral Edge TPU prerequisites when hardware acceleration is enabled."""
+    print("\n🧠 Validating Coral Edge TPU prerequisites...")
+
+    issues = []
+    warnings = []
+
+    try:
+        from config.settings import config
+        enabled = bool(getattr(config, "ENABLE_CORAL_TPU_ACCELERATION", False))
+    except Exception as e:
+        warnings.append(f"Coral TPU validation skipped (config unavailable): {e}")
+        return issues, warnings
+
+    if not enabled:
+        print("ℹ️  Coral TPU acceleration disabled — checks skipped")
+        return issues, warnings
+
+    try:
+        cmdline = Path("/proc/cmdline").read_text(encoding="utf-8").split()
+    except OSError as e:
+        warnings.append(f"Could not read /proc/cmdline: {e}")
+    else:
+        if "pcie_aspm=off" in cmdline:
+            print("✅ pcie_aspm=off present in kernel cmdline")
+        else:
+            warnings.append(
+                "pcie_aspm=off missing from kernel cmdline — Apex D3 resume failures possible "
+                "(add it to GRUB_CMDLINE_LINUX)"
+            )
+
+    device = Path("/dev/apex_0")
+    if not device.exists():
+        warnings.append("/dev/apex_0 not found — Coral Edge TPU unavailable")
+    else:
+        print("✅ /dev/apex_0 found")
+        try:
+            import grp
+            apex_gid = grp.getgrnam("apex").gr_gid
+            if apex_gid in os.getgroups() or os.getegid() == apex_gid:
+                print("✅ Current user belongs to the 'apex' group")
+            else:
+                warnings.append(
+                    "Current user is not in the 'apex' group — /dev/apex_0 may be unreadable"
+                )
+        except KeyError:
+            warnings.append("Group 'apex' is not defined — run scripts/install_coral_udev.sh")
+        except OSError as e:
+            warnings.append(f"Could not inspect 'apex' group: {e}")
+
+    return issues, warnings
+
+
 def validate_services():
     """Validate service imports and initialization."""
     print("\n🔧 Validating services...")
@@ -314,6 +367,10 @@ def main():
     all_issues.extend(issues)
     
     issues, warnings = validate_configuration()
+    all_issues.extend(issues)
+    all_warnings.extend(warnings)
+
+    issues, warnings = validate_tpu_environment()
     all_issues.extend(issues)
     all_warnings.extend(warnings)
     

@@ -1,0 +1,14 @@
+# Environnement Edge TPU (STEP2 / STEP3 / STEP4) — Python 3.11
+# Versions alignées sur coral_env installé (vérifiées le 2026-10-17).
+numpy==1.26.4
+numba==0.65.1
+scipy==1.15.3
+scikit-learn==1.7.2
+# Fournit le module onnxruntime + l'EP OpenVINO CPU FP32 (batch 8, +1,5× sur ECAPA).
+# Pour revenir à un CPU strict : onnxruntime==1.23.2
+onnxruntime-openvino==1.24.1
+tflite-runtime==2.16.1
+pycoral==2.0.1
+opencv-python-headless==4.9.0.80
+fastcluster==1.2.6
+psutil>=5.9

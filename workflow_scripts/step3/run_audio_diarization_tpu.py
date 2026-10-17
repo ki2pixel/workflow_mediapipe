@@ -15,6 +15,10 @@ Algorithmes implémentés (Audit TPU vs GPU "Camille") :
 """
 
 import os
+
+os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
+os.environ.setdefault("OMP_PROC_BIND", "FALSE")
+
 import sys
 import json
 import argparse
@@ -24,50 +28,154 @@ import urllib.request
 import numpy as np
 import math
 import tempfile
+import queue
+import time
 from pathlib import Path
 from datetime import datetime
 from enum import Enum
 import threading
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-import os
+
+try:
+    from numba import njit
+except ImportError:
+    njit = None
+
+try:
+    import fastcluster
+    _HAS_FASTCLUSTER = True
+except ImportError:
+    fastcluster = None
+    _HAS_FASTCLUSTER = False
+
+
+def _jit(*args, **kwargs):
+    if njit is None:
+        return lambda func: func
+    return njit(*args, **kwargs)
+
 
 # --- Process-level globals ---
 _tpu_lock = threading.Lock()
 _yamnet_interp = None
 _thread_local = threading.local()
+_ecapa_session = None
+_ecapa_session_path = None
+_ecapa_session_lock = threading.Lock()
+_ecapa_infer_lock = threading.Lock()
+_ecapa_buffers = threading.local()
+_ANALYSIS_WINDOW_CACHE = None
+_ANALYSIS_WINDOW_SUM = None
+
+
+def _physical_core_count():
+    try:
+        import psutil
+        cores = psutil.cpu_count(logical=False)
+        if cores:
+            return int(cores)
+    except Exception:
+        pass
+    return max(1, (os.cpu_count() or 1) // 2)
+
+
+def _ecapa_thread_count():
+    return max(1, _physical_core_count() - 1)
+
+
+def _fft_worker_count():
+    return max(1, min(_ecapa_thread_count(), 8))
+
+
+def _create_optimized_ecapa_session(model_path):
+    ort_threads = _ecapa_thread_count()
+    sess_options = ort.SessionOptions()
+    sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    sess_options.intra_op_num_threads = ort_threads
+    sess_options.inter_op_num_threads = 1
+    sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+
+    allow_openvino = os.environ.get("STEP3_DISABLE_OPENVINO", "0").strip().lower() not in (
+        "1", "true", "yes", "on"
+    )
+    providers = []
+    if allow_openvino and "OpenVINOExecutionProvider" in ort.get_available_providers():
+        cache_dir = os.environ.get("STEP3_OPENVINO_CACHE_DIR", "/var/tmp/ort_openvino_cache")
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except OSError:
+            cache_dir = tempfile.mkdtemp(prefix="ort_openvino_")
+        providers.append((
+            "OpenVINOExecutionProvider",
+            {
+                "device_type": "CPU",
+                "precision": "FP32",
+                "num_of_threads": str(ort_threads),
+                "cache_dir": cache_dir,
+            },
+        ))
+        logging.info(f"ECAPA-TDNN: OpenVINOExecutionProvider activé (CPU FP32, cache={cache_dir})")
+    providers.append("CPUExecutionProvider")
+
+    session = ort.InferenceSession(str(model_path), sess_options=sess_options, providers=providers)
+    provider_names = [item if isinstance(item, str) else item[0] for item in providers]
+    batch_size = _ecapa_session_batch_size(session)
+    logging.info(
+        f"ECAPA-TDNN: session ONNX partagée (intra_op={ort_threads}, batch={batch_size}, "
+        f"providers={provider_names})"
+    )
+    return session
+
+
+def _ecapa_session_batch_size(session):
+    try:
+        providers = session.get_providers()
+    except Exception:
+        return 32
+    return 8 if "OpenVINOExecutionProvider" in providers else 32
+
+
+class _ECAPAIOBuffers:
+    def __init__(self, session, batch_size=32):
+        self.batch_size = batch_size
+        self.output_name = session.get_outputs()[0].name
+        self.in_buffer = np.zeros((batch_size, ECAPA_N_MELS, ECAPA_FIXED_N_FRAMES), dtype=np.float32)
+        self.in_ort = ort.OrtValue.ortvalue_from_numpy(self.in_buffer, "cpu", 0)
+        self.io_binding = session.io_binding()
+        self.io_binding.bind_ortvalue_input(session.get_inputs()[0].name, self.in_ort)
+        self.io_binding.bind_output(self.output_name)
+
+
+def _get_ecapa_buffers(session):
+    buffers = getattr(_ecapa_buffers, "buffers", None)
+    if buffers is None:
+        buffers = _ECAPAIOBuffers(session, batch_size=_ecapa_session_batch_size(session))
+        _ecapa_buffers.buffers = buffers
+    return buffers
+
 
 def get_extractor_model_cached(model_path):
+    global _ecapa_session, _ecapa_session_path
+    model_str = str(model_path)
+    if model_str.endswith('.onnx'):
+        if not HAS_ONNX:
+            raise ImportError(f"Cannot load {model_str}: onnxruntime is not installed.")
+        if _ecapa_session is None:
+            with _ecapa_session_lock:
+                if _ecapa_session is None:
+                    _ecapa_session = _create_optimized_ecapa_session(model_str)
+                    _ecapa_session_path = model_str
+        elif _ecapa_session_path != model_str:
+            logging.warning(f"ECAPA-TDNN: session déjà initialisée avec {_ecapa_session_path}")
+        return _ecapa_session
+
     if not hasattr(_thread_local, "extractor_model"):
-        model_str = str(model_path)
-        if model_str.endswith('.onnx'):
-            if not HAS_ONNX:
-                raise ImportError(f"Cannot load {model_str}: onnxruntime is not installed.")
-            
-            import multiprocessing
-            audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
-            max_workers = int(audio_workers_str) if audio_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
-            # Allocate the total CPU threads evenly among the max_workers
-            onnx_threads = max(1, multiprocessing.cpu_count() // max_workers)
-            
-            sess_options = ort.SessionOptions()
-            sess_options.intra_op_num_threads = onnx_threads
-            sess_options.inter_op_num_threads = 1
-            # Optimize execution mode for NUMA architecture
-            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            
-            _thread_local.extractor_model = ort.InferenceSession(model_str, sess_options, providers=['CPUExecutionProvider'])
-        else:
-            import tflite_runtime.interpreter as tflite
-            import multiprocessing
-            audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
-            max_workers = int(audio_workers_str) if audio_workers_str.isdigit() else max(1, multiprocessing.cpu_count() // 2)
-            xnnpack_threads = max(1, multiprocessing.cpu_count() // max_workers)
-            
-            interp = tflite.Interpreter(model_path=model_str, num_threads=xnnpack_threads)
-            interp.allocate_tensors()
-            _thread_local.extractor_model = interp
+        import tflite_runtime.interpreter as tflite
+        interp = tflite.Interpreter(model_path=model_str, num_threads=_ecapa_thread_count())
+        interp.allocate_tensors()
+        _thread_local.extractor_model = interp
     return _thread_local.extractor_model
 
 # TFLite / PyCoral imports
@@ -81,7 +189,8 @@ except ImportError:
 
 try:
     import scipy.io.wavfile as wavfile
-    from sklearn.cluster import SpectralClustering, AgglomerativeClustering
+    import scipy.cluster.hierarchy as sch
+    from sklearn.cluster import SpectralClustering
     from sklearn.metrics import silhouette_score
 except ImportError as e:
     logging.critical(f"ERREUR: scipy ou scikit-learn manquant. Installez-les dans coral_env (pip install scipy scikit-learn). Erreur: {e}")
@@ -119,6 +228,12 @@ ECAPA_N_FFT = 400        # 25ms window at 16kHz
 ECAPA_HOP_LENGTH = 160   # 10ms hop at 16kHz
 ECAPA_FIXED_DURATION_SEC = 3.0  # Fixed input duration for the model
 ECAPA_FIXED_N_FRAMES = int(np.ceil(ECAPA_FIXED_DURATION_SEC * ECAPA_SAMPLE_RATE / ECAPA_HOP_LENGTH))
+
+
+def _log_stage_timing(video_name, stage, started_ns):
+    elapsed_ms = (time.perf_counter_ns() - started_ns) / 1e6
+    suffix = f" video={video_name}" if video_name else ""
+    logging.info(f"STAGE_TIMING: {stage}={elapsed_ms:.1f}ms{suffix}")
 
 
 # --- Log-Mel Spectrogram Extraction (CPU-side) ---
@@ -208,6 +323,66 @@ def _pad_or_trim_mel(log_mel, target_frames=ECAPA_FIXED_N_FRAMES):
                       constant_values=np.log(1e-10))
 
 
+def _get_mel_filterbank():
+    global _MEL_FILTERBANK_CACHE
+    if _MEL_FILTERBANK_CACHE is None:
+        _MEL_FILTERBANK_CACHE = _create_mel_filterbank(ECAPA_SAMPLE_RATE, ECAPA_N_FFT, ECAPA_N_MELS)
+    return _MEL_FILTERBANK_CACHE
+
+
+def _get_analysis_window():
+    global _ANALYSIS_WINDOW_CACHE, _ANALYSIS_WINDOW_SUM
+    if _ANALYSIS_WINDOW_CACHE is None:
+        from scipy.signal.windows import hann
+        raw_window = hann(ECAPA_N_FFT, sym=False)
+        _ANALYSIS_WINDOW_CACHE = np.ascontiguousarray(raw_window.astype(np.float32))
+        _ANALYSIS_WINDOW_SUM = float(np.sum(raw_window))
+    return _ANALYSIS_WINDOW_CACHE, _ANALYSIS_WINDOW_SUM
+
+
+def compute_log_mel_spectrogram_batch(waveform_batch, out_tensor=None, fft_workers=None):
+    """Calcule les spectrogrammes Log-Mel (80, 300) d'un lot de segments 3 s.
+
+    Reproduit la grille et l'échelle de ``compute_log_mel_spectrogram``
+    (``boundary=None``, puissance du spectre, fenêtre Hann divisée par sa somme,
+    padding final de 2 trames à ``log(1e-10)``, CMN sur 300 trames).
+    """
+    import scipy.fft
+
+    wav_batch = np.asarray(waveform_batch, dtype=np.float32)
+    if wav_batch.ndim == 1:
+        wav_batch = wav_batch[np.newaxis, :]
+    if wav_batch.shape[-1] < ECAPA_N_FFT:
+        raise ValueError("Segment trop court pour l'extraction Log-Mel")
+
+    n_raw_frames = 1 + (wav_batch.shape[-1] - ECAPA_N_FFT) // ECAPA_HOP_LENGTH
+    analysis_window, window_sum = _get_analysis_window()
+    frames = np.lib.stride_tricks.sliding_window_view(
+        wav_batch, ECAPA_N_FFT, axis=-1
+    )[:, ::ECAPA_HOP_LENGTH, :]
+    windowed = frames * analysis_window
+    spectrum = scipy.fft.rfft(
+        windowed, n=ECAPA_N_FFT, axis=-1,
+        workers=fft_workers if fft_workers is not None else _fft_worker_count(),
+    )
+    spectrum *= np.float32(1.0 / window_sum)
+    power = np.abs(spectrum) ** 2
+    mel_spec = np.matmul(_get_mel_filterbank(), power.transpose(0, 2, 1))
+
+    batch = wav_batch.shape[0]
+    target = out_tensor if out_tensor is not None else np.empty(
+        (batch, ECAPA_N_MELS, ECAPA_FIXED_N_FRAMES), dtype=np.float32
+    )
+    n_frames = min(n_raw_frames, target.shape[-1])
+    target[:, :, :n_frames] = mel_spec[:, :, :n_frames]
+    if target.shape[-1] > n_frames:
+        target[:, :, n_frames:] = np.float32(1e-10)
+    np.maximum(target, np.float32(1e-10), out=target)
+    np.log(target, out=target)
+    target -= target.mean(axis=2, keepdims=True)
+    return target
+
+
 def _extract_3s_segment(data, sample_rate, center_sample):
     """Extract a 3.0-second waveform segment centered at center_sample.
     Pads with silence if out of bounds.
@@ -242,9 +417,8 @@ def extract_ecapa_embedding_batch(waveform_segments, extractor_model):
     """Extract a batch of 192D speaker embeddings from waveform segments.
 
     Pipeline:
-    1. Compute Log-Mel spectrogram for each segment
-    2. CMN normalization
-    3. Run batched Inference
+    1. Compute batched Log-Mel spectrograms with fused CMN
+    2. Run ONNX inference through zero-copy IOBinding (or TFLite fallback)
 
     Args:
         waveform_segments: List of 1D float32 numpy arrays (mono, 16kHz).
@@ -253,35 +427,49 @@ def extract_ecapa_embedding_batch(waveform_segments, extractor_model):
     Returns:
         2D float32 numpy array of shape (batch, 192).
     """
-    log_mels = []
-    for wf in waveform_segments:
-        log_mel = compute_log_mel_spectrogram(wf)
-        log_mel = _pad_or_trim_mel(log_mel)  # (80, 300)
-        log_mel = log_mel - np.mean(log_mel, axis=1, keepdims=True)
-        log_mels.append(log_mel)
+    if len(waveform_segments) == 0:
+        return np.empty((0, 192), dtype=np.float32)
 
-    # shape: (batch, 80, 300)
-    input_data = np.stack(log_mels, axis=0).astype(np.float32)
+    wav_batch = np.stack(waveform_segments, axis=0).astype(np.float32, copy=False)
 
-    if hasattr(extractor_model, 'run'):
-        # ONNX mode
+    if HAS_ONNX and isinstance(extractor_model, ort.InferenceSession):
+        if hasattr(extractor_model, "run_with_iobinding"):
+            buffers = _get_ecapa_buffers(extractor_model)
+            embeddings = None
+            for start in range(0, wav_batch.shape[0], buffers.batch_size):
+                end = min(start + buffers.batch_size, wav_batch.shape[0])
+                current = end - start
+                compute_log_mel_spectrogram_batch(
+                    wav_batch[start:end], out_tensor=buffers.in_buffer[:current]
+                )
+                with _ecapa_infer_lock:
+                    buffers.io_binding.bind_output(buffers.output_name)
+                    extractor_model.run_with_iobinding(buffers.io_binding)
+                    batch_output = buffers.io_binding.get_outputs()[0].numpy()
+                if embeddings is None:
+                    embeddings = np.empty(
+                        (wav_batch.shape[0], batch_output.shape[1]), dtype=np.float32
+                    )
+                embeddings[start:end] = batch_output[:current]
+            return embeddings
+
         input_name = extractor_model.get_inputs()[0].name
-        output = extractor_model.run(None, {input_name: input_data})[0]
-        return output
-    else:
-        # TFLite fallback (iterative over batch since it doesn't support dynamic batching)
-        input_details = extractor_model.get_input_details()[0]
-        output_details = extractor_model.get_output_details()[0]
-        
-        embeddings = []
-        for i in range(input_data.shape[0]):
-            single_input = input_data[i:i+1, :, :]
-            extractor_model.set_tensor(input_details['index'], single_input)
-            extractor_model.invoke()
-            emb = extractor_model.get_tensor(output_details['index'])
-            embeddings.append(emb.flatten())
-            
-        return np.array(embeddings)
+        log_mels = compute_log_mel_spectrogram_batch(wav_batch)
+        return extractor_model.run(None, {input_name: log_mels})[0]
+
+    log_mels = compute_log_mel_spectrogram_batch(wav_batch)
+    input_details = extractor_model.get_input_details()[0]
+    output_details = extractor_model.get_output_details()[0]
+
+    embeddings = []
+    for index in range(log_mels.shape[0]):
+        single_input = log_mels[index:index + 1, :, :]
+        extractor_model.set_tensor(input_details['index'], single_input)
+        extractor_model.invoke()
+        embedding = extractor_model.get_tensor(output_details['index'])
+        embeddings.append(embedding.flatten())
+
+    return np.array(embeddings)
 
 
 class VADState(Enum):
@@ -307,6 +495,55 @@ def download_model(url: str, path: Path):
         except Exception as e:
             logging.critical(f"Échec du téléchargement du modèle YAMNet: {e}")
             raise e
+
+
+def _resolve_edgetpu_delegate():
+    candidate = BASE_DIR / "tmp_lib" / "usr" / "lib" / "x86_64-linux-gnu" / "libedgetpu.so.1"
+    if candidate.exists():
+        return str(candidate)
+    return "libedgetpu.so.1"
+
+
+def _model_is_edgetpu_compiled(model_path: Path) -> bool:
+    try:
+        return b"edgetpu-custom-op" in model_path.read_bytes()
+    except OSError:
+        return False
+
+
+def _require_edgetpu() -> bool:
+    value = os.environ.get("STEP3_REQUIRE_EDGETPU", "0").strip().lower()
+    return value in ("1", "true", "yes", "on")
+
+
+def _assert_edgetpu_delegate_active(interpreter, model_path: Path):
+    """Signale explicitement (ou refuse en mode strict) un repli CPU/XNNPACK."""
+    if not _model_is_edgetpu_compiled(model_path):
+        message = (
+            "Modèle YAMNet non compilé pour l'Edge TPU (aucun edgetpu-custom-op) : "
+            "exécution sur CPU/XNNPACK, accélération DMA/TPU de la VAD inactive."
+        )
+        if _require_edgetpu():
+            logging.critical(message)
+            sys.exit(1)
+        logging.error(message)
+        return
+
+    try:
+        ops = interpreter._get_ops_details()
+    except Exception as exc:
+        logging.warning(f"Vérification du délégué Edge TPU indisponible: {exc}")
+        return
+
+    delegated = sum(1 for op in ops if str(op.get("op_name", "")).upper() == "DELEGATE")
+    if delegated == 0:
+        message = "Modèle compilé Edge TPU mais aucun sous-graphe DELEGATE détecté après allocation."
+        if _require_edgetpu():
+            logging.critical(message)
+            sys.exit(1)
+        logging.error(message)
+        return
+    logging.info(f"Délégué Edge TPU actif: {delegated} sous-graphe(s) délégué(s).")
 
 
 def extract_audio(video_path: Path, temp_wav: Path):
@@ -426,6 +663,60 @@ def apply_fsm_hangover(vad_flags, hop_sec, hangover_sec=DEFAULT_HANGOVER_SEC):
     return result
 
 
+@_jit(fastmath=True, nogil=True)
+def fused_medfilt5_binarize_hangover_fsm(raw_scores, threshold, hangover_frames):
+    """Filtre médian 1D (noyau 5), binarisation stricte et FSM Hangover fusionnés."""
+    n_frames = raw_scores.shape[0]
+    vad_mask = np.zeros(n_frames, dtype=np.uint8)
+    if n_frames == 0:
+        return vad_mask
+
+    hangover_counter = 0
+    window = np.empty(5, dtype=np.float32)
+    for index in range(n_frames):
+        for offset in range(-2, 3):
+            source = index + offset
+            window[offset + 2] = raw_scores[source] if 0 <= source < n_frames else 0.0
+
+        for position in range(1, 5):
+            key = window[position]
+            cursor = position - 1
+            while cursor >= 0 and window[cursor] > key:
+                window[cursor + 1] = window[cursor]
+                cursor -= 1
+            window[cursor + 1] = key
+
+        median_value = window[2]
+        if median_value > threshold:
+            vad_mask[index] = 1
+            hangover_counter = hangover_frames
+        elif hangover_counter > 0:
+            vad_mask[index] = 1
+            hangover_counter -= 1
+
+    return vad_mask
+
+
+def apply_vad_postfilter(probabilities, vad_threshold, hop_sec, hangover_sec,
+                         kernel_size=DEFAULT_MEDIAN_FILTER_SIZE):
+    """Applique le post-filtrage VAD (médian + seuil + hangover)."""
+    if len(probabilities) == 0:
+        return []
+
+    if len(probabilities) < kernel_size or kernel_size != 5:
+        filtered = apply_median_filter_vad(probabilities, kernel_size=kernel_size)
+        flags = [bool(value > vad_threshold) for value in filtered]
+        return apply_fsm_hangover(flags, hop_sec=hop_sec, hangover_sec=hangover_sec)
+
+    hangover_frames = max(1, int(math.ceil(hangover_sec / hop_sec)))
+    mask = fused_medfilt5_binarize_hangover_fsm(
+        np.asarray(probabilities, dtype=np.float32),
+        np.float32(vad_threshold),
+        hangover_frames,
+    )
+    return mask.astype(bool)
+
+
 def estimate_num_speakers(embeddings, max_speakers=DEFAULT_MAX_SPEAKERS):
     """Estime le nombre optimal de locuteurs via Eigen-gap et Silhouette Score.
 
@@ -508,6 +799,161 @@ def estimate_num_speakers(embeddings, max_speakers=DEFAULT_MAX_SPEAKERS):
         return 1
 
 
+def _compute_window_starts(total_samples, segment_size, hop_size):
+    starts = list(range(0, total_samples - segment_size + 1, hop_size))
+    if starts:
+        remaining = total_samples - (starts[-1] + segment_size)
+        if remaining > segment_size // 4 and total_samples >= segment_size:
+            starts.append(total_samples - segment_size)
+    return starts
+
+
+def _get_embedding_stride():
+    try:
+        return max(1, int(os.environ.get("STEP3_EMBEDDING_STRIDE", "1")))
+    except ValueError:
+        return 1
+
+
+def _nearest_embedding_indices(all_times, selected_times):
+    """Associe chaque fenêtre de parole à l'embedding temporellement le plus proche."""
+    all_times = np.asarray(all_times, dtype=np.int64)
+    selected_times = np.asarray(selected_times, dtype=np.int64)
+    if selected_times.size == 0:
+        return np.empty(0, dtype=np.int64)
+
+    right = np.searchsorted(selected_times, all_times, side="left")
+    right = np.clip(right, 0, selected_times.size - 1)
+    left = np.clip(right - 1, 0, selected_times.size - 1)
+    choose_left = np.abs(all_times - selected_times[left]) <= np.abs(selected_times[right] - all_times)
+    return np.where(choose_left, left, right)
+
+
+def _make_tensor_accessor(interpreter, tensor_index):
+    try:
+        accessor = interpreter.tensor(tensor_index)
+        view = accessor()
+    except Exception:
+        return None
+    return accessor if isinstance(view, np.ndarray) else None
+
+
+def _run_yamnet_windows_blockwise(data, interpreter, input_details, output_details,
+                                  window_starts, segment_size, collect_embeddings=False,
+                                  block_size=256):
+    """Pipeline producteur-consommateur Ping-Pong pour les fenêtres YAMNet.
+
+    Le producteur quantifie un bloc de fenêtres en RAM hôte pendant que le
+    consommateur enchaîne les invocations Edge TPU sous un verrou unique par bloc.
+    """
+    input_dtype = input_details['dtype']
+    input_scale, input_zero_point = input_details.get('quantization', (0.0, 0))
+    output_dtype = output_details[0]['dtype']
+    output_scale, output_zero_point = output_details[0].get('quantization', (0.0, 0))
+    total_windows = len(window_starts)
+
+    ping_pong_buffers = [
+        np.empty((block_size, segment_size), dtype=input_dtype),
+        np.empty((block_size, segment_size), dtype=input_dtype),
+    ]
+    ready_queue = queue.Queue(maxsize=1)
+    free_queue = queue.Queue(maxsize=2)
+    free_queue.put(0)
+    free_queue.put(1)
+    producer_errors = []
+
+    def _producer():
+        try:
+            for start_index in range(0, total_windows, block_size):
+                end_index = min(start_index + block_size, total_windows)
+                buffer_id = free_queue.get()
+                buffer = ping_pong_buffers[buffer_id]
+                for row, window_start in enumerate(window_starts[start_index:end_index]):
+                    segment = data[window_start:window_start + segment_size]
+                    if input_dtype == np.int16:
+                        buffer[row] = segment
+                    elif input_dtype in (np.int8, np.uint8):
+                        segment_float = segment.astype(np.float32) / 32768.0
+                        if input_scale > 0.0:
+                            np.clip(
+                                np.rint(segment_float / np.float32(input_scale) + np.float32(input_zero_point)),
+                                np.iinfo(input_dtype).min,
+                                np.iinfo(input_dtype).max,
+                                out=buffer[row],
+                                casting="unsafe",
+                            )
+                        else:
+                            buffer[row] = segment_float
+                    else:
+                        buffer[row] = segment.astype(np.float32) / 32768.0
+                ready_queue.put((buffer_id, start_index, end_index - start_index))
+        except Exception as exc:
+            producer_errors.append(exc)
+        finally:
+            ready_queue.put(None)
+
+    input_accessor = _make_tensor_accessor(interpreter, input_details['index'])
+    output_accessor = _make_tensor_accessor(interpreter, output_details[0]['index'])
+    embedding_accessor = None
+    if collect_embeddings and len(output_details) > 2:
+        embedding_accessor = _make_tensor_accessor(interpreter, output_details[2]['index'])
+
+    raw_probabilities = np.empty(total_windows, dtype=np.float32)
+    raw_embeddings = []
+
+    producer_thread = threading.Thread(target=_producer, daemon=True)
+    producer_thread.start()
+    try:
+        while True:
+            item = ready_queue.get()
+            if item is None:
+                break
+            buffer_id, start_index, count = item
+            buffer = ping_pong_buffers[buffer_id]
+            with _tpu_lock:
+                for offset in range(count):
+                    row = buffer[offset]
+                    if input_accessor is not None:
+                        input_view = input_accessor()
+                        input_view.flat[:] = row.reshape(-1)
+                        del input_view
+                    else:
+                        interpreter.set_tensor(input_details['index'], row.reshape(input_details['shape']))
+                    interpreter.invoke()
+                    if output_accessor is not None:
+                        scores = output_accessor()
+                        speech_probability = float(scores.reshape(-1)[0])
+                        del scores
+                    else:
+                        scores = interpreter.get_tensor(output_details[0]['index'])
+                        speech_probability = float(scores.reshape(-1)[0])
+                        del scores
+                    raw_probabilities[start_index + offset] = speech_probability
+                    if collect_embeddings:
+                        try:
+                            if embedding_accessor is not None:
+                                embedding = embedding_accessor()
+                            else:
+                                embedding = interpreter.get_tensor(output_details[2]['index'])
+                            if output_details[2]['dtype'] in (np.int8, np.uint8):
+                                scale, zero_point = output_details[2].get('quantization', (0.0, 0))
+                                embedding = (embedding.astype(np.float32) - zero_point) * scale
+                            raw_embeddings.append(embedding.reshape(-1).copy())
+                            del embedding
+                        except Exception as exc:
+                            logging.warning(f"Impossible de lire l'embedding YAMNet: {exc}")
+                            raw_embeddings.append(np.random.randn(128))
+            free_queue.put(buffer_id)
+    finally:
+        producer_thread.join(timeout=5.0)
+
+    if producer_errors:
+        raise RuntimeError(f"Erreur dans le thread producteur VAD : {producer_errors[0]}")
+    if output_dtype in (np.int8, np.uint8) and output_scale > 0.0:
+        raw_probabilities = (raw_probabilities - np.float32(output_zero_point)) * np.float32(output_scale)
+    return raw_probabilities.tolist(), raw_embeddings
+
+
 def run_vad_and_embedding(wav_path, extractor_model_path=None,
                           vad_threshold=DEFAULT_VAD_THRESHOLD,
                           hop_overlap=DEFAULT_HOP_OVERLAP,
@@ -535,7 +981,9 @@ def run_vad_and_embedding(wav_path, extractor_model_path=None,
     Returns:
         Tuple (speech_segments, embeddings_array) :
         - speech_segments : Liste de paires [start_sec, end_sec]
-        - embeddings_array : Array numpy des d-vectors correspondants
+        - embeddings_array : Array numpy des d-vectors, un par fenêtre de parole
+          (répliqué depuis l'embedding temporellement le plus proche si
+          ``STEP3_EMBEDDING_STRIDE`` > 1).
     """
     global _tpu_lock, _yamnet_interp
     yamnet_interpreter = _yamnet_interp
@@ -553,118 +1001,23 @@ def run_vad_and_embedding(wav_path, extractor_model_path=None,
     input_details = yamnet_interpreter.get_input_details()[0]
     output_details = yamnet_interpreter.get_output_details()
 
-    # --- Étape 1 & 2 : Fenêtrage glissant + Inférence ---
-    raw_probabilities = []
-    raw_embeddings = []
-    window_starts = []  # Positions de départ en samples
+    window_starts = _compute_window_starts(total_samples, segment_size, hop_size)
+    if not window_starts:
+        return [], np.array([])
 
-    for start in range(0, total_samples - segment_size + 1, hop_size):
-        end = start + segment_size
-        segment = data[start:end]
-
-        # Préparation de l'entrée selon le type attendu par le modèle
-        if input_details['dtype'] == np.int16:
-            input_data = segment.reshape(input_details['shape'])
-        elif input_details['dtype'] in (np.int8, np.uint8):
-            segment_float = segment.astype(np.float32) / 32768.0
-            scale, zero_point = input_details['quantization']
-            input_data = np.round(segment_float / scale + zero_point).astype(input_details['dtype'])
-        else:
-            # Float fallback
-            segment_float = segment.astype(np.float32) / 32768.0
-            input_data = segment_float.reshape(input_details['shape'])
-
-        yamnet_interpreter.set_tensor(input_details['index'], input_data)
-        if _tpu_lock is not None:
-            with _tpu_lock:
-                yamnet_interpreter.invoke()
-        else:
-            yamnet_interpreter.invoke()
-
-        # Scores de classification (Speech = index 0)
-        scores_tensor = yamnet_interpreter.get_tensor(output_details[0]['index'])
-        if output_details[0]['dtype'] in (np.int8, np.uint8):
-            scale_out, zero_point_out = output_details[0]['quantization']
-            scores = (scores_tensor.astype(np.float32) - zero_point_out) * scale_out
-        else:
-            scores = scores_tensor
-
-        speech_prob = float(scores[0][0])
-        raw_probabilities.append(speech_prob)
-        window_starts.append(start)
-
-        # Extraction du d-vector pour chaque fenêtre (seulement pour fallback YAMNet)
-        if not extractor_model_path:
-            # Fallback : embeddings YAMNet (1024D, généralistes)
-            try:
-                embeddings_tensor = yamnet_interpreter.get_tensor(output_details[2]['index'])
-                if output_details[2]['dtype'] in (np.int8, np.uint8):
-                    scale_emb, zero_point_emb = output_details[2]['quantization']
-                    d_vector = (embeddings_tensor.astype(np.float32) - zero_point_emb) * scale_emb
-                else:
-                    d_vector = embeddings_tensor
-                raw_embeddings.append(d_vector[0])
-            except Exception as e:
-                logging.warning(f"Impossible de lire l'embedding YAMNet: {e}")
-                raw_embeddings.append(np.random.randn(128))
-
-    # Traiter le dernier segment si des échantillons restent
-    remaining = total_samples - (window_starts[-1] + segment_size) if window_starts else total_samples
-    if remaining > segment_size // 4 and total_samples >= segment_size:
-        start = total_samples - segment_size
-        segment = data[start:start + segment_size]
-
-        if input_details['dtype'] == np.int16:
-            input_data = segment.reshape(input_details['shape'])
-        elif input_details['dtype'] in (np.int8, np.uint8):
-            segment_float = segment.astype(np.float32) / 32768.0
-            scale, zero_point = input_details['quantization']
-            input_data = np.round(segment_float / scale + zero_point).astype(input_details['dtype'])
-        else:
-            segment_float = segment.astype(np.float32) / 32768.0
-            input_data = segment_float.reshape(input_details['shape'])
-
-        yamnet_interpreter.set_tensor(input_details['index'], input_data)
-        if _tpu_lock is not None:
-            with _tpu_lock:
-                yamnet_interpreter.invoke()
-        else:
-            yamnet_interpreter.invoke()
-
-        scores_tensor = yamnet_interpreter.get_tensor(output_details[0]['index'])
-        if output_details[0]['dtype'] in (np.int8, np.uint8):
-            scale_out, zero_point_out = output_details[0]['quantization']
-            scores = (scores_tensor.astype(np.float32) - zero_point_out) * scale_out
-        else:
-            scores = scores_tensor
-
-        raw_probabilities.append(float(scores[0][0]))
-        window_starts.append(start)
-
-        if not extractor_model_path:
-            try:
-                embeddings_tensor = yamnet_interpreter.get_tensor(output_details[2]['index'])
-                if output_details[2]['dtype'] in (np.int8, np.uint8):
-                    scale_emb, zero_point_emb = output_details[2]['quantization']
-                    d_vector = (embeddings_tensor.astype(np.float32) - zero_point_emb) * scale_emb
-                else:
-                    d_vector = embeddings_tensor
-                raw_embeddings.append(d_vector[0])
-            except Exception:
-                raw_embeddings.append(np.random.randn(128))
+    raw_probabilities, raw_embeddings = _run_yamnet_windows_blockwise(
+        data, yamnet_interpreter, input_details, output_details,
+        window_starts, segment_size,
+        collect_embeddings=not extractor_model_path,
+    )
 
     if not raw_probabilities:
         return [], np.array([])
 
-    # --- Étape 3 : Filtre Médian sur les probabilités ---
-    probs_array = np.array(raw_probabilities, dtype=np.float32)
-    filtered_probs = apply_median_filter_vad(probs_array, kernel_size=median_filter_size)
-
-    # --- Étape 4 : Seuil VAD calibré ---
-    vad_flags = [bool(p > vad_threshold) for p in filtered_probs]
-
-    # --- Étape 5 : FSM Hangover ---
-    vad_flags_fsm = apply_fsm_hangover(vad_flags, hop_sec=hop_sec, hangover_sec=hangover_sec)
+    vad_flags_fsm = apply_vad_postfilter(
+        np.asarray(raw_probabilities, dtype=np.float32),
+        vad_threshold, hop_sec, hangover_sec, median_filter_size,
+    )
 
     # --- Construction des segments de parole et des embeddings correspondants ---
     speech_segments = []
@@ -687,41 +1040,67 @@ def run_vad_and_embedding(wav_path, extractor_model_path=None,
         else:
             model_to_load = model_str
             logging.info(f"ECAPA-TDNN: Utilisation du moteur TFLite Float32 (Batch 1) via {model_to_load}")
-            
-        logging.info(f"ECAPA-TDNN: extraction de {len(speech_indices)} d-vectors 192D...")
-        
+
+        stride = _get_embedding_stride()
+        selected_positions = list(range(0, len(speech_indices), stride))
+        if selected_positions[-1] != len(speech_indices) - 1:
+            selected_positions.append(len(speech_indices) - 1)
+        selected_indices = [speech_indices[position] for position in selected_positions]
+
+        logging.info(
+            f"ECAPA-TDNN: extraction de {len(selected_indices)} d-vectors 192D "
+            f"(stride={stride}, {len(speech_indices)} fenêtres de parole)..."
+        )
+
         extractor_model = get_extractor_model_cached(model_to_load)
-        total_speech = len(speech_indices)
-        
+        total_speech = len(selected_indices)
+        selected_embeddings = []
+        ecapa_started = time.perf_counter_ns()
+
         BATCH_SIZE = 32
-        
+
         for batch_start in range(0, total_speech, BATCH_SIZE):
-            batch_indices = speech_indices[batch_start:batch_start+BATCH_SIZE]
-            
+            batch_indices = selected_indices[batch_start:batch_start+BATCH_SIZE]
+
             waveforms = []
             for idx in batch_indices:
                 center_sample = window_starts[idx] + (segment_size // 2)
                 waveform_3s = _extract_3s_segment(data, sample_rate, center_sample)
                 waveforms.append(waveform_3s)
-            
+
             # Inférence groupée
             d_vecs = extract_ecapa_embedding_batch(waveforms, extractor_model)
             for d_vec in d_vecs:
-                speech_embeddings.append(d_vec)
-            
+                selected_embeddings.append(d_vec)
+
             current_count = min(batch_start + BATCH_SIZE, total_speech)
             if current_count % 32 == 0 or current_count == total_speech:
                 progress_percent = int(current_count / total_speech * 100)
                 vid_log = f" - {video_name}" if video_name else ""
                 logging.info(f"ECAPA_PROGRESS: {current_count}/{total_speech} embeddings ({progress_percent}%){vid_log}")
-            
-        logging.info(f"ECAPA-TDNN: extraction terminée ({len(speech_embeddings)} embeddings)")
+
+        selected_embeddings = np.array(selected_embeddings, dtype=np.float32)
+        if stride == 1:
+            speech_embeddings = selected_embeddings
+        else:
+            all_times = [window_starts[idx] for idx in speech_indices]
+            selected_times = [window_starts[idx] for idx in selected_indices]
+            nearest = _nearest_embedding_indices(all_times, selected_times)
+            speech_embeddings = selected_embeddings[nearest]
+
+        logging.info(
+            f"ECAPA-TDNN: extraction terminée ({len(selected_embeddings)} embeddings, "
+            f"{len(speech_embeddings)} fenêtres assignées)"
+        )
+        _log_stage_timing(video_name, "ecapa", ecapa_started)
     elif speech_indices:
         # Fallback YAMNet : collecter directement les embeddings pré-calculés
         for idx in speech_indices:
             speech_embeddings.append(raw_embeddings[idx])
 
-    return speech_segments, np.array(speech_embeddings) if speech_embeddings else np.array([])
+    if len(speech_embeddings) == 0:
+        return speech_segments, np.array([])
+    return speech_segments, np.asarray(speech_embeddings, dtype=np.float32)
 
 
 def _compute_actual_durations(labels, segments):
@@ -750,6 +1129,43 @@ def _compute_actual_durations(labels, segments):
     return durations
 
 
+@_jit(fastmath=True, nogil=True)
+def _extract_upper_triangle_cosine_dist(gram_matrix):
+    """Extrait la partie triangulaire supérieure stricte de (1 - Gram) en float64."""
+    n = gram_matrix.shape[0]
+    size = (n * (n - 1)) // 2
+    condensed = np.empty(size, dtype=np.float64)
+    index = 0
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            distance = 1.0 - float(gram_matrix[i, j])
+            if distance < 0.0:
+                distance = 0.0
+            condensed[index] = distance
+            index += 1
+    return condensed
+
+
+def compute_ahc_labels(unit_embeddings, distance_threshold=DEFAULT_CLUSTERING_THRESHOLD):
+    """Étiquettes AHC (average linkage, cosinus) avec parité stricte scikit-learn."""
+    n_segments = unit_embeddings.shape[0]
+    if n_segments == 0:
+        return np.empty(0, dtype=np.int32)
+    if n_segments == 1:
+        return np.array([0], dtype=np.int32)
+
+    gram = np.matmul(unit_embeddings, unit_embeddings.T)
+    condensed = _extract_upper_triangle_cosine_dist(gram)
+
+    if _HAS_FASTCLUSTER:
+        linkage_matrix = fastcluster.linkage(condensed, method="average")
+    else:
+        linkage_matrix = sch.linkage(condensed, method="average")
+
+    strict_threshold = np.nextafter(np.float64(distance_threshold), 0.0)
+    return (sch.fcluster(linkage_matrix, t=strict_threshold, criterion="distance") - 1).astype(np.int32)
+
+
 def perform_clustering(embeddings, segments, max_speakers=DEFAULT_MAX_SPEAKERS):
     """
     Clustering par Agglomération Hiérarchique (AHC) avec normalisation L2
@@ -773,14 +1189,8 @@ def perform_clustering(embeddings, segments, max_speakers=DEFAULT_MAX_SPEAKERS):
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     norm_embeddings = np.where(norms > 1e-10, embeddings / norms, embeddings)
 
-    # 2. Clustering AHC avec distance cosine et seuil adaptatif
-    clustering = AgglomerativeClustering(
-        n_clusters=None,
-        metric='cosine',
-        linkage='average',
-        distance_threshold=DEFAULT_CLUSTERING_THRESHOLD
-    )
-    labels = clustering.fit_predict(norm_embeddings)
+    # 2. Clustering AHC condensé (Gram BLAS + fastcluster/scipy)
+    labels = compute_ahc_labels(norm_embeddings)
 
     # 3. Calcul des durées réelles contiguës de parole par locuteur
     cluster_durations = _compute_actual_durations(labels, segments)
@@ -796,27 +1206,26 @@ def perform_clustering(embeddings, segments, max_speakers=DEFAULT_MAX_SPEAKERS):
     if len(major_clusters) < len(cluster_durations):
         logging.info(f"Clustering AHC: Réassignation de {len(cluster_durations) - len(major_clusters)} locuteurs mineurs...")
         
-        # Calcule les vecteurs moyens (centroïdes) pour chaque locuteur majeur
-        major_means = {}
-        for c in major_clusters:
-            major_means[c] = np.mean(norm_embeddings[labels == c], axis=0)
-            norm_val = np.linalg.norm(major_means[c])
-            if norm_val > 1e-10:
-                major_means[c] /= norm_val
+        centroid_list = []
+        for cluster in major_clusters:
+            centroid = np.mean(norm_embeddings[labels == cluster], axis=0)
+            norm_value = np.linalg.norm(centroid)
+            if norm_value > 1e-10:
+                centroid /= norm_value
+            centroid_list.append(centroid)
+        major_centroids = np.stack(centroid_list).astype(np.float32, copy=False)
 
-        new_labels = labels.copy()
-        for i, label in enumerate(labels):
-            if label not in major_clusters:
-                emb = norm_embeddings[i]
-                best_c = None
-                best_sim = -1.0
-                for c in major_clusters:
-                    sim = np.dot(emb, major_means[c])
-                    if sim > best_sim:
-                        best_sim = sim
-                        best_c = c
-                new_labels[i] = best_c
-        labels = new_labels
+        minor_mask = ~np.isin(labels, major_clusters)
+        minor_indices = np.flatnonzero(minor_mask)
+        if minor_indices.size:
+            similarities = np.matmul(
+                norm_embeddings[minor_indices].astype(np.float32, copy=False),
+                major_centroids.T,
+            )
+            best_major = np.argmax(similarities, axis=1)
+            new_labels = labels.copy()
+            new_labels[minor_indices] = np.asarray(major_clusters, dtype=new_labels.dtype)[best_major]
+            labels = new_labels
 
     # Recalculer les durées finales après réassignation
     final_durations = _compute_actual_durations(labels, segments)
@@ -977,6 +1386,7 @@ def worker_process_video(video_path, cfg, extractor_model_path):
             extract_audio(video_path, temp_wav)
 
             # 1. VAD et Extraction (TPU) avec fenêtrage glissant + FSM
+            vad_started = time.perf_counter_ns()
             segments, embeddings = run_vad_and_embedding(
                 temp_wav, 
                 extractor_model_path=extractor_model_path,
@@ -986,19 +1396,24 @@ def worker_process_video(video_path, cfg, extractor_model_path):
                 hangover_sec=cfg['hangover_sec'],
                 video_name=video_path.name
             )
+            _log_stage_timing(video_path.name, "vad", vad_started)
 
             logging.info(f"VAD: {len(segments)} segments de parole détectés")
 
             # 2. Spectral Clustering adaptatif (CPU)
+            clustering_started = time.perf_counter_ns()
             diarization_result = perform_clustering(
                 embeddings, segments,
                 max_speakers=cfg['max_speakers']
             )
+            _log_stage_timing(video_path.name, "clustering", clustering_started)
 
             # Sauvegarde JSON au format original compatible STEP5/6 + speaker_stats
             output_json = video_path.with_name(f"{video_path.stem}_audio.json")
             duration_sec = _run_ffprobe_duration(video_path)
+            json_started = time.perf_counter_ns()
             _write_audio_json_file(output_json, video_path, diarization_result, duration_sec, temp_wav)
+            _log_stage_timing(video_path.name, "json_write", json_started)
 
             logging.info(f"Succès: {output_json.name} créé.")
             return True
@@ -1057,19 +1472,24 @@ def main():
     )
 
     assets_dir = BASE_DIR / "assets"
-    yamnet_model = assets_dir / "yamnet_audio_classificator_quantized_edgetpu.tflite"
-    # ECAPA-TDNN : modèle Float32 exécuté sur CPU (XNNPACK) — évite la perte de précision INT8
+    yamnet_quantized = assets_dir / "yamnet_audio_classificator_quantized_edgetpu.tflite"
+    yamnet_compiled = assets_dir / "yamnet_audio_classificator_edgetpu_compiled.tflite"
+    # ECAPA-TDNN : modèle Float32 exécuté sur CPU (ONNX Runtime) — évite la perte de précision INT8
     extractor_model = assets_dir / "ecapa_tdnn_speaker_float.tflite"
 
-    download_model(YAMNET_URL, yamnet_model)
+    download_model(YAMNET_URL, yamnet_quantized)
+    yamnet_model = yamnet_compiled if yamnet_compiled.exists() else yamnet_quantized
 
     global _yamnet_interp
     try:
         import tflite_runtime.interpreter as tflite
-        delegate = tflite.load_delegate('libedgetpu.so.1')
+        delegate_path = _resolve_edgetpu_delegate()
+        delegate = tflite.load_delegate(delegate_path)
+        logging.info(f"Délégué Edge TPU chargé depuis {delegate_path}")
         _yamnet_interp = tflite.Interpreter(model_path=str(yamnet_model), experimental_delegates=[delegate])
         _yamnet_interp.resize_tensor_input(0, [15360])
         _yamnet_interp.allocate_tensors()
+        _assert_edgetpu_delegate_active(_yamnet_interp, yamnet_model)
         logging.info("Modèle YAMNet Edge TPU chargé dans le processus principal.")
     except Exception as e:
         logging.critical(f"Erreur Edge TPU: {e}")
@@ -1095,7 +1515,7 @@ def main():
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
                     if k.strip() == "STEP3_MAX_WORKERS":
-                        os.environ["STEP3_MAX_WORKERS"] = v.strip()
+                        os.environ.setdefault("STEP3_MAX_WORKERS", v.strip())
                         break
 
     audio_workers_str = os.environ.get("STEP3_MAX_WORKERS", "")
