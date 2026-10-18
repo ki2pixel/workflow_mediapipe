@@ -77,44 +77,45 @@
          }) + '"' : '"' + string + '"';
       }
 
-      if (typeof JSON.stringify !== 'function') {
-         JSON.stringify = function (value) {
-            var i, k, v, partial, gap = '', indent = '';
-            return (function str(key, holder) {
-               var mind = gap, value = holder[key];
-               if (value && typeof value === 'object' && typeof value.toJSON === 'function') {
-                  value = value.toJSON(key);
-               }
-               switch (typeof value) {
-                  case 'string': return quote(value);
-                  case 'number': return isFinite(value) ? String(value) : 'null';
-                  case 'boolean':
-                  case 'null': return String(value);
-                  case 'object':
-                     if (!value) return 'null';
-                     gap += indent;
-                     partial = [];
-                     if (Object.prototype.toString.apply(value) === '[object Array]') {
-                        for (i = 0; i < value.length; i += 1) {
-                           partial[i] = str(i, value) || 'null';
-                        }
-                        v = partial.length === 0 ? '[]' : '[' + gap + partial.join(',') + gap + ']';
-                        gap = mind;
-                        return v;
+      // Toujours installer un JSON.stringify robuste pour ES3 ExtendScript
+      JSON.stringify = function (value) {
+         var gap = '', indent = '';
+         return (function str(key, holder) {
+            var i, k, v, length, partial;
+            var mind = gap, val = holder[key];
+            if (val && typeof val === 'object' && typeof val.toJSON === 'function') {
+               val = val.toJSON(key);
+            }
+            switch (typeof val) {
+               case 'string': return quote(val);
+               case 'number': return isFinite(val) ? String(val) : 'null';
+               case 'boolean':
+               case 'null': return String(val);
+               case 'object':
+                  if (!val) return 'null';
+                  gap += indent;
+                  partial = [];
+                  if (Object.prototype.toString.apply(val) === '[object Array]') {
+                     length = val.length;
+                     for (i = 0; i < length; i += 1) {
+                        partial[i] = str(i, val) || 'null';
                      }
-                     for (k in value) {
-                        if (Object.prototype.hasOwnProperty.call(value, k)) {
-                           v = str(k, value);
-                           if (v) { partial.push(quote(k) + ':' + v); }
-                        }
-                     }
-                     v = partial.length === 0 ? '{}' : '{' + gap + partial.join(',') + gap + '}';
+                     v = partial.length === 0 ? '[]' : '[' + gap + partial.join(',') + gap + ']';
                      gap = mind;
                      return v;
-               }
-            })('', { '': value });
-         };
-      }
+                  }
+                  for (k in val) {
+                     if (Object.prototype.hasOwnProperty.call(val, k)) {
+                        v = str(k, val);
+                        if (v) { partial.push(quote(k) + ':' + v); }
+                     }
+                  }
+                  v = partial.length === 0 ? '{}' : '{' + gap + partial.join(',') + gap + '}';
+                  gap = mind;
+                  return v;
+            }
+         })('', { '': value });
+      };
 
       if (typeof JSON.parse !== 'function') {
          JSON.parse = function (text) {
@@ -313,9 +314,9 @@
    }
 
    // Main CEP Functions
-   function selectFolder() {
+   function selectFolders(currentPathsJson) {
       try {
-         logMessage("selectFolder() appelée", 'info');
+         logMessage("selectFolders() appelée", 'info');
          var folder = Folder.selectDialog("Sélectionner le dossier du projet");
          logMessage("Folder.selectDialog résultat: " + (folder ? "sélectionné" : "annulé"), 'info');
 
@@ -323,29 +324,69 @@
             G.STATE.selectedFolder = folder;
             G.STATE.baseFolderForCsv = folder;
 
+            var existingPaths = [];
+            if (currentPathsJson && currentPathsJson !== "undefined" && currentPathsJson !== "null") {
+               try {
+                  existingPaths = safeJsonParse(currentPathsJson) || [];
+               } catch (eParse) {
+                  existingPaths = [];
+               }
+            }
+            if (!(existingPaths instanceof Array)) {
+               existingPaths = [];
+            }
+
+            var cleanPath = folder.fsName.replace(/\\/g, "/");
+            var alreadyPresent = false;
+            for (var i = 0; i < existingPaths.length; i++) {
+               if (existingPaths[i].replace(/\\/g, "/") === cleanPath) {
+                  alreadyPresent = true;
+                  break;
+               }
+            }
+            if (!alreadyPresent) {
+               existingPaths.push(cleanPath);
+            }
+
             var docsFolder = new Folder(folder.fsName + "/" + G.CONFIG.docsSubFolderName);
+            var vCount = 0;
             var info = "";
             if (docsFolder.exists) {
                var videoFiles = getFilesByExtensions(docsFolder, G.CONFIG.videoExtensions);
-               info = videoFiles.length + " vidéo(s) trouvée(s) dans 'docs'";
+               vCount = videoFiles.length;
+               info = vCount + " vidéo(s) trouvée(s) dans 'docs' (" + folder.name + ")";
             } else {
-               info = "Dossier 'docs' non trouvé";
+               info = "Dossier 'docs' non trouvé dans " + folder.name;
+            }
+
+            var detailedFolders = [];
+            for (var p = 0; p < existingPaths.length; p++) {
+               var pStr = existingPaths[p];
+               var pName = pStr.substring(pStr.lastIndexOf('/') + 1);
+               detailedFolders.push({
+                  path: pStr,
+                  name: pName,
+                  videoCount: (pStr === cleanPath ? vCount : undefined),
+                  checked: true
+               });
             }
 
             var result = {
-               type: 'folderSelected',
+               type: 'foldersSelected',
                success: true,
-               path: folder.fsName,
+               path: cleanPath,
+               paths: existingPaths,
+               folders: detailedFolders,
                info: info
             };
 
             logMessage("Envoi résultat vers CEP: " + JSON.stringify(result), 'info');
             sendToCEP(result);
-            logMessage("Dossier sélectionné: " + folder.fsName, 'success');
+            logMessage("Dossier sélectionné: " + cleanPath, 'success');
             return JSON.stringify(result);
          } else {
             var result = {
-               type: 'folderSelected',
+               type: 'foldersSelected',
                success: false,
                error: "Aucun dossier sélectionné"
             };
@@ -356,12 +397,111 @@
       } catch (e) {
          logMessage("Erreur sélection dossier: " + e.toString(), 'error');
          var result = {
-            type: 'folderSelected',
+            type: 'foldersSelected',
             success: false,
             error: e.toString()
          };
          sendToCEP(result);
          return JSON.stringify(result);
+      }
+   }
+
+   function selectFolder() {
+      return selectFolders();
+   }
+
+   function autoDetectFolders() {
+      try {
+         logMessage("autoDetectFolders() appelée", 'info');
+         var targetDrives = ["F:/", "F:\\", "/f", "F:"];
+         var fFolder = null;
+         for (var d = 0; d < targetDrives.length; d++) {
+            var candidate = new Folder(targetDrives[d]);
+            if (candidate && candidate.exists) {
+               fFolder = candidate;
+               break;
+            }
+         }
+
+         if (!fFolder) {
+            var noDriveRes = {
+               type: 'foldersSelected',
+               success: false,
+               error: "Le lecteur F:\\ est introuvable ou inaccessible"
+            };
+            sendToCEP(noDriveRes);
+            logMessage("Lecteur F:\\ introuvable", 'warning');
+            return JSON.stringify(noDriveRes);
+         }
+
+         var files = fFolder.getFiles();
+         var matchingPaths = [];
+         var detailedFolders = [];
+         var totalVideos = 0;
+
+         if (files && files.length > 0) {
+            for (var fIdx = 0; fIdx < files.length; fIdx++) {
+               var item = files[fIdx];
+               if (item instanceof Folder) {
+                  var folderName = item.name || "";
+                  try { folderName = decodeURI(folderName); } catch (eDec) {}
+                  if (folderName.toLowerCase().indexOf("camille") !== -1) {
+                     var cPath = item.fsName.replace(/\\/g, "/");
+                     matchingPaths.push(cPath);
+                     var docsFolder = new Folder(item.fsName + "/" + G.CONFIG.docsSubFolderName);
+                     var fVideos = 0;
+                     if (docsFolder.exists) {
+                        var vFiles = getFilesByExtensions(docsFolder, G.CONFIG.videoExtensions);
+                        fVideos = vFiles.length;
+                        totalVideos += fVideos;
+                     }
+                     detailedFolders.push({
+                        path: cPath,
+                        name: folderName,
+                        videoCount: fVideos,
+                        checked: true
+                     });
+                  }
+               }
+            }
+         }
+
+         if (matchingPaths.length > 0) {
+            G.STATE.selectedFolder = new Folder(matchingPaths[0]);
+            G.STATE.baseFolderForCsv = G.STATE.selectedFolder;
+
+            var infoStr = matchingPaths.length + " dossier(s) 'Camille' détecté(s) sur F:\\ (" + totalVideos + " vidéo(s) trouvée(s))";
+            var successRes = {
+               type: 'foldersSelected',
+               success: true,
+               paths: matchingPaths,
+               folders: detailedFolders,
+               info: infoStr
+            };
+            sendToCEP(successRes);
+            logMessage(infoStr, 'success');
+            return JSON.stringify(successRes);
+         } else {
+            var emptyRes = {
+               type: 'foldersSelected',
+               success: true,
+               paths: [],
+               folders: [],
+               info: 'Aucun dossier contenant "Camille" trouvé sur F:\\'
+            };
+            sendToCEP(emptyRes);
+            logMessage('Aucun dossier contenant "Camille" trouvé sur F:\\', 'warning');
+            return JSON.stringify(emptyRes);
+         }
+      } catch (e) {
+         logMessage("Erreur autoDetectFolders: " + e.toString(), 'error');
+         var errRes = {
+            type: 'foldersSelected',
+            success: false,
+            error: e.toString()
+         };
+         sendToCEP(errRes);
+         return JSON.stringify(errRes);
       }
    }
 
@@ -449,7 +589,7 @@
       }
    }
 
-   function startBatch(folderPath, config) {
+   function startBatchQueue(pathsJson, config) {
       try {
          if (G.STATE.batchRunning) {
             return JSON.stringify({
@@ -469,25 +609,41 @@
             }
          }
 
-         var folder = new Folder(folderPath);
-         if (!folder || !(folder instanceof Folder) || !folder.exists) {
+         var folders = [];
+         if (pathsJson) {
+            var parsedPaths = safeJsonParse(pathsJson);
+            if (parsedPaths instanceof Array) {
+               for (var pIdx = 0; pIdx < parsedPaths.length; pIdx++) {
+                  var fObj = new Folder(parsedPaths[pIdx]);
+                  if (fObj && fObj.exists) {
+                     folders.push(fObj);
+                  }
+               }
+            } else if (typeof pathsJson === 'string') {
+               var singleF = new Folder(pathsJson);
+               if (singleF && singleF.exists) {
+                  folders.push(singleF);
+               }
+            }
+         }
+
+         if (folders.length === 0) {
             return JSON.stringify({
                success: false,
-               error: "Dossier invalide"
+               error: "Aucun dossier valide spécifié"
             });
          }
 
-         G.STATE.selectedFolder = folder;
-         G.STATE.baseFolderForCsv = folder;
+         G.STATE.folderQueue = folders;
+         G.STATE.selectedFolder = folders[0];
+         G.STATE.baseFolderForCsv = folders[0];
          G.STATE.batchRunning = true;
          G.STATE.cancelRequested = false;
          G.STATE.batchErrors = [];
+         G.STATE.totalProcessedCount = 0;
 
-         logMessage("Démarrage batch processing", 'info');
+         logMessage("Démarrage batch processing pour " + folders.length + " dossier(s)", 'info');
 
-         // Start batch processing asynchronously
-         // setTimeout n'existe pas en ExtendScript, on utilise le planificateur d'AE
-         // Le premier argument est une chaîne de caractères contenant le nom de la fonction globale
          app.scheduleTask("processBatch_Global();", 100, false);
 
          return JSON.stringify({
@@ -501,6 +657,10 @@
             error: e.toString()
          });
       }
+   }
+
+   function startBatch(folderPath, config) {
+      return startBatchQueue(JSON.stringify([folderPath]), config);
    }
 
    function cancelBatch() {
@@ -531,55 +691,68 @@
             return;
          }
 
-         // Step 2.1: Prepare CSVs (delegated to STEP1)
-         performStep2_1_Logic();
-
-         // Step 2.2: Create base AEPs
-         performStep2_2_Logic();
-
-         if (G.STATE.cancelRequested) {
-            sendToCEP({
-               type: 'batchCompleted',
-               results: 'annulé'
-            });
-            return;
+         var queue = G.STATE.folderQueue;
+         if (!queue || queue.length === 0) {
+            if (G.STATE.selectedFolder) {
+               queue = [G.STATE.selectedFolder];
+            } else {
+               queue = [];
+            }
          }
 
-         // Process each project
-         for (var i = 0; i < G.STATE.projectsToProcess.length; i++) {
+         for (var q = 0; q < queue.length; q++) {
+            if (G.STATE.cancelRequested) break;
+            var currentFolder = queue[q];
+            G.STATE.selectedFolder = currentFolder;
+            G.STATE.baseFolderForCsv = currentFolder;
+
+            logMessage("Traitement du dossier (" + (q + 1) + "/" + queue.length + "): " + currentFolder.fsName, 'info');
+
+            // Step 2.1: Prepare CSVs (delegated to STEP1)
+            performStep2_1_Logic();
+
+            // Step 2.2: Create base AEPs
+            performStep2_2_Logic();
+
             if (G.STATE.cancelRequested) break;
 
-            var projectFile = G.STATE.projectsToProcess[i];
-            var progress = {
-               type: 'progress',
-               current: i + 1,
-               total: G.STATE.projectsToProcess.length,
-               message: 'Traitement de ' + projectFile.name
-            };
-            sendToCEP(progress);
+            // Process each project
+            for (var i = 0; i < G.STATE.projectsToProcess.length; i++) {
+               if (G.STATE.cancelRequested) break;
 
-            // Step 3.1: Open project
-            var step3_1_result = performStep3_1_Logic(projectFile);
-            if (!step3_1_result.success) {
-               G.STATE.batchErrors.push(step3_1_result.error);
-               continue;
-            }
+               var projectFile = G.STATE.projectsToProcess[i];
+               var progress = {
+                  type: 'progress',
+                  current: i + 1,
+                  total: G.STATE.projectsToProcess.length,
+                  folder: currentFolder.name,
+                  message: 'Traitement de ' + projectFile.name
+               };
+               sendToCEP(progress);
 
-            // Step 3.2: Process project
-            var step3_2_result = performStep3_2_Logic(step3_1_result.activeCompName, step3_1_result.videoLayerIndex);
-            if (!step3_2_result.success) {
-               G.STATE.batchErrors.push(step3_2_result.error);
-               continue;
-            }
+               // Step 3.1: Open project
+               var step3_1_result = performStep3_1_Logic(projectFile);
+               if (!step3_1_result.success) {
+                  G.STATE.batchErrors.push(step3_1_result.error);
+                  continue;
+               }
 
-            G.STATE.totalProcessedCount++;
+               // Step 3.2: Process project
+               var step3_2_result = performStep3_2_Logic(step3_1_result.activeCompName, step3_1_result.videoLayerIndex);
+               if (!step3_2_result.success) {
+                  G.STATE.batchErrors.push(step3_2_result.error);
+                  continue;
+               }
 
-            // Purge memory periodically
-            if ((i + 1) % G.CONFIG.purgeEveryNProjects === 0) {
-               try {
-                  app.purge(PurgeTarget.ALL_CACHES);
-               } catch (e) {
-                  logMessage("Memory purge failed: " + e.toString(), 'warning');
+               G.STATE.totalProcessedCount++;
+
+               // Purge memory periodically
+               if ((i + 1) % G.CONFIG.purgeEveryNProjects === 0) {
+                  try {
+                     app.purge(PurgeTarget.ALL_CACHES);
+                  } catch (e) {
+                     logMessage("Memory purge failed: " + e.toString(), 'warning');
+                  }
                }
             }
          }
@@ -1863,9 +2036,12 @@
    }
 
    // --- EXPORTS ---
-   $.global.selectFolder = selectFolder;
+   $.global.selectFolder = selectFolders;
+   $.global.selectFolders = selectFolders;
+   $.global.autoDetectFolders = autoDetectFolders;
    $.global.selectCsv = selectCsv;
    $.global.startBatch = startBatch;
+   $.global.startBatchQueue = startBatchQueue;
    $.global.cancelBatch = cancelBatch;
    $.global.runDiagnostics = runDiagnostics;
    $.global.applyCuts = applyCuts;

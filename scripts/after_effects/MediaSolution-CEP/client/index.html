@@ -9,7 +9,7 @@
     <div class="panel-container">
         <header class="panel-header">
             <h1>Media Solution v12.0</h1>
-            <div class="status-indicator" id="statusIndicator">
+            <div class="status-indicator" id="statusIndicator" role="status" aria-live="polite">
                 <span class="status-dot ready"></span>
                 <span class="status-text">Prêt</span>
             </div>
@@ -18,10 +18,25 @@
         <main class="panel-main">
             <!-- Section Sélection Dossier -->
             <section class="section folder-section">
-                <h2>Sélection du Dossier</h2>
+                <h2>Sélection des Dossiers</h2>
                 <div class="folder-controls">
-                    <input type="text" id="folderPath" class="folder-input" placeholder="Aucun dossier sélectionné..." readonly>
+                    <label for="folderPath" class="sr-only">Chemin du dossier sélectionné</label>
+                    <input type="text" id="folderPath" class="folder-input" placeholder="Aucun dossier sélectionné..." readonly aria-readonly="true">
                     <button id="browseFolder" class="btn btn-primary">Parcourir...</button>
+                    <button id="autoDetectFolders" class="btn btn-secondary" title="Détecte automatiquement les dossiers contenant « Camille » à la racine de F:\">
+                        Détection auto...
+                    </button>
+                </div>
+                <div class="folder-list-container is-hidden" id="folderListContainer">
+                    <div class="folder-list-header">
+                        <span class="folder-list-title">Dossiers à traiter :</span>
+                        <div class="folder-list-actions">
+                            <button type="button" id="selectAllFolders" class="btn btn-secondary btn-xs" title="Tout cocher">Tout cocher</button>
+                            <button type="button" id="deselectAllFolders" class="btn btn-secondary btn-xs" title="Tout décocher">Tout décocher</button>
+                            <button type="button" id="clearFolders" class="btn btn-secondary btn-xs" title="Effacer la liste">Effacer</button>
+                        </div>
+                    </div>
+                    <ul class="folder-list" id="folderList"></ul>
                 </div>
                 <div class="folder-info" id="folderInfo"></div>
             </section>
@@ -30,28 +45,114 @@
             <section class="section config-section">
                 <h2>Configuration</h2>
                 <div class="config-grid">
-                    <div class="config-item">
-                        <label for="pythonCmd">Chemin Python:</label>
-                        <input type="text" id="pythonCmd" class="config-input" value="C:/Python313/python.exe">
+                    
+                    <!-- Groupe Status du Bridge Python -->
+                    <div class="config-group">
+                        <div class="bridge-status-container">
+                            <span class="bridge-status-title">Bridge Python :</span>
+                            <span class="daemon-dot" id="bridgeHealthDot" title="Statut du démon PyShiftBridge"></span>
+                            <strong id="bridgeHealthText">Vérification...</strong>
+                            <button id="restartBridge" class="btn btn-secondary btn-xs u-margin-left-auto">Relancer</button>
+                        </div>
+                        <div class="bridge-recovery-info is-hidden" id="bridgeRecoveryInfo">
+                            ⚠️ Le bridge Python est indisponible. Actions suggérées :
+                            <ul>
+                                <li>Vérifiez le <strong>Chemin Python</strong> ci-dessous.</li>
+                                <li>Assurez-vous que le package <code>PyShiftBridge</code> est installé dans votre environnement Python.</li>
+                                <li>Cliquez sur <strong>Relancer</strong> ci-dessus ou redémarrez After Effects.</li>
+                            </ul>
+                        </div>
                     </div>
-                    <div class="config-item">
-                        <label for="enablePythonCutsParser">
+
+                    <!-- Groupe Paramètres Principaux -->
+                    <div class="config-group">
+                        <div class="config-item">
+                            <label for="pythonCmd">Chemin de l'exécutable Python :</label>
+                            <input type="text" id="pythonCmd" class="config-input" placeholder="ex: python.exe ou chemin complet vers python.exe">
+                            <div class="config-help">Requis pour exécuter les outils Python de découpe et d'analyse.</div>
+                        </div>
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-item checkbox-item">
                             <input type="checkbox" id="enablePythonCutsParser" checked>
-                            Parser CSV Python
-                        </label>
+                            <label for="enablePythonCutsParser">
+                                Parser CSV Python
+                            </label>
+                        </div>
+                        <div class="config-help">Utilise Python pour analyser et découper les vidéos à partir de données CSV.</div>
                     </div>
-                    <div class="config-item">
-                        <label for="enableAutoRecentering">
+
+                    <div class="config-group">
+                        <div class="config-item checkbox-item">
                             <input type="checkbox" id="enableAutoRecentering" checked>
-                            Auto-recentrage
-                        </label>
+                            <label for="enableAutoRecentering">
+                                Auto-recentrage des calques
+                            </label>
+                        </div>
+                        <div class="config-help">Active le recentrage automatique des visages/sujets dans After Effects.</div>
                     </div>
-                    <div class="config-item">
-                        <label for="enablePythonAnalyzer">
+
+                    <div class="config-group">
+                        <div class="config-item checkbox-item">
                             <input type="checkbox" id="enablePythonAnalyzer" checked>
-                            Analyzer Python
-                        </label>
+                            <label for="enablePythonAnalyzer">
+                                Analyseur de projet Python
+                            </label>
+                        </div>
+                        <div class="config-help">Permet à Python d'analyser les projets pour accélérer le traitement batch.</div>
                     </div>
+
+                    <!-- Groupe Paramètres Expérimentaux / Avancés (Collapsible) -->
+                    <div class="config-group">
+                        <details class="advanced-config-details">
+                            <summary>Options avancées & expérimentales (Opt-in)</summary>
+                            <div class="advanced-config-content">
+                                
+                                <div class="config-item checkbox-item">
+                                    <input type="checkbox" id="enablePythonRecentering" checked>
+                                    <label for="enablePythonRecentering">
+                                        Auto-recentrage intelligent via Python
+                                    </label>
+                                </div>
+                                <div class="config-help">Calcule les coordonnées de recentrage optimales à l'aide de scripts Python.</div>
+
+                                <div class="config-item checkbox-item">
+                                    <input type="checkbox" id="enablePythonProjectOpen" checked>
+                                    <label for="enablePythonProjectOpen">
+                                        Ouverture de projet via Python (STEP3.1)
+                                    </label>
+                                </div>
+                                <div class="config-help">Permet d'ouvrir le projet AEP en arrière-plan via Python (Expérimental).</div>
+
+                                <div class="config-item checkbox-item">
+                                    <input type="checkbox" id="enablePythonBaseAepCreation" checked>
+                                    <label for="enablePythonBaseAepCreation">
+                                        Création base AEP Python
+                                    </label>
+                                </div>
+                                <div class="config-help">Génère automatiquement le projet AEP de base depuis Python.</div>
+
+                                <div class="config-item checkbox-item">
+                                    <input type="checkbox" id="enablePyAepCuts" checked>
+                                    <label for="enablePyAepCuts">
+                                        Mode Rapide Cuts (py_aep Offline)
+                                    </label>
+                                </div>
+                                <div class="config-help">⚠️ Modifie directement le fichier .aep sur le disque (Requis sauvegarde). Très rapide.</div>
+
+                                <div class="config-item checkbox-item">
+                                    <input type="checkbox" id="enableLogFile" checked>
+                                    <label for="enableLogFile">
+                                        Fichier de logs de session (.log)
+                                    </label>
+                                </div>
+                                <div class="config-help">Écrit MediaSolutionLog_V12.0_CEP_&lt;timestamp&gt;.log dans le dossier du projet. Décochez pour ne plus générer de fichier (l'affichage du panneau Logs reste actif).</div>
+
+                            </div>
+                        </details>
+                    </div>
+
                 </div>
                 <div class="config-actions">
                     <button id="exportConfig" class="btn btn-secondary">Exporter Config</button>
@@ -64,10 +165,11 @@
                 <h2>Traitement Batch</h2>
                 <div class="batch-controls">
                     <button id="startBatch" class="btn btn-primary" disabled>Démarrer Batch</button>
+                    <button id="startBatchPipe" class="btn btn-primary" disabled title="Batch via pipe (transport fiable)">Batch Pipe</button>
                     <button id="cancelBatch" class="btn btn-danger" disabled>Annuler</button>
                     <button id="runDiagnostics" class="btn btn-secondary" disabled>Diagnostics</button>
                 </div>
-                <div class="batch-progress" id="batchProgress" style="display: none;">
+                <div class="batch-progress is-hidden" id="batchProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
@@ -79,9 +181,19 @@
             <section class="section cuts-section">
                 <h2>Cuts CSV</h2>
                 <div class="cuts-controls">
-                    <input type="text" id="csvPath" class="folder-input" placeholder="Sélectionner un fichier CSV..." readonly>
+                    <label for="csvPath" class="sr-only">Chemin du fichier CSV sélectionné</label>
+                    <input type="text" id="csvPath" class="folder-input" placeholder="Sélectionner un fichier CSV..." readonly aria-readonly="true">
                     <button id="browseCsv" class="btn btn-primary">Parcourir...</button>
                     <button id="applyCuts" class="btn btn-primary" disabled>Appliquer Cuts</button>
+                </div>
+                
+                <!-- Information cible & mode -->
+                <div class="cuts-target-container">
+                    <div class="cuts-target-header">
+                        <span id="cutsTargetInfo" class="cuts-target-info warning">Cible : Aucune composition détectée</span>
+                        <button id="refreshTarget" class="btn btn-secondary btn-xs">Rafraîchir</button>
+                    </div>
+                    <span id="cutsModeInfo" class="cuts-mode-info">Mode : Recherche...</span>
                 </div>
             </section>
 
@@ -91,9 +203,20 @@
                 <div class="logs-controls">
                     <button id="clearLogs" class="btn btn-secondary">Effacer</button>
                     <button id="exportLogs" class="btn btn-secondary">Exporter</button>
+                    <div class="log-filter-container">
+                        <label for="logFilter">Filtrer :</label>
+                        <select id="logFilter" class="config-input select-xs">
+                            <option value="all">Tous</option>
+                            <option value="info">Infos</option>
+                            <option value="success">Succès</option>
+                            <option value="warning">Avertissements</option>
+                            <option value="error">Erreurs</option>
+                            <option value="python">Python</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="logs-container" id="logsContainer">
-                    <div class="log-entry">Media Solution v12.0 CEP - Prêt</div>
+                <div class="logs-container" id="logsContainer" role="log" aria-live="polite">
+                    <div class="log-entry">[INFO] Media Solution v12.0 CEP - Prêt</div>
                 </div>
             </section>
         </main>
