@@ -1,11 +1,5 @@
 ---
 trigger: always_on
-description: 
-globs: 
----
-
----
-trigger: always_on
 description: Memory Bank Protocol (Version Fast-Filesystem MCP-Optimized)
 globs: 
 ---
@@ -28,6 +22,7 @@ This protocol defines the mandatory cycle of life for project context. It uses t
 5. **Fault Tolerance (Fallback):** If `fast_read_file` fails ("server not found"), state that the fast-filesystem MCP is unavailable and proceed without context.
 6. **Prohibition:** Never load more than one file at a time.
 7. **Locking Instruction:** ALWAYS use absolute paths for memory-bank files in `/home/kidpixel/workflow_mediapipe/memory-bank/`. Use EXCLUSIVELY the fast-filesystem MCP tools (fast_*). Do NOT attempt to read memory-bank files via regular filesystem tools (read_file).
+8. **MCP Root Constraint:** The `fast-filesystem` server is rooted outside this repository (`/home/kidpixel/kimi-proxy`). A relative path such as `memory-bank/progress.md` therefore reads the **kimi-proxy** memory bank. Always pass the full absolute path, and check that the returned content belongs to this project before editing.
 
 ---
 
@@ -56,6 +51,7 @@ Access these via `fast_read_file`, `replace_file_content`, or `fast_list_directo
 -   **Archiving Tool:** Use `fast_write_file(path="/home/kidpixel/workflow_mediapipe/memory-bank/archives/...")` to archive old entries. Never delete data without archiving via this tool first.
 -   **Creation Restriction:** `fast_write_file` is only for initialization (creation of the 5 base files) or archiving. Interdiction de créer de nouveaux types de fichiers à la racine de `memory-bank/` sans autorisation.
 -   **Traceability:** Ensure the archive path is mentioned in the active file.
+-   **Integrity Check:** Before rewriting a memory-bank file, confirm the source contains no `⟦PRUNÉ…⟧` marker. The `mcp-pruner` layer can elide lines in `fast_read_file` responses; fall back to `filesystem-agent.read_text_file` for a raw read when archiving.
 
 ---
 
@@ -87,7 +83,7 @@ Access these via `fast_read_file`, `replace_file_content`, or `fast_list_directo
 ---
 
 ## 6. Observability & Dashboard Triggers
-To assist the Kimi Proxy monitoring, explicitly state your intent during pulls:
+To assist the workflow MediaPipe monitoring, explicitly state your intent during pulls:
 -   *"Initiating Pre-Flight Validation (Pulling activeContext)..."*
 -   *"Pulling architectural patterns for coding task..."*
 -   *"Synchronizing memory bank (UMB mode)..."*
