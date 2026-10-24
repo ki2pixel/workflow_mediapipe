@@ -44,8 +44,10 @@ un modèle scindé « frontend CPU + CNN compilé ».
 ### Artefacts locaux (gitignorés)
 
 `scratch/bench_step3_der/{ov_k1,ov_k2,ov_k1_10,ov_k2_10}` contiennent les rapports
-Markdown/JSON et les timings. `scratch/bench_step3_der/voxconverse` contient le corpus
-extrait (WAV + RTTM) ; l'archive téléchargée peut être supprimée après extraction.
+Markdown/JSON et les timings. Le corpus VoxConverse extrait (WAV + RTTM) n'est plus
+conservé localement : il a été supprimé le 2026-10-24 pour limiter l'empreinte disque.
+Le retélécharger avec `python3 scripts/fetch_voxconverse_dev.py` (~2 Go) avant tout
+benchmark.
 
 ---
 

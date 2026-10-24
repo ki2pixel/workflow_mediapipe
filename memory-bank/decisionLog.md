@@ -6,9 +6,9 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 > - Ce fichier conserve intégralement les décisions depuis octobre 2026.  
 > - Les décisions antérieures sont synthétisées ci-dessous et disponibles en détail dans `memory-bank/archives/decisionLog_legacy.md` (dernier lot archivé : septembre → mai 2026).
 
-## Historique synthétique (avant mars 2026)
+## Historique synthétique (avant septembre 2026)
 
-Cette section contient le résumé des décisions majeures jusqu'à mars 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
+Cette section contient le résumé des décisions majeures jusqu'à septembre 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
 ## Octobre 2026
 
