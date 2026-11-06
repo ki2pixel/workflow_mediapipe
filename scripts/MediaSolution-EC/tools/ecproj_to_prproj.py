@@ -21,6 +21,11 @@ valeur par valeur avec le .ecproj d'origine. Correspondances vérifiées :
                             |Δnormalisé|/Δt et influence 1/6 ; clés Bézier (ease 0 / 33 %) :
                             gabarit Adobe « 5,0,0,0,0,0 » ; tangentes spatiales automatiques
                             (P_next − P_prev)/6, les valeurs explicites du .ecproj sinon ;
+  - le Time Remap         → un Freeze Frame (une clé Hold constante) devient un **Frame Hold**
+                            natif (`FrameHold` 4 + `FrameHoldStart` sur le `VideoClip`) ; une
+                            vraie courbe de vitesse devient un objet `TimeRemapping` +
+                            paramètre « Speed » (courbe TIME, valeurs en secondes source),
+                            référencé après `Source` ;
   - les calques parentés  → position **monde** (les objets nuls « Null Segments » ne sont pas
                             exportés, comme pour le .aep) ;
   - les médias            → vidéo, image fixe (structure « still » à durée infinie) et audio
@@ -45,7 +50,8 @@ Sont exportés :
   - Masques : modes Add, Subtract, Intersect, Difference, ainsi que l'inversion (paramètre 17) ;
   - Opacité : valeur fixe ou animée par keyframes (paramètre 1) ;
   - Modes de fusion : les 27 modes de compositing Premiere (paramètres 2 et 3) ;
-  - Solides & Calques d'effet : générateurs Color Matte (COLR) et Black Video (BLAK + IsAdjustmentLayer) ;
+  - Solides & Calques d'effet : générateurs Color Matte (COLR, couleur RGB dans
+    `ImporterPrefs`) et Black Video (BLAK + IsAdjustmentLayer) ;
   - Effets : Gaussian Blur (AE.Impact_Blur_FX).
 Seuls les cas non repris (mode de masque exotique, feather par points, roto-bezier, effet hors table)
 bloquent l'export en .prproj. `--force` passe outre.
@@ -159,6 +165,8 @@ CLASS_IDS: dict[str, tuple[str, str]] = {
     "PointComponentParam": ("ca81d347-309b-44d2-acc7-1c572efb973c", "4"),
     "VideoComponentParam": ("fe47129e-6c94-4fc0-95d5-c056a517aaf3", "10"),
     "AudioComponentParam": ("a714635e-a628-4b27-9d59-77eba47dbc1a", "10"),
+    "TimeRemapping": ("ace5148e-9c9b-40ed-9f82-64cb67308464", "2"),
+    "TimeComponentParam": ("278ae1f9-ab7b-4dff-a53c-21029a399a9d", "9"),
 }
 CLASS_UNIFORM_PARAM = ("cc12343e-f113-4d3b-ae05-b287db77d461", "10")
 CLASS_ALT_PARAM = ("a4ff2d6e-7ac2-44f8-9d52-17d9ca50e542", "10")
@@ -166,6 +174,9 @@ CLASS_MUTE_PARAM = ("32657501-3aa4-445f-a49b-d09ecb9fa1ae", "10")
 CLASS_VOLUME_PARAM = ("a714635e-a628-4b27-9d59-77eba47dbc1a", "10")
 CLASS_ENUM_PARAM = ("6e02e8bb-2569-46b2-8ab1-4ab11c43e9c8", "10")
 CLASS_ARB_PARAM = ("313e54d4-6903-49ad-b0bf-8262cdd10f4e", "3")
+# Sens de lecture du paramètre « Speed » du Time Remapping (25_time_remap) : valeur
+# statique sentinelle, puis clés « temps_ticks,secondes_source,6,0,0,0,0,0 ».
+REMAP_START_KEYFRAME = "-91445760000000000,0.000000000000000000000000,0,0,0,0,0,0"
 
 GUID_MEDIA_VIDEO = "228cda18-3625-4d2d-951e-348879e4ed93"
 GUID_MEDIA_AUDIO = "80b8e3d5-6dca-4195-aefb-cb5f407ab009"
@@ -204,10 +215,19 @@ IMMERSIVE = ('{"ambisonicsHRIR":"","ambisonicsMonitoringType":0,"capturedHorizon
              '"projectionType":0,"stereoscopicEye":0,"stereoscopicType":0,"version":3}')
 TONEMAP = '{"peak":-1,"version":3}'
 INFLUENCE = "0.16666666666666666"
-DEFAULT_CLIP_VOLUME = "0.177827939391"
-DEFAULT_CLIP_VOLUME_F = "0.17782793939113617"
 STILL_DURATION_TICKS = 10973491200000000   # durée « infinie » d'un média image : 12 h (comme Adobe)
 STILL_CLIP_TICKS = 1524096000000           # plage nominale du clip image dans le masterclip (6 s)
+# Générateurs synthétiques (Color Matte / Black Video) : mêmes conventions qu'Adobe.
+STILL_CODEC_TYPE = "1380013856"            # CodecType « RAW » d'un flux still (Premiere 2026)
+ZERO_GUID = "00000000-0000-0000-0000-000000000000"
+NO_CONFORMED_AUDIO_RATE = "9223372036854775807"  # i64::MAX, média généré sans audio
+COLOR_MATTE_MODIFICATION_STATE = "GHEjmi0XPID7m/zIAAAAQA=="
+COLOR_MATTE_MODIFICATION_STATE_HASH = "e36a7dbe-b1a9-af63-b399-e5190000001c"
+BLACK_VIDEO_MODIFICATION_STATE = "9G7cYo7OaZ9ewoS+AAAAQA=="
+BLACK_VIDEO_MODIFICATION_STATE_HASH = "a4f9f615-16ac-e2c1-b049-f6b00000001c"
+GENERATOR_SOURCE_IN_TICKS = 3600 * TICKS_PER_SECOND  # les placements Adobe commencent à 1 h dans la source 12 h
+GENERATOR_TEMPLATE_CLIP_TICKS = 5 * TICKS_PER_SECOND  # template du masterclip Adobe : 0–5 s
+DEFAULT_IS_DROP_FRAME = "false"            # 25/30 fps : jamais drop-frame (valeur des mattes Adobe)
 
 # --- masques et effets (structures relevées sur un projet Premiere 2026 de référence) ----------
 # Un masque est un filtre `AE.ADBE AEMask2` (27 paramètres) écrit en sous-composant du filtre
@@ -450,6 +470,48 @@ def pixel_aspect_str(value) -> str:
     return f"{frac.numerator},{frac.denominator}"
 
 
+def solid_rgb(color) -> tuple[int, int, int]:
+    """Couleur d'un solide .ecproj (0..1, éventuellement 0..255) → octets RGB."""
+    values = list(color or [0.0, 0.0, 0.0])[:3]
+    while len(values) < 3:
+        values.append(0.0)
+    out: list[int] = []
+    for value in values:
+        try:
+            channel = float(value)
+        except (TypeError, ValueError):
+            channel = 0.0
+        if channel > 1.5:
+            channel /= 255.0
+        out.append(max(0, min(255, int(round(channel * 255.0)))))
+    return out[0], out[1], out[2]
+
+
+def audio_sample_type(path: str, codec) -> str:
+    """Code `AudioStream/SampleType` d'Adobe, d'après le conteneur et le codec.
+
+    Relevés sur les projets Premiere de référence : WAV PCM16 = 3, AIFF PCM16 = 11,
+    MOV/MXF PCM = 4, AAC/MP3 = 7. Le code décrit le format **sur disque**
+    (16/24 bits, flottant, compressé), pas le format interne de Premiere.
+    """
+    ext = os.path.splitext(path or "")[1].lower()
+    if ext in (".wav", ".wave"):
+        return "3"
+    if ext in (".aif", ".aiff", ".aifc"):
+        return "11"
+    if ext == ".mxf":
+        return "4"
+    if ext == ".mov":
+        # Un .mov ProRes / DNx / non compressé porte du PCM ; un .mov H.264
+        # (téléphone, écran) porte presque toujours de l'AAC -> 7.
+        name = str(codec or "").lower()
+        if any(word in name for word in
+               ("prores", "dnx", "uncompressed", "raw", "pcm", "xdcam", "422", "444")):
+            return "4"
+        return "7"
+    return "7"
+
+
 def node_value(node: dict | None):
     if not node:
         return None
@@ -611,6 +673,127 @@ def scalar_keyframes(node: dict):
     rows = [scalar_row(times[i], val(key), temporal_tail(key, speeds_in[i], speeds_out[i]))
             for i, key in enumerate(keys)]
     return scalar_start(val(keys[0])), ";".join(rows) + ";"
+
+
+def format_remap_value(value: float) -> str:
+    """Valeur de la courbe Speed : secondes source à 24 décimales (format Adobe)."""
+    return f"{float(value):.24f}"
+
+
+def format_remap_bound(value: float) -> str:
+    """Borne du paramètre Speed : entier nu, ou double complet si fractionnaire."""
+    value = float(value)
+    return str(int(value)) if value.is_integer() else repr(value)
+
+
+def build_time_remap(entry: dict, warn) -> dict | None:
+    """Objets TimeRemapping/Speed d'un clip, d'après le nœud `timeRemap` EffectCraft.
+
+    Un Freeze Frame EffectCraft (une seule clé Hold, valeur constante sur tout le calque)
+    est écrit comme **Frame Hold** natif de Premiere (`FrameHold` + `FrameHoldStart` sur
+    le `VideoClip`), la méthode validée dans Premiere 2026 : le clip garde sa durée et
+    toutes les images source pointent vers l'image gelée. Ce n'est pas un Time Remapping
+    (celui-ci, combiné au masque de V3, rendait le calque invisible).
+
+    Pour une vraie courbe de vitesse à plusieurs clés, on écrit des objets
+    `TimeRemapping`/`Speed` : les temps EC (temps de comp, comme dans AE) sont ramenés au
+    temps clip-relatif (`clé - in_point`) et les valeurs restent des secondes source.
+    Premiere interpole cette courbe en mode TIME (6) : les paliers Hold ne sont pas
+    reproduits et sont signalés.
+
+    Retour : `{"kind": "hold", "start": ticks, ...}` pour un gel, ou
+    `{"kind": "remap", "param": Obj, "remap": Obj, ...}` pour une courbe.
+    """
+    layer = entry["layer"]
+    node = conv.find_layer_property(layer, "timeRemap")
+    if node is None:
+        return None
+    bundle = entry["bundle"]
+    name = str(layer.get("name") or bundle["name"])
+    if not bundle.get("has_video") or bundle.get("is_still"):
+        warn(f"calque « {name} » : time remap ignoré (source sans durée)")
+        return None
+    upper_ticks = int(bundle.get("duration") or 0)
+    span = int(entry["end"] - entry["start"])
+    if upper_ticks <= 0 or span <= 0:
+        warn(f"calque « {name} » : time remap ignoré (durée source/clip nulle)")
+        return None
+    upper = upper_ticks / TICKS_PER_SECOND
+
+    keys = sorted(node.get("keys") or [], key=lambda key: int(key.get("time") or 0))
+    keys = [key for key in keys if conv.prop_value(key.get("value")) is not None]
+    points: list[tuple[int, float]] = []
+    if len(keys) <= 1:
+        raw_value = (keys[0] if keys else node).get("value")
+        value = conv.prop_value(raw_value)
+        points = [(0, float(value if value is not None else 0.0)), (span, float(value if value is not None else 0.0))]
+    else:
+        base = int(entry["start"])  # temps de comp → temps clip-relatif
+        for key in keys:
+            tick = int(key.get("time") or 0) - base
+            value = float(conv.prop_value(key.get("value")))
+            if tick < 0:
+                warn(f"calque « {name} » : clé de time remap avant le début du clip, ramenée à 0")
+                tick = 0
+            points.append((tick, value))
+        if any(not is_linear_key(key) for key in keys):
+            warn(f"calque « {name} » : time remap à plusieurs clés non linéaires — "
+                 f"courbe Premiere linéaire (les paliers Hold ne sont pas reproduits)")
+
+    points.sort()
+    deduped: list[tuple[int, float]] = []
+    for tick, value in points:
+        if deduped and tick == deduped[-1][0]:
+            warn(f"calque « {name} » : deux clés de time remap au même temps, la seconde est ignorée")
+            continue
+        deduped.append((tick, value))
+    points = deduped
+
+    clamped: list[tuple[int, float]] = []
+    for tick, value in points:
+        if value < 0.0:
+            warn(f"calque « {name} » : valeur de time remap négative, ramenée à 0")
+            value = 0.0
+        elif value > upper:
+            warn(f"calque « {name} » : valeur de time remap au-delà de la source, ramenée à {upper:.3f} s")
+            value = upper
+        clamped.append((tick, value))
+    points = clamped
+    if not points:
+        warn(f"calque « {name} » : time remap sans clé exploitable, ignoré")
+        return None
+
+    # Valeur constante sur tout le clip = gel (Freeze Frame EffectCraft). On l'écrit en
+    # Frame Hold natif, pas en Time Remapping : c'est la forme validée dans Premiere.
+    if all(abs(value - points[0][1]) <= 1e-9 for _, value in points):
+        return {"kind": "hold", "start": int(round(points[0][1] * TICKS_PER_SECOND)),
+                "param": None, "remap": None, "keys": points}
+
+    # Premiere complète une courbe inachevée par une clé à la fin de la source.
+    last_tick, last_value = points[-1]
+    if last_value < upper - 1e-9:
+        terminal = last_tick + int(round((upper - last_value) * TICKS_PER_SECOND))
+        points.append((terminal, upper))
+
+    keyframes = ";".join(
+        f"{tick},{format_remap_value(value)},6,0,0,0,0,0"
+        for tick, value in points
+    ) + ";"
+    param = Obj("TimeComponentParam")
+    param.txt("Name", "Speed")
+    param.txt("IsTimeVarying", "true")
+    param.txt("IsLocked", "false")
+    param.txt("DiscontinuousInterpolate", "false")
+    param.txt("LowerBound", "0")
+    param.txt("UpperBound", format_remap_bound(upper))
+    param.txt("StartKeyframe", REMAP_START_KEYFRAME)
+    param.txt("Keyframes", keyframes)
+    param.txt("CurrentValue", "0")
+    param.txt("ParameterID", "-1")
+    remap = Obj("TimeRemapping")
+    remap.ref("Keyframes", param)
+    return {"kind": "remap", "start": None, "param": param, "remap": remap,
+            "keys": points}
 
 
 # -------------------------------------------------- tracés de masque (blob Premiere)
@@ -847,13 +1030,16 @@ def build_mask_component(mask: dict, index: int, source_w: float, source_h: floa
                          warn) -> tuple[Obj, list[Obj]]:
     """Filtre `AE.ADBE AEMask2` (27 paramètres) d'un masque .ecproj.
 
-    Le tracé est écrit en coordonnées normalisées par la taille **source** du clip (les
-    masques vivent dans l'espace du calque, comme dans After Effects : 1920×1080 pour une
-    source paysage, même si la séquence est en 1080×1920), Position/Anchor au centre de sa
-    bounding-box. Un masque sans tracé prend l'état par défaut d'Adobe (`Type 0`,
-    Position/Anchor `0:0`) : il ne découpe rien. Un tracé animé est écrit à sa première clé
-    (comme l'export .aep) ; les options non reprises (mode ≠ Add, inversion…) sont refusées
-    en amont par `premiere_skip_reason` et signalées ici par un avertissement.
+    Le masque est écrit en sous-composant du filtre Opacité du clip (structure validée
+    dans Premiere 2026 : le masque se rend sans conteneur `SelectionComponents`
+    supplémentaire). Le tracé est en coordonnées normalisées par la taille **source** du
+    clip (les masques vivent dans l'espace du calque, comme dans After Effects :
+    1920×1080 pour une source paysage, même si la séquence est en 1080×1920),
+    Position/Anchor au centre de sa bounding-box. Un masque sans tracé prend l'état par
+    défaut d'Adobe (`Type 0`, Position/Anchor `0:0`) : il ne découpe rien. Un tracé animé
+    est écrit à sa première clé (comme l'export .aep) ; les options non reprises (mode ≠
+    Add, inversion…) sont refusées en amont par `premiere_skip_reason` et signalées ici
+    par un avertissement.
     """
     kind = mask.get("kind") or {}
     children = mask_children(mask)
@@ -914,15 +1100,16 @@ def build_mask_component(mask: dict, index: int, source_w: float, source_h: floa
         make_mask_enum_param(22, "Type", mask_type, 0, 4, control=10),
         make_mask_arb_param(23, "User Interactions", MASK_INTERACTIONS_DATA),
     ]
-    filter_obj = Obj("VideoFilterComponent")
-    filter_obj.el(E("Component", {"Version": "7"}, children=[
+    component_children: list[E] = [
         E("Params", {"Version": "1"}, children=[
             E("Param", {"Index": str(position), "ref": param})
             for position, param in enumerate(params)
         ]),
         E("DisplayName", text=MASK2_DISPLAY_NAME),
         E("InstanceName", text=f"{index + 1:02d}"),
-    ]))
+    ]
+    filter_obj = Obj("VideoFilterComponent")
+    filter_obj.el(E("Component", {"Version": "7"}, children=component_children))
     filter_obj.el(E("PremiereFilterPrivateData",
                     {"Encoding": "base64", "BinaryHash": mask_payload_hash(MASK2_PRIVATE_DATA)},
                     text=MASK2_PRIVATE_DATA))
@@ -934,8 +1121,9 @@ def build_mask_component(mask: dict, index: int, source_w: float, source_h: floa
 def build_opacity_component(mask_filters: list[Obj] | None = None,
                             opacity_node: dict | None = None,
                             blend_mode: str = "Normal") -> tuple[Obj, list[Obj]]:
-    """Filtre Opacité explicite (`AE.ADBE Opacity`) portant les masques en sous-composants,
-    le mode de fusion et l'opacité (statique ou animée).
+    """Filtre Opacité explicite (`AE.ADBE Opacity`) : masques en sous-composants, mode de
+    fusion et opacité (statique ou animée). Les masques `AE.ADBE AEMask2` sont écrits ici
+    comme le fait Adobe pour un masque de calque (voir build_mask_component).
     """
     mask_filters = list(mask_filters or [])
     api_val, gui_val = BLEND_MODE_MAP.get(blend_mode, (18, 0))
@@ -1177,7 +1365,7 @@ def make_scalar_param(node: dict | None, fallback=0.0, time_varying=False,
 
 
 def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_missing: bool,
-            xml_dump: bool, log) -> dict:
+            xml_dump: bool, log, audio_fallback: bool = False) -> dict:
     with open(ec_path, "r", encoding="utf-8") as handle:
         ec = json.load(handle)
 
@@ -1233,6 +1421,7 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
                 "is_still": True,
                 "is_generator": True,
                 "is_adjustment": is_adj,
+                "color_rgb": solid_rgb(item_kind.get("color")),
             }
             continue
 
@@ -1243,7 +1432,8 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         stored_path = conv.apply_path_map(real_path, path_maps)
         if stored_path != real_path and re.match(r"^[A-Za-z]:", stored_path):
             stored_path = stored_path.replace("/", "\\")
-        if not os.path.exists(real_path):
+        missing = not os.path.exists(real_path)
+        if missing:
             warn_missing(f"média absent du disque (référencé quand même) : {real_path}")
         is_still = str(item_kind.get("kind") or "") == "Still"
         bundles[str(item_id)] = {
@@ -1264,6 +1454,9 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             "is_still": is_still,
             "is_generator": False,
             "is_adjustment": False,
+            "missing": missing,
+            "codec": str(item_kind.get("codec") or ""),
+            "audio_sample_type": audio_sample_type(real_path, item_kind.get("codec")),
         }
         if not bundles[str(item_id)]["has_video"] and not bundles[str(item_id)]["has_audio"]:
             warn(f"média « {item.get('name')} » sans vidéo ni audio : traité comme vidéo")
@@ -1331,6 +1524,26 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
                            + audio_only_entries)
     entries_by_track = tracks
     track_count = max(1, len(entries_by_track))
+
+    # Audio de secours (optionnel) : un segment vidéo dont tous les calques ont
+    # `switches.audio=false` est muet dans EffectCraft. Sur demande, on reprend l'audio
+    # du calque le plus bas (V1) de ce segment — cas typique d'un freeze créé par
+    # duplication de la V1, où l'audio a été coupé sur les trois copies.
+    if audio_fallback:
+        candidates = [entry for entry in entries
+                      if entry["bundle"]["has_video"] and entry["bundle"]["has_audio"]]
+        for entry in sorted(candidates, key=lambda item: (item["track"], item["start"])):
+            if entry["audio"]:
+                continue
+            overlap = [other for other in entries
+                       if other["bundle"]["has_audio"]
+                       and other["start"] < entry["end"] and entry["start"] < other["end"]]
+            if any(other["audio"] for other in overlap):
+                continue
+            entry["audio"] = True
+            warn(f"segment {entry['start'] / TICKS_PER_SECOND:.3f}–"
+                 f"{entry['end'] / TICKS_PER_SECOND:.3f} s : aucune piste audio active — "
+                 f"audio de secours pris sur « {entry['layer'].get('name')} »")
 
     # pistes audio : allocation indépendante (seuls les calques réellement audibles)
     audio_tracks_list: list[list[dict]] = []
@@ -1517,11 +1730,22 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         children_order: list[Obj] = []
         if bundle["has_video"]:
             video_source = Obj("VideoMediaSource")
-            video_clip_children = [E("Source", {"ref": video_source}),
-                                   E("ClipID", text=str(uuid.uuid4()))]
+            video_clip_children = []
+            if bundle.get("is_generator"):
+                # Les clips de média synthétique portent cette préférence Adobe
+                # (pas de MarkerOwner).
+                video_clip_children.append(E("Node", {"Version": "1"}, children=[
+                    E("Properties", {"Version": "1"}, children=[
+                        E("BE.Prefs.SyntheticMedia.DefaultIsDropFrame", text=DEFAULT_IS_DROP_FRAME)
+                    ])
+                ]))
+            video_clip_children += [E("Source", {"ref": video_source}),
+                                    E("ClipID", text=str(uuid.uuid4()))]
             if is_still:
+                template_ticks = (GENERATOR_TEMPLATE_CLIP_TICKS
+                                  if bundle.get("is_generator") else STILL_CLIP_TICKS)
                 video_clip_children += [E("InPoint", text="0"),
-                                        E("OutPoint", text=str(STILL_CLIP_TICKS))]
+                                        E("OutPoint", text=str(template_ticks))]
             video_clip_children.append(E("InUse", text="false"))
             video_clip = Obj("VideoClip")
             video_clip.el(E("Clip", {"Version": "18"}, children=video_clip_children))
@@ -1716,8 +1940,11 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
     mix_chain = make_audio_chain([faders[audio_track_count], meters[audio_track_count]],
                                  with_defaults=False)
     inlet = Obj("AudioTrackInlet")
+    # Adobe route TOUTES les pistes audio dans l'inlet du mixage ; n'en
+    # déclarer qu'une laissait les autres pistes hors du bus master.
     inlet.el(E("Sources", {"Version": "1"}, children=[
-        E("Source", {"Index": "0", "ref": audio_tracks[0]})
+        E("Source", {"Index": str(index), "ref": track})
+        for index, track in enumerate(audio_tracks)
     ]))
     inlet.el(layout_e())
 
@@ -1729,40 +1956,87 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             audio_stream.el(layout_e())
             audio_stream.txt("FrameRate", audio_ticks)
             audio_stream.txt("Duration", str(bundle["duration"]))
-            audio_stream.txt("SampleType", "5")
+            audio_stream.txt("SampleType", bundle.get("audio_sample_type") or "7")
         video_stream = None
         if bundle["has_video"]:
             video_stream = Obj("VideoStream")
-            video_stream.txt("FrameRate", ticks_per_frame(bundle["frame_rate"]))
-            video_stream.txt("Duration", str(bundle["duration"]))
-            video_stream.txt("CodecType", "1061109567")
-            if bundle["is_still"]:
+            if bundle.get("is_generator"):
+                # Flux still d'un générateur synthétique : structure des projets
+                # Premiere 2026 (COLR / BLAK), sans fichier ni codec réel.
                 video_stream.txt("IsStill", "true")
-            video_stream.txt("FrameRect", f"0,0,{bundle['width']},{bundle['height']}")
-            video_stream.txt("OriginalColorSpace", COLOR_SPACE)
-            video_stream.txt("IsPAROverridden", "true")
-            video_stream.txt("OriginalFieldType", "-1")
-            video_stream.txt("IsFieldTypeOverridden", "true")
-            video_stream.txt("OverriddenFieldType", "0")
+                video_stream.txt("FrameRate", ticks_per_frame(bundle["frame_rate"]))
+                video_stream.txt("FrameRect", f"0,0,{bundle['width']},{bundle['height']}")
+                video_stream.txt("Duration", str(bundle["duration"]))
+                video_stream.txt("CodecType", STILL_CODEC_TYPE)
+                if bundle.get("is_adjustment"):
+                    video_stream.txt("IsContinuousTime", "true")
+                video_stream.txt("FieldTypeIsUncertain", "true")
+            else:
+                video_stream.txt("FrameRate", ticks_per_frame(bundle["frame_rate"]))
+                video_stream.txt("Duration", str(bundle["duration"]))
+                video_stream.txt("CodecType", "1061109567")
+                if bundle["is_still"]:
+                    video_stream.txt("IsStill", "true")
+                video_stream.txt("FrameRect", f"0,0,{bundle['width']},{bundle['height']}")
+                video_stream.txt("OriginalColorSpace", COLOR_SPACE)
+                video_stream.txt("IsPAROverridden", "true")
+                video_stream.txt("OriginalFieldType", "-1")
+                video_stream.txt("IsFieldTypeOverridden", "true")
+                video_stream.txt("OverriddenFieldType", "0")
         media_obj = Obj("Media", uid=True)
         if audio_stream is not None:
             media_obj.ref("AudioStream", audio_stream)
         if video_stream is not None:
             media_obj.ref("VideoStream", video_stream)
         if bundle.get("is_generator"):
+            if not bundle.get("is_adjustment"):
+                # La couleur d'un Color Matte tient dans ces 8 octets :
+                # [R, G, B, 0, 1, 0, 0, 0] (opaque, version 1).
+                r, g, b = bundle.get("color_rgb") or (0, 0, 0)
+                prefs = base64.b64encode(bytes([r, g, b, 0, 1, 0, 0, 0])).decode("ascii")
+                media_obj.el(E("ImporterPrefs", {
+                    "Encoding": "base64",
+                    "BinaryHash": mask_payload_hash(prefs),
+                }, text=prefs))
+                state, state_hash = (COLOR_MATTE_MODIFICATION_STATE,
+                                     COLOR_MATTE_MODIFICATION_STATE_HASH)
+            else:
+                # Black Video (calque de réglage) n'a pas d'ImporterPrefs.
+                state, state_hash = (BLACK_VIDEO_MODIFICATION_STATE,
+                                     BLACK_VIDEO_MODIFICATION_STATE_HASH)
+            media_obj.el(E("ModificationState", {
+                "Encoding": "base64",
+                "BinaryHash": state_hash,
+            }, text=state))
             media_obj.txt("FilePath", bundle["stored_path"])
-            media_obj.txt("ImplementationID", GUID_GENERATOR_IMPLEMENTATION)
-            media_obj.txt("Title", bundle["name"])
             media_obj.txt("Infinite", "true")
+            media_obj.txt("ImplementationID", GUID_GENERATOR_IMPLEMENTATION)
+            media_obj.txt("Title", "Black Video" if bundle.get("is_adjustment") else bundle["name"])
+            # Conservé pour les tests/archives existants : Adobe l'omet, mais
+            # Premiere l'accepte sur les générateurs (0 = pas de raison d'offline).
             media_obj.txt("OfflineReason", "0")
             media_obj.txt("ActualMediaFilePath", bundle["stored_path"])
+            media_obj.txt("ContentAndMetadataState", ZERO_GUID)
+            media_obj.txt("ConformedAudioRate", NO_CONFORMED_AUDIO_RATE)
         else:
             media_obj.txt("FilePath", bundle["stored_path"])
             media_obj.txt("ImplementationID", GUID_IMPLEMENTATION)
             media_obj.txt("Title", os.path.basename(bundle["real_path"]) or bundle["name"])
             if bundle["is_still"]:
                 media_obj.txt("Infinite", "true")
-            media_obj.txt("OfflineReason", "1")
+            # Adobe n'écrit OfflineReason que pour un média hors ligne ; un
+            # fichier présent doit rester sans cette balise, sinon Premiere
+            # marque le média offline et doit le reconnecter à l'ouverture.
+            if bundle.get("missing"):
+                media_obj.txt("OfflineReason", "1")
+            if audio_stream is not None:
+                # Ticks par échantillon audio conformé (48 kHz -> 5292000).
+                # Adobe l'écrit sur tout média porteur d'audio ; sans cette
+                # valeur, le moteur audio de Premiere 2026 part avec un taux
+                # invalide et plante à la lecture (AudioFilterHost).
+                media_obj.txt("ConformedAudioRate", str(audio_ticks))
+            media_obj.txt("ContentAndMetadataState", str(uuid.uuid4()))
+            media_obj.txt("ActualMediaFilePath", bundle["stored_path"])
         bundle["media_obj"] = media_obj
         bundle["audio_stream"] = audio_stream
         bundle["video_stream"] = video_stream
@@ -1786,6 +2060,12 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         layer = entry["layer"]
         bundle = entry["bundle"]
         name = str(layer.get("name") or bundle["name"])
+        time_effect = build_time_remap(entry, warn)
+        entry["time_effect"] = time_effect
+        entry["time_remap"] = (time_effect if time_effect is not None
+                               and time_effect["kind"] == "remap" else None)
+        entry["frame_hold"] = (time_effect["start"] if time_effect is not None
+                               and time_effect["kind"] == "hold" else None)
         sw = float(bundle["width"])
         sh = float(bundle["height"])
         offset = conv.world_offset(layer, layers_by_id) if layer.get("parent") else (0.0, 0.0)
@@ -1841,10 +2121,11 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             and abs(rotation_value) < 1e-6
         )
 
-        # masques et effets : le masque vit sous l'Opacité du clip (matérialisée), les effets
-        # sont des composants de premier niveau de la chaîne, comme Motion
-        mask_filters: list[Obj] = []
-        mask_params: list[Obj] = []
+        # masques : sous-composants du filtre Opacité du clip (structure la plus simple,
+        # validée dans Premiere 2026 à côté de la variante Adobe avec conteneur
+        # `SelectionComponents`). Les effets restent des composants de premier niveau de
+        # la chaîne, comme Motion.
+        layer_masks: list[dict] = []
         for mask in conv.enabled_masks(layer):
             mode = str((mask.get("kind") or {}).get("mode") or "Add")
             if mode == "None":
@@ -1853,7 +2134,12 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
                 warn(f"masque « {mask.get('name')} » de « {name} » : tracé ouvert (non fermé) "
                      f"— non écrit, comme dans EffectCraft (le calque reste entier)")
                 continue
-            mask_filter, params = build_mask_component(mask, len(mask_filters), sw, sh, warn)
+            layer_masks.append(mask)
+
+        mask_filters: list[Obj] = []
+        mask_params: list[Obj] = []
+        for mask_index, mask in enumerate(layer_masks):
+            mask_filter, params = build_mask_component(mask, mask_index, sw, sh, warn)
             mask_filters.append(mask_filter)
             mask_params += params
 
@@ -1884,8 +2170,9 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             blur_filter, params = build_blur_component(effect, warn)
             blur_filters.append(blur_filter)
             blur_params += params
-        if (mask_filters or opacity_filter is not None or blur_filters) and default_motion:
-            # masque, opacité personnalisée ou effet + Transform par défaut : écrire un filtre Motion explicite
+        if (opacity_filter is not None or blur_filters) and default_motion:
+            # opacité personnalisée ou effet + Transform par défaut : écrire un filtre
+            # Motion explicite (un masque de clip ne l'exige pas)
             default_motion = False
 
         if default_motion:
@@ -1930,12 +2217,30 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         entry["opacity_filter"] = opacity_filter
         entry["blur_filters"] = blur_filters
         segment_video_clip = Obj("VideoClip")
-        segment_video_clip.el(E("Clip", {"Version": "18"}, children=[
-            E("Source", {"ref": bundle["video_source"]}),
+        clip_children = []
+        if bundle.get("is_generator"):
+            clip_children.append(E("Node", {"Version": "1"}, children=[
+                E("Properties", {"Version": "1"}, children=[
+                    E("BE.Prefs.SyntheticMedia.DefaultIsDropFrame", text=DEFAULT_IS_DROP_FRAME)
+                ])
+            ]))
+        clip_children.append(E("Source", {"ref": bundle["video_source"]}))
+        if entry["time_remap"] is not None:
+            clip_children.append(E("TimeRemapping", {"ref": entry["time_remap"]["remap"]}))
+        # Adobe place les clips de média synthétique à 1 h dans la source de 12 h
+        # (le template du masterclip reste à 0–5 s).
+        source_offset = (GENERATOR_SOURCE_IN_TICKS
+                         if bundle.get("is_generator") and entry["time_remap"] is None else 0)
+        clip_children += [
             E("ClipID", text=str(uuid.uuid4())),
-            E("InPoint", text=str(entry["src_in"])),
-            E("OutPoint", text=str(entry["src_out"])),
-        ]))
+            E("InPoint", text=str(entry["src_in"] + source_offset)),
+            E("OutPoint", text=str(entry["src_out"] + source_offset)),
+        ]
+        segment_video_clip.el(E("Clip", {"Version": "18"}, children=clip_children))
+        if entry["frame_hold"] is not None:
+            # Add Frame Hold de Premiere : 4 = hold sur une image source précise.
+            segment_video_clip.txt("FrameHold", "4")
+            segment_video_clip.txt("FrameHoldStart", str(entry["frame_hold"]))
         video_subclip = Obj("SubClip")
         video_subclip.ref("Clip", segment_video_clip)
         video_subclip.ref("MasterClip", bundle["master_obj"])
@@ -1967,6 +2272,8 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             entry["mask_filters"] = []
             entry["opacity_filter"] = None
             entry["blur_filters"] = []
+            entry["frame_hold"] = None
+            entry["time_remap"] = None
             entry["video_chain"] = None
             entry["video_item"] = None
             entry["video_subclip"] = None
@@ -1974,34 +2281,11 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             entry["keyframed"] = False
 
         if entry["audio"] and bundle["has_audio"]:
-            mute_param = Obj("AudioComponentParam", classid_version=CLASS_MUTE_PARAM)
-            mute_param.txt("IsTimeVarying", "false")
-            mute_param.txt("ParameterControlType", "17")
-            mute_param.txt("RangeLocked", "false")
-            volume_param = Obj("AudioComponentParam", classid_version=CLASS_VOLUME_PARAM)
-            volume_param.txt("StartKeyframe", f"{SENTINEL},{DEFAULT_CLIP_VOLUME},0,0,0,0,0,0")
-            volume_param.txt("CurrentValue", DEFAULT_CLIP_VOLUME_F)
-            volume_param.txt("ParameterControlType", "17")
-            volume_param.txt("RangeLocked", "false")
-            audio_filter = Obj("AudioFilterComponent")
-            audio_filter.el(E("AudioComponent", {"Version": "3"}, children=[
-                E("Component", {"Version": "7"}, children=[
-                    E("Params", {"Version": "1"}, children=[
-                        E("Param", {"Index": "0", "ref": mute_param}),
-                        E("Param", {"Index": "1", "ref": volume_param}),
-                    ]),
-                    E("Intrinsic", text="true"),
-                    E("ID", text="3"),
-                ]),
-                layout_e(),
-                E("ChannelType", text="1"),
-                E("FrameRate", text=str(audio_ticks)),
-                E("AudioComponentType", text="0"),
-            ]))
-            audio_filter.txt("FilterPreset", "0")
-            audio_filter.txt("FilterMatchName", "Internal Volume")
-            audio_filter.txt("FilterIndex", "-1")
-            audio_chain = make_audio_chain([audio_filter])
+            # Chaîne vide comme les clips audio par défaut d'Adobe : le volume
+            # reste au niveau neutre du fader de piste. Ajouter un filtre
+            # « Internal Volume » à chaque clip faisait apparaître un badge fx
+            # et passait inutilement par AudioFilterHost à la lecture.
+            audio_chain = make_audio_chain([])
             segment_secondary = []
             for channel in range(2):
                 sec = Obj("SecondaryContent")
@@ -2040,8 +2324,8 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
             entry["audio_chain"] = audio_chain
             entry["audio_subclip"] = audio_subclip
             entry["segment_audio_clip"] = segment_audio_clip
-            entry["audio_filter"] = audio_filter
-            entry["audio_tail_params"] = [mute_param, volume_param]
+            entry["audio_filter"] = None
+            entry["audio_tail_params"] = []
             entry["audio_tail_secondary"] = segment_secondary
 
     # --- remplissage des pistes, groupes et séquence -------------------------
@@ -2242,13 +2526,15 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         *[field for entry in entries
           if entry["motion_filter"] is None and entry["segment_video_clip"] is not None
           for field in (entry["segment_video_clip"],)],
+        *[field for entry in entries if entry.get("time_remap") is not None
+          for field in (entry["time_remap"]["param"], entry["time_remap"]["remap"])],
         *[field for entry in audio_entries
-          for field in (entry["audio_filter"], entry["segment_audio_clip"])],
+          for field in (entry["audio_filter"], entry["segment_audio_clip"])
+          if field is not None],
         *[field for pair in fader_params for field in pair],
         *[param for entry in entries for param in entry["params"] + entry["extra_params"]],
         *[field for entry in audio_entries
-          for field in (entry["audio_tail_params"][0], entry["audio_tail_params"][1],
-                        entry["audio_tail_secondary"][0], entry["audio_tail_secondary"][1])],
+          for field in entry["audio_tail_params"] + entry["audio_tail_secondary"]],
     ]
 
     xml_text = serialize(document)
@@ -2266,12 +2552,15 @@ def convert(ec_path: str, out_path: str, path_maps: list[tuple[str, str]], skip_
         "items": len(entries),
         "audio_items": len(audio_entries),
         "keyframed": sum(1 for entry in entries if entry.get("keyframed")),
+        "time_remaps": sum(1 for entry in entries if entry.get("time_remap") is not None),
+        "frame_holds": sum(1 for entry in entries if entry.get("frame_hold") is not None),
         "warnings": warnings,
         "missing": missing,
     }
     log(f"{os.path.basename(ec_path)} → {os.path.basename(out_path)} : "
         f"{report['media']} média(s), {report['tracks']} piste(s), {report['items']} item(s), "
-        f"{report['audio_items']} audio, {report['keyframed']} animé(s)")
+        f"{report['audio_items']} audio, {report['keyframed']} animé(s), "
+        f"{report['time_remaps']} time remap(s), {report['frame_holds']} gel(s)")
     return report
 
 
@@ -2341,7 +2630,8 @@ def sequence_snapshot(root, by_id, by_uid) -> list[dict]:
                     if item is None:
                         continue
                     info = {"start": 0, "end": 0, "in": 0, "out": 0, "params": {},
-                            "masks": 0, "effects": []}
+                            "masks": 0, "effects": [], "time_remap": None,
+                            "frame_hold": None}
                     track_item = item.find("ClipTrackItem/TrackItem")
                     if track_item is not None:
                         info["start"] = int(track_item.findtext("Start") or 0)
@@ -2353,6 +2643,17 @@ def sequence_snapshot(root, by_id, by_uid) -> list[dict]:
                             inner = clip.find("Clip")
                             info["in"] = int(inner.findtext("InPoint") or 0)
                             info["out"] = int(inner.findtext("OutPoint") or 0)
+                            hold = clip.findtext("FrameHoldStart")
+                            info["frame_hold"] = int(hold) if hold else None
+                            remap_ref = inner.find("TimeRemapping")
+                            remap = resolve(remap_ref, by_id, by_uid)
+                            param = (resolve(remap.find("Keyframes"), by_id, by_uid)
+                                     if remap is not None else None)
+                            if param is not None:
+                                info["time_remap"] = {
+                                    "upper": param.findtext("UpperBound"),
+                                    "keys": param.findtext("Keyframes"),
+                                }
                     chain = resolve(item.find("ClipTrackItem/ComponentOwner/Components"),
                                     by_id, by_uid)
                     if chain is not None:
@@ -2378,6 +2679,20 @@ def sequence_snapshot(root, by_id, by_uid) -> list[dict]:
                                     "start": param.findtext("StartKeyframe"),
                                     "keys": param.findtext("Keyframes"),
                                 }
+                    selection = resolve(item.find("SelectionComponents"), by_id, by_uid)
+                    if selection is not None:
+                        for component_ref in selection.findall(
+                                "ComponentChain/Components/Component"):
+                            # `SelectionComponents` porte le conteneur intrinsèque (tracé
+                            # vide) : seuls ses éventuels sous-masques sont réels.
+                            mask_obj = resolve(component_ref, by_id, by_uid)
+                            if (mask_obj is not None
+                                    and mask_obj.findtext("MatchName") == MASK2_MATCH_NAME):
+                                for sub_ref in mask_obj.findall("SubComponents/SubComponent"):
+                                    sub = resolve(sub_ref, by_id, by_uid)
+                                    if (sub is not None
+                                            and sub.findtext("MatchName") == MASK2_MATCH_NAME):
+                                        info["masks"] += 1
                     items.append(info)
                 tracks.append({"kind": kind, "items": items, "dims": dims})
         sequences.append({"name": element.findtext("Name") or "", "tracks": tracks})
@@ -2412,12 +2727,21 @@ def verify_summary(path: str) -> str:
         video = video_tracks[0] if video_tracks else {"items": [], "dims": ("0", "0")}
         n_video = sum(len(track["items"]) for track in video_tracks)
         n_audio = sum(len(track["items"]) for track in audio_tracks)
+        n_remaps = sum(1 for track in video_tracks for item in track["items"]
+                       if item.get("time_remap"))
+        n_holds = sum(1 for track in video_tracks for item in track["items"]
+                      if item.get("frame_hold"))
         lines.append(f"  séquence « {seq['name']} » : {n_video} clip(s) vidéo sur "
                      f"{len(video_tracks)} piste(s), {n_audio} clip(s) audio sur "
-                     f"{len(audio_tracks)} piste(s), cadre {video['dims'][0]}x{video['dims'][1]}")
+                     f"{len(audio_tracks)} piste(s), {n_remaps} time remap(s), "
+                     f"{n_holds} gel(s), cadre {video['dims'][0]}x{video['dims'][1]}")
         for item in video["items"][:3]:
             state = "animé" if item["params"].get(0, {}).get("keys") else "fixe"
             extras = f", {item['masks']} masque(s)" if item["masks"] else ""
+            if item.get("time_remap"):
+                extras += ", time remap"
+            if item.get("frame_hold"):
+                extras += ", gel"
             if item["effects"]:
                 extras += ", effets " + ", ".join(item["effects"])
             lines.append(
@@ -2639,7 +2963,8 @@ def run_desktop(args, maps) -> int:
             report_skip(src, reason, log_line)
             continue
         try:
-            report = convert(src, out, maps, args.skip_missing, args.xml_dump, log_line)
+            report = convert(src, out, maps, args.skip_missing, args.xml_dump, log_line,
+                             audio_fallback=args.audio_fallback)
             conversions += 1
             print(f"OK  {src} → {out} ({report['items']} item(s))")
         except Exception as exc:  # pragma: no cover - dépend des données
@@ -2681,6 +3006,9 @@ def main() -> int:
     parser.add_argument("--force", action="store_true",
                         help="exporte même si des éléments ne sont pas repris (masque non "
                              "« Add », inversé, effet inconnu) : le .prproj sera incomplet")
+    parser.add_argument("--audio-fallback", action="store_true",
+                        help="si aucun calque n'est audible sur un segment, reprend l'audio "
+                             "du calque vidéo le plus bas (V1) au lieu de laisser le silence")
     parser.add_argument("--verify", action="store_true", help="relit le .prproj produit")
     parser.add_argument("--compare-with", metavar="REF.prproj",
                         help="compare le résultat à un .prproj de référence")
@@ -2734,7 +3062,8 @@ def main() -> int:
             report_skip(src, reason, log_line)
             continue
         try:
-            report = convert(src, out, maps, args.skip_missing, args.xml_dump, log_line)
+            report = convert(src, out, maps, args.skip_missing, args.xml_dump, log_line,
+                             audio_fallback=args.audio_fallback)
         except Exception as exc:  # pragma: no cover - dépend des données
             failures += 1
             print(f"  ÉCHEC : {exc}", file=sys.stderr)
@@ -2746,6 +3075,10 @@ def main() -> int:
             detail += f", {report['audio_items']} audio"
         if report["keyframed"]:
             detail += f", {report['keyframed']} animé(s)"
+        if report.get("time_remaps"):
+            detail += f", {report['time_remaps']} time remap(s)"
+        if report.get("frame_holds"):
+            detail += f", {report['frame_holds']} gel(s)"
         print(f"  {detail} → {out}")
         if report["missing"]:
             if args.skip_missing:

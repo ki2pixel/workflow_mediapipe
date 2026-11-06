@@ -97,8 +97,8 @@ setup Windows/AE continue de fonctionner tel quel.
 | `ListBox` mono-sélection dans EffectCraft | — | contourné : liste de cases à cocher dynamiques |
 | Multi-sélection partielle dans EffectCraft : parenter plusieurs calques n'en parente qu'un, déplier les options d'un calque n'affecte qu'un calque | rend fastidieux le parentage d'une série de calques | **contourné dans le panel** : chaque comp générée reçoit un objet nul « Null Segments » (haut-centre de la comp, position `[540, 0]`, même convention top-centre que les segments) et tous les segments y sont parentés par script, un par un ; la position monde des découpes reste inchangée (compensation type pick-whip), la position affichée devient relative au null |
 | Codecs vidéo d'EffectCraft | un format non décodable ne peut pas être importé (testé OK : H.264) | tester l'import en amont ; transcoder les formats exotiques (hors périmètre du port) |
-| Sorties `.ecproj` uniquement (pas d'export natif `.aep` dans EffectCraft) | pas d'échange direct avec After Effects depuis l'app | **Résolu en post-traitement** : `tools/ecproj_to_aep.py` convertit les `.ecproj` en `.aep` **AE 2026+** via py_aep (médias/comps/calques + **keyframes du groupe Transform** — valeurs, interpolation, easings, tangentes, vérifié clé par clé ; les objets nuls propres à EffectCraft ne sont pas exportés et les positions parentées sont écrites en coordonnées monde, donc rendu identique ; **masques** et **effets de la table EFFECT_MAP** — Gaussian Blur — désormais exportés via `tools/ae_effect_defs.aepdefs`, tracé de masque animé limité à sa première clé par py_aep ; formes/texte/expressions/autres effets non repris) ; `tools/export_aep_from_cache.py` + raccourci Bureau `Export-AEP-Camille.desktop` font le scan de `/mnt/cache` (dossiers Camille) et l'export en lot au double-clic. Mapping `/mnt/cache ⇒ F:` appliqué au chemin **écrit** dans le `.aep` (le média est lu depuis Linux) ; `--verify` relit le projet produit |
-| Pas d'export natif `.prproj` (Premiere) ; l'export XML FCP7 d'EffectCraft importe avec des positions incohérentes | pas d'échange direct avec Premiere Pro | **Résolu en post-traitement (v1)** : `tools/ecproj_to_prproj.py` écrit directement le `.prproj` **Premiere 2026** depuis le `.ecproj` (structure relevée sur un projet Adobe de référence ; Position/Anchor vérifiées identiques après normalisation, keyframes et audio repris, temps **exacts** du `.ecproj` — la chaîne Adobe `.aep`→Premiere décalait les clés de 1 à 4 images par un effet de timebase 24→25 fps ; **images fixes** exportées en médias « still » comme Adobe, avec composants Motion/Opacity intrinsèques quand le Transform est par défaut) ; raccourci `Export-PRPROJ-Camille.desktop` (mapping `/mnt/cache ⇒ F:`), `--verify` et `--compare-with` ; limites v1 : Footage uniquement, une seule comp, opacité/blend/stretch particuliers signalés et non exportés. **Masques et effets** : les masques « Add » non inversés sont écrits en filtre `AE.ADBE AEMask2` sous l'Opacité du clip (tracé en blob binaire, 1re clé si animé) et l'effet Gaussian Blur en `AE.Impact_Blur_FX` — structures relevées sur un projet Premiere 2026 de référence (détail : `../../../docs/audits/prproj-masques-premiere-2026.md`) ; les masques hors périmètre (autre mode, inversés, options exotiques) et les effets hors table bloquent toujours l'export `.prproj` (`.aep` seul, `.prproj` obsolète supprimé, `--force` pour passer outre) |
+| Sorties `.ecproj` uniquement (pas d'export natif `.aep` dans EffectCraft) | pas d'échange direct avec After Effects depuis l'app | **Résolu en post-traitement** : `tools/ecproj_to_aep.py` convertit les `.ecproj` en `.aep` **AE 2026+** via py_aep (médias, **solides** — couleur, dimensions, pixel aspect —, comps/calques + **keyframes du groupe Transform** — valeurs, interpolation, easings, tangentes, vérifié clé par clé ; les objets nuls propres à EffectCraft ne sont pas exportés et les positions parentées sont écrites en coordonnées monde, donc rendu identique ; **masques**, **effets de la table EFFECT_MAP** — Gaussian Blur — et **Time Remap** (Freeze Frame : clé Hold, image figée sur tout le calque) désormais exportés, les effets via `tools/ae_effect_defs.aepdefs`, tracé de masque animé limité à sa première clé par py_aep ; formes/texte/expressions/autres effets non repris) ; `tools/export_aep_from_cache.py` + raccourci Bureau `Export-AEP-Camille.desktop` font le scan de `/mnt/cache` (dossiers Camille) et l'export en lot au double-clic. Mapping `/mnt/cache ⇒ F:` appliqué au chemin **écrit** dans le `.aep` (le média est lu depuis Linux) ; `--verify` relit le projet produit |
+| Pas d'export natif `.prproj` (Premiere) ; l'export XML FCP7 d'EffectCraft importe avec des positions incohérentes | pas d'échange direct avec Premiere Pro | **Résolu en post-traitement (v1)** : `tools/ecproj_to_prproj.py` écrit directement le `.prproj` **Premiere 2026** depuis le `.ecproj` (structure relevée sur un projet Adobe de référence ; Position/Anchor vérifiées identiques après normalisation, keyframes et audio repris, temps **exacts** du `.ecproj` — la chaîne Adobe `.aep`→Premiere décalait les clés de 1 à 4 images par un effet de timebase 24→25 fps ; **images fixes** exportées en médias « still » comme Adobe, avec composants Motion/Opacity intrinsèques quand le Transform est par défaut ; **solides & calques d'effet** en Color Matte `COLR` et Black Video `BLAK` ; **audio stable Premiere 2026** avec chaîne de composants vide par clip, `ConformedAudioRate`, SampleType conforme et routage master complet) ; raccourci `Export-PRPROJ-Camille.desktop` (mapping `/mnt/cache ⇒ F:`), `--verify` et `--compare-with` ; `--audio-fallback` reprend l'audio du calque vidéo le plus bas (V1) quand aucun calque n'est audible sur un segment (freeze dupliqué avec audio coupé) ; limites v1 : Footage et Solid uniquement, une seule comp, opacité/blend/stretch particuliers signalés et non exportés. **Masques, effets et Freeze Frame** : les masques « Add » non inversés sont écrits en filtre `AE.ADBE AEMask2` sous-composant de l'Opacité du clip (`InstanceName`, payload privé complet, `BinaryHash`), tracé en blob binaire, 1re clé si animé — la variante Adobe avec conteneur vide dans `SelectionComponents` + masque à payload vide a aussi été validée dans Premiere 2026, mais la forme simple sous l'Opacité est conservée ; l'effet Gaussian Blur en `AE.Impact_Blur_FX` ; un Freeze Frame (Time Remap EC à clé Hold constante) en **Frame Hold** natif (`FrameHold` 4 + `FrameHoldStart`), et une vraie courbe de vitesse en objet `TimeRemapping` + paramètre « Speed » (courbe à plusieurs clés approximée en mode TIME, paliers Hold signalés) — structures relevées sur les fixtures Adobe 26/76 et un projet Premiere 2026 reconstruit (masque + Add Frame Hold) ; les masques hors périmètre (autre mode, inversés, options exotiques) et les effets hors table bloquent toujours l'export `.prproj` (`.aep` seul, `.prproj` obsolète supprimé, `--force` pour passer outre) |
 | Encodage/décodage vidéo 100 % CPU (aucun NVENC/QSV/AMF/VAAPI dans EffectCraft, encodeurs pure Rust) | pas de rendu accéléré dans l'app | **Résolu autrement** : les rendus sont lancés côté **Premiere Pro / Media Encoder** (accélération GPU native) à partir des `.prproj` produits par `tools/ecproj_to_prproj.py`. L'outil expérimental `tools/encode_gpu.py` (transcodage NVENC d'un master déjà rendu) a été **retiré** : il n'accélérait pas un rendu direct (l'encodage CPU d'EffectCraft ne pèse que ~2 % du temps) |
 | Patch Rust d'EffectCraft (drain des tâches planifiées après chaque handler) | débloquerait progression live + batch automatique in-app | **écarté** (décision : 100 % scripts) ; peut être proposé en amont plus tard |
 
@@ -119,6 +119,13 @@ setup Windows/AE continue de fonctionner tel quel.
   Aqua/Brown, anchors 260 / 283,3 / 275 / 310, scale 180) — conforme. Cas d'erreur
   testés : média absent (`--skip-missing`, `--path-map`) et code retour 1.
   Validation finale sur After Effects 2026 (Windows) à faire côté utilisateur.
+- **Time Remap / Freeze Frame** : projet réel `PP - La revue de presse - Karine
+  Dubernet_9x16` (deux calques `Segment 105`, une clé Hold à 475,56 s). Relecture
+  py_aep 0.18.2 : `time_remap_enabled = True`, clé `475,560 s → 475,560 s` Hold sur
+  les deux calques, le troisième `Segment 105` reste sans remap. Relecture py_premiere
+  du `.prproj` : deux clips à 471,96–482,92 s avec
+  `FrameHoldStart = 120 799 848 960 000` (475,56 s) et aucun `TimeRemapping` ; le masque
+  de V3 est un `AEMask2` sous l'Opacité (`InstanceName 01`, payload privé complet).
 - **Export en lot** (`tools/export_aep_from_cache.py`, raccourci Bureau
   `Export-AEP-Camille.desktop`) : scan de `/mnt/cache` en 0,13 s → 8 dossiers projet
   détectés (7 « Cvmille » + « Camille », les deux orthographes du cache) ; conversion du
@@ -131,12 +138,13 @@ setup Windows/AE continue de fonctionner tel quel.
   (le média est importé depuis Linux, puis le chemin est réécrit dans le chunk
   `LIST:Als2 → alas` de la source) — idempotence vérifiée sur 3 passages consécutifs.
 - **Versions py_aep** : les convertisseurs prennent la plus récente présente sous
-  `Scripts/` (`py_aep-0.18.1` en priorité, `py_aep-0.13.0` en repli) et détectent à
-  l'exécution sa convention de masques (≤ 0.16 : normalisée par la comp ; ≥ 0.17 :
-  pixels source comme After Effects) — le **même** `.aep` est produit dans les deux cas
-  (comparé valeur par valeur sur le projet Camille). Le choix est journalisé
-  (`py_aep 0.18.1 (…)` dans `tools/aep_export.log`). Dépendances 0.18.1 : `attrs`,
-  `PyYAML`, `fonttools`, `uharfbuzz` (site utilisateur, `pip install --user uharfbuzz`).
+  `Scripts/` (`py-aep-0.18.2` en priorité, puis `py_aep-0.18.1`, `py_aep-0.13.0` en
+  repli ; les deux préfixes de dossier sont acceptés) et détectent à l'exécution sa
+  convention de masques (≤ 0.16 : normalisée par la comp ; ≥ 0.17 : pixels source comme
+  After Effects) — le **même** `.aep` est produit dans les deux cas (comparé valeur par
+  valeur sur le projet Camille). Le choix est journalisé (`py_aep 0.18.2 (…)` dans
+  `tools/aep_export.log`). Dépendances 0.18.2 : `attrs`, `PyYAML`, `fonttools`,
+  `uharfbuzz` (site utilisateur, `pip install --user uharfbuzz`).
 - **Encodage GPU retiré** (`tools/encode_gpu.py`, expérimental) : le transcodage NVENC d'un
   master déjà rendu n'accélérait pas un rendu direct — comparatif mesuré : rendu + H.264 CPU
   3,32 s, rendu ProRes 3,25 s, rendu `--gpu` (composition GPU) 5,15 s, seul l'encodage était
@@ -157,5 +165,20 @@ setup Windows/AE continue de fonctionner tel quel.
   utilisateur : un masque conforme, l'autre calque noir — cause trouvée : les masques au tracé
   **ouvert** (vides) du `.ecproj` ne sont pas appliqués par EffectCraft (`render/src/masks.rs` :
   aucune transparence tant que le tracé n'est pas fermé) ; ils ne sont désormais plus écrits
-  non plus, le clip reste entier comme dans EffectCraft. Validation visuelle dans Premiere 2026
-  à refaire côté utilisateur.
+  non plus, le clip reste entier comme dans EffectCraft. **Troisième passe** (projet
+  `PP - La revue de presse - Karine Dubernet_9x16`) : V3 masqué + Time Remapping restait
+  invisible, même sans masque dans un test dérivé ; l'utilisateur a reconstruit le segment
+  dans Premiere 2026 avec un masque redessiné et **Add Frame Hold** — structure de référence
+  décisive : le gel est un `FrameHold` natif, pas un `TimeRemapping` ; le masque peut vivre
+  sous l'Opacité avec son payload complet (structure simple, conservée) ou dans la variante
+  Adobe conteneur vide `SelectionComponents` + masque à payload vide — les deux ont été
+  validées dans Premiere 2026. Le convertisseur écrit désormais le Frame Hold et garde la
+  structure simple sous l'Opacité.
+- **Calques solides & stabilité audio Premiere 2026** (projet réel `Gulli - MSL1 - L’interview « Quand j’étais petit » d’Igor Paixão_9x16_assist`) :
+  - **Calques solides** : exportés en solides natifs dans `.aep` (`py_aep`) et en générateurs Color Matte (`COLR`, couleur RGB dans l'`ImporterPrefs` de 8 octets) dans `.prproj`.
+  - **Crash audio Premiere 2026 résolu** : le dump Windows signalait un crash à la lecture dans `AudioFilterHost.dll` (`AR::IsBypassActuallyMute`, `c0000005`). Causes identifiées et corrigées dans `ecproj_to_prproj.py` :
+    1. Filtre factice « Internal Volume » par clip supprimé : les clips gardent une chaîne audio vide comme les clips Adobe par défaut.
+    2. `ConformedAudioRate` systématiquement renseigné sur les flux audio (`5292000` ticks pour 48 kHz, et sentinelle `i64::MAX` pour les médias sans audio) pour initialiser correctement le moteur de conformage.
+    3. Toutes les pistes audio sont désormais reliées à l'`AudioTrackInlet` du bus master (plus de pistes orphelines).
+    4. `AudioStream/SampleType` adapté au conteneur/codec (`3` WAV PCM16, `4` MOV/MXF, `7` AAC/MP4, `11` AIFF).
+  Validation utilisateur sous Premiere Pro 2026 : solide bleu affiché et lecture timeline fluide sans plantage.

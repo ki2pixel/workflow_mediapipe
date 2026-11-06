@@ -3,14 +3,17 @@
 
 EffectCraft ne sait pas écrire de .aep : ce convertisseur s'exécute donc **hors**
 EffectCraft (Python), en post-traitement du batch. Il reconstruit le projet avec la
-bibliothèque py_aep (`Scripts/py_aep-0.18.1`, repli 0.13.0), qui écrit des .aep au format AE 2026+
-(version par défaut de `py_aep.new()`), le même chemin que l'ancien mode « py_aep
-Offline » du bridge Windows.
+bibliothèque py_aep (`Scripts/py-aep-0.18.2` en priorité, replis 0.18.1 et 0.13.0),
+qui écrit des .aep au format AE 2026+ (version par défaut de `py_aep.new()`), le même
+chemin que l'ancien mode « py_aep Offline » du bridge Windows.
 
-Repris du .ecproj : media importés (chemins), comps (nom/taille/pixel aspect/durée/cadence),
-calques (nom, in/out, audio, label, anchor/position/scale) — c'est-à-dire tout ce que
-produit le panel Media Solution (segments coupés et recentrés) — plus les **masques** et
-les **effets** (table EFFECT_MAP : Gaussian Blur pour l'instant).
+Repris du .ecproj : media importés (chemins), **solides** (couleur, largeur/hauteur, pixel
+aspect), comps (nom/taille/pixel aspect/durée/cadence), calques (nom, in/out, audio, label,
+anchor/position/scale) — c'est-à-dire tout ce que produit le panel Media Solution (segments
+coupés et recentrés) — plus les **masques**, les **effets** (table EFFECT_MAP : Gaussian Blur
+pour l'instant) et le **Time Remap** (Freeze Frame : une clé Hold, donc l'image figée sur
+tout le calque). Un solide est créé au premier calque qui l'utilise via `comp.add_solid`,
+puis son FootageItem est réutilisé pour les calques suivants.
 
 Les **objets nuls** créés par le panel (« Null Segments ») ne sont pas exportés : ils
 servent à regrouper/parenter les segments dans EffectCraft, et py_aep n'expose pas la
@@ -66,16 +69,18 @@ LABEL_NAMES = [
 
 # Versions py_aep connues, la plus récente d'abord : il suffit de déposer une version
 # dans Scripts/ pour que les convertisseurs la prennent (les masques s'adaptent, voir
-# py_aep_masks_are_source_based).
-PY_AEP_VERSIONS = ("0.18.1", "0.13.0")
+# py_aep_masks_are_source_based). Les releases récentes utilisent un dossier
+# « py-aep-… » (tiret), les anciennes « py_aep-… » (underscore) : les deux sont acceptés.
+PY_AEP_VERSIONS = ("0.18.2", "0.18.1", "0.13.0")
 PY_AEP_ROOTS = (
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Scripts"),
     os.path.expanduser("~/Media_Solution/Scripts"),
     os.path.expanduser("~/Documents/Scripts"),
 )
 DEFAULT_PY_AEP_CANDIDATES = [os.environ.get("PY_AEP_PATH", "")] + [
-    os.path.join(root, f"py_aep-{version}", "src")
+    os.path.join(root, f"{prefix}{version}", "src")
     for root in PY_AEP_ROOTS for version in PY_AEP_VERSIONS
+    for prefix in ("py-aep-", "py_aep-")
 ]
 
 DEFAULT_EFFECT_DEFS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ae_effect_defs.aepdefs")
@@ -153,9 +158,17 @@ def py_aep_masks_are_source_based(py_aep: Any) -> bool:
 
 
 def py_aep_info(py_aep: Any) -> str:
-    """« 0.18.1 (…/Scripts/py_aep-0.18.1/src) » — version et origine, pour les journaux."""
+    """« 0.18.2 (…/Scripts/py-aep-0.18.2/src) » — version et origine, pour les journaux."""
     version = str(getattr(py_aep, "__version__", "") or "?").lstrip("v") or "?"
     path = os.path.dirname(os.path.dirname(os.path.abspath(getattr(py_aep, "__file__", ""))))
+    if version in ("?", "0", "0.0.0"):
+        # Certaines releases (0.18.2) laissent __version__ à 0.0.0 : reprendre le
+        # numéro du dossier py-aep-X.Y.Z / py_aep-X.Y.Z.
+        folder = os.path.basename(os.path.dirname(path))
+        for prefix in ("py-aep-", "py_aep-"):
+            if folder.startswith(prefix) and folder[len(prefix):]:
+                version = folder[len(prefix):]
+                break
     return f"{version} ({path})"
 
 
@@ -235,6 +248,18 @@ def _shift(value: Any, offset: tuple[float, float]) -> Any:
 
 def find_group(layer: dict, match: str) -> dict | None:
     """Groupe du calque .ecproj (`transform`, `masks`, `effects`…)."""
+    for child in (layer.get("props") or {}).get("children") or []:
+        if child.get("match") == match:
+            return child
+    return None
+
+
+def find_layer_property(layer: dict, match: str) -> dict | None:
+    """Propriété directe du calque (`props.children`), par ex. `timeRemap`.
+
+    Les propriétés du Transform sont dans le sous-groupe `transform` (voir
+    find_transform_node) ; le Time Remap est à la racine du calque, comme dans AE.
+    """
     for child in (layer.get("props") or {}).get("children") or []:
         if child.get("match") == match:
             return child
@@ -486,6 +511,89 @@ def write_effects(av: Any, layer: dict, py_aep: Any, report: dict, name: str) ->
         report["effects"] += 1
 
 
+def write_time_remap(av: Any, layer: dict, py_aep: Any, report: dict, name: str) -> int:
+    """Écrit le Time Remap du calque .ecproj dans le .aep.
+
+    EffectCraft stocke le Time Remap comme AE : une propriété scalaire à la racine du
+    calque, en secondes de source. Un Freeze Frame y laisse **une seule clé Hold** ;
+    une propriété à une clé étant constante, tout le calque montre cette image.
+
+    py_aep active le remap en semant deux clés d'identité : on n'en garde qu'une, puis
+    on écrit la courbe EC par-dessus (temps en secondes de comp, valeurs en secondes
+    de source), interpolation comprise.
+    """
+    node = find_layer_property(layer, "timeRemap")
+    if node is None:
+        return 0
+    if not getattr(av, "can_set_time_remap_enabled", False):
+        report["time_remap_warnings"].append(
+            f"{name} : time remap ignoré (source sans durée, comme une image fixe)")
+        return 0
+
+    keys = sorted(node.get("keys") or [], key=lambda key: float(key.get("time") or 0.0))
+    keys = [key for key in keys if prop_value(key.get("value")) is not None]
+    deduped = []
+    for key in keys:
+        if deduped and float(key.get("time") or 0.0) == float(deduped[-1].get("time") or 0.0):
+            report["time_remap_warnings"].append(
+                f"{name} : deux clés de time remap au même temps, la seconde est ignorée")
+            continue
+        deduped.append(key)
+    keys = deduped
+    enabled = False
+    try:
+        av.time_remap_enabled = True
+        enabled = True
+        prop = av["ADBE Time Remapping"]
+        while len(prop.keyframes) > 1:
+            prop.remove_key(len(prop.keyframes) - 1)
+        if not prop.keyframes:
+            raise ValueError("propriété Time Remap sans clé après activation")
+
+        if keys:
+            first = keys[0]
+            kf = prop.keyframes[0]
+            kf.time = ticks_to_seconds(first.get("time") or 0)
+            kf.value = prop_value(first.get("value"))
+            for key in keys[1:]:
+                prop.set_value_at_time(ticks_to_seconds(key.get("time") or 0),
+                                       prop_value(key.get("value")))
+        else:
+            # Remap activé sans clé (toutes supprimées dans EffectCraft) : la valeur
+            # statique s'applique au calque entier. Une clé Hold unique l'exprime.
+            kf = prop.keyframes[0]
+            kf.time = ticks_to_seconds(layer.get("in_point") or 0)
+            value = prop_value(node.get("value"))
+            kf.value = value if value is not None else 0.0
+
+        written = 0
+        if keys:
+            for index, key in enumerate(keys):
+                try:
+                    kf = prop.keyframes[index]
+                except (IndexError, AttributeError):
+                    break
+                apply_keyframe_meta(kf, key, py_aep)
+                written += 1
+        else:
+            for side in ("in", "out"):
+                setattr(kf, f"{side}_interpolation_type",
+                        py_aep.KeyframeInterpolationType.HOLD)
+            written = 1
+        report["time_remaps"] += 1
+        return written
+    except Exception as e:
+        if enabled:
+            # Ne pas laisser un remap à moitié écrit (clés d'identité seules) : le
+            # désactiver rend le calque au comportement d'avant, comme un remap ignoré.
+            try:
+                av.time_remap_enabled = False
+            except Exception:
+                pass
+        report["time_remap_warnings"].append(f"{name} : time remap non appliqué ({e})")
+        return 0
+
+
 def mask_path_shape(node: dict, py_aep: Any, scale: tuple[float, float]) -> Any:
     """Shape py_aep d'un nœud Mask Path .ecproj (vertices/tangentes mis à l'échelle)."""
     value = ((node.get("value") or {}).get("v")) or {}
@@ -632,10 +740,34 @@ def convert(
 
     # 1) Médias
     footage_by_item: dict[str, Any] = {}
+    solid_specs: dict[str, dict[str, Any]] = {}
     media_report: list[str] = []
     source_size_by_item: dict[str, tuple[int, int]] = {}
     for item_id, item in items.items():
         kind = item.get("kind") or {}
+        if kind.get("type") == "Solid":
+            # Un solide n'a pas de fichier : il sera créé dans la comp au premier
+            # calque qui l'utilise (comp.add_solid), puis réutilisé par son FootageItem.
+            width = int(kind.get("width") or 0)
+            height = int(kind.get("height") or 0)
+            source_size_by_item[str(item_id)] = (width, height)
+            color = kind.get("color") or [0.0, 0.0, 0.0]
+            try:
+                raw_rgb = [float(c) for c in list(color)[:3]]
+            except (TypeError, ValueError):
+                raw_rgb = [0.0, 0.0, 0.0]
+            # Le schéma .ecproj stocke 0..1 ; on tolère aussi 0..255.
+            rgb = [max(0.0, min(1.0, c / 255.0 if c > 1.5 else c)) for c in raw_rgb]
+            while len(rgb) < 3:
+                rgb.append(0.0)
+            solid_specs[str(item_id)] = {
+                "name": str(item.get("name") or "Solid"),
+                "color": rgb,
+                "width": width or None,
+                "height": height or None,
+                "pixel_aspect": float(kind.get("pixel_aspect") or 1.0),
+            }
+            continue
         if kind.get("type") != "Footage":
             continue
         source_size_by_item[str(item_id)] = (int(kind.get("width") or 0),
@@ -671,8 +803,10 @@ def convert(
         "masks": 0,
         "effects": 0,
         "keys": 0,
+        "time_remaps": 0,
         "mask_warnings": [],
         "effect_warnings": [],
+        "time_remap_warnings": [],
         "effect_defs_path": effect_defs_path,
     }
     for item_id, item in items.items():
@@ -703,11 +837,41 @@ def convert(
                 # position monde (voir world_offset), le rendu est donc identique.
                 nulls_skipped += 1
                 continue
-            footage = footage_by_item.get(str(source.get("item")))
-            if footage is None:
-                print(f"  ! calque '{layer.get('name')}' : média source absent, ignoré", file=sys.stderr)
-                continue
-            av = comp.add(footage)
+            item_key = str(source.get("item"))
+            is_solid = (source.get("type") or "") == "Solid"
+            if is_solid:
+                # Première utilisation d'un solide : comp.add_solid crée à la fois
+                # l'élément de projet (dossier Solids d'AE) et le calque. On garde
+                # ensuite son FootageItem pour les autres calques qui le référencent.
+                footage = footage_by_item.get(item_key)
+                if footage is None:
+                    spec = solid_specs.get(item_key)
+                    if spec is None:
+                        print(f"  ! calque '{layer.get('name')}' : solide source absent, ignoré",
+                              file=sys.stderr)
+                        continue
+                    try:
+                        av = comp.add_solid(
+                            color=spec["color"],
+                            name=spec["name"],
+                            width=spec["width"],
+                            height=spec["height"],
+                            pixel_aspect=spec["pixel_aspect"],
+                        )
+                    except Exception as e:
+                        print(f"  ! calque '{layer.get('name')}' : solide non créé ({e})",
+                              file=sys.stderr)
+                        continue
+                    footage_by_item[item_key] = av.source
+                else:
+                    av = comp.add(footage)
+            else:
+                footage = footage_by_item.get(item_key)
+                if footage is None:
+                    print(f"  ! calque '{layer.get('name')}' : média source absent, ignoré",
+                          file=sys.stderr)
+                    continue
+                av = comp.add(footage)
             try:
                 av.name = layer.get("name") or av.name
             except Exception:
@@ -717,7 +881,14 @@ def convert(
                 av.out_point = ticks_to_seconds(layer.get("out_point") or 0)
             except Exception as e:
                 print(f"  ! calque '{layer.get('name')}' : in/out non appliqués ({e})", file=sys.stderr)
-            set_audio(av, bool((layer.get("switches") or {}).get("audio", False)))
+            # Un solide n'a pas de piste audio : ne pas activer le switch audio.
+            set_audio(av, False if is_solid
+                      else bool((layer.get("switches") or {}).get("audio", False)))
+            if (layer.get("switches") or {}).get("adjustment"):
+                try:
+                    av.adjustment_layer = True
+                except Exception:
+                    pass
             try:
                 av.label = Label(label_index(layer.get("label")))
             except Exception:
@@ -741,6 +912,8 @@ def convert(
             write_masks(av, layer, py_aep, source_size_by_item.get(str(source.get("item"))),
                         mask_space, (comp_width, comp_height), report, layer.get("name") or "?")
             write_effects(av, layer, py_aep, report, layer.get("name") or "?")
+            keys_written += write_time_remap(av, layer, py_aep, report,
+                                             layer.get("name") or "?")
             layers_done += 1
 
     # py_aep refuse d'écraser un .aep existant (save() lève FileExistsError) :
@@ -760,8 +933,10 @@ def convert(
         "keys": keys_written + report["keys"],
         "masks": report["masks"],
         "effects": report["effects"],
+        "time_remaps": report["time_remaps"],
         "mask_warnings": report["mask_warnings"],
         "effect_warnings": report["effect_warnings"],
+        "time_remap_warnings": report["time_remap_warnings"],
         "media": media_report,
     }
 
@@ -793,6 +968,14 @@ def verify(aep_path: str, py_aep: Any) -> None:
                 if masks:
                     extras.append("masques: " + ", ".join(
                         m.name for m in masks.properties if getattr(m, "name", None)))
+            except Exception:
+                pass
+            try:
+                if layer.time_remap_enabled:
+                    remap = layer["ADBE Time Remapping"]
+                    keys = ", ".join(f"{k.time:.3f}s→{k.value:.3f}s"
+                                     for k in remap.keyframes)
+                    extras.append(f"time remap ({keys})")
             except Exception:
                 pass
             print(
@@ -869,12 +1052,14 @@ def main() -> int:
             detail += f", {report['masks']} masque(s)"
         if report.get("effects"):
             detail += f", {report['effects']} effet(s)"
+        if report.get("time_remaps"):
+            detail += f", {report['time_remaps']} time remap(s)"
         if report.get("nulls_skipped"):
             detail += f", {report['nulls_skipped']} objet(s) nul(s) non exporté(s)"
         if report.get("unparented"):
             detail += f", {report['unparented']} calque(s) parenté(s) replacé(s) en position monde"
         print(f"  {detail} → {out}")
-        for key in ("mask_warnings", "effect_warnings"):
+        for key in ("mask_warnings", "effect_warnings", "time_remap_warnings"):
             for line in report.get(key) or []:
                 print(f"  ! {line}", file=sys.stderr)
         if args.verify:

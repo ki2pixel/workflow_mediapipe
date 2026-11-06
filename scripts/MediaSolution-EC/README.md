@@ -138,16 +138,19 @@ exécute `effectcraft-cli script` en headless sur les dossiers du manifeste
 ## Exporter aussi en .aep (post-traitement)
 
 EffectCraft n'écrit pas de `.aep` : l'export se fait **hors EffectCraft**, en
-post-traitement du batch, avec la bibliothèque py_aep (`Scripts/py_aep-0.18.1` — le même
-chemin que l'ancien mode « py_aep Offline » du bridge Windows ; `Scripts/py_aep-0.13.0`
-reste utilisable, les convertisseurs prennent la version la plus récente présente et
-s'adaptent à sa convention de masques). Sont repris : médias,
-comps (nom/taille/pixel aspect/cadence/durée) et calques (nom, in/out, audio, label) avec
+post-traitement du batch, avec la bibliothèque py_aep (`Scripts/py-aep-0.18.2` en
+priorité — le même chemin que l'ancien mode « py_aep Offline » du bridge Windows ;
+`Scripts/py_aep-0.18.1` et `Scripts/py_aep-0.13.0` restent utilisables, les
+convertisseurs prennent la version la plus récente présente et s'adaptent à sa
+convention de masques). Sont repris : médias, **solides** (couleur, largeur/hauteur,
+pixel aspect), comps (nom/taille/pixel aspect/cadence/durée) et calques (nom, in/out, audio,
+label) avec
 tout le **groupe Transform** (anchor, position, échelle, orientation, rotations, opacité)
 — **valeurs statiques et keyframes** (temps, valeurs, interpolation linéaire/bezier/hold,
 easings temporels, tangentes spatiales) — plus les **masques** (forme, mode, inversion,
-couleur, feather + falloff, opacité, expansion, roto-bezier) et les **effets** reconnus par
-la table `EFFECT_MAP` (Gaussian Blur pour l'instant : intensité, dimensions, repeat edge).
+couleur, feather + falloff, opacité, expansion, roto-bezier), les **effets** reconnus par
+la table `EFFECT_MAP` (Gaussian Blur pour l'instant : intensité, dimensions, repeat edge)
+et le **Time Remap** (Freeze Frame : une clé Hold, donc l'image figée sur tout le calque).
 
 Ce qui n'est **pas** repris : les autres familles de propriétés (formes, texte, expressions,
 autres effets), qui restent spécifiques à EffectCraft.
@@ -230,22 +233,42 @@ projet de référence généré par Adobe et vérifiée valeur par valeur :
 - **images fixes** (png, jpg…) → médias « still » Premiere (durée infinie, `IsStill`, sans
   audio) ; un calque dont le Transform est celui par défaut utilise les composants
   Motion/Opacity intrinsèques de Premiere, comme le fait l'import Adobe ;
-- **audio seul** (mp3, wav…) → média audio sans flux vidéo, comme Adobe ;
-- **masques** (modes « Add », « Subtract », « Intersect », « Difference », inversion comprise) → filtre `AE.ADBE AEMask2` (27 paramètres) sous-composant de
-  l'**Opacité** du clip (matérialisée, comme Adobe) ; tracé en blob binaire (points normalisés
-  par la taille **source** du média — espace du calque, comme After Effects —, 3 points par
-  sommet, tangentes absolues), payloads avec `BinaryHash`, Position/Anchor au centre de la
-  bounding-box ; un tracé animé est écrit à sa première clé (comme l'export `.aep`) ;
-  **un masque qu'EffectCraft n'applique pas — tracé ouvert (non fermé), mode « None », masque
-  désactivé — n'est pas écrit** : le clip reste entier, comme dans EffectCraft
-  (`crates/render/src/masks.rs` : aucune transparence tant que le tracé n'est pas fermé) ; un
-  masque vide **mais fermé** découpe à vide et prend l'état par défaut d'Adobe (`Type 0`) —
-  relevé de format : `../../docs/audits/prproj-masques-premiere-2026.md` ;
+- **audio seul** (mp3, wav…) → média audio sans flux vidéo, comme Adobe ; l'audio des
+  calques vidéo suit `switches.audio` ; `--audio-fallback` reprend l'audio du calque vidéo
+  le plus bas (V1) quand **aucun** calque n'est audible sur un segment (cas d'un freeze
+  dupliqué dont l'audio a été coupé sur les copies) ;
+- **audio & stabilité lecture Premiere 2026** → pistes audio allouées par segments actifs,
+  toutes connectées à l'`AudioTrackInlet` du bus master ; les clips gardent une chaîne de
+  composants **vide** (comme les clips Adobe par défaut) — **aucun** filtre « Internal Volume »
+  n'est écrit par clip (un filtre synthétique provoquait un crash immédiat à la lecture dans
+  `AudioFilterHost` / `AR::IsBypassActuallyMute`) ; les médias porteurs d'audio reçoivent
+  `ConformedAudioRate` (`5292000` à 48 kHz, ou sentinelle `i64::MAX` si absence de flux) et un
+  `AudioStream/SampleType` conforme à la source (`3` WAV PCM16, `4` PCM MOV/MXF, `7` AAC/MP4,
+  `11` AIFF) ; un média présent sur disque n'est plus marqué `OfflineReason`. Le gain par clip
+  d'EffectCraft n'est pas repris — à ajuster directement dans Premiere ;
+- **masques** (modes « Add », « Subtract », « Intersect », « Difference », inversion comprise) → filtre `AE.ADBE AEMask2` (27 paramètres) écrit en sous-composant de
+  l'**Opacité** du clip (matérialisée) avec `InstanceName` (« 01 », « 02 »…), payload privé
+  complet et `BinaryHash` ; tracé en blob binaire (points normalisés par la taille **source**
+  du média — espace du calque, comme After Effects —, 3 points par sommet, tangentes
+  absolues), Position/Anchor au centre de la bounding-box ; un tracé animé est écrit à sa
+  première clé (comme l'export `.aep`) ; **un masque qu'EffectCraft n'applique pas — tracé
+  ouvert (non fermé), mode « None », masque désactivé — n'est pas écrit** : le clip reste
+  entier, comme dans EffectCraft (`crates/render/src/masks.rs` : aucune transparence tant que
+  le tracé n'est pas fermé) ; un masque vide **mais fermé** découpe à vide et prend l'état par
+  défaut d'Adobe (`Type 0`). La variante Adobe avec conteneur intrinsèque vide dans
+  `SelectionComponents` + masque à payload vide a aussi été testée dans Premiere 2026 : elle
+  fonctionne, mais la forme simple sous l'Opacité est conservée (validée, moins d'objets) ;
 - **Gaussian Blur** (`ec.blur.gaussian`) → filtre `AE.Impact_Blur_FX` de Premiere (18
   paramètres) : `blurriness` → « Amount » (borné 0-100) ; `dimensions`/`repeatEdge` d'EffectCraft
   ne sont pas repris (avertissement) ;
-- **solides & calques d'effet** → générateurs « Color Matte » (COLR) et « Black Video »
-  (BLAK + `IsAdjustmentLayer`) de Premiere, comme le fait l'import Adobe ;
+- **Freeze Frame** (Time Remap EC à clé Hold constante) → **Frame Hold** natif de Premiere
+  (`FrameHold` 4 + `FrameHoldStart` sur le `VideoClip`) : le clip garde sa durée et l'image
+  source reste figée — méthode validée dans Premiere 2026, y compris avec masque ; une vraie
+  courbe de vitesse à plusieurs clés reste écrite en `TimeRemapping`/`Speed` (paliers Hold
+  signalés) ;
+- **solides & calques d'effet** → générateurs « Color Matte » (COLR, couleur RGB dans
+  l'`ImporterPrefs` de 8 octets) et « Black Video » (BLAK + `IsAdjustmentLayer`) de
+  Premiere, comme le fait l'import Adobe ;
 - **modes de fusion** → les 27 modes natifs de Premiere (doubles paramètres « Blend Mode » 2 et 3
   de l'Opacité, table `BLEND_MODE_MAP` des 38 noms EffectCraft ; « Normal » reste implicite) ;
 - médias référencés par leur chemin écrit (**par défaut `PATH_MAP`, `/mnt/cache ⇒ F:`**,
@@ -272,6 +295,10 @@ ces éléments.
 python3 tools/ecproj_to_prproj.py "/mnt/cache/94 Camille/projets/UJUD - ARRIVEE OLU_9x16.ecproj" \
   --path-map "/mnt/cache=F:" --verify \
   --compare-with "/mnt/cache/94 Camille/projets/UJUD - ARRIVEE OLU_9x16.prproj"
+
+# segment dont tous les calques ont l'audio coupé : reprendre l'audio de la V1
+python3 tools/ecproj_to_prproj.py "/mnt/cache/309 Camille/projets/PP - La revue de presse - Karine Dubernet_9x16.ecproj" \
+  -o "/mnt/cache/309 Camille/projets/PP - La revue de presse - Karine Dubernet_9x16.prproj" --audio-fallback
 
 # tout un dossier :
 python3 tools/ecproj_to_prproj.py "/mnt/cache/94 Camille/projets" --all --path-map "/mnt/cache=F:"
