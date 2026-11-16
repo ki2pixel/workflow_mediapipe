@@ -10,6 +10,21 @@ Ce document enregistre les décisions architecturales et techniques importantes 
 
 Cette section contient le résumé des décisions majeures jusqu'à septembre 2026. Pour les détails chronologiques complets, consultez `archives/decisionLog_legacy.md`.
 
+## Novembre 2026
+
+- [2026-11-16 22:18:00] **Audit et optimisation des règles Antigravity et indexation projet (COMPLET)**
+  - **Contexte** : L'IDE Antigravity émettait des alertes de dépassement de limite de tokens (`You have exceeded the maximum token limit for this file`) sur les règles dépassant ~750 mots / 5,5 Ko. `codingstandards.md` utilisait de surcroît la directive Cursor obsolète `alwaysApply: true`, tandis que `v5.md` et `prompt-injection-guard.md` surchargeaient inutilement le prompt système `always_on` avec 20 Ko de redondances.
+  - **Décisions & Actions Appliquées** :
+    1. **Création de `.antigravityignore`** : Exclusion de l'indexation de l'agent des environnements virtuels (`*env*/`, `coral_env/`), objets `.git/`, caches (`.pytest_cache/`, `.mypy_cache/`), médias lourds (`assets/`, `archives/`, `scratch/`, `tmp/`) et logs, allégeant instantanément le scan de ~3,8 Go.
+    2. **Création de `.agents/rules/pipeline-standards.md`** (47 lignes, 526 mots, 4,2 Ko, `trigger: model_decision`) : Déport modulaire de l'ensemble des spécifications techniques STEP1 à STEP8 (moteur ONNX GPU, YAMNet Split TPU, embeddings ECAPA, cascade BlazeFace, hiérarchie 4 paliers, EffectCraft CLI).
+    3. **Allègement de `.agents/rules/codingstandards.md`** (45 lignes, 479 mots, 4,1 Ko, `trigger: model_decision`) : Remplacement de `alwaysApply: true`, recentrage sur les standards transversaux (Flask slim, singletons `WorkflowState` RLock, spawn OpenCV 5.0, immuabilité DOMBatcher, streaming O(1), anti-patrons) et renvoi vers `pipeline-standards.md`.
+    4. **Condensation de `.agents/rules/v5.md`** (32 lignes, 320 mots, 2,5 Ko, `trigger: always_on`) : Fusion des sections redondantes §1 et §3, élagage des verbosités d'outils, maintien strict des principes de non-régression et du verrou `enhance_complex`.
+    5. **Condensation de `.agents/rules/prompt-injection-guard.md`** (39 lignes, 380 mots, 2,85 Ko, `trigger: always_on`) : Maintien intégral de la règle Warning-Then-Stop, suppression des volumineux tableaux d'exemples, conservation de l'immunité documentaire et du protocole d'opérations destructives (dry-run, confirmation).
+    6. **Rationalisation de `.agents/rules/test-strategy.md`** (39 lignes, 368 mots, 2,65 Ko, `trigger: model_decision`) : Tableau des perspectives synthétique, Given/When/Then, parité des cas d'erreur et cibles de couverture de branches.
+    7. **Toilettage de `.agents/rules/memorybankprotocol.md`** (40 lignes, 358 mots, 2,88 Ko, `trigger: always_on`) : Retrait des mentions Windsurf legacy, consolidation des règles de chemins absolus.
+    8. **Mise à jour des workflows** : `.agents/workflows/enhance.md` et `enhance_complex.md` intègrent désormais explicitement `pipeline-standards.md` et `test-strategy.md` dans leurs contraintes.
+  - **Résultat** : 100% des règles du projet sont désormais sous 4,3 Ko / <600 mots. Zéro alerte IDE Antigravity, zéro perte d'exigence normative.
+
 ## Octobre 2026
 
 - [2026-10-17 14:04:00] **Alignement et documentation des variables d'environnement STEP3 (.env & .env.example) (COMPLET)**

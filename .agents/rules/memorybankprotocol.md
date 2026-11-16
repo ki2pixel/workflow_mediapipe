@@ -4,86 +4,37 @@ description: Memory Bank Protocol (Version Fast-Filesystem MCP-Optimized)
 globs: 
 ---
 
-# Memory Bank Protocol (Version Fast-Filesystem MCP-Optimized)
+# Protocole Memory Bank (MCP fast-filesystem Optimisé)
 
-## Overview
-This protocol defines the mandatory cycle of life for project context. It uses the `fast-filesystem` MCP server to minimize token noise while maintaining surgical precision in documentation.
+Cycle de vie du contexte persistant du projet via le serveur MCP `fast-filesystem` pour minimiser le coût en tokens.
 
-**Windsurf is now in 'Token-Saver' mode. Minimize context usage by using tools instead of pre-loading.**
+## 1. Protocole d'Initialisation Sélective
+- **Déclencheur** : `first_interaction` | **Priorité** : immédiate | **Requis** : oui
+- **Actions Requises** :
+  1. **MCP Pull Initial** : Appeler `fast_read_file(path="/home/kidpixel/workflow_mediapipe/memory-bank/activeContext.md")`.
+  2. **Vérification d'État** : Intégrer les bloqueurs, le focus courant et les prochaines étapes.
+  3. **Contrainte de Sobriété** : Ne **jamais** charger `productContext.md` ou `systemPatterns.md` sans besoin explicite d'architecture.
+  4. **Préfixe Obligatoire** : Débuter la réponse par `[MEMORY BANK: ACTIVE (MCP-PULL)]`.
+  5. **Tolérance aux Pannes** : Si le serveur est indisponible, l'indiquer et poursuivre sans contexte mémoire.
+  6. **Chemins Absolus Exclusifs** : Utiliser **uniquement** des chemins absolus (`/home/kidpixel/workflow_mediapipe/memory-bank/...`) avec les outils `fast_*`. Ne jamais utiliser de chemins relatifs.
 
-## 1. Selective Initialization Protocol
-### Trigger: `first_interaction` | Priority: `immediate` | Required: `true`
+## 2. Structure & Rôles des Fichiers
+- **`productContext.md`** : Périmètre, finalité et exigences globales du projet.
+- **`activeContext.md`** : État de session, décisions récentes et tâches actives.
+- **`systemPatterns.md`** : Patrons récurrents (architecture, flux, tests).
+- **`decisionLog.md`** : Décisions techniques majeures et arbitrages.
+- **`progress.md`** : Suivi des réalisations, tâches en cours et prochaines étapes.
 
-**Actions Required:**
-1. **Start with MCP Pull:** Call `fast_read_file(path="/home/kidpixel/workflow_mediapipe/memory-bank/activeContext.md")`.
-2. **Internalize Status:** Verify blockers, current focus, and next steps.
-3. **Strict Constraint:** Do NOT load `productContext.md` or `systemPatterns.md` unless the task specifically requires architectural or strategic depth.
-4. **Prefix Requirement:** Begin the response with `[MEMORY BANK: ACTIVE (MCP-PULL)]`.
-5. **Fault Tolerance (Fallback):** If `fast_read_file` fails ("server not found"), state that the fast-filesystem MCP is unavailable and proceed without context.
-6. **Prohibition:** Never load more than one file at a time.
-7. **Locking Instruction:** ALWAYS use absolute paths for memory-bank files in `/home/kidpixel/workflow_mediapipe/memory-bank/`. Use EXCLUSIVELY the fast-filesystem MCP tools (fast_*). Do NOT attempt to read memory-bank files via regular filesystem tools (read_file).
-8. **MCP Root Constraint:** The `fast-filesystem` server is rooted outside this repository (`/home/kidpixel/kimi-proxy`). A relative path such as `memory-bank/progress.md` therefore reads the **kimi-proxy** memory bank. Always pass the full absolute path, and check that the returned content belongs to this project before editing.
+## 3. Normes de Mise à Jour & Archivage
+- **Fréquence** : Mise à jour en fin de tâche majeure ou sur commande `UMB`.
+- **Format Horodaté** : `[YYYY-MM-DD HH:MM:SS] - [Résumé]` (obligatoire pour tout log).
+- **Politique de Rétention (90 jours)** : Archiver les entrées anciennes vers `memory-bank/archives/*.md` via `fast_write_file`.
+- **Contrôle d'Intégrité** : Vérifier l'absence de marqueurs d'élision `⟦PRUNÉ…⟧` avant toute réécriture.
 
----
+## 4. Règles Spécifiques au Contexte
+- **Documentation** : Avant de répondre à des questions sur la doc, énoncer : *"I will consult the project's internal documentation."*
+- **Architecture & Code** : Avant toute refonte, énoncer : *"I will adhere to the project's mandatory architectural and coding standards."* et consulter [codingstandards.md](file:///home/kidpixel/workflow_mediapipe/.agents/rules/codingstandards.md).
 
-## 2. File Structure & Responsibilities
-Access these via `fast_read_file`, `replace_file_content`, or `fast_list_directory` using absolute paths in `/home/kidpixel/workflow_mediapipe/memory-bank/`.
-
--   **`productContext.md`**: Project scope, goals, and standards.
--   **`activeContext.md`**: Current session state, active decisions, and blockers.
--   **`systemPatterns.md`**: Recurring patterns (coding, architecture, testing).
--   **`decisionLog.md`**: Technical decisions, implementations, and alternatives.
--   **`progress.md`**: Work status tracking (completed, current, next, issues).
-
----
-
-## 3. Update & Quality Standards (Mandatory)
-
-### Update Protocol
--   **Frequency:** Update at the end of a task or via the `UMB` command.
--   **Timestamp Format:** `[YYYY-MM-DD HH:MM:SS] - [Summary]` (Required for every log entry).
--   **Conciseness:** Keep entries focused and actionable.
--   **Cross-References:** Link related entries across files to maintain a logical web.
-
-### Retention Policy
--   **90-day Detail:** Keep full details for the last 90 days in `decisionLog.md` and `progress.md`.
--   **Archiving:** Summarize older entries and move them to `memory-bank/archives/*.md`.
--   **Archiving Tool:** Use `fast_write_file(path="/home/kidpixel/workflow_mediapipe/memory-bank/archives/...")` to archive old entries. Never delete data without archiving via this tool first.
--   **Creation Restriction:** `fast_write_file` is only for initialization (creation of the 5 base files) or archiving. Interdiction de créer de nouveaux types de fichiers à la racine de `memory-bank/` sans autorisation.
--   **Traceability:** Ensure the archive path is mentioned in the active file.
--   **Integrity Check:** Before rewriting a memory-bank file, confirm the source contains no `⟦PRUNÉ…⟧` marker. The `mcp-pruner` layer can elide lines in `fast_read_file` responses; fall back to `filesystem-agent.read_text_file` for a raw read when archiving.
-
----
-
-## 4. Context-Specific Rules
-
-### A. Documentation Context
--   **Trigger:** Questions about 'docs', 'guides', 'guidelines', or 'API reference'.
--   **Instruction:** Before answering, state: *"I will consult the project's internal documentation."*
--   **Priority Pull:** Read `docs/workflow` and root markdown files (e.g., `README.md`).
--   **Conflict Resolution:** If code and docs conflict, cite both and ask for clarification.
-
-### B. Coding & Architecture Context
--   **Trigger:** Requests to generate, modify, refactor code, or architectural questions.
--   **Instruction:** State: *"I will adhere to the project's mandatory architectural and coding standards."*
--   **Selective Pull:** Immediately call `read_file` for `.agents/rules/codingstandards.md`.
--   **Constraint:** Formulate the plan based **strictly** on the principles found in the standards.
-
----
-
-## 5. Special Command: Update Memory Bank (UMB)
--   **Trigger:** User inputs `^(Update Memory Bank|UMB)$`.
--   **Process:**
-    1.  **Halt:** Stop current activity.
-    2.  **Acknowledge:** Respond with `[MEMORY BANK: UPDATING]`.
-    3.  **Audit:** Review current chat for decisions, changes, or clarifications.
-    4.  **Sync:** Call `replace_file_content` or `multi_replace_file_content` on relevant files (usually `progress.md` and `activeContext.md`).
-    5.  **Clean:** Do NOT summarize the entire project history, only the *current session's* deltas.
-
----
-
-## 6. Observability & Dashboard Triggers
-To assist the workflow MediaPipe monitoring, explicitly state your intent during pulls:
--   *"Initiating Pre-Flight Validation (Pulling activeContext)..."*
--   *"Pulling architectural patterns for coding task..."*
--   *"Synchronizing memory bank (UMB mode)..."*
+## 5. Commande Spéciale : Update Memory Bank (UMB)
+- Déclencheur : Message utilisateur correspondant à `^(Update Memory Bank|UMB)$`.
+- Processus : Acknowledger avec `[MEMORY BANK: UPDATING]`, auditer les deltas de la session, synchroniser `progress.md` et `activeContext.md` via `edit_file`, sans dupliquer l'historique complet.

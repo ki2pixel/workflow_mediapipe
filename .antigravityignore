@@ -1,0 +1,47 @@
+# Environnements virtuels et dépendances lourdes
+*env*/
+coral_env/
+env/
+transnet_env/
+audio_env/
+tracking_env_slim/
+insightface_env/
+tracking_cv5_env/
+transnet_cv5_env/
+node_modules/
+
+# Objets Git et métadonnées de versionnement
+.git/
+
+# Caches Python, typage et tests
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Médias lourds, archives et données temporaires
+assets/
+archives/
+scratch/
+tmp/
+tmp_lib/
+temp_audio/
+projets_extraits/
+_finalized_output/
+csv_downloads/
+
+# Logs et runtime
+logs/
+debug/
+*.log
+*_debug.log
+*.sqlite3*
+*.onnx
+*.tflite
+*.part
+*.tmp
+

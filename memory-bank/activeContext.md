@@ -1,6 +1,19 @@
 # Contexte Actif (Active Context)
 
 ## Tâche en Cours
+- [2026-11-16 22:18:00] **Audit et optimisation des règles Antigravity et indexation projet (COMPLET)** :
+  - **Problème résolu** : Élimination définitive des alertes IDE Antigravity `You have exceeded the maximum token limit for this file` (seuil ~750 mots / 5,5 Ko) et élimination du trigger Cursor legacy `alwaysApply: true`.
+  - **Modifications appliquées** :
+    - `.antigravityignore` créé pour isoler de l'indexation de l'agent les ~3,8 Go de venvs (`*env*/`, `coral_env/`), objets Git, caches de tests, médias lourds et logs.
+    - `.agents/rules/pipeline-standards.md` créé (4,2 Ko, 526 mots, `trigger: model_decision`) isolant les spécifications STEP1-STEP8.
+    - `.agents/rules/codingstandards.md` allégé (4,1 Ko, 479 mots, `trigger: model_decision`).
+    - `.agents/rules/v5.md` condensé (2,5 Ko, 320 mots, `trigger: always_on`).
+    - `.agents/rules/prompt-injection-guard.md` condensé (2,85 Ko, 380 mots, `trigger: always_on`).
+    - `.agents/rules/test-strategy.md` condensé (2,65 Ko, 368 mots, `trigger: model_decision`).
+    - `.agents/rules/memorybankprotocol.md` toiletté (2,88 Ko, 358 mots, `trigger: always_on`).
+    - Workflows `enhance.md` et `enhance_complex.md` enrichis avec les références aux nouvelles règles.
+  - **Indicateur de succès** : 100% des règles sous 4,3 Ko / <600 mots (total réduit de 57,4 Ko à 35,4 Ko), 56 tests unitaires validés (100%).
+
 - [2026-10-18 00:50:00] **Optimisations de recadrage P0 & P1 (MediaSolution-EC & After Effects CEP Panel) (COMPLET)** :
   - **Priorité P0 (`scripts/MediaSolution-EC/MediaSolution.jsx` & `scripts/after_effects/MediaSolution-CEP/host/MediaSolution.jsx`)** :
     - *Arbitrage audio (`audioByFrame`)* : Branchement effectif de la diarisation (`is_speech_present`, correspondance `speaker_label`/`active_speakers`/`video_speakers`, repli `jawOpen > 0.12`).

@@ -101,3 +101,11 @@ order from `codingstandards.md`: `workflow-operator` → debug/local skills →
 these rules → docs → global skills. Standard workflows (commit, docs-updater,
 docs → global skills. Standard workflows (commit, docs-updater,
 repomix-bundle, enhance, end) live in `./.agents/workflows/`.
+
+## MCP fast-filesystem — absolute paths required
+
+- **All `fast_*` tools** (`fast_read_file`, `fast_search_files`, `fast_get_directory_tree`, `fast_list_directory`, `fast_read_multiple_files`, `fast_write_file`) require an **absolute path** under `/home/kidpixel/`.
+- **Forbidden**: `"."`, `"./..."`, `"../..."`, or any relative path. The `fast-filesystem` daemon is shared across projects; a relative path is resolved against its own `cwd`, not this repository, and may silently read another project.
+- **Targeted edits**: use `filesystem-agent.edit_file` (a separate server), not `fast-filesystem`, with an absolute path.
+- **Sanity check**: if a `fast_*` result appears to come from another repository, stop, inspect the `path` field, and retry with an absolute path.
+- **Expected errors**: `-32602 RELATIVE_PATH_UNSUPPORTED`, `-32602 RELATIVE_PATH_ESCAPES_WORKSPACE`, `-32000 PATH_OUTSIDE_ALLOWED_ROOT`.

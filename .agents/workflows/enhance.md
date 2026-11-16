@@ -31,7 +31,9 @@ Affiche uniquement ce bloc. Si tu écris du texte en dehors, tu as échoué.
       [Étapes pour l'IA suivante : analyse intention, chargement contexte, génération mega-prompt]
 
       # CONTRAINTES
-      - Respecter codingstandards.md
+      - Respecter .agents/rules/codingstandards.md
+      - Respecter .agents/rules/pipeline-standards.md
+      - Respecter .agents/rules/test-strategy.md
       - Ne pas casser l'architecture existante
       - Utiliser uniquement les skills activés
       ```

@@ -23,7 +23,7 @@ Tu transformes une demande complexe en une stratégie d'exécution multi-étapes
 # PROTOCOLE D'EXÉCUTION OBLIGATOIRE
 
 ## Phase 1 : Compréhension du contexte
-1. **Lire le contexte actif** : Utiliser `fast_read_file` sur `memory-bank/activeContext.md`
+1. **Lire le contexte actif & les règles** : Utiliser `fast_read_file` sur `memory-bank/activeContext.md`, et consulter `codingstandards.md`, `pipeline-standards.md` et `test-strategy.md` selon le périmètre.
 2. **Analyser l'état actuel** : Vérifier les tâches existantes avec outil `list_tasks`
 
 ## Phase 2 : Planification avec Shrimp Task Manager
@@ -55,7 +55,9 @@ Tu transformes une demande complexe en une stratégie d'exécution multi-étapes
 - **Outils disponibles** : plan_task, analyze_task, reflect_task, split_tasks, list_tasks, execute_task, verify_task, delete_task, clear_all_tasks, update_task, query_task, get_task_detail, process_thought, init_project_rules, research_mode
 
 # CONTRAINTES
-- Respecter codingstandards.md
+- Respecter .agents/rules/codingstandards.md
+- Respecter .agents/rules/pipeline-standards.md
+- Respecter .agents/rules/test-strategy.md
 - Ne pas casser l'architecture existante
 - Utiliser uniquement les skills activés
 ```
